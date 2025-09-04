@@ -8,6 +8,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/QuicCubic.h>
+#include <quic/congestion_control/test/Utils.h>
 
 using namespace testing;
 
@@ -26,7 +27,7 @@ TEST_F(CubicHystartTest, SendAndAck) {
   // Packet 0 is acked:
   conn.lossState.lrtt = 100us;
   auto packet = makeTestingWritePacket(0, 1000, 1000);
-  cubic.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   cubic.onPacketAckOrLoss(
       makeAck(0, 1000, Clock::now(), packet.metadata.time), std::nullopt);
 
@@ -43,7 +44,7 @@ TEST_F(CubicHystartTest, CwndLargerThanSSThresh) {
 
   // Packet 0 is acked:
   auto packet = makeTestingWritePacket(0, 1000, 1000);
-  cubic.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   cubic.onPacketAckOrLoss(
       makeAck(0, 1000, Clock::now(), packet.metadata.time), std::nullopt);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
@@ -63,7 +64,7 @@ TEST_F(CubicHystartTest, NoDelayIncrease) {
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
   auto packet = makeTestingWritePacket(0, 1000, 1000, realNow);
-  cubic.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   cubic.onPacketAckOrLoss(
       makeAck(0, 1000, realNow + 2us, packet.metadata.time), std::nullopt);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
@@ -82,11 +83,11 @@ TEST_F(CubicHystartTest, AckTrain) {
   auto packetSize = kLowSsthreshInMss * conn.udpSendPacketLen;
   auto packet0 = makeTestingWritePacket(
       0, packetSize, packetSize, realNow - std::chrono::milliseconds(10));
-  cubic.onPacketSent(packet0);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet0);
   // Packet 1 is sent:
   auto packet1 = makeTestingWritePacket(
       1, packetSize, packetSize * 2, realNow - std::chrono::milliseconds(5));
-  cubic.onPacketSent(packet1);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   // Packet 0 is acked:
   cubic.onPacketAckOrLoss(
       makeAck(
@@ -122,7 +123,7 @@ TEST_F(CubicHystartTest, NoAckTrainNoDelayIncrease) {
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
   auto packet = makeTestingWritePacket(0, 1000, 1000, realNow);
-  cubic.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   cubic.onPacketAckOrLoss(
       makeAck(0, 1000, realNow + kAckCountingGap + 2us, packet.metadata.time),
       std::nullopt);
@@ -141,7 +142,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
     auto fullSize = cubic.getWritableBytes();
     auto packet =
         makeTestingWritePacket(packetNum, fullSize, fullSize + totalSent);
-    cubic.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
     cubic.onPacketAckOrLoss(
         makeAck(packetNum++, fullSize, Clock::now(), packet.metadata.time),
         std::nullopt);
@@ -154,7 +155,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
       packetNum, 1000, totalSent + 1000, packetsSentTime);
   totalSent += 1000;
   conn.lossState.largestSent = firstPacketNum;
-  cubic.onPacketSent(packet0);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet0);
 
   auto secondPacketNum = packetNum++;
   auto packet1 = makeTestingWritePacket(
@@ -162,7 +163,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   totalSent += 1000;
   // Packet 1 is sent:
   conn.lossState.largestSent = secondPacketNum;
-  cubic.onPacketSent(packet1);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
 
   conn.lossState.lrtt = 10ms;
 
@@ -184,7 +185,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
       packetNum, 1000, totalSent + 1000, estimatedRttEndTarget + 1us);
   totalSent += 1000;
   conn.lossState.largestSent = packetNum;
-  cubic.onPacketSent(packet2);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet2);
   // This will end current RTT round and start a new one next time Ack happens:
   ackTime = packet2.metadata.time + ackTimeIncrease;
   cubic.onPacketAckOrLoss(
@@ -200,7 +201,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
     conn.lossState.largestSent = i + packetNum;
     auto packet = makeTestingWritePacket(
         i + packetNum, 1000, totalSent + 1000, packetsSentTime);
-    cubic.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
     totalSent += 1000;
     ackTime += ackTimeIncrease;
     moreAcks.push_back(
@@ -215,7 +216,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   conn.lossState.largestSent = packetNum;
   auto packetEnd = makeTestingWritePacket(
       packetNum, 1000, totalSent + 1000, packetsSentTime);
-  cubic.onPacketSent(packetEnd);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packetEnd);
   totalSent += 1000;
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(
@@ -234,12 +235,12 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   auto packet0 = makeTestingWritePacket(0, 1, totalSent + 1, realNow);
   // Packet 0 is sent:
   conn.lossState.largestSent = 0;
-  cubic.onPacketSent(packet0);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet0);
   totalSent += 1;
 
   auto packet1 = makeTestingWritePacket(1, 1, totalSent + 1, realNow);
   conn.lossState.largestSent = 1;
-  cubic.onPacketSent(packet1);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   totalSent += 1;
 
   conn.lossState.lrtt = 100us;
@@ -256,7 +257,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
 
   auto packet2 = makeTestingWritePacket(2, 10, 10 + totalSent, realNow);
   conn.lossState.largestSent = 2;
-  cubic.onPacketSent(packet2);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet2);
   totalSent += 10;
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(
@@ -272,7 +273,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
     auto packet = makeTestingWritePacket(i + 3, 1, 1 + totalSent, realNow);
     ackTime += ackTimeIncrease;
     moreAcks.push_back(makeAck(i + 3, 1, ackTime, packet.metadata.time));
-    cubic.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
     totalSent += 1;
   }
   for (auto& ack : moreAcks) {
@@ -283,7 +284,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   conn.lossState.largestSent = kAckSampling;
   auto packetEnd =
       makeTestingWritePacket(kAckSampling, 1, 1 + totalSent, realNow);
-  cubic.onPacketSent(packetEnd);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packetEnd);
   totalSent += 1;
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(
@@ -302,7 +303,7 @@ TEST_F(CubicHystartTest, ReduceByCubicReductionFactor) {
   conn.lossState.largestSent = 0;
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   // this increases inflight by 1000:
-  cubic.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   EXPECT_EQ(initCwnd - 1000, cubic.getWritableBytes());
   // this decreases inflight by 1000, and then decreases cwnd by Cubic:
   CongestionController::LossEvent loss;

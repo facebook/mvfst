@@ -76,8 +76,10 @@ void Bbr2CongestionController::onRemoveBytesFromInflight(
 
 void Bbr2CongestionController::onPacketSent(
     const OutstandingPacketWrapper& packet) {
+  bool wasIdle = (conn_.lossState.inflightBytes == packet.metadata.encodedSize);
+
   // Handle restart from idle
-  if (conn_.lossState.inflightBytes == 0 && isAppLimited()) {
+  if (wasIdle && isAppLimited()) {
     idleRestart_ = true;
     extraAckedStartTimestamp_ = Clock::now();
     extraAckedDelivered_ = 0;
@@ -88,11 +90,6 @@ void Bbr2CongestionController::onPacketSent(
       checkProbeRttDone();
     }
   }
-
-  addAndCheckOverflow(
-      conn_.lossState.inflightBytes,
-      packet.metadata.encodedSize,
-      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
 
   // Maintain cwndLimited flag. We consider the transport being cwnd limited if
   // we are using > 90% of the cwnd.

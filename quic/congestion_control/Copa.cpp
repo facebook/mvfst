@@ -45,11 +45,6 @@ void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
 }
 
 void Copa::onPacketSent(const OutstandingPacketWrapper& packet) {
-  addAndCheckOverflow(
-      conn_.lossState.inflightBytes,
-      packet.metadata.encodedSize,
-      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
-
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes

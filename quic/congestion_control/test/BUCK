@@ -23,6 +23,23 @@ mvfst_cpp_library(
     ],
 )
 
+mvfst_cpp_library(
+    name = "test_utils",
+    srcs = [
+        "Utils.cpp",
+    ],
+    headers = [
+        "Utils.h",
+    ],
+    deps = [
+        "//quic/congestion_control:congestion_control_functions",
+    ],
+    exported_deps = [
+        "//quic/congestion_control:congestion_controller",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
 mvfst_cpp_test(
     name = "CongestionControlFunctionsTest",
     srcs = [
@@ -58,6 +75,7 @@ mvfst_cpp_test(
     ],
     deps = [
         ":TestingCubic",
+        ":test_utils",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:cubic",
@@ -71,6 +89,7 @@ mvfst_cpp_test(
         "NewRenoTest.cpp",
     ],
     deps = [
+        ":test_utils",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:newreno",
@@ -84,6 +103,7 @@ mvfst_cpp_test(
         "CopaTest.cpp",
     ],
     deps = [
+        ":test_utils",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:copa",
@@ -99,6 +119,7 @@ mvfst_cpp_test(
     ],
     deps = [
         ":mocks",
+        ":test_utils",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",
@@ -163,6 +184,7 @@ mvfst_cpp_test(
     ],
     deps = [
         ":mocks",
+        ":test_utils",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",
@@ -207,6 +229,7 @@ mvfst_cpp_test(
     ],
     deps = [
         ":mocks",
+        ":test_utils",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",

@@ -37,10 +37,6 @@ void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
 }
 
 void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
-  addAndCheckOverflow(
-      conn_.lossState.inflightBytes,
-      packet.metadata.encodedSize,
-      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes

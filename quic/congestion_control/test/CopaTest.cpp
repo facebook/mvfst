@@ -9,6 +9,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/test/Utils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/state/test/Mocks.h>
 
@@ -105,7 +106,8 @@ class CopaTest : public Test {
     auto totalSent = 0;
     while (copa.getWritableBytes() > 0) {
       totalSent += packetSize;
-      copa.onPacketSent(createPacket(packetNumToSend, packetSize, totalSent));
+      quic::test::onPacketsSentWrapper(
+          &conn, &copa, createPacket(packetNumToSend, packetSize, totalSent));
       numPacketsInFlight++;
       EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
     }
@@ -164,10 +166,13 @@ TEST_F(CopaTest, TestWritableBytes) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint64_t writableBytes = copa.getWritableBytes();
-  copa.onPacketSent(
+  quic::test::onPacketsSentWrapper(
+      &conn,
+      &copa,
       createPacket(ackPacketNum, writableBytes - 10, writableBytes - 10));
   EXPECT_EQ(copa.getWritableBytes(), 10);
-  copa.onPacketSent(createPacket(ackPacketNum, 20, writableBytes + 10));
+  quic::test::onPacketsSentWrapper(
+      &conn, &copa, createPacket(ackPacketNum, 20, writableBytes + 10));
   EXPECT_EQ(copa.getWritableBytes(), 0);
 }
 
@@ -185,7 +190,7 @@ TEST_F(CopaTest, PersistentCongestion) {
   PacketNum ackPacketNum = 6;
   uint32_t ackedSize = 10;
   auto pkt = createPacket(ackPacketNum, ackedSize, ackedSize);
-  copa.onPacketSent(pkt);
+  quic::test::onPacketsSentWrapper(&conn, &copa, pkt);
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
@@ -220,7 +225,8 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint32_t ackedSize = 10;
-  copa.onPacketSent(createPacket(ackPacketNum, ackedSize, ackedSize));
+  quic::test::onPacketsSentWrapper(
+      &conn, &copa, createPacket(ackPacketNum, ackedSize, ackedSize));
   copa.onRemoveBytesFromInflight(2);
   EXPECT_EQ(copa.getWritableBytes(), originalWritableBytes - ackedSize + 2);
 
@@ -265,7 +271,8 @@ TEST_F(CopaTest, TestSlowStartAck) {
   // send one cwnd worth packets in a burst
   while (copa.getWritableBytes() > 0) {
     totalSent += packetSize;
-    copa.onPacketSent(createPacket(packetNumToSend, packetSize, totalSent));
+    quic::test::onPacketsSentWrapper(
+        &conn, &copa, createPacket(packetNumToSend, packetSize, totalSent));
     numPacketsInFlight++;
     EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
   }
@@ -570,7 +577,7 @@ TEST_F(CopaTest, PacketLossInvokesPacer) {
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);
   auto packet = createPacket(0 /* pacetNum */, 1000, 1000);
-  copa.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &copa, packet);
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);

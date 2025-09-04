@@ -1035,6 +1035,10 @@ quic::Expected<void, QuicError> updateConnection(
   }
 
   if (conn.congestionController) {
+    addAndCheckOverflow(
+        conn.lossState.inflightBytes,
+        pkt.metadata.encodedSize,
+        2 * conn.transportSettings.maxCwndInMss * conn.udpSendPacketLen);
     conn.congestionController->onPacketSent(pkt);
   }
   if (conn.pacer) {

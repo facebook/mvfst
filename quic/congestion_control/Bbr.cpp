@@ -124,13 +124,11 @@ void BbrCongestionController::onPacketLoss(
 
 void BbrCongestionController::onPacketSent(
     const OutstandingPacketWrapper& packet) {
-  if (!conn_.lossState.inflightBytes && isAppLimited()) {
+  bool wasIdle = (conn_.lossState.inflightBytes == packet.metadata.encodedSize);
+
+  if (wasIdle && isAppLimited()) {
     exitingQuiescene_ = true;
   }
-  addAndCheckOverflow(
-      conn_.lossState.inflightBytes,
-      packet.metadata.encodedSize,
-      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
   if (!ackAggregationStartTime_) {
     ackAggregationStartTime_ = packet.metadata.time;
   }

@@ -10,6 +10,8 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+
+#include <quic/congestion_control/test/Utils.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -54,7 +56,7 @@ TEST_F(Bbr2Test, BytesInFlightAccounting) {
   for (int i = 0; i < 3; i++) {
     auto packet =
         makeTestingWritePacket(pn++, packetSize, totalSent += packetSize);
-    bbr2.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(conn_.get(), &bbr2, packet);
     EXPECT_EQ(conn_->lossState.inflightBytes, totalSent);
   }
 
@@ -96,7 +98,7 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
   for (int i = 0; i < 10; i++) {
     auto packet = makeTestingWritePacket(
         pn, packetSize, totalSent += packetSize, testStart_ + 10ms);
-    bbr2.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(conn_.get(), &bbr2, packet);
     packet.nonDsrPacketSequenceNumber = pn++;
     conn_->outstandings.packets.emplace_back(std::move(packet));
     ASSERT_EQ(conn_->lossState.inflightBytes, totalSent);
@@ -150,7 +152,7 @@ TEST_F(Bbr2Test, GracefullyHandleMissingFields) {
   auto packet = makeTestingWritePacket(0, 0, 0, testStart_);
   packet.lastAckedPacketInfo.reset();
   packet.maybeClonedPacketIdentifier.reset();
-  EXPECT_NO_THROW(bbr2.onPacketSent(packet));
+  EXPECT_NO_THROW(quic::test::onPacketsSentWrapper(conn_.get(), &bbr2, packet));
 
   EXPECT_NO_THROW(bbr2.onPacketAckOrLoss(nullptr, nullptr));
   auto ackEvent = CongestionController::AckEvent::Builder()

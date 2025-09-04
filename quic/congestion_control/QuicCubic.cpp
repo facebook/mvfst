@@ -99,19 +99,7 @@ void Cubic::onPersistentCongestion() {
   }
 }
 
-void Cubic::onPacketSent(const OutstandingPacketWrapper& packet) {
-  if (std::numeric_limits<uint64_t>::max() - conn_.lossState.inflightBytes <
-      packet.metadata.encodedSize) {
-    throw QuicInternalException(
-        "Cubic: inflightBytes overflow",
-        LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
-  }
-
-  addAndCheckOverflow(
-      conn_.lossState.inflightBytes,
-      packet.metadata.encodedSize,
-      2 * conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
-
+void Cubic::onPacketSent(const OutstandingPacketWrapper& /* packet */) {
   if (conn_.transportSettings.ccaConfig.leaveHeadroomForCwndLimited) {
     // Consider cwndBlocked if inflight bytes >= 0.5 * cwnd
     isCwndBlocked_ = conn_.lossState.inflightBytes >= (cwndBytes_ >> 1);

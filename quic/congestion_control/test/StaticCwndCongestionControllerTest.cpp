@@ -10,7 +10,9 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+
 #include <quic/congestion_control/StaticCwndCongestionController.h>
+#include <quic/congestion_control/test/Utils.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -38,7 +40,8 @@ TEST_F(StaticCwndCongestionControllerTest, RemoveBytesFromInflight) {
 
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
-  cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
+  quic::test::onPacketsSentWrapper(
+      &conn, &cca, makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(cwndInBytes - bytesSent, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -56,7 +59,8 @@ TEST_F(StaticCwndCongestionControllerTest, RemoveBytesFromInflightFullCwnd) {
 
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
-  cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
+  quic::test::onPacketsSentWrapper(
+      &conn, &cca, makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -77,7 +81,8 @@ TEST_F(
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
-  cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
+  quic::test::onPacketsSentWrapper(
+      &conn, &cca, makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -96,7 +101,8 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAcked) {
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
-  cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
+  quic::test::onPacketsSentWrapper(
+      &conn, &cca, makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(cwndInBytes - bytesSent, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -117,7 +123,8 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAckedFullCwnd) {
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
-  cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
+  quic::test::onPacketsSentWrapper(
+      &conn, &cca, makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -138,7 +145,8 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAckedOvershoot) {
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
-  cca.onPacketSent(makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
+  quic::test::onPacketsSentWrapper(
+      &conn, &cca, makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent));
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -160,13 +168,18 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenAcked) {
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
-  cca.onPacketSent(
+  quic::test::onPacketsSentWrapper(
+      &conn,
+      &cca,
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1));
   EXPECT_EQ(cwndInBytes - bytesSentPkt1, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
-  cca.onPacketSent(makeTestingWritePacket(
-      pktSeqNum, bytesSentPkt2, bytesSentPkt1 + bytesSentPkt2));
+  quic::test::onPacketsSentWrapper(
+      &conn,
+      &cca,
+      makeTestingWritePacket(
+          pktSeqNum, bytesSentPkt2, bytesSentPkt1 + bytesSentPkt2));
   EXPECT_EQ(
       cwndInBytes - bytesSentPkt1 - bytesSentPkt2, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
@@ -197,13 +210,18 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenAckedOvershoot) {
   StaticCwndCongestionController cca(
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
-  cca.onPacketSent(
+  quic::test::onPacketsSentWrapper(
+      &conn,
+      &cca,
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1));
   EXPECT_EQ(cwndInBytes - bytesSentPkt1, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
-  cca.onPacketSent(makeTestingWritePacket(
-      pktSeqNum, bytesSentPkt2, bytesSentPkt1 + bytesSentPkt2));
+  quic::test::onPacketsSentWrapper(
+      &conn,
+      &cca,
+      makeTestingWritePacket(
+          pktSeqNum, bytesSentPkt2, bytesSentPkt1 + bytesSentPkt2));
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -233,7 +251,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLost) {
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt = makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent);
-  cca.onPacketSent(pkt);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt);
   EXPECT_EQ(cwndInBytes - bytesSent, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -256,7 +274,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostFullCwnd) {
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt = makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent);
-  cca.onPacketSent(pkt);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt);
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -279,7 +297,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostOvershoot) {
       conn, (StaticCwndCongestionController::CwndInBytes(cwndInBytes)));
 
   const auto pkt = makeTestingWritePacket(pktSeqNum, bytesSent, bytesSent);
-  cca.onPacketSent(pkt);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt);
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
@@ -304,13 +322,13 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLost) {
 
   const auto pkt1 =
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1);
-  cca.onPacketSent(pkt1);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt1);
   EXPECT_EQ(cwndInBytes - bytesSentPkt1, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   const auto pkt2 = makeTestingWritePacket(
       pktSeqNum, bytesSentPkt2, bytesSentPkt1 + bytesSentPkt2);
-  cca.onPacketSent(pkt2);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt2);
   EXPECT_EQ(
       cwndInBytes - bytesSentPkt1 - bytesSentPkt2, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
@@ -347,13 +365,13 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLostOvershoot) {
 
   const auto pkt1 =
       makeTestingWritePacket(pktSeqNum, bytesSentPkt1, bytesSentPkt1);
-  cca.onPacketSent(pkt1);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt1);
   EXPECT_EQ(cwndInBytes - bytesSentPkt1, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   const auto pkt2 = makeTestingWritePacket(
       pktSeqNum, bytesSentPkt2, bytesSentPkt1 + bytesSentPkt2);
-  cca.onPacketSent(pkt2);
+  quic::test::onPacketsSentWrapper(&conn, &cca, pkt2);
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 

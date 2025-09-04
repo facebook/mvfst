@@ -69,7 +69,6 @@ struct StaticCwndCongestionController : public CongestionController {
 
  private:
   QuicConnectionStateBase& conn_;
-  uint64_t inflightBytes_{0}; // initially zero bytes inflight
   bool isAppLimited_{true}; // initially starts true
   const uint64_t congestionWindowInBytes_;
   PacerIntervalSource pacerIntervalSource_;

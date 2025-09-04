@@ -11,7 +11,9 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
+
 #include <quic/congestion_control/test/Mocks.h>
+#include <quic/congestion_control/test/Utils.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -65,7 +67,8 @@ TEST_F(BbrTest, Recovery) {
   BbrCongestionController bbr(conn);
   // Make a huge inflight so we don't underflow anything
   auto inflightBytes = std::numeric_limits<uint16_t>::max();
-  bbr.onPacketSent(makeTestingWritePacket(9, inflightBytes, inflightBytes));
+  quic::test::onPacketsSentWrapper(
+      &conn, &bbr, makeTestingWritePacket(9, inflightBytes, inflightBytes));
 
   // This also makes sure recoveryWindow_ is larger than inflightBytes
   uint64_t ackedBytes = 1000 * conn.transportSettings.minCwndInMss * 2;
@@ -162,7 +165,7 @@ TEST_F(BbrTest, StartupCwnd) {
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
 
   auto packet = makeTestingWritePacket(0, 3000, 3000);
-  bbr.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   auto startingCwnd = bbr.getCongestionWindow();
   conn.lossState.srtt = 100us;
   EXPECT_CALL(*rawRttSampler, minRtt()).WillRepeatedly(Return(100us));
@@ -188,7 +191,7 @@ TEST_F(BbrTest, StartupCwndImplicit) {
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
 
   auto packet = makeTestingWritePacket(0, 3000, 3000);
-  bbr.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   auto startingCwnd = bbr.getCongestionWindow();
   conn.lossState.srtt = 100us;
   EXPECT_CALL(*rawRttSampler, newRttSample(_, _)).Times(0);
@@ -222,7 +225,7 @@ TEST_F(BbrTest, LeaveStartup) {
     conn.lossState.largestSent = currentLatest;
     auto packet = makeTestingWritePacket(
         conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
-    bbr.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
     totalSent += 1000;
     EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
         .WillRepeatedly(Return(
@@ -266,7 +269,8 @@ TEST_F(BbrTest, RemoveInflightBytes) {
   conn.udpSendPacketLen = 1000;
   BbrCongestionController bbr(conn);
   auto writableBytesAfterInit = bbr.getWritableBytes();
-  bbr.onPacketSent(makeTestingWritePacket(0, 1000, 1000));
+  quic::test::onPacketsSentWrapper(
+      &conn, &bbr, makeTestingWritePacket(0, 1000, 1000));
   EXPECT_EQ(writableBytesAfterInit - 1000, bbr.getWritableBytes());
   bbr.onRemoveBytesFromInflight(1000);
   EXPECT_EQ(writableBytesAfterInit, bbr.getWritableBytes());
@@ -294,7 +298,7 @@ TEST_F(BbrTest, ProbeRtt) {
         conn.lossState.largestSent.value(),
         conn.udpSendPacketLen,
         totalSent + conn.udpSendPacketLen);
-    bbr.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
     inflightPackets.push_back(
         std::make_pair(currentLatest, packet.metadata.time));
     inflightBytes += conn.udpSendPacketLen;
@@ -551,7 +555,7 @@ TEST_F(BbrTest, AckAggregation) {
     conn.lossState.largestSent = currentLatest;
     auto packet = makeTestingWritePacket(
         conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
-    bbr.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
     totalSent += 1000;
     EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
         .WillRepeatedly(Return(
@@ -598,7 +602,7 @@ TEST_F(BbrTest, AckAggregation) {
   conn.lossState.largestSent = currentLatest;
   auto packet = makeTestingWritePacket(
       conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
-  bbr.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   totalSent += 1000;
   auto ackEvent = makeAck(
       currentLatest, 1000, packet.metadata.time + 10ms, packet.metadata.time);
@@ -624,7 +628,7 @@ TEST_F(BbrTest, AckAggregation) {
       currentMaxAckHeight * 2 + 100,
       currentMaxAckHeight * 2 + 100 + totalSent,
       packet.metadata.time + 1us);
-  bbr.onPacketSent(packet1);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet1);
   totalSent += (currentMaxAckHeight * 2 + 100);
   auto ackEvent2 = makeAck(
       currentLatest,
@@ -646,7 +650,7 @@ TEST_F(BbrTest, AppLimited) {
 
   auto packet = makeTestingWritePacket(
       conn.lossState.largestSent.value_or(0), 1000, 1000);
-  bbr.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   conn.lossState.largestSent = conn.lossState.largestSent.value_or(0) + 1;
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
   bbr.setAppLimited();
@@ -671,7 +675,7 @@ TEST_F(BbrTest, AppLimitedIgnored) {
         conn.lossState.largestSent.value_or(0), 1000, 1000 + inflightBytes);
     conn.lossState.largestSent = conn.lossState.largestSent.value_or(0) + 1;
     inflightBytes += 1000;
-    bbr.onPacketSent(packet);
+    quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   }
   // setAppLimited will be ignored:
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(0);
@@ -693,7 +697,7 @@ TEST_F(BbrTest, ExtendMinRttExpiration) {
 
   auto packet = makeTestingWritePacket(
       conn.lossState.largestSent.value_or(0), 1000, 1000);
-  bbr.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   EXPECT_CALL(*rawRttSampler, timestampMinRtt(_)).Times(1);
   bbr.onPacketAckOrLoss(
       makeAck(
@@ -762,7 +766,7 @@ TEST_F(BbrTest, PacketLossInvokesPacer) {
   conn.pacer = std::move(mockPacer);
 
   auto packet = makeTestingWritePacket(0, 1000, 1000);
-  bbr.onPacketSent(packet);
+  quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
@@ -779,14 +783,16 @@ TEST_F(BbrTest, ProbeRttSetsAppLimited) {
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
   bbr.setRttSampler(std::move(mockRttSampler));
 
-  bbr.onPacketSent(makeTestingWritePacket(0, 1000, 1000));
+  quic::test::onPacketsSentWrapper(
+      &conn, &bbr, makeTestingWritePacket(0, 1000, 1000));
   EXPECT_CALL(*rawRttSampler, minRttExpired()).Times(1).WillOnce(Return(true));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(2);
   bbr.onPacketAckOrLoss(
       makeAck(0, 1000, Clock::now(), Clock::now() - 5ms), std::nullopt);
   EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
 
-  bbr.onPacketSent(makeTestingWritePacket(1, 1000, 2000));
+  quic::test::onPacketsSentWrapper(
+      &conn, &bbr, makeTestingWritePacket(1, 1000, 2000));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
   bbr.onPacketAckOrLoss(
       makeAck(1, 1000, Clock::now(), Clock::now() - 5ms), std::nullopt);

@@ -20,23 +20,20 @@ StaticCwndCongestionController::StaticCwndCongestionController(
 
 void StaticCwndCongestionController::onRemoveBytesFromInflight(
     uint64_t bytesToRemove) {
-  subtractAndCheckUnderflow(inflightBytes_, bytesToRemove);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytesToRemove);
 }
 
 void StaticCwndCongestionController::onPacketSent(
-    const OutstandingPacketWrapper& packet) {
+    const OutstandingPacketWrapper& /* packet */) {
   isAppLimited_ = false;
-  addAndCheckOverflow(
-      inflightBytes_,
-      packet.metadata.encodedSize,
-      conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen);
 }
 
 void StaticCwndCongestionController::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
   if (ackEvent) {
-    subtractAndCheckUnderflow(inflightBytes_, ackEvent->ackedBytes);
+    subtractAndCheckUnderflow(
+        conn_.lossState.inflightBytes, ackEvent->ackedBytes);
 
     if (conn_.pacer && ackEvent->rttSample) {
       switch (pacerIntervalSource_) {
@@ -58,13 +55,14 @@ void StaticCwndCongestionController::onPacketAckOrLoss(
     }
   }
   if (lossEvent) {
-    subtractAndCheckUnderflow(inflightBytes_, lossEvent->lostBytes);
+    subtractAndCheckUnderflow(
+        conn_.lossState.inflightBytes, lossEvent->lostBytes);
   }
 }
 
 uint64_t StaticCwndCongestionController::getWritableBytes() const noexcept {
-  return getCongestionWindow() > inflightBytes_
-      ? getCongestionWindow() - inflightBytes_
+  return getCongestionWindow() > conn_.lossState.inflightBytes
+      ? getCongestionWindow() - conn_.lossState.inflightBytes
       : 0;
 }
 
