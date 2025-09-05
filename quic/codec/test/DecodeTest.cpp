@@ -209,6 +209,7 @@ std::unique_ptr<folly::IOBuf> createAckFrequencyFrame(
   if (reorderThreshold) {
     reorderThreshold->encode(appenderOp);
   }
+  ackFrequencyFrame->coalesce();
   return ackFrequencyFrame;
 }
 
@@ -1117,7 +1118,8 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeValid) {
       sequenceNumber, packetTolerance, maxAckDelay, reorderThreshold);
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
-  Cursor cursor(ackFrequencyFrame.get());
+  ContiguousReadCursor cursor(
+      ackFrequencyFrame->data(), ackFrequencyFrame->length());
   auto res = decodeAckFrequencyFrame(cursor);
   EXPECT_TRUE(res.has_value());
   auto decodedFrame = *res->asAckFrequencyFrame();
@@ -1135,7 +1137,8 @@ TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
       sequenceNumber, packetTolerance, maxAckDelay, std::nullopt);
   ASSERT_NE(ackFrequencyFrame, nullptr);
 
-  Cursor cursor(ackFrequencyFrame.get());
+  ContiguousReadCursor cursor(
+      ackFrequencyFrame->data(), ackFrequencyFrame->length());
   auto res = decodeAckFrequencyFrame(cursor);
   EXPECT_TRUE(res.hasError());
   EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);

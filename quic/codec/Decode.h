@@ -96,10 +96,10 @@ Optional<VersionNegotiationPacket> decodeVersionNegotiation(
     bool reliable);
 
 [[nodiscard]] quic::Expected<ConnectionCloseFrame, QuicError>
-decodeConnectionCloseFrame(Cursor& cursor);
+decodeConnectionCloseFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<ConnectionCloseFrame, QuicError>
-decodeApplicationClose(Cursor& cursor);
+decodeApplicationClose(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
     ContiguousReadCursor& cursor);
@@ -117,13 +117,13 @@ decodeUniMaxStreamsFrame(ContiguousReadCursor& cursor);
     ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<QuicFrame, QuicError> decodeKnobFrame(
-    Cursor& cursor);
+    ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<QuicSimpleFrame, QuicError>
-decodeAckFrequencyFrame(Cursor& cursor);
+decodeAckFrequencyFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<ImmediateAckFrame, QuicError>
-decodeImmediateAckFrame(Cursor& cursor);
+decodeImmediateAckFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<DataBlockedFrame, QuicError>
 decodeDataBlockedFrame(ContiguousReadCursor& cursor);

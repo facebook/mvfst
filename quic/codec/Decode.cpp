@@ -73,48 +73,52 @@ quic::Expected<PingFrame, QuicError> decodePingFrame(ContiguousReadCursor&) {
   return PingFrame();
 }
 
-quic::Expected<QuicFrame, QuicError> decodeKnobFrame(Cursor& cursor) {
-  auto knobSpace = quic::follyutils::decodeQuicInteger(cursor);
+quic::Expected<QuicFrame, QuicError> decodeKnobFrame(
+    ContiguousReadCursor& cursor) {
+  auto knobSpace = quic::decodeQuicInteger(cursor);
   if (!knobSpace) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob space"));
   }
-  auto knobId = quic::follyutils::decodeQuicInteger(cursor);
+  auto knobId = quic::decodeQuicInteger(cursor);
   if (!knobId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob id"));
   }
-  auto knobLen = quic::follyutils::decodeQuicInteger(cursor);
+  auto knobLen = quic::decodeQuicInteger(cursor);
   if (!knobLen) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad knob len"));
   }
-  BufPtr knobBlob;
-  cursor.cloneAtMost(knobBlob, knobLen->first);
+  BufPtr knobBlob = BufHelpers::create(
+      std::min(knobLen->first, (uint64_t)cursor.remaining()));
+  size_t amountRead =
+      cursor.pullAtMost(knobBlob->writableData(), knobLen->first);
+  knobBlob->append(amountRead);
   return QuicFrame(
       KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob)));
 }
 
 quic::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
-    Cursor& cursor) {
-  auto sequenceNumber = quic::follyutils::decodeQuicInteger(cursor);
+    ContiguousReadCursor& cursor) {
+  auto sequenceNumber = quic::decodeQuicInteger(cursor);
   if (!sequenceNumber) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence number"));
   }
-  auto packetTolerance = quic::follyutils::decodeQuicInteger(cursor);
+  auto packetTolerance = quic::decodeQuicInteger(cursor);
   if (!packetTolerance) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad packet tolerance"));
   }
-  auto updateMaxAckDelay = quic::follyutils::decodeQuicInteger(cursor);
+  auto updateMaxAckDelay = quic::decodeQuicInteger(cursor);
   if (!updateMaxAckDelay) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad update max ack delay"));
   }
-  auto reorderThreshold = quic::follyutils::decodeQuicInteger(cursor);
+  auto reorderThreshold = quic::decodeQuicInteger(cursor);
   if (!reorderThreshold) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -129,7 +133,8 @@ quic::Expected<QuicSimpleFrame, QuicError> decodeAckFrequencyFrame(
   return QuicSimpleFrame(frame);
 }
 
-quic::Expected<ImmediateAckFrame, QuicError> decodeImmediateAckFrame(Cursor&) {
+quic::Expected<ImmediateAckFrame, QuicError> decodeImmediateAckFrame(
+    ContiguousReadCursor&) {
   return ImmediateAckFrame();
 }
 
@@ -793,9 +798,9 @@ quic::Expected<PathResponseFrame, QuicError> decodePathResponseFrame(
 }
 
 quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
-    Cursor& cursor) {
+    ContiguousReadCursor& cursor) {
   TransportErrorCode errorCode{};
-  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
+  auto varCode = quic::decodeQuicInteger(cursor);
   if (!varCode) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -803,7 +808,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
   }
   errorCode = static_cast<TransportErrorCode>(varCode->first);
 
-  auto frameTypeField = quic::follyutils::decodeQuicInteger(cursor);
+  auto frameTypeField = quic::decodeQuicInteger(cursor);
   if (!frameTypeField || frameTypeField->second != sizeof(uint8_t)) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -811,7 +816,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
   }
   FrameType triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
 
-  auto reasonPhraseLength = quic::follyutils::decodeQuicInteger(cursor);
+  auto reasonPhraseLength = quic::decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
       reasonPhraseLength->first > kMaxReasonPhraseLength) {
     return quic::make_unexpected(QuicError(
@@ -831,9 +836,9 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
 }
 
 quic::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
-    Cursor& cursor) {
+    ContiguousReadCursor& cursor) {
   ApplicationErrorCode errorCode{};
-  auto varCode = quic::follyutils::decodeQuicInteger(cursor);
+  auto varCode = quic::decodeQuicInteger(cursor);
   if (!varCode) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -841,7 +846,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
   }
   errorCode = static_cast<ApplicationErrorCode>(varCode->first);
 
-  auto reasonPhraseLength = quic::follyutils::decodeQuicInteger(cursor);
+  auto reasonPhraseLength = quic::decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
       reasonPhraseLength->first > kMaxReasonPhraseLength) {
     return quic::make_unexpected(QuicError(
@@ -1119,19 +1124,19 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*pathResponseRes);
     }
     case FrameType::CONNECTION_CLOSE: {
-      auto connCloseRes = decodeConnectionCloseFrame(cursor);
+      auto connCloseRes = decodeConnectionCloseFrame(contiguousCursor);
       if (!connCloseRes.has_value()) {
         return quic::make_unexpected(connCloseRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*connCloseRes);
     }
     case FrameType::CONNECTION_CLOSE_APP_ERR: {
-      auto appCloseRes = decodeApplicationClose(cursor);
+      auto appCloseRes = decodeApplicationClose(contiguousCursor);
       if (!appCloseRes.has_value()) {
         return quic::make_unexpected(appCloseRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*appCloseRes);
     }
     case FrameType::HANDSHAKE_DONE: {
@@ -1157,27 +1162,27 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*datagramRes);
     }
     case FrameType::KNOB: {
-      auto knobRes = decodeKnobFrame(cursor);
+      auto knobRes = decodeKnobFrame(contiguousCursor);
       if (knobRes.hasError()) {
         return knobRes;
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*knobRes);
     }
     case FrameType::ACK_FREQUENCY: {
-      auto ackFreqRes = decodeAckFrequencyFrame(cursor);
+      auto ackFreqRes = decodeAckFrequencyFrame(contiguousCursor);
       if (!ackFreqRes.has_value()) {
         return quic::make_unexpected(ackFreqRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*ackFreqRes);
     }
     case FrameType::IMMEDIATE_ACK: {
-      auto immediateAckRes = decodeImmediateAckFrame(cursor);
+      auto immediateAckRes = decodeImmediateAckFrame(contiguousCursor);
       if (!immediateAckRes.has_value()) {
         return quic::make_unexpected(immediateAckRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*immediateAckRes);
     }
     case FrameType::ACK_RECEIVE_TIMESTAMPS: {
