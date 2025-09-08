@@ -55,7 +55,7 @@ uint64_t TokenGenerator::decryptToken(
 
   // Try to parse the decrypted token
   auto decryptedToken = (*maybeDecryptedToken).get();
-  Cursor cursor(decryptedToken);
+  ContiguousReadCursor cursor(decryptedToken->data(), decryptedToken->length());
 
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 

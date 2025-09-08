@@ -141,16 +141,16 @@ decodeUniStreamsBlockedFrame(ContiguousReadCursor& cursor);
 decodeNewConnectionIdFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<RetireConnectionIdFrame, QuicError>
-decodeRetireConnectionIdFrame(Cursor& cursor);
+decodeRetireConnectionIdFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<StopSendingFrame, QuicError>
 decodeStopSendingFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<PathChallengeFrame, QuicError>
-decodePathChallengeFrame(Cursor& cursor);
+decodePathChallengeFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<PathResponseFrame, QuicError>
-decodePathResponseFrame(Cursor& cursor);
+decodePathResponseFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
     ContiguousReadCursor& cursor,
@@ -187,10 +187,10 @@ decodeAckFrameWithReceivedTimestamps(
     ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<HandshakeDoneFrame, QuicError>
-decodeHandshakeDoneFrame(Cursor& cursor);
+decodeHandshakeDoneFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<uint64_t, TransportErrorCode>
-parsePlaintextRetryOrNewToken(Cursor& cursor);
+parsePlaintextRetryOrNewToken(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<DatagramFrame, QuicError> decodeDatagramFrame(
     BufQueue& queue,

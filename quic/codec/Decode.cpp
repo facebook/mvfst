@@ -766,8 +766,8 @@ quic::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
 }
 
 quic::Expected<RetireConnectionIdFrame, QuicError>
-decodeRetireConnectionIdFrame(Cursor& cursor) {
-  auto sequenceNum = quic::follyutils::decodeQuicInteger(cursor);
+decodeRetireConnectionIdFrame(ContiguousReadCursor& cursor) {
+  auto sequenceNum = quic::decodeQuicInteger(cursor);
   if (!sequenceNum) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad sequence num"));
@@ -776,24 +776,24 @@ decodeRetireConnectionIdFrame(Cursor& cursor) {
 }
 
 quic::Expected<PathChallengeFrame, QuicError> decodePathChallengeFrame(
-    Cursor& cursor) {
-  if (!cursor.canAdvance(sizeof(uint64_t))) {
+    ContiguousReadCursor& cursor) {
+  uint64_t pathData = 0;
+  if (!cursor.tryReadBE<uint64_t>(pathData)) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Not enough input bytes to read path challenge frame."));
   }
-  auto pathData = cursor.readBE<uint64_t>();
   return PathChallengeFrame(pathData);
 }
 
 quic::Expected<PathResponseFrame, QuicError> decodePathResponseFrame(
-    Cursor& cursor) {
-  if (!cursor.canAdvance(sizeof(uint64_t))) {
+    ContiguousReadCursor& cursor) {
+  uint64_t pathData = 0;
+  if (!cursor.tryReadBE<uint64_t>(pathData)) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Not enough input bytes to read path response frame."));
   }
-  auto pathData = cursor.readBE<uint64_t>();
   return PathResponseFrame(pathData);
 }
 
@@ -866,7 +866,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
 }
 
 quic::Expected<HandshakeDoneFrame, QuicError> decodeHandshakeDoneFrame(
-    Cursor& /*cursor*/) {
+    ContiguousReadCursor& /*cursor*/) {
   return HandshakeDoneFrame();
 }
 
@@ -876,12 +876,12 @@ quic::Expected<HandshakeDoneFrame, QuicError> decodeHandshakeDoneFrame(
  * associated data.
  */
 quic::Expected<uint64_t, TransportErrorCode> parsePlaintextRetryOrNewToken(
-    Cursor& cursor) {
+    ContiguousReadCursor& cursor) {
   // Read in the timestamp
-  if (!cursor.canAdvance(sizeof(uint64_t))) {
+  uint64_t timestampInMs = 0;
+  if (!cursor.tryReadBE<uint64_t>(timestampInMs)) {
     return quic::make_unexpected(TransportErrorCode::INVALID_TOKEN);
   }
-  auto timestampInMs = cursor.readBE<uint64_t>();
 
   return timestampInMs;
 }
@@ -911,18 +911,16 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     BufQueue& queue,
     const PacketHeader& header,
     const CodecParameters& params) {
-  Cursor cursor(queue.front());
-  auto frameTypeInt = quic::follyutils::decodeQuicInteger(cursor);
+  ContiguousReadCursor contiguousCursor(
+      queue.front()->data(), queue.front()->length());
+  auto frameTypeInt = quic::decodeQuicInteger(contiguousCursor);
   if (!frameTypeInt) {
     return quic::make_unexpected(QuicError(
         TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid frame-type field"));
   }
-  queue.trimStart(cursor - queue.front());
-  cursor.reset(queue.front());
-  FrameType frameType = static_cast<FrameType>(frameTypeInt->first);
-
-  ContiguousReadCursor contiguousCursor(
-      queue.front()->data(), queue.front()->length());
+  queue.trimStart(contiguousCursor.getCurrentPosition());
+  contiguousCursor.reset(queue.front()->data(), queue.front()->length());
+  auto frameType = static_cast<FrameType>(frameTypeInt->first);
 
   // No more try/catch, just use Expected/make_unexpected pattern
   switch (frameType) {
@@ -1100,27 +1098,27 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*newConnIdRes);
     }
     case FrameType::RETIRE_CONNECTION_ID: {
-      auto retireConnIdRes = decodeRetireConnectionIdFrame(cursor);
+      auto retireConnIdRes = decodeRetireConnectionIdFrame(contiguousCursor);
       if (!retireConnIdRes.has_value()) {
         return quic::make_unexpected(retireConnIdRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*retireConnIdRes);
     }
     case FrameType::PATH_CHALLENGE: {
-      auto pathChallengeRes = decodePathChallengeFrame(cursor);
+      auto pathChallengeRes = decodePathChallengeFrame(contiguousCursor);
       if (!pathChallengeRes.has_value()) {
         return quic::make_unexpected(pathChallengeRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*pathChallengeRes);
     }
     case FrameType::PATH_RESPONSE: {
-      auto pathResponseRes = decodePathResponseFrame(cursor);
+      auto pathResponseRes = decodePathResponseFrame(contiguousCursor);
       if (!pathResponseRes.has_value()) {
         return quic::make_unexpected(pathResponseRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*pathResponseRes);
     }
     case FrameType::CONNECTION_CLOSE: {
@@ -1140,11 +1138,11 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return QuicFrame(*appCloseRes);
     }
     case FrameType::HANDSHAKE_DONE: {
-      auto handshakeDoneRes = decodeHandshakeDoneFrame(cursor);
+      auto handshakeDoneRes = decodeHandshakeDoneFrame(contiguousCursor);
       if (!handshakeDoneRes.has_value()) {
         return quic::make_unexpected(handshakeDoneRes.error());
       }
-      queue.trimStart(cursor - queue.front());
+      queue.trimStart(contiguousCursor.getCurrentPosition());
       return QuicFrame(*handshakeDoneRes);
     }
     case FrameType::DATAGRAM: {

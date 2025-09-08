@@ -131,6 +131,8 @@ std::unique_ptr<folly::IOBuf> createRstStreamFrame(
     reliableSizeQuicInt.encode(appenderOp);
   }
 
+  rstStreamFrame->coalesce();
+
   return rstStreamFrame;
 }
 
@@ -1044,7 +1046,8 @@ TEST_F(DecodeTest, ParsePlaintextNewToken) {
   NewToken newToken(clientIp, timestampInMs);
   BufPtr plaintextNewToken = newToken.getPlaintextToken();
 
-  Cursor cursor(plaintextNewToken.get());
+  ContiguousReadCursor cursor(
+      plaintextNewToken->data(), plaintextNewToken->length());
 
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 
@@ -1065,7 +1068,8 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   RetryToken retryToken(odcid, clientIp, clientPort, timestampInMs);
   BufPtr plaintextRetryToken = retryToken.getPlaintextToken();
 
-  Cursor cursor(plaintextRetryToken.get());
+  ContiguousReadCursor cursor(
+      plaintextRetryToken->data(), plaintextRetryToken->length());
 
   /**
    * Now we continue with the parsing logic here.
