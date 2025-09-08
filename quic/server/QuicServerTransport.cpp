@@ -441,7 +441,7 @@ void QuicServerTransport::setClientConnectionId(
     const ConnectionId& clientConnectionId) {
   conn_->clientConnectionId = clientConnectionId;
   conn_->peerConnectionIds.emplace_back(
-      clientConnectionId, kInitialSequenceNumber);
+      clientConnectionId, kInitialConnectionIdSequenceNumber);
 }
 
 void QuicServerTransport::setClientChosenDestConnectionId(

@@ -441,7 +441,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     return std::nullopt;
   }
 
-  uint64_t nextSelfConnectionIdSequence{0};
+  uint64_t nextSelfConnectionIdSequence{kInitialConnectionIdSequenceNumber};
 
   struct PendingEvents {
     Resets resets;

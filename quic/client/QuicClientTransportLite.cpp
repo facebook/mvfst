@@ -80,7 +80,8 @@ QuicClientTransportLite::QuicClientTransportLite(
   conn_->clientConnectionId = srcConnId;
   conn_->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   conn_->readCodec->setClientConnectionId(srcConnId);
-  conn_->selfConnectionIds.emplace_back(srcConnId, kInitialSequenceNumber);
+  conn_->selfConnectionIds.emplace_back(
+      srcConnId, conn_->nextSelfConnectionIdSequence++);
   auto randCidExpected =
       ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
   CHECK(randCidExpected.has_value());
@@ -404,7 +405,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
   if (!conn_->serverConnectionId && longHeader) {
     conn_->serverConnectionId = longHeader->getSourceConnId();
     conn_->peerConnectionIds.emplace_back(
-        longHeader->getSourceConnId(), kInitialSequenceNumber);
+        longHeader->getSourceConnId(), kInitialConnectionIdSequenceNumber);
     conn_->readCodec->setServerConnectionId(*conn_->serverConnectionId);
   }
 
@@ -1024,9 +1025,14 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
     }
   }
 
-  auto result = maybeSendTransportKnobs();
-  if (!result.has_value()) {
-    return result;
+  auto sendKnobsResult = maybeSendTransportKnobs();
+  if (!sendKnobsResult.has_value()) {
+    return sendKnobsResult;
+  }
+
+  auto issueCidResult = maybeIssueConnectionIds();
+  if (!sendKnobsResult.has_value()) {
+    return issueCidResult;
   }
 
   return {};
@@ -2121,6 +2127,42 @@ QuicClientTransportLite::maybeSendTransportKnobs() {
       }
     }
     transportKnobsSent_ = true;
+  }
+  return {};
+}
+
+quic::Expected<void, QuicError>
+QuicClientTransportLite::maybeIssueConnectionIds() {
+  const uint64_t maximumIdsToIssue = maximumConnectionIdsToIssue(*conn_);
+  if (conn_->clientConnectionId->size() > 0 && conn_->oneRttWriteCipher) {
+    // Make sure size of selfConnectionIds is not larger than maximumIdsToIssue
+    for (size_t i = conn_->selfConnectionIds.size(); i < maximumIdsToIssue;
+         ++i) {
+      auto newConnIdRes =
+          ConnectionId::createRandom(conn_->clientConnectionId->size());
+      if (newConnIdRes.hasError()) {
+        return quic::make_unexpected(newConnIdRes.error());
+      }
+
+      auto newConnIdData = ConnectionIdData{
+          *newConnIdRes, conn_->nextSelfConnectionIdSequence++};
+      newConnIdData.token = StatelessResetToken();
+      folly::Random::secureRandom(
+          newConnIdData.token->data(), newConnIdData.token->size());
+
+      conn_->selfConnectionIds.push_back(newConnIdData);
+
+      NewConnectionIdFrame frame(
+          newConnIdData.sequenceNumber,
+          0,
+          newConnIdData.connId,
+          *newConnIdData.token);
+
+      // Always send connection ids on the primary path. We'll make sure they
+      // are available to the peer before it needs them. This is easier than
+      // having to bundle them with probes.
+      sendSimpleFrame(*conn_, std::move(frame));
+    }
   }
   return {};
 }

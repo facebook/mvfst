@@ -300,7 +300,14 @@ quic::Expected<void, QuicError> processServerInitialParams(
     }
   }
 
-  // TODO Validate active_connection_id_limit
+  if (activeConnectionIdLimit.has_value() &&
+      activeConnectionIdLimit < kDefaultActiveConnectionIdLimit) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        fmt::format(
+            "Active connection id limit too small. received limit = {}",
+            *activeConnectionIdLimit)));
+  }
 
   if (!packetSize || *packetSize == 0) {
     packetSize = kDefaultUDPSendPacketLen;
@@ -357,8 +364,6 @@ quic::Expected<void, QuicError> processServerInitialParams(
     conn.udpSendPacketLen = *packetSize;
   }
 
-  // Currently no-op for a client; it doesn't issue connection ids
-  // to the server.
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 

@@ -29,7 +29,7 @@ constexpr size_t kMaxConnectionIdSize = 20;
 // on inbound initial packets.
 constexpr size_t kMinInitialDestinationConnIdLength = 8;
 
-constexpr uint64_t kInitialSequenceNumber = 0x0;
+constexpr uint64_t kInitialConnectionIdSequenceNumber = 0x0;
 
 // First two bits of CID is version
 enum class ConnectionIdVersion : uint8_t { V0 = 0, V1 = 1, V2 = 2, V3 = 3 };

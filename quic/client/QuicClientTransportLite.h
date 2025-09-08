@@ -372,6 +372,8 @@ class QuicClientTransportLite
 
   void asyncClose(QuicError error);
 
+  quic::Expected<void, QuicError> maybeIssueConnectionIds();
+
   // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};

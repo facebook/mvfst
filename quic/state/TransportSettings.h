@@ -260,7 +260,7 @@ struct TransportSettings {
   // the callback registered through notifyPendingWriteOnConnection() will
   // not be called
   uint64_t totalBufferSpaceAvailable{kDefaultBufferSpaceAvailable};
-  // Whether the endpoint allows peer to migrate to new address
+  // (Server only) Whether to allow the client to migrate to a new address
   bool disableMigration{true};
   // Whether or not the socket should gracefully drain on close
   bool shouldDrain{true};
