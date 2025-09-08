@@ -66,6 +66,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
+      uint64_t activeConnectionIdLimit,
       const StatelessResetToken& token,
       ConnectionId initialSourceCid,
       ConnectionId originalDestinationCid,
@@ -83,6 +84,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         idleTimeout_(idleTimeout),
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
+        activeConnectionIdLimit_(activeConnectionIdLimit),
         token_(token),
         initialSourceCid_(initialSourceCid),
         originalDestinationCid_(originalDestinationCid),
@@ -201,6 +203,16 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     }
     params.parameters.push_back(std::move(maxPacketSizeResult.value()));
 
+    auto activeConnLimitResult = encodeIntegerParameter(
+        TransportParameterId::active_connection_id_limit,
+        activeConnectionIdLimit_);
+    if (activeConnLimitResult.hasError()) {
+      throw fizz::FizzException(
+          "Failed to encode active_connection_id_limit",
+          fizz::AlertDescription::internal_error);
+    }
+    params.parameters.push_back(std::move(activeConnLimitResult.value()));
+
     // stateless reset token
     params.parameters.push_back(TransportParameter(
         TransportParameterId::stateless_reset_token,
@@ -253,6 +265,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
+  uint64_t activeConnectionIdLimit_;
   Optional<ClientTransportParameters> clientTransportParameters_;
   StatelessResetToken token_;
   ConnectionId initialSourceCid_;

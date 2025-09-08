@@ -420,7 +420,15 @@ quic::Expected<void, QuicError> processClientInitialParams(
         "Max Ack Delay is greater than 2^14 "));
   }
 
-  // TODO Validate active_connection_id_limit
+  if (activeConnectionIdLimit &&
+      activeConnectionIdLimit < kDefaultActiveConnectionIdLimit) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        fmt::format(
+            "Active connection id limit too small. received limit = {}",
+            *activeConnectionIdLimit)));
+  }
+
   if (packetSize && *packetSize < kMinMaxUDPPayload) {
     return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
@@ -1033,6 +1041,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
             conn.transportSettings.idleTimeout,
             conn.transportSettings.ackDelayExponent,
             conn.transportSettings.maxRecvPacketSize,
+            conn.transportSettings.selfActiveConnectionIdLimit,
             *newServerConnIdData->token,
             conn.serverConnectionId.value(),
             initialDestinationConnectionId,

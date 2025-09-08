@@ -121,6 +121,7 @@ class ServerHandshakeTest : public Test {
         kDefaultIdleTimeout,
         kDefaultAckDelayExponent,
         kDefaultUDPSendPacketLen,
+        kDefaultActiveConnectionIdLimit,
         generateStatelessResetToken(),
         ConnectionId::createAndMaybeCrash(
             std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),

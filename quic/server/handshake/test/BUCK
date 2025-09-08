@@ -9,14 +9,13 @@ fb_dirsync_cpp_unittest(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
+        "fbsource//third-party/googletest:gtest",
         "//fizz/client/test:mocks",
         "//fizz/crypto/test:TestUtil",
-        "//fizz/protocol/clock/test:mock_clock",
         "//fizz/protocol/test:mocks",
         "//fizz/server/test:mocks",
         "//folly/io/async:scoped_event_base_thread",
         "//folly/io/async:ssl_context",
-        "//folly/io/async/test:mocks",
         "//quic:constants",
         "//quic/common:string_utils",
         "//quic/common/test:test_utils",
@@ -24,7 +23,6 @@ fb_dirsync_cpp_unittest(
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/fizz/server/handshake:handshake_app_token",
-        "//quic/handshake:handshake",
         "//quic/server/handshake:app_token",
         "//quic/server/handshake:server_handshake",
         "//quic/state:quic_state_machine",
@@ -38,9 +36,11 @@ fb_dirsync_cpp_unittest(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
+        "fbsource//third-party/googletest:gtest",
         "//fizz/protocol/test:test_util",
         "//quic:constants",
         "//quic/common/test:test_utils",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/server/handshake:server_extension",
     ],
 )
@@ -51,7 +51,7 @@ fb_dirsync_cpp_unittest(
         "AppTokenTest.cpp",
     ],
     deps = [
-        "//fizz/server:resumption_state",
+        "fbsource//third-party/googletest:gtest",
         "//quic:constants",
         "//quic/common:optional",
         "//quic/fizz/server/handshake:handshake_app_token",
@@ -66,6 +66,7 @@ fb_dirsync_cpp_unittest(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
+        "fbsource//third-party/googletest:gtest",
         "//fizz/server:resumption_state",
         "//quic:constants",
         "//quic/api/test:mocks",

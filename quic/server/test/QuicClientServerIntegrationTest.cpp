@@ -144,6 +144,7 @@ TEST_F(ServerTransportParameters, InvariantlyAdvertisedParameters) {
       _id::max_packet_size,
       _id::stateless_reset_token,
       _id::disable_migration,
+      _id::active_connection_id_limit,
       _id::ack_receive_timestamps_enabled};
 
   // validate equality of expected params and params sent by server
