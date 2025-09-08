@@ -540,7 +540,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     server->onNetworkData(
-        peer == nullptr ? clientAddr : *peer, std::move(data));
+        server->getLocalAddress(),
+        std::move(data),
+        peer == nullptr ? clientAddr : *peer);
     if (writes) {
       loopForWrites();
     }

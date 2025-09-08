@@ -48,6 +48,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   }
 
   quic::Expected<void, QuicError> processPackets(
+      const Optional<folly::SocketAddress>& /*localAddress*/,
       NetworkData&& networkData,
       const Optional<folly::SocketAddress>& server) override {
     networkDataVec_.push_back(std::move(networkData));

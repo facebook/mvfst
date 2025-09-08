@@ -3610,7 +3610,7 @@ TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
 
   // writeChain, first, last byte callbacks triggered after delivery
   auto& conn = server->getConnectionState();
-  folly::SocketAddress addr;
+  folly::SocketAddress lAddr, rAddr;
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;
@@ -3621,7 +3621,7 @@ TEST_F(QuicServerTransportTest, InvokeDeliveryCallbacksSingleByteWithDSR) {
   EXPECT_CALL(writeBufMetaDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
-  server->onNetworkData(addr, std::move(networkData));
+  server->onNetworkData(lAddr, std::move(networkData), rAddr);
   Mock::VerifyAndClearExpectations(&writeChainDeliveryCb);
   Mock::VerifyAndClearExpectations(&writeBufMetaDeliveryCb);
   Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);

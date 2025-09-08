@@ -915,7 +915,8 @@ static void handleCipherUnavailable(
         onPacketDropped,
         PacketDropReason::PARSE_ERROR_PACKET_BUFFERED);
     ServerEvents::ReadData pendingReadData;
-    pendingReadData.peer = readData.peer;
+    pendingReadData.localAddress = readData.localAddress;
+    pendingReadData.peerAddress = readData.peerAddress;
     pendingReadData.udpPacket = ReceivedUdpPacket(
         std::move(originalData->packet),
         readData.udpPacket.timings,
@@ -1239,7 +1240,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       maybeSetExperimentalSettings(conn);
     }
 
-    if (conn.peerAddress != readData.peer) {
+    if (conn.peerAddress != readData.peerAddress) {
       QUIC_STATS(conn.statsCallback, onPeerAddressChanged);
       auto migrationDenied = (encryptionLevel != EncryptionLevel::AppData) ||
           conn.transportSettings.disableMigration;
@@ -1577,7 +1578,10 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           pktHasRetransmittableData = true;
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
           auto simpleResult = updateSimpleFrameOnPacketReceived(
-              conn, simpleFrame, dstConnId, readData.peer != conn.peerAddress);
+              conn,
+              simpleFrame,
+              dstConnId,
+              readData.peerAddress != conn.peerAddress);
           if (simpleResult.hasError()) {
             return quic::make_unexpected(simpleResult.error());
           }
@@ -1632,7 +1636,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     // won't increase the limit.
     updateWritableByteLimitOnRecvPacket(conn);
 
-    if (conn.peerAddress != readData.peer) {
+    if (conn.peerAddress != readData.peerAddress) {
       // TODO use new conn id, make sure the other endpoint has new conn id
       if (isNonProbingPacket) {
         if (packetNum == ackState.largestRecvdPacketNum) {
@@ -1642,8 +1646,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
               shortHeader->getConnectionId() != conn.serverConnectionId) {
             intentionalMigration = true;
           }
-          auto migrationResult =
-              onConnectionMigration(conn, readData.peer, intentionalMigration);
+          auto migrationResult = onConnectionMigration(
+              conn, readData.peerAddress, intentionalMigration);
           if (migrationResult.hasError()) {
             return quic::make_unexpected(migrationResult.error());
           }

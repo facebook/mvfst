@@ -116,7 +116,13 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsgWrapper(
         break;
     }
   }
-  return processPackets(std::move(networkData), server);
+  auto localAddressRes = sock.address();
+  if (FOLLY_UNLIKELY(localAddressRes.hasError())) {
+    return quic::make_unexpected(localAddressRes.error());
+  }
+
+  return processPackets(
+      localAddressRes.value(), std::move(networkData), server);
 }
 
 quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsg(
@@ -136,7 +142,13 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsg(
     return recvResult;
   }
 
-  return processPackets(std::move(networkData), server);
+  auto localAddressRes = sock.address();
+  if (FOLLY_UNLIKELY(localAddressRes.hasError())) {
+    return quic::make_unexpected(localAddressRes.error());
+  }
+
+  return processPackets(
+      localAddressRes.value(), std::move(networkData), server);
 }
 
 quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
@@ -155,7 +167,13 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
     return recvResult;
   }
 
-  return processPackets(std::move(networkData), server);
+  auto localAddressRes = sock.address();
+  if (FOLLY_UNLIKELY(localAddressRes.hasError())) {
+    return quic::make_unexpected(localAddressRes.error());
+  }
+
+  return processPackets(
+      localAddressRes.value(), std::move(networkData), server);
 }
 
 } // namespace quic

@@ -286,7 +286,8 @@ class TestQuicTransport
 
   quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress&,
-      ReceivedUdpPacket&& udpPacket) override {
+      ReceivedUdpPacket&& udpPacket,
+      const folly::SocketAddress&) override {
     if (udpPacket.buf.empty()) {
       return {};
     }
@@ -454,19 +455,19 @@ class TestQuicTransport
       OptionalIntegral<StreamGroupId> groupId = std::nullopt) {
     auto buf = encodeStreamBuffer(id, std::move(data), std::move(groupId));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0));
+    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
   }
 
   void addCryptoData(StreamBuffer data) {
     auto buf = encodeCryptoBuffer(std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0));
+    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
   }
 
   void addMaxStreamsFrame(MaxStreamsFrame frame) {
     auto buf = encodeMaxStreamsFrame(frame);
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0));
+    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
   }
 
   void addStreamReadError(StreamId id, QuicErrorCode ex) {
@@ -484,7 +485,7 @@ class TestQuicTransport
   void addDatagram(BufPtr data, TimePoint recvTime = Clock::now()) {
     auto buf = encodeDatagramFrame(std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), recvTime, 0));
+    onNetworkData(addr, NetworkData(std::move(buf), recvTime, 0), addr);
   }
 
   void closeStream(StreamId id) {
@@ -532,7 +533,7 @@ class TestQuicTransport
         id,
         StreamBuffer(IOBuf::create(0), stream->maxOffsetObserved + 1, true));
     auto networkData = NetworkData(std::move(buf), Clock::now(), 0);
-    onNetworkData(addr, std::move(networkData));
+    onNetworkData(addr, std::move(networkData), addr);
   }
 
   QuicStreamState* getStream(StreamId id) {

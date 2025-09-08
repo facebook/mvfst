@@ -23,10 +23,16 @@ struct CachedServerTransportParameters;
 
 struct PendingClientData {
   ReceivedUdpPacket udpPacket;
-  folly::SocketAddress peer;
+  folly::SocketAddress peerAddress;
+  folly::SocketAddress localAddress;
 
-  PendingClientData(ReceivedUdpPacket udpPacketIn, folly::SocketAddress peerIn)
-      : udpPacket(std::move(udpPacketIn)), peer(std::move(peerIn)) {}
+  PendingClientData(
+      folly::SocketAddress localAddressIn,
+      ReceivedUdpPacket udpPacketIn,
+      folly::SocketAddress peerAddressIn)
+      : udpPacket(std::move(udpPacketIn)),
+        peerAddress(std::move(peerAddressIn)),
+        localAddress(std::move(localAddressIn)) {}
 };
 
 struct QuicClientConnectionState : public QuicConnectionStateBase {

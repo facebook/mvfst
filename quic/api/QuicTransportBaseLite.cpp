@@ -76,8 +76,9 @@ QuicTransportBaseLite::QuicTransportBaseLite(
           LooperType::PeekLooper)) {}
 
 void QuicTransportBaseLite::onNetworkData(
-    const folly::SocketAddress& peer,
-    NetworkData&& networkData) noexcept {
+    const folly::SocketAddress& localAddress,
+    NetworkData&& networkData,
+    const folly::SocketAddress& peerAddress) noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     if (!conn_->transportSettings.networkDataPerSocketRead) {
@@ -126,7 +127,7 @@ void QuicTransportBaseLite::onNetworkData(
 
     auto packets = std::move(networkData).movePackets();
     for (auto& packet : packets) {
-      auto res = onReadData(peer, std::move(packet));
+      auto res = onReadData(localAddress, std::move(packet), peerAddress);
       if (!res.has_value()) {
         VLOG(4) << __func__ << " " << res.error().message << " " << *this;
         exceptionCloseWhat_ = res.error().message;

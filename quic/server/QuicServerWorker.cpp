@@ -875,13 +875,14 @@ void QuicServerWorker::dispatchPacketData(
   // helper fn to handle fwd-ing data to the transport
   auto fwdNetworkDataToTransport = [&](QuicServerTransport* transport) {
     DCHECK(transport->getEventBase()->isInEventBaseThread());
-    transport->onNetworkData(client, std::move(networkData));
+    transport->onNetworkData(
+        socket_->address(), std::move(networkData), client);
     // process pending 0rtt data for this DCID if present
     if (routingData.isInitial && !pending0RttData_.empty()) {
       auto itr = pending0RttData_.find(dstConnId);
       if (itr != pending0RttData_.end()) {
         for (auto& data : itr->second) {
-          transport->onNetworkData(client, std::move(data));
+          transport->onNetworkData(socket_->address(), std::move(data), client);
         }
         pending0RttData_.erase(itr);
       }

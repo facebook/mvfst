@@ -126,8 +126,9 @@ QuicClientTransportLite::~QuicClientTransportLite() {
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
-    const folly::SocketAddress& peer,
-    ReceivedUdpPacket&& udpPacket) {
+    const folly::SocketAddress& localAddress,
+    ReceivedUdpPacket&& udpPacket,
+    const folly::SocketAddress& peerAddress) {
   // Process the arriving UDP packet, which may have coalesced QUIC packets.
   {
     BufQueue& udpData = udpPacket.buf;
@@ -138,7 +139,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
       auto versionNegotiation =
           conn_->readCodec->tryParsingVersionNegotiation(udpData);
       if (versionNegotiation) {
-        VLOG(4) << "Got version negotiation packet from peer=" << peer
+        VLOG(4) << "Got version negotiation packet from peer=" << peerAddress
                 << " versions=" << std::hex << versionNegotiation->versions
                 << " " << *this;
 
@@ -151,7 +152,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
     for (uint16_t processedPackets = 0;
          !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
          processedPackets++) {
-      auto res = processUdpPacketData(peer, udpPacket);
+      auto res = processUdpPacketData(localAddress, udpPacket, peerAddress);
       if (!res.has_value()) {
         return res;
       }
@@ -170,8 +171,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
       // buffer.
       pendingPacket.udpPacket.buf.append(udpPacket.buf.move());
 
-      auto res =
-          processUdpPacketData(pendingPacket.peer, pendingPacket.udpPacket);
+      auto res = processUdpPacketData(
+          pendingPacket.localAddress,
+          pendingPacket.udpPacket,
+          pendingPacket.peerAddress);
       if (!res.has_value()) {
         return res;
       }
@@ -185,8 +188,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
       // buffer.
       pendingPacket.udpPacket.buf.append(udpPacket.buf.move());
 
-      auto res =
-          processUdpPacketData(pendingPacket.peer, pendingPacket.udpPacket);
+      auto res = processUdpPacketData(
+          pendingPacket.localAddress,
+          pendingPacket.udpPacket,
+          pendingPacket.peerAddress);
       if (!res.has_value()) {
         return res;
       }
@@ -197,8 +202,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
-    const folly::SocketAddress& peer,
-    ReceivedUdpPacket& udpPacket) {
+    const folly::SocketAddress& localAddress,
+    ReceivedUdpPacket& udpPacket,
+    const folly::SocketAddress& peerAddress) {
   auto packetSize = udpPacket.buf.chainLength();
   if (packetSize == 0) {
     return {};
@@ -254,7 +260,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
     if (happyEyeballsEnabled_) {
       happyEyeballsOnDataReceived(
-          *clientConn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
+          *clientConn_,
+          happyEyeballsConnAttemptDelayTimeout_,
+          socket_,
+          peerAddress);
     }
     // Set the destination connection ID to be the value from the source
     // connection id of the retry packet
@@ -294,11 +303,12 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         ? clientConn_->pendingOneRttData
         : clientConn_->pendingHandshakeData;
     pendingData.emplace_back(
+        localAddress,
         ReceivedUdpPacket(
             std::move(cipherUnavailable->packet),
             udpPacket.timings,
             udpPacket.tosValue),
-        peer);
+        peerAddress);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
           cipherUnavailable->protectionType, packetSize);
@@ -348,7 +358,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
   if (happyEyeballsEnabled_) {
     CHECK(socket_);
     happyEyeballsOnDataReceived(
-        *clientConn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
+        *clientConn_,
+        happyEyeballsConnAttemptDelayTimeout_,
+        socket_,
+        peerAddress);
   }
 
   LongHeader* longHeader = regularOptional->header.asLong();
@@ -965,8 +978,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
-    const folly::SocketAddress& peer,
-    ReceivedUdpPacket&& udpPacket) {
+    const folly::SocketAddress& localAddress,
+    ReceivedUdpPacket&& udpPacket,
+    const folly::SocketAddress& peerAddress) {
   if (closeState_ == CloseState::CLOSED) {
     // If we are closed, then we shouldn't process new network data.
     QUIC_STATS(
@@ -977,7 +991,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
     return {};
   }
   bool waitingForFirstPacket = !hasReceivedUdpPackets(*conn_);
-  auto res = processUdpPacket(peer, std::move(udpPacket));
+  auto res = processUdpPacket(localAddress, std::move(udpPacket), peerAddress);
   if (!res.has_value()) {
     return res;
   }
@@ -1722,8 +1736,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
+    const Optional<folly::SocketAddress>& localAddress,
     NetworkData&& networkData,
-    const Optional<folly::SocketAddress>& server) {
+    const Optional<folly::SocketAddress>& peerAddress) {
   if (networkData.getPackets().empty()) {
     // recvMmsg and recvMsg might have already set the reason and counter
     if (conn_->loopDetectorCallback) {
@@ -1738,13 +1753,14 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
     }
     return {};
   }
-  DCHECK(server.has_value());
+  DCHECK(localAddress.has_value());
+  DCHECK(peerAddress.has_value());
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
   networkData.setReceiveTimePoint(packetReceiveTime);
 
-  onNetworkData(*server, std::move(networkData));
+  onNetworkData(*localAddress, std::move(networkData), *peerAddress);
   return {};
 }
 
@@ -1779,8 +1795,13 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
       break;
     }
 
-    auto processResult =
-        processPackets(std::move(networkDataSinglePacket), server);
+    auto localAddressRes = sock.address();
+    if (localAddressRes.hasError()) {
+      return quic::make_unexpected(localAddressRes.error());
+    }
+
+    auto processResult = processPackets(
+        localAddressRes.value(), std::move(networkDataSinglePacket), server);
     if (!processResult.has_value()) {
       return processResult;
     }
