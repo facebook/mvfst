@@ -470,7 +470,7 @@ struct TransportSettings {
   bool disablePausedPriority{false};
 
   // Use the new priority queue and scheduling implementation
-  bool useNewPriorityQueue{false};
+  bool useNewPriorityQueue{true};
 
   bool sendAckOnlyInitial{false};
 

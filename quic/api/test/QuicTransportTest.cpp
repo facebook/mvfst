@@ -1932,6 +1932,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
 
   // Flow control lifted
   stream->conn.flowControlState.peerAdvertisedMaxOffset = 300;
+  conn.streamManager->onMaxData();
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
   auto writeRes4 = writeQuicDataToSocket(
