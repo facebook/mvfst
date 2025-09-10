@@ -1083,9 +1083,6 @@ struct ShortHeader {
 
  private:
   ShortHeader() = delete;
-  bool readInitialByte(uint8_t initalByte);
-  bool readConnectionId(Cursor& cursor);
-  bool readPacketNum(PacketNum largestReceivedUdpPacketNum, Cursor& cursor);
 
  private:
   PacketNum packetSequenceNum_{0};
