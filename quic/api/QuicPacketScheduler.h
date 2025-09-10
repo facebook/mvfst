@@ -169,6 +169,27 @@ class SimpleFrameScheduler {
   const QuicConnectionStateBase& conn_;
 };
 
+/*
+ * PathValidationFrameScheduler schedules PathChallenge and PathResponse frames
+ * for a specific path. This is used for writing packets on a path that is
+ * not currently in use by the connection.
+ * Note: For the current path, SimpleFrameScheduler schedules these frames.
+ */
+class PathValidationFrameScheduler {
+ public:
+  explicit PathValidationFrameScheduler(
+      const QuicConnectionStateBase& conn,
+      PathIdType pathId);
+
+  [[nodiscard]] bool hasPendingPathValidationFrames() const;
+
+  bool writePathValidationFrames(PacketBuilderInterface& builder);
+
+ private:
+  const QuicConnectionStateBase& conn_;
+  const PathIdType pathId_;
+};
+
 class PingFrameScheduler {
  public:
   explicit PingFrameScheduler(const QuicConnectionStateBase& conn);
@@ -276,6 +297,7 @@ class FrameScheduler : public QuicPacketScheduler {
     Builder& pingFrames();
     Builder& datagramFrames();
     Builder& immediateAckFrames();
+    Builder& pathValidationFrames(PathIdType pathId);
 
     FrameScheduler build() &&;
 
@@ -296,6 +318,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool pingFrameScheduler_{false};
     bool datagramFrameScheduler_{false};
     bool immediateAckFrameScheduler_{false};
+    Optional<PathIdType> schedulePathValidationFramesForPathId_;
   };
 
   FrameScheduler(folly::StringPiece name, QuicConnectionStateBase& conn);
@@ -327,6 +350,7 @@ class FrameScheduler : public QuicPacketScheduler {
   Optional<PingFrameScheduler> pingFrameScheduler_;
   Optional<DatagramFrameScheduler> datagramFrameScheduler_;
   Optional<ImmediateAckFrameScheduler> immediateAckFrameScheduler_;
+  Optional<PathValidationFrameScheduler> pathValidationFrameScheduler_;
   folly::StringPiece name_;
   QuicConnectionStateBase& conn_;
 };

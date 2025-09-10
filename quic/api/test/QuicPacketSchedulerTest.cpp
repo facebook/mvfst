@@ -3479,6 +3479,123 @@ TEST_P(QuicPacketSchedulerTest, BlockedSchedulerNoSpaceHandling) {
   EXPECT_TRUE(conn.pendingEvents.sendDataBlocked);
 }
 
+TEST_P(QuicPacketSchedulerTest, PathValidationHasPendingFrames) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  PathIdType pathId1 = 1;
+  PathIdType pathId2 = 2;
+
+  // No entries initially
+  PathValidationFrameScheduler scheduler1(conn, pathId1);
+  EXPECT_FALSE(scheduler1.hasPendingPathValidationFrames());
+
+  // Add response for a different path; still false for pathId1
+  conn.pendingEvents.pathResponses.emplace(
+      pathId2, PathResponseFrame(0xdeadbeef));
+  EXPECT_FALSE(scheduler1.hasPendingPathValidationFrames());
+
+  // Add challenge for pathId1; becomes true
+  conn.pendingEvents.pathChallenges.emplace(pathId1, PathChallengeFrame(0xabc));
+  EXPECT_TRUE(scheduler1.hasPendingPathValidationFrames());
+
+  // Also true for a scheduler pointed at pathId2 due to response
+  PathValidationFrameScheduler scheduler2(conn, pathId2);
+  EXPECT_TRUE(scheduler2.hasPendingPathValidationFrames());
+}
+
+TEST_P(QuicPacketSchedulerTest, WritePathValidationFramesSpecificPathAndOrder) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  PathIdType targetPath = 7;
+  PathIdType otherPath = 9;
+
+  // Populate both challenge and response for target path
+  PathResponseFrame resp(0xbeef);
+  PathChallengeFrame chall(0x1234);
+  conn.pendingEvents.pathResponses.emplace(targetPath, resp);
+  conn.pendingEvents.pathChallenges.emplace(targetPath, chall);
+
+  // And unrelated entries for another path (should be ignored)
+  conn.pendingEvents.pathResponses.emplace(
+      otherPath, PathResponseFrame(0x9999));
+  conn.pendingEvents.pathChallenges.emplace(
+      otherPath, PathChallengeFrame(0x8888));
+
+  auto builder = setupMockPacketBuilder();
+
+  PathValidationFrameScheduler scheduler(conn, targetPath);
+  ASSERT_TRUE(scheduler.hasPendingPathValidationFrames());
+  EXPECT_TRUE(scheduler.writePathValidationFrames(*builder));
+
+  // Expect exactly 2 frames written: PathResponse then PathChallenge (by impl)
+  ASSERT_EQ(builder->frames_.size(), 2);
+  auto f0 = builder->frames_[0].asQuicSimpleFrame();
+  ASSERT_NE(f0, nullptr);
+  ASSERT_NE(f0->asPathResponseFrame(), nullptr);
+  EXPECT_EQ(f0->asPathResponseFrame()->pathData, resp.pathData);
+
+  auto f1 = builder->frames_[1].asQuicSimpleFrame();
+  ASSERT_NE(f1, nullptr);
+  ASSERT_NE(f1->asPathChallengeFrame(), nullptr);
+  EXPECT_EQ(f1->asPathChallengeFrame()->pathData, chall.pathData);
+}
+
+TEST_P(QuicPacketSchedulerTest, PathValidationSchedulerRespectsPathId) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  PathIdType pathWithData = 3;
+  PathIdType emptyPath = 4;
+
+  conn.pendingEvents.pathChallenges.emplace(
+      pathWithData, PathChallengeFrame(0x55));
+
+  PathValidationFrameScheduler scheduler(conn, emptyPath);
+  EXPECT_FALSE(scheduler.hasPendingPathValidationFrames());
+  auto builder = setupMockPacketBuilder();
+  EXPECT_FALSE(scheduler.writePathValidationFrames(*builder));
+  EXPECT_TRUE(builder->frames_.empty());
+}
+
+TEST_P(QuicPacketSchedulerTest, PathValidationCausesPaddingToFullPacket) {
+  // Using real builder via FrameScheduler to verify padding behavior
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  PathIdType pathId = 11;
+  conn.pendingEvents.pathChallenges.emplace(pathId, PathChallengeFrame(0x42));
+
+  // Create a short header packet builder (AppData)
+  auto connId = getTestConnectionId();
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "PathValidationScheduler")
+                                           .pathValidationFrames(pathId))
+                                 .build();
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  ASSERT_FALSE(result.hasError());
+
+  // Verify we padded out to full UDP packet length
+  auto pktLen = result.value().packet->header.computeChainDataLength() +
+      result.value().packet->body.computeChainDataLength();
+  EXPECT_EQ(pktLen, conn.udpSendPacketLen);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicPacketSchedulerTest,
     QuicPacketSchedulerTest,

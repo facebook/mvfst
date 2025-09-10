@@ -175,6 +175,12 @@ FrameScheduler::Builder& FrameScheduler::Builder::immediateAckFrames() {
   return *this;
 }
 
+FrameScheduler::Builder& FrameScheduler::Builder::pathValidationFrames(
+    PathIdType pathId) {
+  schedulePathValidationFramesForPathId_ = pathId;
+  return *this;
+}
+
 FrameScheduler FrameScheduler::Builder::build() && {
   FrameScheduler scheduler(name_, conn_);
   if (streamFrameScheduler_) {
@@ -209,6 +215,11 @@ FrameScheduler FrameScheduler::Builder::build() && {
   if (immediateAckFrameScheduler_) {
     scheduler.immediateAckFrameScheduler_.emplace(
         ImmediateAckFrameScheduler(conn_));
+  }
+  if (schedulePathValidationFramesForPathId_.has_value()) {
+    scheduler.pathValidationFrameScheduler_.emplace(
+        PathValidationFrameScheduler(
+            conn_, schedulePathValidationFramesForPathId_.value()));
   }
   return scheduler;
 }
@@ -332,9 +343,18 @@ FrameScheduler::scheduleFramesForPacket(
     }
   }
 
+  bool hasPathProbingFrame = false;
+  if (pathValidationFrameScheduler_) {
+    if (pathValidationFrameScheduler_->hasPendingPathValidationFrames()) {
+      pathValidationFrameScheduler_->writePathValidationFrames(wrapper);
+      hasPathProbingFrame = true;
+    }
+  }
+
   if (builder.hasFramesPending()) {
-    if (initialPacket) {
-      // This is the initial packet, we need to fill er up.
+    if (initialPacket || hasPathProbingFrame) {
+      // This is the initial packet or a it has a path probing frame, we need to
+      // fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
         auto writeRes = writeFrame(PaddingFrame(), builder);
         if (!writeRes.has_value()) {
@@ -382,7 +402,9 @@ bool FrameScheduler::hasImmediateData() const {
       (datagramFrameScheduler_ &&
        datagramFrameScheduler_->hasPendingDatagramFrames()) ||
       (immediateAckFrameScheduler_ &&
-       immediateAckFrameScheduler_->hasPendingImmediateAckFrame());
+       immediateAckFrameScheduler_->hasPendingImmediateAckFrame()) ||
+      (pathValidationFrameScheduler_ &&
+       pathValidationFrameScheduler_->hasPendingPathValidationFrames());
 }
 
 folly::StringPiece FrameScheduler::name() const {
@@ -743,11 +765,15 @@ SimpleFrameScheduler::SimpleFrameScheduler(const QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
 bool SimpleFrameScheduler::hasPendingSimpleFrames() const {
+  // TODO: JBESHAY MIGRATION - Remove the first condition when the
+  // PathValidationScheduler is wired.
   return conn_.pendingEvents.pathChallenge ||
       !conn_.pendingEvents.frames.empty();
 }
 
 bool SimpleFrameScheduler::writeSimpleFrames(PacketBuilderInterface& builder) {
+  // TODO: JBESHAY MIGRATION - Remove this when the PathValidationScheduler is
+  // wired.
   auto& pathChallenge = conn_.pendingEvents.pathChallenge;
   if (pathChallenge &&
       !writeSimpleFrame(QuicSimpleFrame(*pathChallenge), builder)) {
@@ -762,6 +788,43 @@ bool SimpleFrameScheduler::writeSimpleFrames(PacketBuilderInterface& builder) {
     }
     framesWritten = true;
   }
+  return framesWritten;
+}
+
+PathValidationFrameScheduler::PathValidationFrameScheduler(
+    const QuicConnectionStateBase& conn,
+    PathIdType pathId)
+    : conn_(conn), pathId_(pathId) {}
+
+bool PathValidationFrameScheduler::hasPendingPathValidationFrames() const {
+  return conn_.pendingEvents.pathChallenges.find(pathId_) !=
+      conn_.pendingEvents.pathChallenges.end() ||
+      conn_.pendingEvents.pathResponses.find(pathId_) !=
+      conn_.pendingEvents.pathResponses.end();
+}
+
+bool PathValidationFrameScheduler::writePathValidationFrames(
+    PacketBuilderInterface& builder) {
+  bool framesWritten = false;
+
+  // Write PathResponse frames for the specified path
+  auto pathResponse = conn_.pendingEvents.pathResponses.find(pathId_);
+  if (pathResponse != conn_.pendingEvents.pathResponses.end()) {
+    if (!writeSimpleFrame(QuicSimpleFrame(pathResponse->second), builder)) {
+      return false;
+    }
+    framesWritten = true;
+  }
+
+  // Write PathChallenge frames for the specified path
+  auto pathChallenge = conn_.pendingEvents.pathChallenges.find(pathId_);
+  if (pathChallenge != conn_.pendingEvents.pathChallenges.end()) {
+    if (!writeSimpleFrame(QuicSimpleFrame(pathChallenge->second), builder)) {
+      return false;
+    }
+    framesWritten = true;
+  }
+
   return framesWritten;
 }
 
