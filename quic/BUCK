@@ -65,7 +65,10 @@ mvfst_cpp_library(
     name = "tls_exception",
     srcs = select({
         "DEFAULT": ["QuicTLSExceptionFizz.cpp"],
-        "ovr_config//os/constraints:android": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
+        "ovr_config//os/constraints:android": select({
+            "DEFAULT": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
+            "ovr_config//build_mode/constraints:arvr_mode_enabled": ["QuicTLSExceptionFizz.cpp"],
+        }),
         "ovr_config//os/constraints:iphoneos": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
     }),
     headers = [
@@ -75,9 +78,14 @@ mvfst_cpp_library(
         "DEFAULT": [
             "//fizz/record:record",
         ],
-        "ovr_config//os/constraints:android": [
-            "fbsource//xplat/mobilenetwork:tls_common",  # @manual
-        ],
+        "ovr_config//os/constraints:android": select({
+            "DEFAULT": [
+                "fbsource//xplat/mobilenetwork:tls_common",  # @manual
+            ],
+            "ovr_config//build_mode/constraints:arvr_mode_enabled": [
+                "//fizz/record:record",
+            ],
+        }),
         "ovr_config//os/constraints:iphoneos": [
             "fbsource//xplat/mobilenetwork:tls_common",  # @manual
         ],
