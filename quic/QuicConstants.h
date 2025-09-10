@@ -55,6 +55,7 @@ using Cursor = folly::io::Cursor;
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 using DurationRep = std::chrono::microseconds::rep;
+using PathIdType = uint32_t;
 using namespace std::chrono_literals;
 
 constexpr uint64_t kMaxVarInt = (1ull << 62) - 1;
@@ -392,6 +393,8 @@ enum class LocalErrorCode : uint64_t {
   PACER_NOT_AVAILABLE = 0x4000001C,
   RTX_POLICIES_LIMIT_EXCEEDED = 0x4000001D,
   CONGESTION_CONTROL_ERROR = 0x4000001E,
+  PATH_NOT_EXISTS = 0x4000001F,
+  PATH_MANAGER_ERROR = 0x40000020,
 };
 
 enum class QuicNodeType : bool {

@@ -28,6 +28,7 @@
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicConnectionStats.h>
+#include <quic/state/QuicPathManager.h>
 #include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
@@ -421,6 +422,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Current peer address.
   folly::SocketAddress peerAddress;
 
+  // Current path id as tracked by the path manager.
+  PathIdType currentPathId;
+
   // Local address. INADDR_ANY if not set.
   Optional<folly::SocketAddress> localAddress;
 
@@ -446,6 +450,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   struct PendingEvents {
     Resets resets;
     Optional<PathChallengeFrame> pathChallenge;
+
+    std::unordered_map<PathIdType, PathChallengeFrame> pathChallenges;
+    std::unordered_map<PathIdType, PathResponseFrame> pathResponses;
 
     FrameList frames;
 

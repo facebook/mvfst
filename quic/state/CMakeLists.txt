@@ -12,6 +12,7 @@ add_library(
   ClonedPacketIdentifier.cpp
   PendingPathRateLimiter.cpp
   QuicPriorityQueue.cpp
+  QuicPathManager.cpp
 )
 
 set_property(TARGET mvfst_state_machine PROPERTY VERSION ${PACKAGE_VERSION})

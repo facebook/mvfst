@@ -209,3 +209,19 @@ mvfst_cpp_test(
         "//quic/state:quic_state_machine",
     ],
 )
+
+mvfst_cpp_test(
+    name = "quic_path_manager_test",
+    srcs = [
+        "QuicPathManagerTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        "//quic:constants",
+        "//quic/codec:types",
+        "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/state:quic_state_machine",
+    ],
+)
