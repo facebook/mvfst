@@ -33,8 +33,7 @@ Copa::Copa(QuicConnectionStateBase& conn)
   useRttStanding_ = conn_.transportSettings.copaUseRttStanding;
 }
 
-void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
+void Copa::onRemoveBytesFromInflight(uint64_t /* bytes */) {
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
@@ -143,7 +142,6 @@ void Copa::onPacketAckOrLoss(
 
 void Copa::onPacketAcked(const AckEvent& ack) {
   DCHECK(ack.largestNewlyAckedPacket.has_value());
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())
@@ -300,7 +298,6 @@ void Copa::onPacketLoss(const LossEvent& loss) {
         kCongestionPacketLoss);
   }
   DCHECK(loss.largestLostPacketNum.has_value());
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, loss.lostBytes);
   if (loss.persistentCongestion) {
     // TODO See if we should go to slowStart here
     VLOG(10) << __func__ << " writable=" << getWritableBytes()

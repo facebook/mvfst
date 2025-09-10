@@ -19,9 +19,7 @@ StaticCwndCongestionController::StaticCwndCongestionController(
       pacerIntervalSource_(pacerIntervalSource) {}
 
 void StaticCwndCongestionController::onRemoveBytesFromInflight(
-    uint64_t bytesToRemove) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytesToRemove);
-}
+    uint64_t /* bytesToRemove */) {}
 
 void StaticCwndCongestionController::onPacketSent(
     const OutstandingPacketWrapper& /* packet */) {
@@ -30,11 +28,8 @@ void StaticCwndCongestionController::onPacketSent(
 
 void StaticCwndCongestionController::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
-    const LossEvent* FOLLY_NULLABLE lossEvent) {
+    const LossEvent* FOLLY_NULLABLE /* lossEvent */) {
   if (ackEvent) {
-    subtractAndCheckUnderflow(
-        conn_.lossState.inflightBytes, ackEvent->ackedBytes);
-
     if (conn_.pacer && ackEvent->rttSample) {
       switch (pacerIntervalSource_) {
         case PacerIntervalSource::MinRtt:
@@ -53,10 +48,6 @@ void StaticCwndCongestionController::onPacketAckOrLoss(
           break;
       }
     }
-  }
-  if (lossEvent) {
-    subtractAndCheckUnderflow(
-        conn_.lossState.inflightBytes, lossEvent->lostBytes);
   }
 }
 

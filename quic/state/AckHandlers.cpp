@@ -7,6 +7,7 @@
 
 #include <folly/MapUtil.h>
 #include <folly/tracing/StaticTracepoint.h>
+#include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/AckedPacketIterator.h>
@@ -74,6 +75,7 @@ void updateCongestionControllerForAck(
         QUIC_STATS(conn.statsCallback, onPersistentCongestion);
       }
     }
+    subtractAndCheckUnderflow(conn.lossState.inflightBytes, ack.ackedBytes);
     conn.congestionController->onPacketAckOrLoss(
         &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     for (auto& packetProcessor : conn.packetProcessors) {

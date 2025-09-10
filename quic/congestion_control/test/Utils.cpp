@@ -22,4 +22,35 @@ void onPacketsSentWrapper(
   cc->onPacketSent(packet);
 }
 
+void onPacketAckOrLossWrapper(
+    quic::QuicConnectionStateBase* conn,
+    quic::CongestionController* cc,
+    quic::Optional<quic::AckEvent> ack,
+    quic::Optional<quic::CongestionController::LossEvent> loss) {
+  if (loss) {
+    quic::subtractAndCheckUnderflow(
+        conn->lossState.inflightBytes, loss->lostBytes);
+  }
+
+  if (ack) {
+    quic::subtractAndCheckUnderflow(
+        conn->lossState.inflightBytes, ack->ackedBytes);
+  }
+  quic::AckEvent* ackEvent = (ack ? &(*ack) : nullptr);
+  quic::CongestionController::LossEvent* lossEvent =
+      (loss ? &(*loss) : nullptr);
+  cc->onPacketAckOrLoss(ackEvent, lossEvent);
+}
+
+void removeBytesFromInflight(
+    quic::QuicConnectionStateBase* conn,
+    uint64_t bytesToRemove,
+    quic::CongestionController* cc) {
+  if (conn) {
+    quic::subtractAndCheckUnderflow(
+        conn->lossState.inflightBytes, bytesToRemove);
+  }
+  cc->onRemoveBytesFromInflight(bytesToRemove);
+}
+
 } // namespace quic::test

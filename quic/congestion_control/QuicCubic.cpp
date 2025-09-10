@@ -152,8 +152,7 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
   }
 }
 
-void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
+void Cubic::onRemoveBytesFromInflight(uint64_t /* bytes */) {
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -339,7 +338,6 @@ void Cubic::onPacketAckOrLoss(
 
 void Cubic::onPacketAcked(const AckEvent& ack) {
   auto currentCwnd = cwndBytes_;
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   if (recoveryState_.endOfRecovery.has_value() &&
       *recoveryState_.endOfRecovery >= ack.largestNewlyAckedPacketSentTime) {
     if (conn_.qLogger) {

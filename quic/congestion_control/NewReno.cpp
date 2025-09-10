@@ -25,8 +25,7 @@ NewReno::NewReno(QuicConnectionStateBase& conn)
       conn_.transportSettings.minCwndInMss);
 }
 
-void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
+void NewReno::onRemoveBytesFromInflight(uint64_t /* bytes */) {
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
@@ -52,7 +51,6 @@ void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
 
 void NewReno::onAckEvent(const AckEvent& ack) {
   DCHECK(ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
@@ -115,7 +113,6 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
   DCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, loss.lostBytes);
   if (!endOfRecovery_ || *endOfRecovery_ < *loss.largestLostSentTime) {
     endOfRecovery_ = Clock::now();
     cwndBytes_ = (cwndBytes_ >> kRenoLossReductionFactorShift);

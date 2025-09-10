@@ -13,6 +13,7 @@
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -240,6 +241,8 @@ template <class ClockType = Clock>
     auto& lossEvent = lossEventResult.value();
     if (conn.congestionController && lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      subtractAndCheckUnderflow(
+          conn.lossState.inflightBytes, lossEvent->lostBytes);
       conn.congestionController->onPacketAckOrLoss(
           nullptr, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     }
@@ -333,7 +336,10 @@ template <class ClockType = Clock>
 
   conn.lossState.rtxCount += lossEvent.lostPackets;
   if (conn.congestionController && lossEvent.largestLostPacketNum.has_value()) {
-    conn.congestionController->onRemoveBytesFromInflight(lossEvent.lostBytes);
+    subtractAndCheckUnderflow(
+        conn.lossState.inflightBytes, lossEvent.lostBytes);
+    conn.congestionController->onRemoveBytesFromInflight(
+        conn.lossState.inflightBytes);
   }
   VLOG(10) << __func__ << " marked=" << lossEvent.lostPackets;
   return {};

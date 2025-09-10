@@ -46,7 +46,7 @@ TEST_F(StaticCwndCongestionControllerTest, RemoveBytesFromInflight) {
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // remove the bytes in flight
-  cca.onRemoveBytesFromInflight(bytesSent);
+  quic::test::removeBytesFromInflight(&conn, bytesSent, &cca);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -65,7 +65,7 @@ TEST_F(StaticCwndCongestionControllerTest, RemoveBytesFromInflightFullCwnd) {
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // remove the bytes in flight
-  cca.onRemoveBytesFromInflight(bytesSent);
+  quic::test::removeBytesFromInflight(&conn, bytesSent, &cca);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -87,7 +87,7 @@ TEST_F(
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // remove the bytes in flight
-  cca.onRemoveBytesFromInflight(bytesSent);
+  quic::test::removeBytesFromInflight(&conn, bytesSent, &cca);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -109,7 +109,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAcked) {
   // ack the packet
   const auto ack =
       makeAck(pktSeqNum, bytesSent, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack, std::nullopt);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -131,7 +131,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAckedFullCwnd) {
   // ack the packet
   const auto ack =
       makeAck(pktSeqNum, bytesSent, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack, std::nullopt);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -153,7 +153,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenAckedOvershoot) {
   // ack the packet
   const auto ack =
       makeAck(pktSeqNum, bytesSent, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack, std::nullopt);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -187,14 +187,14 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenAcked) {
   // ack pkt1
   const auto ack1 =
       makeAck(pktSeqNum, bytesSentPkt1, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack1, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack1, std::nullopt);
   EXPECT_EQ(cwndInBytes - bytesSentPkt2, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // ack pkt2
   const auto ack2 =
       makeAck(pktSeqNum, bytesSentPkt2, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack2, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack2, std::nullopt);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -228,14 +228,14 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenAckedOvershoot) {
   // ack pkt1
   const auto ack1 =
       makeAck(pktSeqNum, bytesSentPkt1, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack1, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack1, std::nullopt);
   EXPECT_EQ(0, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // ack pkt2
   const auto ack2 =
       makeAck(pktSeqNum, bytesSentPkt2, Clock::now(), Clock::now() - 5ms);
-  cca.onPacketAckOrLoss(&ack2, nullptr /* lossEvent */);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, ack2, std::nullopt);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -258,7 +258,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLost) {
   // mark the packet lost
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(pkt);
-  cca.onPacketAckOrLoss(nullptr, &lossEvent);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -281,7 +281,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostFullCwnd) {
   // mark the packet lost
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(pkt);
-  cca.onPacketAckOrLoss(nullptr, &lossEvent);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -304,7 +304,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostOvershoot) {
   // mark the packet lost
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(pkt);
-  cca.onPacketAckOrLoss(nullptr, &lossEvent);
+  quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 }
@@ -337,7 +337,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLost) {
   {
     CongestionController::LossEvent lossEvent;
     lossEvent.addLostPacket(pkt1);
-    cca.onPacketAckOrLoss(nullptr, &lossEvent);
+    quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(cwndInBytes - bytesSentPkt2, cca.getWritableBytes());
     EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
   }
@@ -346,7 +346,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLost) {
   {
     CongestionController::LossEvent lossEvent;
     lossEvent.addLostPacket(pkt2);
-    cca.onPacketAckOrLoss(nullptr, &lossEvent);
+    quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
     EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
   }
@@ -379,7 +379,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLostOvershoot) {
   {
     CongestionController::LossEvent lossEvent;
     lossEvent.addLostPacket(pkt1);
-    cca.onPacketAckOrLoss(nullptr, &lossEvent);
+    quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(0, cca.getWritableBytes());
     EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
   }
@@ -388,7 +388,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLostOvershoot) {
   {
     CongestionController::LossEvent lossEvent;
     lossEvent.addLostPacket(pkt2);
-    cca.onPacketAckOrLoss(nullptr, &lossEvent);
+    quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
     EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
   }

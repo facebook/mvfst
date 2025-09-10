@@ -60,6 +60,7 @@ mvfst_cpp_test(
     ],
     deps = [
         ":TestingCubic",
+        ":test_utils",
         "//folly/portability:gtest",
         "//quic/common/test:test_utils",
     ],
@@ -212,6 +213,7 @@ mvfst_cpp_test(
         "ThrottlingSignalProviderTest.cpp",
     ],
     deps = [
+        ":test_utils",
         "//quic/api:transport",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:bbr",

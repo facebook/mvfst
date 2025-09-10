@@ -169,12 +169,10 @@ void BbrCongestionController::onPacketAckOrLoss(
     const LossEvent* FOLLY_NULLABLE lossEvent) {
   auto prevInflightBytes = conn_.lossState.inflightBytes;
   if (ackEvent) {
-    subtractAndCheckUnderflow(
-        conn_.lossState.inflightBytes, ackEvent->ackedBytes);
+    prevInflightBytes += ackEvent->ackedBytes;
   }
   if (lossEvent) {
-    subtractAndCheckUnderflow(
-        conn_.lossState.inflightBytes, lossEvent->lostBytes);
+    prevInflightBytes += lossEvent->lostBytes;
   }
   if (lossEvent) {
     onPacketLoss(*lossEvent, ackEvent ? ackEvent->ackedBytes : 0);
@@ -660,9 +658,7 @@ void BbrCongestionController::detectBottleneckBandwidth(bool appLimitedSample) {
 }
 
 void BbrCongestionController::onRemoveBytesFromInflight(
-    uint64_t bytesToRemove) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytesToRemove);
-}
+    uint64_t /* bytesToRemove */) {}
 
 std::string bbrStateToString(BbrCongestionController::BbrState state) {
   switch (state) {

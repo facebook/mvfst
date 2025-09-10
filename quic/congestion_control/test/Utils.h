@@ -22,4 +22,14 @@ void onPacketsSentWrapper(
     quic::CongestionController* cc,
     const quic::OutstandingPacketWrapper& packet);
 
+void onPacketAckOrLossWrapper(
+    quic::QuicConnectionStateBase* conn,
+    quic::CongestionController* cc,
+    quic::Optional<quic::AckEvent> ack,
+    quic::Optional<quic::CongestionController::LossEvent> loss);
+
+void removeBytesFromInflight(
+    quic::QuicConnectionStateBase* conn,
+    uint64_t bytesToRemove,
+    quic::CongestionController* cc);
 } // namespace quic::test

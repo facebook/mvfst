@@ -26,7 +26,8 @@ TEST_F(CubicRecoveryTest, LossBurst) {
   totalSent += 1000;
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet0);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss));
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   auto cwndAfterLoss = cubic.getCongestionWindow();
 
@@ -39,7 +40,8 @@ TEST_F(CubicRecoveryTest, LossBurst) {
     conn.lossState.largestSent = i;
     loss2.addLostPacket(packet);
   }
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss2));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss2));
   // Still in recovery:
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   // Cwnd should be reduced.
@@ -55,8 +57,11 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   auto packet = makeTestingWritePacket(0, 1000, 1000 + totalSent);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   totalSent += 1000;
-  cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet.metadata.time), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(0, 1000, Clock::now(), packet.metadata.time),
+      std::nullopt);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 
   // Send three packets, lose second immediately.
@@ -72,7 +77,8 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   conn.lossState.largestSent = 3;
   CongestionController::LossEvent loss2;
   loss2.addLostPacket(packet2);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss2));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss2));
 
   // Should now be in recovery. Send packet4, receive acks for 3 and 4 which
   // should exit recovery with a certain cwnd.
@@ -81,17 +87,24 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet4);
   totalSent += 1000;
   conn.lossState.largestSent = 4;
-  cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, Clock::now(), packet3.metadata.time), std::nullopt);
-  cubic.onPacketAckOrLoss(
-      makeAck(4, 1000, Clock::now(), packet4.metadata.time), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(3, 1000, Clock::now(), packet3.metadata.time),
+      std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(4, 1000, Clock::now(), packet4.metadata.time),
+      std::nullopt);
   auto cwndAfterRecovery = cubic.getCongestionWindow();
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
   // Now lose packet1, which should be ignored.
   CongestionController::LossEvent loss1;
   loss1.addLostPacket(packet1);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss1));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss1));
   EXPECT_EQ(CubicStates::Steady, cubic.state());
   EXPECT_EQ(cwndAfterRecovery, cubic.getCongestionWindow());
 }
@@ -103,15 +116,19 @@ TEST_F(CubicRecoveryTest, LossAfterRecovery) {
   // Send/ack one packet.
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
-  cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet.metadata.time), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(0, 1000, Clock::now(), packet.metadata.time),
+      std::nullopt);
   // Lose one packet.
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   conn.lossState.largestSent = 1;
   CongestionController::LossEvent loss1;
   loss1.addLostPacket(packet1);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss1));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss1));
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   auto cwndAfterLoss = cubic.getCongestionWindow();
 
@@ -121,7 +138,8 @@ TEST_F(CubicRecoveryTest, LossAfterRecovery) {
   conn.lossState.largestSent = 2;
   CongestionController::LossEvent loss2;
   loss2.addLostPacket(packet2);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss2));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss2));
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   EXPECT_TRUE(cwndAfterLoss > cubic.getCongestionWindow());
 }
@@ -145,19 +163,32 @@ TEST_F(CubicRecoveryTest, AckNotLargestNotChangeCwnd) {
 
   // packet5 is lost:
   loss.addLostPacket(packet5);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss));
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   auto cwndAfterLoss = cubic.getWritableBytes() + 4000; // 4k are in flight
 
   // the the rest are acked:
-  cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet1.metadata.time), std::nullopt);
-  cubic.onPacketAckOrLoss(
-      makeAck(1, 1000, Clock::now(), packet2.metadata.time), std::nullopt);
-  cubic.onPacketAckOrLoss(
-      makeAck(2, 1000, Clock::now(), packet3.metadata.time), std::nullopt);
-  cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, Clock::now(), packet4.metadata.time), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(0, 1000, Clock::now(), packet1.metadata.time),
+      std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(1, 1000, Clock::now(), packet2.metadata.time),
+      std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(2, 1000, Clock::now(), packet3.metadata.time),
+      std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(3, 1000, Clock::now(), packet4.metadata.time),
+      std::nullopt);
 
   // Still in recovery:
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());

@@ -79,8 +79,11 @@ TEST_F(BbrTest, Recovery) {
       inflightBytes + ackedBytes - loss.lostBytes, inflightBytes + ackedBytes);
   // This sets the connection to recovery state, also sets both the
   // endOfRoundTrip_ and endOfRecovery_ to Clock::now()
-  bbr.onPacketAckOrLoss(
-      makeAck(0, ackedBytes, Clock::now(), Clock::now() - 5ms), loss);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
+      makeAck(0, ackedBytes, Clock::now(), Clock::now() - 5ms),
+      loss);
   auto estimatedEndOfRoundTrip = Clock::now();
   EXPECT_TRUE(bbr.inRecovery());
   EXPECT_EQ(expectedRecoveryWindow, bbr.getCongestionWindow());
@@ -111,13 +114,15 @@ TEST_F(BbrTest, Recovery) {
   // This doesn't change endOfRoundTrip_, but move endOfRecovery to new
   // Clock::now()
   auto estimatedLossTime = Clock::now();
-  bbr.onPacketAckOrLoss(std::nullopt, loss2);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, std::nullopt, loss2);
   EXPECT_EQ(expectedRecoveryWindow, bbr.getCongestionWindow());
 
   ackedBytes = 500;
   expectedRecoveryWindow += ackedBytes; // GROWTH
   // This will move the Recovery to GROWTH
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           11,
           ackedBytes,
@@ -133,13 +138,13 @@ TEST_F(BbrTest, Recovery) {
   loss3.persistentCongestion = true;
   loss3.lostBytes = inflightBytes / 2;
   expectedRecoveryWindow = conn.udpSendPacketLen * kMinCwndInMssForBbr;
-  bbr.onPacketAckOrLoss(std::nullopt, loss3);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, std::nullopt, loss3);
   EXPECT_EQ(expectedRecoveryWindow, bbr.getCongestionWindow());
 
   CongestionController::AckEvent ack3 = makeAck(
       12, inflightBytes / 2, estimatedLossTime + 10ms, estimatedLossTime + 5ms);
   // This will exit Recovery
-  bbr.onPacketAckOrLoss(ack3, std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack3, std::nullopt);
   EXPECT_FALSE(bbr.inRecovery());
   // Only one update should have been issued.
   ASSERT_EQ(conn.pendingEvents.frames.size(), 1);
@@ -174,8 +179,11 @@ TEST_F(BbrTest, StartupCwnd) {
           Bandwidth(5000ULL * 1000 * 1000, std::chrono::microseconds(1))));
   // Target cwnd will be 100 * 5000 * 2.885 = 1442500, but you haven't finished
   // STARTUP, too bad kiddo, you only grow a little today
-  bbr.onPacketAckOrLoss(
-      makeAck(0, 3000, Clock::now(), packet.metadata.time), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
+      makeAck(0, 3000, Clock::now(), packet.metadata.time),
+      std::nullopt);
   EXPECT_EQ(startingCwnd + 3000, bbr.getCongestionWindow());
 }
 
@@ -203,7 +211,7 @@ TEST_F(BbrTest, StartupCwndImplicit) {
   // STARTUP, too bad kiddo, you only grow a little today
   auto ack = makeAck(0, 3000, Clock::now(), packet.metadata.time);
   ack.implicit = true;
-  bbr.onPacketAckOrLoss(ack, std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, std::nullopt);
   EXPECT_EQ(startingCwnd + 3000, bbr.getCongestionWindow());
 }
 
@@ -230,7 +238,9 @@ TEST_F(BbrTest, LeaveStartup) {
     EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
         .WillRepeatedly(Return(
             mockedBandwidth * (growFast ? kExpectedStartupGrowth : 1.0)));
-    bbr.onPacketAckOrLoss(
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &bbr,
         makeAck(currentLatest, 1000, Clock::now(), packet.metadata.time),
         std::nullopt);
     conn.lossState.totalBytesAcked += 1000;
@@ -272,7 +282,7 @@ TEST_F(BbrTest, RemoveInflightBytes) {
   quic::test::onPacketsSentWrapper(
       &conn, &bbr, makeTestingWritePacket(0, 1000, 1000));
   EXPECT_EQ(writableBytesAfterInit - 1000, bbr.getWritableBytes());
-  bbr.onRemoveBytesFromInflight(1000);
+  quic::test::removeBytesFromInflight(&conn, 1000, &bbr);
   EXPECT_EQ(writableBytesAfterInit, bbr.getWritableBytes());
 }
 
@@ -313,7 +323,9 @@ TEST_F(BbrTest, ProbeRtt) {
   // Ack the first one without min rtt expiration.
   auto packetToAck = inflightPackets.front();
   EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(false));
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           packetToAck.first,
           conn.udpSendPacketLen,
@@ -331,7 +343,9 @@ TEST_F(BbrTest, ProbeRtt) {
   packetToAck = inflightPackets.front();
   EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(true));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(AnyNumber());
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           packetToAck.first,
           conn.udpSendPacketLen,
@@ -348,7 +362,9 @@ TEST_F(BbrTest, ProbeRtt) {
   // None of these acks will lead to a new RTT round
   while (inflightBytes >= bbr.getCongestionWindow() + conn.udpSendPacketLen) {
     packetToAck = inflightPackets.front();
-    bbr.onPacketAckOrLoss(
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &bbr,
         makeAck(
             packetToAck.first,
             conn.udpSendPacketLen,
@@ -365,7 +381,9 @@ TEST_F(BbrTest, ProbeRtt) {
   ASSERT_FALSE(inflightPackets.empty());
   packetToAck = inflightPackets.front();
   auto currentTime = Clock::now();
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           packetToAck.first,
           conn.udpSendPacketLen,
@@ -380,7 +398,9 @@ TEST_F(BbrTest, ProbeRtt) {
   // Ack everything still inflight
   while (inflightPackets.size()) {
     packetToAck = inflightPackets.front();
-    bbr.onPacketAckOrLoss(
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &bbr,
         makeAck(
             packetToAck.first,
             conn.udpSendPacketLen,
@@ -397,7 +417,9 @@ TEST_F(BbrTest, ProbeRtt) {
   // counting down both time duration and has reached a new rtt round.
   sendFunc();
   packetToAck = inflightPackets.front();
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           packetToAck.first,
           conn.udpSendPacketLen,
@@ -415,7 +437,9 @@ TEST_F(BbrTest, ProbeRtt) {
   EXPECT_CALL(
       *rawRttSampler, timestampMinRtt(packetToAck.second + kProbeRttDuration))
       .Times(1);
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           packetToAck.first,
           conn.udpSendPacketLen,
@@ -442,7 +466,7 @@ TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrash) {
                  .setPacketNumberSpace(PacketNumberSpace::Initial)
                  .setLargestAckedPacket(pn)
                  .build();
-  bbr.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, loss);
 }
 
 TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
@@ -459,7 +483,7 @@ TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
                  .setPacketNumberSpace(PacketNumberSpace::Handshake)
                  .setLargestAckedPacket(pn)
                  .build();
-  bbr.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, loss);
 }
 
 TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
@@ -476,7 +500,7 @@ TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .setLargestAckedPacket(pn)
                  .build();
-  bbr.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, loss);
 }
 
 TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrashPn1) {
@@ -493,7 +517,7 @@ TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrashPn1) {
                  .setPacketNumberSpace(PacketNumberSpace::Initial)
                  .setLargestAckedPacket(pn)
                  .build();
-  bbr.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, loss);
 }
 
 TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrashPn1) {
@@ -510,7 +534,7 @@ TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrashPn1) {
                  .setPacketNumberSpace(PacketNumberSpace::Handshake)
                  .setLargestAckedPacket(pn)
                  .build();
-  bbr.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, loss);
 }
 
 TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrashPn1) {
@@ -527,7 +551,7 @@ TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrashPn1) {
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .setLargestAckedPacket(pn)
                  .build();
-  bbr.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ack, loss);
 }
 
 TEST_F(BbrTest, AckAggregation) {
@@ -560,7 +584,9 @@ TEST_F(BbrTest, AckAggregation) {
     EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
         .WillRepeatedly(Return(
             mockedBandwidth * (growFast ? kExpectedStartupGrowth : 1.0)));
-    bbr.onPacketAckOrLoss(
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &bbr,
         makeAck(
             currentLatest,
             1000,
@@ -613,7 +639,7 @@ TEST_F(BbrTest, AckAggregation) {
       .WillRepeatedly(Return(mockedBandwidth * 10));
   auto expectedBdp =
       mockedBandwidth * 50 * std::chrono::microseconds(50) / 1000 / 1000;
-  bbr.onPacketAckOrLoss(ackEvent, std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ackEvent, std::nullopt);
   auto newCwnd = bbr.getCongestionWindow();
   auto currentMaxAckHeight = 0;
   if (newCwnd != currentCwnd + 1000) {
@@ -636,7 +662,7 @@ TEST_F(BbrTest, AckAggregation) {
       ackEvent.ackTime + 1ms,
       packet1.metadata.time);
 
-  bbr.onPacketAckOrLoss(ackEvent2, std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, ackEvent2, std::nullopt);
   newCwnd = bbr.getCongestionWindow();
   EXPECT_GT(newCwnd, expectedBdp * kProbeBwGain + currentMaxAckHeight);
 }
@@ -699,7 +725,9 @@ TEST_F(BbrTest, ExtendMinRttExpiration) {
       conn.lossState.largestSent.value_or(0), 1000, 1000);
   quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   EXPECT_CALL(*rawRttSampler, timestampMinRtt(_)).Times(1);
-  bbr.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
       makeAck(
           conn.lossState.largestSent.value_or(0),
           1000,
@@ -770,7 +798,7 @@ TEST_F(BbrTest, PacketLossInvokesPacer) {
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
-  bbr.onPacketAckOrLoss(std::nullopt, lossEvent);
+  quic::test::onPacketAckOrLossWrapper(&conn, &bbr, std::nullopt, lossEvent);
 }
 
 TEST_F(BbrTest, ProbeRttSetsAppLimited) {
@@ -787,15 +815,21 @@ TEST_F(BbrTest, ProbeRttSetsAppLimited) {
       &conn, &bbr, makeTestingWritePacket(0, 1000, 1000));
   EXPECT_CALL(*rawRttSampler, minRttExpired()).Times(1).WillOnce(Return(true));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(2);
-  bbr.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), Clock::now() - 5ms), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
+      makeAck(0, 1000, Clock::now(), Clock::now() - 5ms),
+      std::nullopt);
   EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
 
   quic::test::onPacketsSentWrapper(
       &conn, &bbr, makeTestingWritePacket(1, 1000, 2000));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
-  bbr.onPacketAckOrLoss(
-      makeAck(1, 1000, Clock::now(), Clock::now() - 5ms), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &bbr,
+      makeAck(1, 1000, Clock::now(), Clock::now() - 5ms),
+      std::nullopt);
   EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
 }
 

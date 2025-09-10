@@ -8,6 +8,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/QuicCubic.h>
+#include <quic/congestion_control/test/Utils.h>
 
 using namespace quic;
 using namespace quic::test;
@@ -27,8 +28,11 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   auto packet0 = makeTestingWritePacket(0, 1000, 1000);
   conn.lossState.largestSent = 0;
   cubic.onPacketSent(packet0);
-  cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet0.metadata.time), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(0, 1000, Clock::now(), packet0.metadata.time),
+      std::nullopt);
   EXPECT_EQ(3000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
@@ -39,7 +43,8 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   cubic.onPacketSent(packet1);
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet1);
-  cubic.onPacketAckOrLoss(std::nullopt, std::move(loss));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss));
   EXPECT_EQ(2100, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }

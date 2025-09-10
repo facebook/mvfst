@@ -121,8 +121,11 @@ class CopaTest : public Test {
     conn.lossState.srtt = 50ms;
 
     // ack for first packet, lastCwndDoubleTime_ will be initialized now
-    copa.onPacketAckOrLoss(
-        createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &copa,
+        createAckEvent(packetNumToAck, packetSize, now),
+        std::nullopt);
     numPacketsInFlight--;
     EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
 
@@ -143,8 +146,11 @@ class CopaTest : public Test {
     // Rttmin = 50ms
     conn.lossState.srtt = 100ms;
 
-    copa.onPacketAckOrLoss(
-        createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &copa,
+        createAckEvent(packetNumToAck, packetSize, now),
+        std::nullopt);
     packetNumToAck++;
     EXPECT_FALSE(copa.inSlowStart());
     uint64_t cwndChange =
@@ -204,7 +210,7 @@ TEST_F(CopaTest, PersistentCongestion) {
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
-  copa.onPacketAckOrLoss(std::nullopt, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &copa, std::nullopt, loss);
   EXPECT_EQ(
       copa.getWritableBytes(),
       conn.transportSettings.minCwndInMss * conn.udpSendPacketLen);
@@ -227,7 +233,7 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   uint32_t ackedSize = 10;
   quic::test::onPacketsSentWrapper(
       &conn, &copa, createPacket(ackPacketNum, ackedSize, ackedSize));
-  copa.onRemoveBytesFromInflight(2);
+  quic::test::removeBytesFromInflight(&conn, 2, &copa);
   EXPECT_EQ(copa.getWritableBytes(), originalWritableBytes - ackedSize + 2);
 
   std::vector<int> indices =
@@ -286,8 +292,11 @@ TEST_F(CopaTest, TestSlowStartAck) {
   conn.lossState.srtt = 280ms;
 
   // ack for first packet, lastCwndDoubleTime_ will be initialized now
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   numPacketsInFlight--;
   EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
 
@@ -307,11 +316,17 @@ TEST_F(CopaTest, TestSlowStartAck) {
 
   auto lastCwnd = copa.getCongestionWindow();
   // Say more time passed and some packets were acked meanwhile.
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
   now += 300ms;
 
@@ -320,8 +335,11 @@ TEST_F(CopaTest, TestSlowStartAck) {
   // RTTmin = 280ms
   conn.lossState.srtt = 300ms;
 
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
   now += 100ms;
 
@@ -332,8 +350,11 @@ TEST_F(CopaTest, TestSlowStartAck) {
 
   // ack for 5th packet, at this point currentRate < targetRate, but not enough
   // time has passed for cwnd to double again in slow start
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   EXPECT_TRUE(copa.inSlowStart());
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd);
 
@@ -347,8 +368,11 @@ TEST_F(CopaTest, TestSlowStartAck) {
 
   // ack for 6th packet, at this point even though lrtt has increased, standing
   // rtt hasn't. Hence it will still not exit slow start
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   EXPECT_TRUE(copa.inSlowStart());
   // cwnd = 40 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd);
@@ -360,8 +384,11 @@ TEST_F(CopaTest, TestSlowStartAck) {
 
   // ack for 7th packet, at this point currentRate > targetRate, so it would
   // exit slow start and reduce cwnd
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   EXPECT_FALSE(copa.inSlowStart());
   EXPECT_LE(copa.getCongestionWindow(), lastCwnd);
 }
@@ -384,8 +411,11 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
   conn.lossState.lrtt = 100ms;
   // Rttmin = 100ms
   conn.lossState.srtt = 100ms;
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
   uint64_t cwndChange =
       cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
@@ -399,8 +429,11 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
   conn.lossState.lrtt = 50ms;
   // Rttmin = 60ms
   conn.lossState.srtt = 100ms;
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
   cwndChange = cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
   // cwnd = 9.6 + 1 / (0.5 * 9.6) = 9.8 packets
@@ -412,8 +445,11 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
   // Rttmin = 60ms
   conn.lossState.srtt = 100ms;
   // Though lrtt has increased, rtt standing has not.  Will still increase
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
   cwndChange = cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
   // cwnd = 9.8 + 1 / (0.5 * 9.8) = 10.0 packets
@@ -422,8 +458,11 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
 
   // If sufficient time has elapsed, the increased rtt will be noted
   now += 110ms;
-  copa.onPacketAckOrLoss(
-      createAckEvent(packetNumToAck, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &copa,
+      createAckEvent(packetNumToAck, packetSize, now),
+      std::nullopt);
   packetNumToAck++;
   cwndChange = cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
   // cwnd = 10 - 1 / (0.5 * 10) = 9.8
@@ -455,7 +494,8 @@ TEST_F(CopaTest, TestVelocity) {
   conn.lossState.srtt = 100ms;
   now += 100ms;
   // velocity = 1, direction = 0
-  copa.onPacketAckOrLoss(createAckEvent(30, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(30, packetSize, now), std::nullopt);
 
   uint64_t cwndChange =
       cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
@@ -465,7 +505,8 @@ TEST_F(CopaTest, TestVelocity) {
 
   // another ack, velocity = 1, direction 0 -> 1
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(35, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(35, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 10 + 1 / (0.5 * 10) = 10.2 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -473,7 +514,8 @@ TEST_F(CopaTest, TestVelocity) {
 
   // another ack, velocity = 1, direction = 1
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(40, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(40, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 10.2 + 1 / (0.5 * 10.2) = 10.4 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -481,7 +523,8 @@ TEST_F(CopaTest, TestVelocity) {
 
   // another ack, velocity = 1, direction = 1
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(45, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(45, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 10.4 + 1 / (0.5 * 10.4) = 10.6 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -489,7 +532,8 @@ TEST_F(CopaTest, TestVelocity) {
 
   // another ack, velocity = 1, direction = 1
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(50, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 10.4 + 1 / (0.5 * 10.4) = 10.6 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -498,7 +542,8 @@ TEST_F(CopaTest, TestVelocity) {
   // another ack, velocity = 2, direction = 1
   velocity = 2 * velocity;
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(55, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(55, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 10 + 2 / (0.5 * 10.6) = 11 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -507,7 +552,8 @@ TEST_F(CopaTest, TestVelocity) {
   // another ack, velocity = 4, direction = 1
   velocity = 2 * velocity;
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(60, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(60, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 11 + 4 / (0.5 * 11) = 11.8 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -516,7 +562,8 @@ TEST_F(CopaTest, TestVelocity) {
   // another ack, velocity = 8, direction = 1
   velocity = 2 * velocity;
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(65, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(65, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 11.8 + 8 / (0.5 * 11.8) = 13.4 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -530,7 +577,8 @@ TEST_F(CopaTest, TestVelocity) {
   velocity = 1;
   // give it some extra time for rtt standing to reset
   now += 110ms;
-  copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), std::nullopt);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &copa, createAckEvent(50, packetSize, now), std::nullopt);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 11.8 + 8 / (0.5 * 11.8) = 13.4 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd - cwndChange);
@@ -555,7 +603,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .setLargestAckedPacket(1)
                  .build();
-  copa.onPacketAckOrLoss(ack, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &copa, ack, loss);
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
@@ -581,7 +629,7 @@ TEST_F(CopaTest, PacketLossInvokesPacer) {
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
-  copa.onPacketAckOrLoss(std::nullopt, lossEvent);
+  quic::test::onPacketAckOrLossWrapper(&conn, &copa, std::nullopt, lossEvent);
 }
 
 } // namespace quic::test

@@ -70,9 +70,7 @@ Bbr2CongestionController::Bbr2CongestionController(
 // Congestion Controller Interface
 
 void Bbr2CongestionController::onRemoveBytesFromInflight(
-    uint64_t bytesToRemove) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytesToRemove);
-}
+    uint64_t /* bytesToRemove */) {}
 
 void Bbr2CongestionController::onPacketSent(
     const OutstandingPacketWrapper& packet) {
@@ -118,14 +116,6 @@ void Bbr2CongestionController::onPacketAckOrLoss(
                                           : std::chrono::microseconds(1));
     }
   };
-  if (ackEvent) {
-    subtractAndCheckUnderflow(
-        conn_.lossState.inflightBytes, ackEvent->ackedBytes);
-  }
-  if (lossEvent) {
-    subtractAndCheckUnderflow(
-        conn_.lossState.inflightBytes, lossEvent->lostBytes);
-  }
   SCOPE_EXIT {
     VLOG(6) << "State=" << bbr2StateToString(state_)
             << " inflight=" << conn_.lossState.inflightBytes

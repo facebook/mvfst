@@ -12,6 +12,7 @@
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/SimulatedTBF.h>
 #include <quic/congestion_control/ThrottlingSignalProvider.h>
+#include <quic/congestion_control/test/Utils.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace ::testing;
@@ -106,7 +107,8 @@ TEST(ThrottlingSignalProviderTest, TokenBasedDynamicCapOnWritableBytes) {
     // Ack each sent packet after 5ms
     auto ack = makeAck(
         pn, 2000, now + std::chrono::milliseconds{5}, packet.metadata.time);
-    conn.congestionController->onPacketAckOrLoss(&ack, nullptr);
+    quic::test::onPacketAckOrLossWrapper(
+        &conn, conn.congestionController.get(), ack, std::nullopt);
     auto writableBytes = congestionControlWritableBytes(conn);
     auto maybeSignal = signalProvider->getCurrentThrottlingSignal();
     ASSERT_TRUE(maybeSignal.has_value());
@@ -155,7 +157,9 @@ TEST(
     bbr.onPacketSent(packet);
     totalBytesSent += 2000;
     // Ack each sent packet after 5ms
-    bbr.onPacketAckOrLoss(
+    quic::test::onPacketAckOrLossWrapper(
+        &conn,
+        &bbr,
         makeAck(
             pn, 2000, now + std::chrono::milliseconds{5}, packet.metadata.time),
         std::nullopt);

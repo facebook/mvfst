@@ -113,22 +113,22 @@ TEST_F(NewRenoTest, TestLoss) {
   EXPECT_EQ(reno.getBytesInFlight(), 41);
   auto originalWritableBytes = reno.getWritableBytes();
 
-  reno.onPacketAckOrLoss(
-      std::nullopt, createLossEvent({std::make_pair(loss1, 11)}));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &reno, std::nullopt, createLossEvent({std::make_pair(loss1, 11)}));
   EXPECT_EQ(reno.getBytesInFlight(), 30);
 
   EXPECT_FALSE(reno.inSlowStart());
   auto newWritableBytes1 = reno.getWritableBytes();
   EXPECT_LE(newWritableBytes1, originalWritableBytes + 11);
 
-  reno.onPacketAckOrLoss(
-      std::nullopt, createLossEvent({std::make_pair(loss2, 10)}));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &reno, std::nullopt, createLossEvent({std::make_pair(loss2, 10)}));
   auto newWritableBytes2 = reno.getWritableBytes();
   EXPECT_LE(newWritableBytes2, newWritableBytes1 + 10);
   EXPECT_EQ(reno.getBytesInFlight(), 20);
 
-  reno.onPacketAckOrLoss(
-      std::nullopt, createLossEvent({std::make_pair(loss3, 20)}));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &reno, std::nullopt, createLossEvent({std::make_pair(loss3, 20)}));
   auto newWritableBytes3 = reno.getWritableBytes();
   EXPECT_LE(newWritableBytes3, newWritableBytes2 + 20);
   EXPECT_EQ(reno.getBytesInFlight(), 0);
@@ -148,7 +148,9 @@ TEST_F(NewRenoTest, SendMoreThanWritable) {
       createPacket(loss, originalWritableBytes + 20, Clock::now()));
   EXPECT_EQ(reno.getBytesInFlight(), originalWritableBytes + 20);
   EXPECT_EQ(reno.getWritableBytes(), 0);
-  reno.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &reno,
       std::nullopt,
       createLossEvent({std::make_pair(loss, originalWritableBytes + 20)}));
   EXPECT_LT(reno.getWritableBytes(), originalWritableBytes);
@@ -168,7 +170,9 @@ TEST_F(NewRenoTest, TestSlowStartAck) {
 
   quic::test::onPacketsSentWrapper(&conn, &reno, packet);
   EXPECT_EQ(reno.getBytesInFlight(), ackedSize);
-  reno.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &reno,
       createAckEvent(ackPacketNum1, ackedSize, packet.metadata.time),
       std::nullopt);
   EXPECT_TRUE(reno.inSlowStart());
@@ -188,8 +192,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   PacketNum loss1 = 4;
   quic::test::onPacketsSentWrapper(
       &conn, &reno, createPacket(loss1, 10, Clock::now()));
-  reno.onPacketAckOrLoss(
-      std::nullopt, createLossEvent({std::make_pair(loss1, 10)}));
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &reno, std::nullopt, createLossEvent({std::make_pair(loss1, 10)}));
   EXPECT_FALSE(reno.inSlowStart());
   auto newWritableBytes1 = reno.getWritableBytes();
   EXPECT_LT(newWritableBytes1, originalWritableBytes);
@@ -199,7 +203,9 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   auto packet1 = createPacket(
       ackPacketNum1, ackedSize, Clock::now() - std::chrono::milliseconds(10));
   quic::test::onPacketsSentWrapper(&conn, &reno, packet1);
-  reno.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &reno,
       createAckEvent(ackPacketNum1, ackedSize, packet1.metadata.time),
       std::nullopt);
   EXPECT_FALSE(reno.inSlowStart());
@@ -210,7 +216,9 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   PacketNum ackPacketNum2 = 6;
   auto packet2 = createPacket(ackPacketNum2, ackedSize, Clock::now());
   quic::test::onPacketsSentWrapper(&conn, &reno, packet2);
-  reno.onPacketAckOrLoss(
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &reno,
       createAckEvent(ackPacketNum2, ackedSize, packet2.metadata.time),
       std::nullopt);
   EXPECT_FALSE(reno.inSlowStart());
@@ -255,7 +263,7 @@ TEST_F(NewRenoTest, PersistentCongestion) {
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
-  reno.onPacketAckOrLoss(std::nullopt, loss);
+  quic::test::onPacketAckOrLossWrapper(&conn, &reno, std::nullopt, loss);
   EXPECT_EQ(
       reno.getWritableBytes(),
       conn.transportSettings.minCwndInMss * conn.udpSendPacketLen);
@@ -274,7 +282,7 @@ TEST_F(NewRenoTest, RemoveBytesWithoutLossOrAck) {
   uint32_t ackedSize = 10;
   quic::test::onPacketsSentWrapper(
       &conn, &reno, createPacket(ackPacketNum, ackedSize, Clock::now()));
-  reno.onRemoveBytesFromInflight(2);
+  quic::test::removeBytesFromInflight(&conn, 2, &reno);
   EXPECT_EQ(reno.getWritableBytes(), originalWritableBytes - ackedSize + 2);
 }
 } // namespace quic::test

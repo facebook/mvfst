@@ -23,8 +23,7 @@ Copa2::Copa2(QuicConnectionStateBase& conn)
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
 }
 
-void Copa2::onRemoveBytesFromInflight(uint64_t bytes) {
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
+void Copa2::onRemoveBytesFromInflight(uint64_t /* bytes */) {
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
@@ -114,7 +113,6 @@ void Copa2::onPacketLoss(const LossEvent& loss) {
         kCongestionPacketLoss);
   }
   DCHECK(loss.largestLostPacketNum.has_value());
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, loss.lostBytes);
   if (loss.persistentCongestion) {
     VLOG(10) << __func__ << " writable=" << getWritableBytes()
              << " cwnd=" << cwndBytes_
@@ -138,7 +136,6 @@ void Copa2::onPacketLoss(const LossEvent& loss) {
 
 void Copa2::onPacketAcked(const AckEvent& ack) {
   DCHECK(ack.largestNewlyAckedPacket.has_value());
-  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())

@@ -489,7 +489,6 @@ TEST_F(QuicLossFunctionsTest, TestOnPTOSkipProcessed) {
   }
   EXPECT_EQ(10, conn->outstandings.packets.size());
   std::vector<PacketNum> lostPackets;
-  EXPECT_CALL(*rawCongestionController, onRemoveBytesFromInflight(_)).Times(0);
   EXPECT_CALL(*quicStats_, onPTO());
   auto ret = onPTOAlarm(*conn);
   EXPECT_FALSE(ret.hasError());
@@ -1820,8 +1819,6 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejected) {
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(4, conn->outstandings.packets.size());
   std::vector<bool> lostPackets;
-  // onRemoveBytesFromInflight should still happen
-  EXPECT_CALL(*rawCongestionController, onRemoveBytesFromInflight(_)).Times(1);
   auto result = markZeroRttPacketsLost(
       *conn,
       [&lostPackets](auto&, auto&, bool processed)
@@ -1877,8 +1874,6 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   ASSERT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
 
   std::vector<bool> lostPackets;
-  // onRemoveBytesFromInflight should still happen
-  EXPECT_CALL(*rawCongestionController, onRemoveBytesFromInflight(_)).Times(1);
   auto result = markZeroRttPacketsLost(
       *conn,
       [&lostPackets](auto&, auto&, bool processed)

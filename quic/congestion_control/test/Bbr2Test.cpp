@@ -70,18 +70,20 @@ TEST_F(Bbr2Test, BytesInFlightAccounting) {
                       .setLargestAckedPacket(0)
                       .build();
   ackEvent.ackedBytes = 3000;
-  bbr2.onPacketAckOrLoss(&ackEvent, nullptr);
+  quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, ackEvent, std::nullopt);
   EXPECT_EQ(conn_->lossState.inflightBytes, 6000);
 
   // Mark 1 packet as lost
   CongestionController::LossEvent lossEvent;
   lossEvent.lostPackets = 1;
   lossEvent.lostBytes = 3000;
-  bbr2.onPacketAckOrLoss(nullptr, &lossEvent);
+  quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, std::nullopt, lossEvent);
   EXPECT_EQ(conn_->lossState.inflightBytes, 3000);
 
   // Remove 1 packet from inflight
-  bbr2.onRemoveBytesFromInflight(3000);
+  quic::test::removeBytesFromInflight(conn_.get(), 3000, &bbr2);
   EXPECT_EQ(conn_->lossState.inflightBytes, 0);
 }
 
@@ -140,7 +142,8 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
   if (conn_->transportSettings.ccaConfig.paceInitCwnd) {
     EXPECT_CALL(*rawPacer_, refreshPacingRate(_, _, _));
   }
-  bbr2.onPacketAckOrLoss(&ackEvent, nullptr);
+  quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, ackEvent, std::nullopt);
   // Cwnd should increase.
   EXPECT_GT(bbr2.getCongestionWindow(), cwnd);
 }
@@ -154,7 +157,8 @@ TEST_F(Bbr2Test, GracefullyHandleMissingFields) {
   packet.maybeClonedPacketIdentifier.reset();
   EXPECT_NO_THROW(quic::test::onPacketsSentWrapper(conn_.get(), &bbr2, packet));
 
-  EXPECT_NO_THROW(bbr2.onPacketAckOrLoss(nullptr, nullptr));
+  EXPECT_NO_THROW(quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, std::nullopt, std::nullopt));
   auto ackEvent = CongestionController::AckEvent::Builder()
                       .setAckTime(testStart_)
                       .setAdjustedAckTime(testStart_)
@@ -162,10 +166,13 @@ TEST_F(Bbr2Test, GracefullyHandleMissingFields) {
                       .setPacketNumberSpace(PacketNumberSpace::Handshake)
                       .setLargestAckedPacket(4)
                       .build();
-  EXPECT_NO_THROW(bbr2.onPacketAckOrLoss(&ackEvent, nullptr));
+  EXPECT_NO_THROW(quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, ackEvent, std::nullopt));
 
   CongestionController::LossEvent lossEvent;
-  bbr2.onPacketAckOrLoss(nullptr, &lossEvent);
-  EXPECT_NO_THROW(bbr2.onPacketAckOrLoss(nullptr, &lossEvent));
+  quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, std::nullopt, lossEvent);
+  EXPECT_NO_THROW(quic::test::onPacketAckOrLossWrapper(
+      conn_.get(), &bbr2, std::nullopt, lossEvent));
 }
 } // namespace quic::test
