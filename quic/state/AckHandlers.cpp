@@ -76,6 +76,10 @@ void updateCongestionControllerForAck(
       }
     }
     subtractAndCheckUnderflow(conn.lossState.inflightBytes, ack.ackedBytes);
+    if (lossEvent) {
+      subtractAndCheckUnderflow(
+          conn.lossState.inflightBytes, lossEvent->lostBytes);
+    }
     conn.congestionController->onPacketAckOrLoss(
         &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     for (auto& packetProcessor : conn.packetProcessors) {

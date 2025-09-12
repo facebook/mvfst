@@ -25,6 +25,8 @@
 
 #include <numeric>
 
+#include <array>
+
 using namespace testing;
 
 namespace quic::test {
@@ -7799,7 +7801,81 @@ TEST_P(AckHandlersTest, SkippedPacketNumberClearedAfterDistance) {
   ASSERT_FALSE(getAckState(conn, pnSpace).skippedPacketNum.has_value());
 }
 
+TEST_P(AckHandlersTest, InflightBytesDecrementOnAckIncludesLostBytes) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+
+  // Avoid triggering time-based losses; force reordering-based loss.
+  conn.lossState.srtt = 10s;
+  conn.lossState.reorderingThreshold = 1;
+
+  const auto pnSpace = GetParam().pnSpace;
+  auto startTime = Clock::now();
+
+  // Create 4 outstanding packets of equal encoded size (100 bytes each).
+  const uint16_t kPktSize = 100;
+  uint32_t inflightAtSend = 0;
+  StreamId streamid = 100;
+  for (PacketNum packetNum = 0; packetNum < 4; ++packetNum) {
+    auto regularPacket = createNewPacket(packetNum, pnSpace);
+    WriteStreamFrame frame(streamid++, 0, 0, true);
+    regularPacket.frames.emplace_back(frame);
+
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+
+    OutstandingPacketWrapper sentPacket(
+        std::move(regularPacket),
+        startTime + std::chrono::milliseconds(packetNum),
+        /* encodedSizeIn */ kPktSize,
+        /* encodedBodySizeIn */ 0,
+        /* totalBytesSentIn */ static_cast<uint64_t>(packetNum + 1),
+        /* inflightBytesIn */ inflightAtSend + kPktSize,
+        LossState(),
+        /* writeCountIn */ 0,
+        OutstandingPacketMetadata::DetailsPerStream());
+
+    conn.outstandings.packets.emplace_back(std::move(sentPacket));
+    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
+        getAckState(conn, pnSpace).nonDsrPacketSequenceNumber++;
+
+    inflightAtSend += kPktSize;
+  }
+
+  // Initialize connection inflight bytes to the sum of outstanding packet
+  // sizes. 4 packets * 100 bytes each = 400 bytes.
+  conn.lossState.inflightBytes = inflightAtSend;
+
+  // ACK packets 2 and 3. With reorderingThreshold = 1, packets 0 and 1
+  // should be declared lost by reordering.
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 3;
+  ackFrame.ackBlocks.emplace_back(2, 3);
+  ackFrame.ackDelay = 0ms;
+
+  auto res = processAckFrame(
+      conn,
+      pnSpace,
+      ackFrame,
+      [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+      [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      startTime + 10ms);
+  ASSERT_FALSE(res.hasError());
+
+  // Inflight should be decremented by acked bytes (200) + lost bytes (200)
+  // = 400, to 0.
+  EXPECT_EQ(conn.lossState.inflightBytes, 0);
+}
+
 INSTANTIATE_TEST_SUITE_P(
+
     AckHandlersTests,
     AckHandlersTest,
     Values(
