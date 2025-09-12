@@ -2564,8 +2564,8 @@ TEST_F(QuicClientTransportAfterStartTest, PartialReadLoopCounting) {
   // Read twice in the loop, once success, then fail. Loop detector shouldn't
   // fire.
   conn.transportSettings.maxRecvBatchSize = 2;
-  socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
-  socketReads.emplace_back(TestReadData(EBADF));
+  socketReads.emplace_back(packet->coalesce(), serverAddr);
+  socketReads.emplace_back(EBADF);
   EXPECT_CALL(*rawLoopDetectorCallback, onSuspiciousReadLoops(_, _)).Times(0);
   client->invokeOnNotifyDataAvailable(*sock);
 }
@@ -2611,7 +2611,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
       std::nullopt /* shortHeaderOverride */,
       data->length() /* offset */));
 
-  socketReads.emplace_back(TestReadData(packet1->coalesce(), serverAddr));
+  socketReads.emplace_back(packet1->coalesce(), serverAddr);
   deliverData(packet2->coalesce());
   if (!dataDelivered) {
     eventbase_->loopForever();
@@ -2667,7 +2667,7 @@ TEST_F(
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
+  socketReads.emplace_back(packet->coalesce(), serverAddr);
   deliverNetworkError(EAGAIN);
   if (!dataDelivered) {
     eventbase_->loopForever();
@@ -2698,7 +2698,7 @@ TEST_F(
 
   {
     EXPECT_CALL(*sock, pauseRead()).Times(AtLeast(1));
-    socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
+    socketReads.emplace_back(packet->coalesce(), serverAddr);
     deliverNetworkError(EBADF);
   }
   auto fizzClientSetReadCallback11 = client->setReadCallback(streamId, nullptr);
