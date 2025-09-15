@@ -142,7 +142,7 @@ QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
     return false;
   }
   DCHECK(currentConnIdDataIt != end);
-  pendingEvents.frames.push_back(
+  pendingEvents.frames.emplace_back(
       RetireConnectionIdFrame(currentConnIdDataIt->sequenceNumber));
   mainPeerId = replacementConnIdDataIt->connId;
 

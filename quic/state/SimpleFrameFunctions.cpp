@@ -78,7 +78,7 @@ void updateSimpleFrameOnPacketLoss(
     case QuicSimpleFrame::Type::StopSendingFrame: {
       const StopSendingFrame& stopSendingFrame = *frame.asStopSendingFrame();
       if (conn.streamManager->streamExists(stopSendingFrame.streamId)) {
-        conn.pendingEvents.frames.push_back(stopSendingFrame);
+        conn.pendingEvents.frames.emplace_back(stopSendingFrame);
       }
       break;
     }
@@ -91,11 +91,11 @@ void updateSimpleFrameOnPacketLoss(
       break;
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
-      conn.pendingEvents.frames.push_back(*frame.asPathResponseFrame());
+      conn.pendingEvents.frames.emplace_back(*frame.asPathResponseFrame());
       break;
     }
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {
-      conn.pendingEvents.frames.push_back(*frame.asHandshakeDoneFrame());
+      conn.pendingEvents.frames.emplace_back(*frame.asHandshakeDoneFrame());
       break;
     }
     case QuicSimpleFrame::Type::NewConnectionIdFrame:

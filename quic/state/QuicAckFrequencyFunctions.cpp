@@ -25,7 +25,7 @@ void requestPeerAckFrequencyChange(
   frame.updateMaxAckDelay = maxAckDelay.count();
   frame.reorderThreshold = reorderThreshold;
   frame.sequenceNumber = conn.nextAckFrequencyFrameSequenceNumber++;
-  conn.pendingEvents.frames.push_back(frame);
+  conn.pendingEvents.frames.emplace_back(frame);
 }
 
 std::chrono::microseconds clampMaxAckDelay(
