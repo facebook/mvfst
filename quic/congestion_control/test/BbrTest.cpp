@@ -309,8 +309,7 @@ TEST_F(BbrTest, ProbeRtt) {
         conn.udpSendPacketLen,
         totalSent + conn.udpSendPacketLen);
     quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
-    inflightPackets.push_back(
-        std::make_pair(currentLatest, packet.metadata.time));
+    inflightPackets.emplace_back(currentLatest, packet.metadata.time);
     inflightBytes += conn.udpSendPacketLen;
     currentLatest++;
     totalSent += conn.udpSendPacketLen;
