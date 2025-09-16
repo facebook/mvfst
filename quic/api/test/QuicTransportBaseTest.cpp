@@ -4216,8 +4216,7 @@ TEST_P(QuicTransportImplTestBase, HandleKnobCallbacks) {
   BufPtr buf(folly::IOBuf::create(data.size()));
   memcpy(buf->writableData(), data.data(), data.size());
   buf->append(data.size());
-  conn->pendingEvents.knobs.emplace_back(
-      KnobFrame(knobSpace, knobId, std::move(buf)));
+  conn->pendingEvents.knobs.emplace_back(knobSpace, knobId, std::move(buf));
 
   EXPECT_CALL(connCallback, onKnobMock(knobSpace, knobId, _))
       .WillOnce(Invoke([](Unused, Unused, Unused) { /* do nothing */ }));

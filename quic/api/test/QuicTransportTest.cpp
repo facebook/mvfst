@@ -252,10 +252,10 @@ void verifyCorrectness(
   BufQueue retxBufCombined;
   std::vector<StreamBuffer> rtxCopy;
   for (auto& itr : stream->retransmissionBuffer) {
-    rtxCopy.push_back(StreamBuffer(
+    rtxCopy.emplace_back(
         folly::IOBuf::copyBuffer(itr.second->data.getHead()->getRange()),
         itr.second->offset,
-        itr.second->eof));
+        itr.second->eof);
   }
   std::sort(rtxCopy.begin(), rtxCopy.end(), [](auto& s1, auto& s2) {
     return s1.offset < s2.offset;
