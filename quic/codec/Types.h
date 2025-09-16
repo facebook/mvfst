@@ -924,9 +924,9 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
 // Types of frames which are written.
 DECLARE_VARIANT_TYPE(QuicWriteFrame, QUIC_WRITE_FRAME)
 
-enum class HeaderForm : bool {
-  Long = 1,
+enum class HeaderForm : uint8_t {
   Short = 0,
+  Long = 1,
 };
 
 enum class ProtectionType {
