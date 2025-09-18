@@ -90,7 +90,6 @@ mvfst_cpp_library(
         "//folly/io:iobuf",
         "//quic:constants",
         "//quic:exception",
-        "//quic/codec:types",
         "//quic/common:network_data",
         "//quic/common:optional",
         "//quic/common/events:eventbase",

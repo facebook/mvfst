@@ -11,7 +11,6 @@
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicSocketLite.h>
-#include <quic/codec/Types.h>
 #include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/observer/SocketObserverContainer.h>
