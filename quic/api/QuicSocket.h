@@ -14,7 +14,6 @@
 #include <quic/codec/Types.h>
 #include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
-#include <quic/congestion_control/Bandwidth.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/priority/PriorityQueue.h>

@@ -95,7 +95,6 @@ mvfst_cpp_library(
         "//quic/common/events:eventbase",
         "//quic/common/events:quic_timer",
         "//quic/common/udpsocket:quic_async_udp_socket",
-        "//quic/congestion_control:bandwidth",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/congestion_control:copa",
         "//quic/congestion_control:cubic",
