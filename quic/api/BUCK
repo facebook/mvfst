@@ -42,7 +42,7 @@ mvfst_cpp_library(
     deps = [
     ],
     exported_deps = [
-        "//quic/codec:types",
+        "//quic:exception",
     ],
 )
 

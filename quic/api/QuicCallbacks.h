@@ -7,9 +7,12 @@
 
 #pragma once
 
-#include <quic/codec/Types.h>
+#include <quic/QuicException.h>
 
 namespace quic {
+
+using StreamId = uint64_t;
+using StreamGroupId = uint64_t;
 
 /**
  * Callback class for receiving data on a stream
