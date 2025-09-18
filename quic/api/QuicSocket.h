@@ -19,7 +19,6 @@
 #include <quic/priority/PriorityQueue.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
-#include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
 
 #include <folly/Portability.h>
