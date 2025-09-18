@@ -17,7 +17,6 @@
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/priority/PriorityQueue.h>
-#include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
 
 #include <folly/Portability.h>
