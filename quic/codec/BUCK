@@ -95,13 +95,12 @@ mvfst_cpp_library(
     ],
     deps = [
         "//quic:exception",
-        "//quic/common:contiguous_cursor",
-        "//quic/folly_utils:folly_utils",
     ],
     exported_deps = [
         ":packet_number",
         ":types",
         "//quic:constants",
+        "//quic/common:contiguous_cursor",
         "//quic/common:expected",
         "//quic/state:transport_settings",
     ],

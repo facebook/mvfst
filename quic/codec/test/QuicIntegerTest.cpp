@@ -12,9 +12,7 @@
 #include <quic/common/StringUtils.h>
 
 #include <quic/QuicException.h>
-#include <quic/codec/QuicInteger.h>
 #include <quic/common/ContiguousCursor.h>
-#include <quic/folly_utils/Utils.h>
 
 using namespace testing;
 using namespace folly;

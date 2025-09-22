@@ -11,7 +11,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
-#include <quic/folly_utils/Utils.h>
 #include <chrono>
 #include <cstdint>
 
