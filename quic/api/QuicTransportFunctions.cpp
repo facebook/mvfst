@@ -407,12 +407,14 @@ iobufChainBasedBuildScheduleEncrypt(
     return DataPathResult::makeBuildFailure();
   }
   packet->header.coalesce();
+  packet->body.coalesce();
   auto headerLen = packet->header.length();
   auto bodyLen = packet->body.computeChainDataLength();
   auto unencrypted = BufHelpers::createCombined(
       headerLen + bodyLen + aead.getCipherOverhead());
-  auto bodyCursor = Cursor(&packet->body);
-  bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
+  auto bodyCursor =
+      ContiguousReadCursor(packet->body.data(), packet->body.length());
+  CHECK(bodyCursor.tryPull(unencrypted->writableData() + headerLen, bodyLen));
   unencrypted->advance(headerLen);
   unencrypted->append(bodyLen);
   auto encryptResult =
@@ -423,8 +425,9 @@ iobufChainBasedBuildScheduleEncrypt(
   auto packetBuf = std::move(encryptResult.value());
   DCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
-  auto headerCursor = Cursor(&packet->header);
-  headerCursor.pull(packetBuf->writableData(), headerLen);
+  auto headerCursor =
+      ContiguousReadCursor(packet->header.data(), packet->header.length());
+  CHECK(headerCursor.tryPull(packetBuf->writableData(), headerLen));
   packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
 
   HeaderForm headerForm = packet->packet.header.getHeaderForm();
