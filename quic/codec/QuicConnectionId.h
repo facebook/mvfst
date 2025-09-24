@@ -84,8 +84,6 @@ struct ConnectionId {
 
   explicit ConnectionId(const std::vector<uint8_t>& connidIn);
 
-  explicit ConnectionId(Cursor& cursor, size_t len);
-
   std::array<uint8_t, kMaxConnectionIdSize> connid;
   uint8_t connidLen;
 };

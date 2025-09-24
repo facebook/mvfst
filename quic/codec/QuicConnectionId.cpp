@@ -42,17 +42,6 @@ ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {
   }
 }
 
-ConnectionId::ConnectionId(Cursor& cursor, size_t len) {
-  // Zero is special case for connids.
-  if (len == 0) {
-    connidLen = 0;
-    return;
-  }
-  CHECK(len <= kMaxConnectionIdSize) << "ConnectionId invalid size";
-  connidLen = len;
-  cursor.pull(connid.data(), len);
-}
-
 quic::Expected<ConnectionId, QuicError> ConnectionId::create(
     const std::vector<uint8_t>& connidIn) {
   static_assert(
