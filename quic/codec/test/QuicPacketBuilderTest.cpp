@@ -834,6 +834,51 @@ TEST_P(QuicPacketBuilderTest, TestCipherOverhead) {
       kDefaultUDPSendPacketLen - cipherOverhead);
 }
 
+TEST_F(QuicPacketBuilderTest, TestChainedBufferInsert) {
+  ConnectionId emptyCID = ConnectionId::createZeroLength();
+  PacketNum packetNum = 0;
+  PacketNum largestAcked = 0;
+
+  // Create a RegularQuicPacketBuilder
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen,
+      LongHeader(
+          LongHeader::Types::Handshake,
+          emptyCID,
+          emptyCID,
+          packetNum,
+          QuicVersion::MVFST),
+      largestAcked);
+
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  // Create a chained IOBuf with multiple segments
+  auto buf1 = folly::IOBuf::copyBuffer("AB"); // 2 bytes - first segment
+  auto buf2 = folly::IOBuf::copyBuffer("CDEF"); // 4 bytes - second segment
+  auto buf3 = folly::IOBuf::copyBuffer("GHIJKL"); // 6 bytes - third segment
+
+  // Chain the buffers together
+  buf1->appendToChain(std::move(buf2));
+  buf1->appendToChain(std::move(buf3));
+
+  // Verify we have a chained buffer with multiple segments
+  EXPECT_GT(buf1->countChainElements(), 1);
+  EXPECT_EQ(buf1->computeChainDataLength(), 12); // Total: "ABCDEFGHIJKL"
+
+  // Expected behavior: should extract "ABCDEFGH" (8 bytes)
+  builder.insert(std::move(buf1), 8);
+
+  // Build the packet to examine what was actually inserted
+  auto builtOut = std::move(builder).buildPacket();
+
+  // Check what was actually inserted
+  auto actualSize = builtOut.body.computeChainDataLength();
+  auto bodyContent = builtOut.body.moveToFbString();
+
+  EXPECT_EQ(actualSize, 8); // This should fail when bug is fixed
+  EXPECT_EQ(bodyContent, "ABCDEFGH"); // This should fail when bug is fixed
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicPacketBuilderTests,
     QuicPacketBuilderTest,

@@ -197,18 +197,20 @@ void RegularQuicPacketBuilder::insert(BufPtr buf) {
 }
 
 void RegularQuicPacketBuilder::insert(BufPtr buf, size_t limit) {
-  BufPtr streamData;
-  Cursor cursor(buf.get());
-  cursor.clone(streamData, limit);
-  // reminaingBytes_ update is taken care of inside this insert call:
-  insert(std::move(streamData));
+  insert(BufQueue(std::move(buf)), limit);
 }
 
 void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
-  BufPtr streamData;
-  Cursor cursor(buf.front());
-  cursor.clone(streamData, limit);
-  // reminaingBytes_ update is taken care of inside this insert call:
+  const auto* pBuf = CHECK_NOTNULL(buf.front());
+  limit = std::min(limit, buf.chainLength());
+  BufPtr streamData = BufHelpers::create(limit);
+  do {
+    ContiguousReadCursor cursor{pBuf->data(), pBuf->length()};
+    size_t dataSize = cursor.pullAtMost(streamData->writableTail(), limit);
+    streamData->append(dataSize);
+    limit -= dataSize;
+    pBuf = pBuf->next();
+  } while (pBuf != buf.front() && limit > 0);
   insert(std::move(streamData));
 }
 
