@@ -135,7 +135,7 @@ void FileQLogger::finishStream() {
   writeToStream(
       prettyJson_ ? (basePadding_ + "\"summary\" : ") : "\"summary\":");
   summaryBuffer << summaryJson;
-  std::string summaryPadding = "";
+  std::string summaryPadding;
   // add padding to every line in the summary except the first
   while (getline(summaryBuffer, line)) {
     writeToStream(fmt::format("{}{}{}", summaryPadding, line, endLine_));
