@@ -619,3 +619,72 @@ TEST(QuicBufferTest, TestEqualsNullPointers) {
 }
 
 } // namespace quic
+
+namespace quic {
+
+TEST(QuicBufferTest, TestTakeOwnershipBasic) {
+  // Allocate a raw buffer
+  std::size_t cap = 16;
+  void* raw = malloc(cap);
+  ASSERT_NE(raw, nullptr);
+  // Fill with pattern
+  memset(raw, 0xAB, cap);
+
+  auto buf = QuicBuffer::takeOwnership(raw, cap);
+  EXPECT_EQ(buf->capacity(), cap);
+  EXPECT_EQ(buf->length(), cap);
+  EXPECT_EQ(buf->headroom(), 0);
+  EXPECT_EQ(buf->tailroom(), 0);
+  EXPECT_EQ(buf->data(), raw);
+  // Verify content
+  for (size_t i = 0; i < cap; ++i) {
+    EXPECT_EQ(buf->data()[i], (uint8_t)0xAB);
+  }
+}
+
+namespace {
+struct FreeFnState {
+  int frees{0};
+  void* lastPtr{nullptr};
+};
+
+static void testFreeFn(void* p, void* user) {
+  auto* st = static_cast<FreeFnState*>(user);
+  st->frees++;
+  st->lastPtr = p;
+  free(p);
+}
+} // namespace
+
+TEST(QuicBufferTest, TestTakeOwnershipCustomFreeFn) {
+  std::size_t cap = 8;
+  void* raw = malloc(cap);
+  ASSERT_NE(raw, nullptr);
+  FreeFnState state;
+  auto buf = QuicBuffer::takeOwnership(raw, cap, &testFreeFn, &state);
+  // Destroy buffer and ensure free function called exactly once
+  buf.reset();
+  EXPECT_EQ(state.frees, 1);
+  EXPECT_EQ(state.lastPtr, raw);
+}
+
+TEST(QuicBufferTest, TestTakeOwnershipCloneSharing) {
+  std::size_t cap = 4;
+  void* raw = malloc(cap);
+  ASSERT_NE(raw, nullptr);
+  memset(raw, 0xCD, cap);
+
+  FreeFnState state;
+  {
+    auto buf = QuicBuffer::takeOwnership(raw, cap, &testFreeFn, &state);
+    EXPECT_FALSE(buf->isSharedOne());
+    auto clone = buf->cloneOne();
+    EXPECT_TRUE(buf->isSharedOne());
+    EXPECT_TRUE(clone->isSharedOne());
+    // Both go out of scope here
+  }
+  EXPECT_EQ(state.frees, 1);
+  EXPECT_EQ(state.lastPtr, raw);
+}
+
+} // namespace quic

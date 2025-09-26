@@ -83,6 +83,37 @@ std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(
       capacity, (uint8_t*)buf, (uint8_t*)buf, capacity, nullptr));
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::takeOwnership(
+    void* buf,
+    std::size_t capacity,
+    FreeFunction freeFn,
+    void* userData) {
+  // If userData is provided without a freeFn, match IOBuf semantics by using
+  // free(). However, in folly::IOBuf this is DCHECKed; we will DCHECK as well.
+  DCHECK(!userData || (userData && freeFn));
+
+  // Build a shared_ptr that owns the buffer and will free it appropriately.
+  std::shared_ptr<uint8_t[]> shared{
+      static_cast<uint8_t*>(buf), [freeFn, userData](uint8_t* p) {
+        if (!p) {
+          return;
+        }
+        if (freeFn) {
+          freeFn(static_cast<void*>(p), userData);
+        } else {
+          // Default to free() if no custom free function is provided.
+          free(static_cast<void*>(p));
+        }
+      }};
+
+  return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
+      capacity,
+      static_cast<uint8_t*>(buf),
+      static_cast<uint8_t*>(buf),
+      capacity,
+      std::move(shared)));
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(ByteRange range) {
   return wrapBuffer((void*)range.data(), range.size());
 }

@@ -9,6 +9,7 @@
 
 #include <folly/portability/SysUio.h>
 #include <quic/common/QuicRange.h>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 
@@ -16,6 +17,8 @@ namespace quic {
 
 class QuicBuffer {
  public:
+  using FreeFunction = void (*)(void* buf, void* userData);
+
   enum CreateOp {
     CREATE = 0,
   };
@@ -62,6 +65,14 @@ class QuicBuffer {
       std::size_t capacity);
 
   static std::unique_ptr<QuicBuffer> wrapBuffer(ByteRange range);
+
+  // Take ownership of an external buffer and free it using freeFn(userData)
+  // semantics matching folly::IOBuf::takeOwnership.
+  static std::unique_ptr<QuicBuffer> takeOwnership(
+      void* buf,
+      std::size_t capacity,
+      FreeFunction freeFn = nullptr,
+      void* userData = nullptr);
 
   static QuicBuffer wrapBufferAsValue(
       const void* buf,
