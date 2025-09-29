@@ -688,3 +688,43 @@ TEST(QuicBufferTest, TestTakeOwnershipCloneSharing) {
 }
 
 } // namespace quic
+
+namespace quic {
+
+TEST(QuicBufferTest, TestFromStringBasic) {
+  auto buf = QuicBuffer::fromString(std::string("hello"));
+  EXPECT_EQ(buf->length(), 5);
+  EXPECT_EQ(buf->capacity(), 5);
+  EXPECT_EQ(buf->headroom(), 0);
+  EXPECT_EQ(buf->tailroom(), 0);
+  EXPECT_EQ(memcmp(buf->data(), "hello", 5), 0);
+  EXPECT_FALSE(buf->isSharedOne());
+  auto clone = buf->cloneOne();
+  EXPECT_TRUE(buf->isSharedOne());
+  EXPECT_TRUE(clone->isSharedOne());
+}
+
+TEST(QuicBufferTest, TestFromStringUniquePtr) {
+  auto s = std::make_unique<std::string>("abc");
+  auto buf = QuicBuffer::fromString(std::move(s));
+  EXPECT_EQ(buf->length(), 3);
+  EXPECT_EQ(buf->capacity(), 3);
+  EXPECT_EQ(buf->headroom(), 0);
+  EXPECT_EQ(buf->tailroom(), 0);
+  EXPECT_EQ(memcmp(buf->data(), "abc", 3), 0);
+  EXPECT_FALSE(buf->isSharedOne());
+  auto clone = buf->cloneOne();
+  EXPECT_TRUE(buf->isSharedOne());
+  EXPECT_TRUE(clone->isSharedOne());
+}
+
+TEST(QuicBufferTest, TestFromStringEmpty) {
+  auto buf = QuicBuffer::fromString(std::string());
+  EXPECT_EQ(buf->length(), 0);
+  EXPECT_EQ(buf->capacity(), 0);
+  EXPECT_EQ(buf->headroom(), 0);
+  EXPECT_EQ(buf->tailroom(), 0);
+  EXPECT_TRUE(buf->empty());
+}
+
+} // namespace quic

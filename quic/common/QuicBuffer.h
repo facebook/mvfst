@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstring>
 #include <memory>
+#include <string>
 
 namespace quic {
 
@@ -63,6 +64,16 @@ class QuicBuffer {
   static std::unique_ptr<QuicBuffer> wrapBuffer(
       void* buf,
       std::size_t capacity);
+
+  // Create a QuicBuffer from a std::string without copying the contents.
+  // The returned QuicBuffer will take ownership of the string's storage
+  // and delete the std::string when the buffer is freed, mirroring
+  // folly::IOBuf::fromString semantics.
+  static std::unique_ptr<QuicBuffer> fromString(std::unique_ptr<std::string>);
+
+  static std::unique_ptr<QuicBuffer> fromString(std::string s) {
+    return fromString(std::make_unique<std::string>(std::move(s)));
+  }
 
   static std::unique_ptr<QuicBuffer> wrapBuffer(ByteRange range);
 

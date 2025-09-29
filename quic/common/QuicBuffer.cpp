@@ -114,6 +114,21 @@ std::unique_ptr<QuicBuffer> QuicBuffer::takeOwnership(
       std::move(shared)));
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::fromString(
+    std::unique_ptr<std::string> ptr) {
+  // Take ownership of the string's underlying buffer and ensure the
+  // std::string is deleted when the QuicBuffer is freed.
+  auto ret = takeOwnership(
+      static_cast<void*>(ptr->data()),
+      ptr->size(),
+      [](void*, void* userData) { delete static_cast<std::string*>(userData); },
+      static_cast<void*>(ptr.get()));
+  // Release ownership of the std::string from the unique_ptr, since the
+  // QuicBuffer now owns its lifetime via the custom deleter.
+  std::ignore = ptr.release();
+  return ret;
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(ByteRange range) {
   return wrapBuffer((void*)range.data(), range.size());
 }
