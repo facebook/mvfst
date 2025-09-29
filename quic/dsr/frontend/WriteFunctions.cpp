@@ -85,8 +85,11 @@ quic::Expected<uint64_t, QuicError> writePacketizationRequest(
     // Similar to the regular write case, if we build, we update connection
     // states. The connection states are changed already no matter the result
     // of addSendInstruction() call.
+    auto& currentPath =
+        *connection.pathManager->getPath(connection.currentPathId);
     auto updateResult = updateConnection(
         connection,
+        currentPath,
         std::nullopt /* Packet Event */,
         packet.packet,
         Clock::now(),

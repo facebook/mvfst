@@ -42,6 +42,7 @@ class DSRCommonTestFixture : public testing::Test {
     serverHandshake_->setCipherSuite(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
     conn_.serverHandshakeLayer = serverHandshake_.get();
     conn_.handshakeLayer = std::move(serverHandshake_);
+    initializePathManagerState(conn_);
   }
 
  protected:

@@ -1171,6 +1171,7 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
+      0,
       135,
       0,
       0,
@@ -1181,6 +1182,7 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Handshake),
       Clock::now(),
+      0,
       1217,
       0,
       0,
@@ -1191,6 +1193,7 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
   conn.outstandings.packets.emplace_back(
       makeTestShortPacket(),
       Clock::now(),
+      0,
       5556,
       5000,
       0,
@@ -1201,6 +1204,7 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
+      0,
       56,
       0,
       0,
@@ -1211,6 +1215,7 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
   conn.outstandings.packets.emplace_back(
       makeTestShortPacket(),
       Clock::now(),
+      0,
       6665,
       6000,
       0,

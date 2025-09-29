@@ -102,6 +102,22 @@ writeQuicDataToSocket(
     TimePoint writeLoopBeginTime = Clock::now());
 
 /**
+ * Attempts to write path validation frames for any paths pending validation
+ * besides the connection's current path.
+ */
+[[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
+writePathValidationData(
+    QuicAsyncUDPSocket& sock,
+    QuicConnectionStateBase& connection,
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher,
+    QuicVersion version,
+    uint64_t packetLimit,
+    TimePoint writeLoopBeginTime = Clock::now());
+
+/**
  * Writes only the crypto and ack frames to the socket.
  *
  * return the number of packets written to socket.
@@ -157,6 +173,7 @@ WriteDataReason shouldWriteData(QuicConnectionStateBase& conn);
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
 bool hasBufferedDataToWrite(const QuicConnectionStateBase& conn);
+bool hasAlternatePathValidationDataToWrite(const QuicConnectionStateBase& conn);
 
 /**
  * Invoked when the written stream data was new stream data.
@@ -204,6 +221,7 @@ bool handleStreamBufMetaWritten(
  */
 [[nodiscard]] quic::Expected<void, QuicError> updateConnection(
     QuicConnectionStateBase& conn,
+    const PathInfo& path,
     Optional<ClonedPacketIdentifier> clonedPacketIdentifier,
     RegularQuicWritePacket packet,
     TimePoint time,
@@ -218,6 +236,14 @@ bool handleStreamBufMetaWritten(
  * client's address has been validated.
  */
 uint64_t probePacketWritableBytes(QuicConnectionStateBase& conn);
+
+/*
+ * Returns the number of writable bytes available based upon the path validation
+ * status. For the client this is always uint64_t::max().
+ */
+uint64_t pathValidationWritableBytes(
+    const QuicConnectionStateBase& conn,
+    PathIdType pathId);
 
 /**
  * Returns the minimum available bytes window out of path validation rate
@@ -293,6 +319,7 @@ void updatePacketLimitForImminentStreams(
 writeConnectionDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
+    PathIdType pathId,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     HeaderBuilder builder,

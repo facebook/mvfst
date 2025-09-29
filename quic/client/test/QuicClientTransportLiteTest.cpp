@@ -25,7 +25,9 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
       std::unique_ptr<QuicAsyncUDPSocketMock> socket,
       std::shared_ptr<MockClientHandshakeFactory> handshakeFactory)
       : QuicTransportBaseLite(evb, std::move(socket)),
-        QuicClientTransportLite(evb, nullptr, handshakeFactory) {}
+        QuicClientTransportLite(evb, nullptr, handshakeFactory) {
+    initializePathManagerState(*clientConn_);
+  }
 
   QuicClientConnectionState* getConn() {
     return clientConn_;

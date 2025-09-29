@@ -167,6 +167,13 @@ uint64_t getEncodedBodySize(const RegularQuicPacketBuilder::Packet& packet) {
   return encodedBodySize;
 }
 
+void initializePathManagerState(QuicServerConnectionState& conn) {
+  auto pathRes = conn.pathManager->addValidatedPath(
+      folly::SocketAddress("::1", 12345), folly::SocketAddress("::1", 54321));
+  CHECK(!pathRes.hasError());
+  conn.currentPathId = pathRes.value();
+}
+
 class QuicTransportFunctionsTest : public Test {
  public:
   void SetUp() override {
@@ -200,6 +207,11 @@ class QuicTransportFunctionsTest : public Test {
                ->setMaxLocalUnidirectionalStreams(
                    kDefaultMaxStreamsUnidirectional)
                .hasError());
+
+    // Initialize current path
+    initializePathManagerState(*conn);
+    currentPathInfo_ = conn->pathManager->getPath(conn->currentPathId);
+
     // Do not skip packet numbers for the tests.
     conn->transportSettings.skipOneInNPacketSequenceNumber = 0;
     return conn;
@@ -212,6 +224,7 @@ class QuicTransportFunctionsTest : public Test {
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<MockQuicStats> quicStats_;
+  const PathInfo* currentPathInfo_{};
 };
 
 TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
@@ -221,6 +234,7 @@ TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
   EXPECT_EQ(0, conn->outstandings.packets.size());
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       Clock::now(),
@@ -273,6 +287,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       .WillOnce(Return(true));
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint{},
@@ -338,6 +353,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       .WillOnce(Return(false));
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet2.packet,
       TimePoint(),
@@ -470,6 +486,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       .WillOnce(Return(true));
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet1.packet,
       TimePoint{},
@@ -535,6 +552,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       .WillOnce(Return(false));
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet2.packet,
       TimePoint(),
@@ -643,6 +661,7 @@ TEST_F(
       .WillOnce(Return(true));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet1.packet,
                    TimePoint{},
@@ -733,6 +752,7 @@ TEST_F(
       .WillOnce(Return(false));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet2.packet,
                    TimePoint(),
@@ -803,6 +823,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    handshakePacket.packet,
                    TimePoint{},
@@ -812,6 +833,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    .hasError());
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    initialPacket.packet,
                    TimePoint{},
@@ -821,6 +843,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    .hasError());
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    appDataPacket.packet,
                    TimePoint{},
@@ -874,6 +897,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   packet.packet.frames.push_back(WriteStreamFrame(stream1->id, 0, 0, true));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -926,6 +950,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
       WriteStreamFrame(stream1->id, 0, buf->computeChainDataLength(), false));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -975,6 +1000,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
       conn->ackStates.handshakeAckState->largestAckScheduled;
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1015,6 +1041,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   packet.packet.frames.push_back(std::move(ackFrame));
   auto result2 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1036,6 +1063,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
 
   auto result4 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet2.packet,
       TimePoint(),
@@ -1070,6 +1098,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   packet.packet.frames.push_back(PaddingFrame());
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1109,6 +1138,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->writeBuffer.append(data->clone());
   auto result1 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1132,6 +1162,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->writeBuffer.append(data->clone());
   auto result2 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1165,6 +1196,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   handshakeStream->writeBuffer.append(data->clone());
   auto result3 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1184,6 +1216,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   handshakeStream->writeBuffer.append(data->clone());
   auto result4 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1244,6 +1277,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
   initialStream->writeBuffer.append(data->clone());
   auto result1 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1271,6 +1305,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
   initialStream->writeBuffer.append(data->clone());
   auto result2 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1309,6 +1344,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   auto result2 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1333,6 +1369,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       WriteStreamFrame(stream1->id, 0, 0, true));
   auto result4 = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       nonHandshake.packet,
       TimePoint(),
@@ -1388,6 +1425,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1407,6 +1445,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
       WriteStreamFrame(stream1->id, 0, 0, true));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    nonHandshake.packet,
                    TimePoint(),
@@ -1472,6 +1511,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1525,6 +1565,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   conn->lossState.totalAckElicitingPacketsSent = 15;
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1615,6 +1656,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithAppLimitedStats) {
   // record the packet as having been sent
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1676,6 +1718,7 @@ TEST_F(
   // record the packet as having been sent
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1717,6 +1760,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       clonedPacketIdentifier,
       std::move(writePacket),
       MockClock::now(),
@@ -1770,6 +1814,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   packet.packet.frames.push_back(std::move(streamWindowUpdate));
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1807,6 +1852,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   packet.packet.frames.push_back(std::move(connWindowUpdate));
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1847,6 +1893,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1867,6 +1914,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
   auto sentPacketNumber = conn->ackStates.appDataAckState.nextPacketNum;
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -1888,6 +1936,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1909,6 +1958,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
   packet.packet.frames.push_back(PingFrame());
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1931,6 +1981,7 @@ TEST_F(QuicTransportFunctionsTest, TestPingFrameCounter) {
   packet.packet.frames.push_back(PingFrame());
   auto result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -1956,6 +2007,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
   packet.packet.frames.push_back(writeStreamFrame);
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -2000,6 +2052,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
   packet.packet.frames.push_back(writeStreamFrame2);
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -2042,6 +2095,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame1);
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -2080,6 +2134,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame1);
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -2125,6 +2180,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame2);
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -2165,6 +2221,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   packet.packet.frames.push_back(frame2);
   result = updateConnection(
       *conn,
+      *currentPathInfo_,
       std::nullopt,
       packet.packet,
       TimePoint(),
@@ -2216,6 +2273,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   packet1.packet.frames.push_back(frame1);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet1.packet,
                    TimePoint(),
@@ -2233,6 +2291,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   packet2.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet2.packet,
                    TimePoint(),
@@ -2284,6 +2343,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
   packet3.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet3.packet,
                    TimePoint(),
@@ -2338,6 +2398,7 @@ TEST_F(
   packet1.packet.frames.push_back(frame1);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet1.packet,
                    TimePoint(),
@@ -2355,6 +2416,7 @@ TEST_F(
   packet2.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet2.packet,
                    TimePoint(),
@@ -2372,6 +2434,7 @@ TEST_F(
   packet3.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet3.packet,
                    TimePoint(),
@@ -2432,6 +2495,7 @@ TEST_F(
   packet4.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet4.packet,
                    TimePoint(),
@@ -2487,6 +2551,7 @@ TEST_F(
   packet1.packet.frames.push_back(frame1);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet1.packet,
                    TimePoint(),
@@ -2505,6 +2570,7 @@ TEST_F(
   packet2.packet.frames.push_back(frame2);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet2.packet,
                    TimePoint(),
@@ -2523,6 +2589,7 @@ TEST_F(
   packet3.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet3.packet,
                    TimePoint(),
@@ -2583,6 +2650,7 @@ TEST_F(
   packet4.packet.frames.push_back(frame3);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet4.packet,
                    TimePoint(),
@@ -2661,6 +2729,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet1.packet,
                    TimePoint(),
@@ -2732,6 +2801,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet2.packet,
                    TimePoint(),
@@ -3504,6 +3574,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
       FizzServerQuicHandshakeContext::Builder().build());
   conn.serverConnectionId = getTestConnectionId();
   conn.clientConnectionId = getTestConnectionId();
+  initializePathManagerState(conn);
   // writeCryptoDataProbesToSocketForTest writes Initial LongHeader, thus it
   // writes at Initial level.
   auto currentPacketSeqNum = conn.ackStates.initialAckState->nextPacketNum;
@@ -3554,6 +3625,7 @@ TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
 
   conn.serverConnectionId = getTestConnectionId();
   conn.clientConnectionId = getTestConnectionId();
+  initializePathManagerState(conn);
   // writeCryptoDataProbesToSocketForTest writes Initial LongHeader, thus it
   // writes at Initial level.
   auto currentPacketSeqNum = conn.ackStates.initialAckState->nextPacketNum;
@@ -3942,8 +4014,20 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
-TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
+TEST_F(
+    QuicTransportFunctionsTest,
+    ShouldWriteDataTestDuringPathValidationForCurrentPath) {
   auto conn = createConn();
+
+  // Switch to an unvalidated path
+  auto pathInfoRes = conn->pathManager->getOrAddPath(
+      folly::SocketAddress("::1", 12346), folly::SocketAddress("::1", 54321));
+  ASSERT_FALSE(pathInfoRes.hasError());
+  auto& pathInfo = pathInfoRes.value().get();
+  conn->currentPathId = pathInfo.id;
+
+  conn->transportSettings.limitedCwndInMss = 1;
+  conn->udpSendPacketLen = 1200;
 
   // Create the CC.
   auto mockCongestionController =
@@ -3952,44 +4036,103 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
   conn->congestionController = std::move(mockCongestionController);
   conn->oneRttWriteCipher = test::createNoOpAead();
 
-  // Create an outstandingPathValidation + limiter so this will be applied.
-  auto pathValidationLimiter = std::make_unique<MockPendingPathRateLimiter>();
-  MockPendingPathRateLimiter* rawLimiter = pathValidationLimiter.get();
-  conn->pathValidationLimiter = std::move(pathValidationLimiter);
-  conn->outstandingPathValidation = PathChallengeFrame(1000);
-
-  // Have stream data queued up during the test so there's something TO write.
+  // Have stream data queued up during the test so there's something to write.
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
   ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), false).hasError());
 
-  // Only case that we allow the write; both CC / PathLimiter have
+  // Only case that we allow the write; both CC and unvalidated path have
   // writablebytes
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
+  // Receiving a packet should add new credit to the path limiter.
+  // Credit = conn_.transportSettings.limitedCwndInMss * conn_.udpSendPacketLen
+  conn->pathManager->onPathPacketReceived(conn->currentPathId);
+  ASSERT_EQ(pathInfo.writableBytes, 1200);
 
   EXPECT_CALL(*quicStats_, onCwndBlocked()).Times(0);
-  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::STREAM, shouldWriteData(*conn));
 
-  // CC has writableBytes, but PathLimiter doesn't.
+  // CC has writableBytes, but PathInfo doesn't.
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(0));
+  conn->pathManager->onPathPacketSent(conn->currentPathId, 1200);
 
   EXPECT_CALL(*quicStats_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
-  // PathLimiter has writableBytes, CC doesn't
+  // PathInfo has writableBytes, CC doesn't
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
+  conn->pathManager->onPathPacketReceived(conn->currentPathId);
+  ASSERT_EQ(pathInfo.writableBytes, 1200);
 
   EXPECT_CALL(*quicStats_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
-  // Neither PathLimiter or CC have writablebytes
+  // Neither PathInfo or CC have writablebytes
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(0));
+  conn->pathManager->onPathPacketSent(conn->currentPathId, 1200);
 
   EXPECT_CALL(*quicStats_, onCwndBlocked());
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    ShouldWriteDataTestDuringPathValidationForAlternatePath) {
+  auto conn = createConn();
+
+  // Initiate a probe on an alternate path. This is not the current path.
+
+  auto pathInfoRes = conn->pathManager->getOrAddPath(
+      folly::SocketAddress("::1", 12346), folly::SocketAddress("::1", 54321));
+  ASSERT_FALSE(pathInfoRes.hasError());
+  auto& pathInfo = pathInfoRes.value().get();
+
+  conn->transportSettings.limitedCwndInMss = 1;
+  conn->udpSendPacketLen = 1200;
+
+  // Create the CC.
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  conn->oneRttWriteCipher = test::createNoOpAead();
+
+  // CC always has writable bytes.
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(100));
+  EXPECT_CALL(*quicStats_, onCwndBlocked()).Times(0);
+
+  // Only case that we allow the write; is when we have a probe to write and
+  // enough writable bytes for the path.
+
+  // Receiving a packet should add new credit to the path writable bytes.
+  // Credit = conn_.transportSettings.limitedCwndInMss * conn_.udpSendPacketLen
+  conn->pathManager->onPathPacketReceived(pathInfo.id);
+  ASSERT_EQ(pathInfo.writableBytes, 1200);
+
+  // There are writable bytes but no challenges/responses.
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+
+  // There are writable bytes and a challenge.
+  conn->pendingEvents.pathChallenges.emplace(
+      pathInfo.id, PathChallengeFrame(12345));
+  EXPECT_EQ(WriteDataReason::PATH_VALIDATION, shouldWriteData(*conn));
+
+  // There are writable bytes and a response.
+  conn->pendingEvents.pathChallenges.clear();
+  conn->pendingEvents.pathResponses.emplace(
+      pathInfo.id, PathResponseFrame(12345));
+  EXPECT_EQ(WriteDataReason::PATH_VALIDATION, shouldWriteData(*conn));
+
+  // There is a reponse but no writable bytes
+  conn->pathManager->onPathPacketSent(pathInfo.id, 1200);
+  ASSERT_EQ(pathInfo.writableBytes, 0);
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+
+  // There is a challenge but no writable bytes
+  conn->pendingEvents.pathResponses.clear();
+  conn->pendingEvents.pathChallenges.emplace(
+      pathInfo.id, PathChallengeFrame(12345));
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
@@ -4172,6 +4315,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterAppData) {
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    clonedPacketIdentifier,
                    packet.packet,
                    TimePoint(),
@@ -4201,6 +4345,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterHandshake) {
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    clonedPacketIdentifier,
                    packet.packet,
                    TimePoint(),
@@ -4230,6 +4375,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterInitial) {
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    clonedPacketIdentifier,
                    packet.packet,
                    TimePoint(),
@@ -4254,6 +4400,7 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
   conn->streamManager->queueBlocked(stream->id, 1000);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -4279,6 +4426,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
   // This shall not crash
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    clonedPacketIdentifier,
                    packet.packet,
                    TimePoint(),
@@ -4302,6 +4450,7 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
   EXPECT_DEATH(
       (void)updateConnection(
           *conn,
+          *currentPathInfo_,
           std::nullopt,
           packet.packet,
           TimePoint(),
@@ -4324,6 +4473,7 @@ TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -4344,6 +4494,7 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
   conn->pendingEvents.resets.emplace(stream->id, rstStreamFrame);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -4370,6 +4521,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   // This shall not crash
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    clonedPacketIdentifier,
                    packet.packet,
                    TimePoint(),
@@ -4388,6 +4540,7 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint{},
@@ -4406,6 +4559,7 @@ TEST_F(QuicTransportFunctionsTest, TotalPacketsSentUpdate) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint{},
@@ -4429,6 +4583,7 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   conn->outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    clonedPacketIdentifier,
                    packet.packet,
                    TimePoint(),
@@ -5015,6 +5170,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
 
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    packet.packet,
                    TimePoint(),
@@ -5045,6 +5201,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   retxPacket.packet.frames.push_back(writeStreamFrame);
   ASSERT_FALSE(updateConnection(
                    *conn,
+                   *currentPathInfo_,
                    std::nullopt,
                    retxPacket.packet,
                    TimePoint(),
@@ -5076,6 +5233,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_FALSE(updateConnection(
                      *conn,
+                     *currentPathInfo_,
                      std::nullopt,
                      packet.packet,
                      TimePoint(),
@@ -5093,6 +5251,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_TRUE(updateConnection(
                     *conn,
+                    *currentPathInfo_,
                     std::nullopt,
                     packet.packet,
                     TimePoint(),
@@ -5119,6 +5278,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_FALSE(updateConnection(
                      *conn,
+                     *currentPathInfo_,
                      std::nullopt,
                      packet.packet,
                      TimePoint(),
@@ -5141,6 +5301,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_TRUE(updateConnection(
                     *conn,
+                    *currentPathInfo_,
                     std::nullopt,
                     packet.packet,
                     TimePoint(),
@@ -5167,6 +5328,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_FALSE(updateConnection(
                      *conn,
+                     *currentPathInfo_,
                      std::nullopt,
                      packet.packet,
                      TimePoint(),
@@ -5184,6 +5346,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
     packet.packet.frames.push_back(writeStreamFrame);
     ASSERT_TRUE(updateConnection(
                     *conn,
+                    *currentPathInfo_,
                     std::nullopt,
                     packet.packet,
                     TimePoint(),
@@ -5318,8 +5481,8 @@ TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {
 
   // Make congestionControlWritableBytes only exercise the code path pertaining
   // to the congestion controller's getWritableBytes and the excess cwnd.
-  conn->pendingEvents.pathChallenge = std::nullopt;
-  conn->outstandingPathValidation = std::nullopt;
+  conn->pendingEvents.pathResponses.clear();
+  conn->pendingEvents.pathChallenges.clear();
   conn->writableBytesLimit = std::nullopt;
   conn->throttlingSignalProvider = nullptr;
 

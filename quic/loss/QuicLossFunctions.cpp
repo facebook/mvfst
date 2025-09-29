@@ -114,6 +114,7 @@ quic::Expected<void, QuicError> onPTOAlarm(QuicConnectionStateBase& conn) {
 
 quic::Expected<void, QuicError> markPacketLoss(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     RegularQuicWritePacket& packet,
     bool processed) {
   QUIC_STATS(conn.statsCallback, onPacketLoss);
@@ -268,7 +269,7 @@ quic::Expected<void, QuicError> markPacketLoss(
         if (processed) {
           break;
         }
-        updateSimpleFrameOnPacketLoss(conn, frame);
+        updateSimpleFrameOnPacketLoss(conn, pathId, frame);
         break;
       }
       default:
@@ -397,7 +398,8 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
         !conn.outstandings.clonedPacketIdentifiers.count(
             *pkt.maybeClonedPacketIdentifier);
 
-    auto visitorResult = lossVisitor(conn, pkt.packet, processed);
+    auto visitorResult =
+        lossVisitor(conn, pkt.metadata.pathId, pkt.packet, processed);
     if (!visitorResult.has_value()) {
       return quic::make_unexpected(visitorResult.error());
     }

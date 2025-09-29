@@ -137,12 +137,16 @@ TEST_F(QuicPathManagerTest, GetOrAddPathExisting) {
   ASSERT_TRUE(result.has_value());
   PathIdType originalId = result.value();
 
-  const auto& path = manager_->getOrAddPath(localAddr1_, peerAddr1_);
+  const auto& pathRes = manager_->getOrAddPath(localAddr1_, peerAddr1_);
+  ASSERT_FALSE(pathRes.hasError());
+  auto& path = pathRes.value().get();
   EXPECT_EQ(path.id, originalId);
 }
 
 TEST_F(QuicPathManagerTest, GetOrAddPathNew) {
-  const auto& path = manager_->getOrAddPath(localAddr1_, peerAddr1_);
+  const auto& pathRes = manager_->getOrAddPath(localAddr1_, peerAddr1_);
+  ASSERT_FALSE(pathRes.hasError());
+  auto& path = pathRes.value().get();
   EXPECT_EQ(path.status, PathStatus::NotValid);
   EXPECT_EQ(path.peerAddress, peerAddr1_);
 
@@ -304,11 +308,10 @@ TEST_F(QuicPathManagerTest, OnPathChallengeSent) {
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->status, PathStatus::Validating);
   EXPECT_TRUE(path->lastChallengeSentTimestamp.has_value());
-  EXPECT_TRUE(path->pathResponeDeadline.has_value());
+  EXPECT_TRUE(path->pathResponseDeadline.has_value());
 
   // Verify pending events updated
   EXPECT_TRUE(connState_->pendingEvents.schedulePathValidationTimeout);
-  EXPECT_EQ(connState_->pendingEvents.pathChallenges.count(id), 0);
 }
 
 TEST_F(QuicPathManagerTest, OnPathResponseReceived) {
@@ -329,20 +332,20 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceived) {
   PathResponseFrame response(challengeResult.value());
   response.pathData = challengeResult.value();
 
-  auto validatedPath = manager_->onPathResponseReceived(response);
+  auto validatedPath = manager_->onPathResponseReceived(response, id);
   ASSERT_NE(validatedPath, nullptr);
   EXPECT_EQ(validatedPath->id, id);
   EXPECT_EQ(validatedPath->status, PathStatus::Validated);
   EXPECT_TRUE(validatedPath->rttSample.has_value());
   EXPECT_FALSE(validatedPath->outstandingChallengeData.has_value());
   EXPECT_FALSE(validatedPath->lastChallengeSentTimestamp.has_value());
-  EXPECT_FALSE(validatedPath->pathResponeDeadline.has_value());
+  EXPECT_FALSE(validatedPath->pathResponseDeadline.has_value());
 }
 
 TEST_F(QuicPathManagerTest, OnPathResponseReceivedStaleResponse) {
   PathResponseFrame response(12345); // Non-existent challenge data
 
-  auto validatedPath = manager_->onPathResponseReceived(response);
+  auto validatedPath = manager_->onPathResponseReceived(response, 0);
   EXPECT_EQ(validatedPath, nullptr);
 }
 
@@ -387,7 +390,7 @@ TEST_F(QuicPathManagerTest, OnPathValidationTimeoutExpired) {
   auto path = manager_->getPath(id);
   ASSERT_NE(path, nullptr);
   auto pathInfo = const_cast<PathInfo*>(path);
-  pathInfo->pathResponeDeadline =
+  pathInfo->pathResponseDeadline =
       std::chrono::steady_clock::now() - std::chrono::seconds(1);
 
   manager_->onPathValidationTimeoutExpired();
@@ -398,7 +401,7 @@ TEST_F(QuicPathManagerTest, OnPathValidationTimeoutExpired) {
   EXPECT_EQ(path->status, PathStatus::NotValid);
   EXPECT_FALSE(path->outstandingChallengeData.has_value());
   EXPECT_FALSE(path->lastChallengeSentTimestamp.has_value());
-  EXPECT_FALSE(path->pathResponeDeadline.has_value());
+  EXPECT_FALSE(path->pathResponseDeadline.has_value());
 }
 
 // Callback Tests
@@ -439,7 +442,7 @@ TEST_F(QuicPathManagerTest, PathValidationCallbackOnValidation) {
 
   PathResponseFrame response(challengeResult.value());
 
-  manager_->onPathResponseReceived(response);
+  manager_->onPathResponseReceived(response, id);
 
   EXPECT_TRUE(callback.invoked);
   EXPECT_EQ(callback.pathId, id);
@@ -468,7 +471,7 @@ TEST_F(QuicPathManagerTest, PathValidationCallbackOnTimeout) {
   auto path = manager_->getPath(id);
   ASSERT_NE(path, nullptr);
   auto pathInfo = const_cast<PathInfo*>(path);
-  pathInfo->pathResponeDeadline =
+  pathInfo->pathResponseDeadline =
       std::chrono::steady_clock::now() - std::chrono::seconds(1);
 
   manager_->onPathValidationTimeoutExpired();

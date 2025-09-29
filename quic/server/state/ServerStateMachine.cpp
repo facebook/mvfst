@@ -45,50 +45,6 @@ bool maybeNATRebinding(
       newIPAddr.inSubnet(oldIPAddr, 24);
 }
 
-CongestionAndRttState moveCurrentCongestionAndRttState(
-    QuicServerConnectionState& conn) {
-  CongestionAndRttState state;
-  state.peerAddress = conn.peerAddress;
-  state.recordTime = Clock::now();
-  state.congestionController = std::move(conn.congestionController);
-  state.srtt = conn.lossState.srtt;
-  state.lrtt = conn.lossState.lrtt;
-  state.rttvar = conn.lossState.rttvar;
-  state.mrtt = conn.lossState.mrtt;
-  return state;
-}
-
-void resetCongestionAndRttState(QuicServerConnectionState& conn) {
-  CHECK(conn.congestionControllerFactory)
-      << "CongestionControllerFactory is not set.";
-  conn.congestionController =
-      conn.congestionControllerFactory->makeCongestionController(
-          conn, conn.transportSettings.defaultCongestionController);
-  conn.lossState.srtt = 0us;
-  conn.lossState.lrtt = 0us;
-  conn.lossState.rttvar = 0us;
-  conn.lossState.mrtt = kDefaultMinRtt;
-}
-
-void recoverOrResetCongestionAndRttState(
-    QuicServerConnectionState& conn,
-    const folly::SocketAddress& peerAddress) {
-  auto& lastState = conn.migrationState.lastCongestionAndRtt;
-  if (lastState && lastState->peerAddress == peerAddress &&
-      (Clock::now() - lastState->recordTime <=
-       kTimeToRetainLastCongestionAndRttState)) {
-    // recover from matched non-stale state
-    conn.congestionController = std::move(lastState->congestionController);
-    conn.lossState.srtt = lastState->srtt;
-    conn.lossState.lrtt = lastState->lrtt;
-    conn.lossState.rttvar = lastState->rttvar;
-    conn.lossState.mrtt = lastState->mrtt;
-    conn.migrationState.lastCongestionAndRtt.reset();
-  } else {
-    resetCongestionAndRttState(conn);
-  }
-}
-
 void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
   // no-op versions
   if (conn.version == QuicVersion::MVFST_EXPERIMENTAL) {
@@ -785,7 +741,7 @@ void maybeUpdateTransportFromAppToken(
 
 quic::Expected<void, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,
-    const folly::SocketAddress& newPeerAddress,
+    PathIdType readPathId,
     bool isIntentional) {
   if (conn.migrationState.numMigrations >=
       conn.transportSettings.maxNumMigrationsAllowed) {
@@ -802,60 +758,59 @@ quic::Expected<void, QuicError> onConnectionMigration(
         TransportErrorCode::INVALID_MIGRATION, "Too many migrations"));
   }
 
-  bool hasPendingPathChallenge = conn.pendingEvents.pathChallenge.has_value();
-  // Clear any pending path challenge frame that is not sent
-  conn.pendingEvents.pathChallenge.reset();
-
-  auto& previousPeerAddresses = conn.migrationState.previousPeerAddresses;
-  auto it = std::find(
-      previousPeerAddresses.begin(),
-      previousPeerAddresses.end(),
-      newPeerAddress);
-  if (it == previousPeerAddresses.end()) {
-    ++conn.migrationState.numMigrations;
-    // send new path challenge
-    conn.pendingEvents.pathChallenge.emplace(folly::Random::secureRand64());
-
-    // If we are already in the middle of a migration reset
-    // the available bytes in the rate-limited window, but keep the
-    // window.
-    conn.pathValidationLimiter =
-        std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
-  } else {
-    previousPeerAddresses.erase(it);
+  auto* readPath = conn.pathManager->getPath(readPathId);
+  auto* connPath = conn.pathManager->getPath(conn.currentPathId);
+  if (!readPath || !connPath) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR, "Inconsistent path state"));
   }
 
-  // At this point, path validation scheduled, writable bytes limit set
-  // However if this is NAT rebinding, keep congestion state unchanged
-  bool isNATRebinding = maybeNATRebinding(newPeerAddress, conn.peerAddress);
-
-  // Cancel current path validation if any
-  if (hasPendingPathChallenge || conn.outstandingPathValidation) {
-    conn.pendingEvents.schedulePathValidationTimeout = false;
-    conn.outstandingPathValidation.reset();
-
-    // Only change congestion & rtt state if not NAT rebinding
-    if (!isNATRebinding) {
-      recoverOrResetCongestionAndRttState(conn, newPeerAddress);
-    }
+  if (readPath->status != PathStatus::Validated &&
+      connPath->status == PathStatus::Validated) {
+    // We may need to fallback to the current path if the new path fails
+    // validation
+    conn.fallbackPathId = connPath->id;
   } else {
-    // Only add validated addresses to previousPeerAddresses
-    conn.migrationState.previousPeerAddresses.push_back(conn.peerAddress);
-
-    // Only change congestion & rtt state if not NAT rebinding
-    if (!isNATRebinding) {
-      // Current peer address is validated,
-      // remember its congestion state and rtt stats
-      CongestionAndRttState state = moveCurrentCongestionAndRttState(conn);
-      recoverOrResetCongestionAndRttState(conn, newPeerAddress);
-      conn.migrationState.lastCongestionAndRtt = std::move(state);
-    }
+    conn.fallbackPathId.reset();
   }
+
+  // If this is NAT rebinding, keep congestion state unchanged
+  bool isNATRebinding =
+      maybeNATRebinding(readPath->peerAddress, connPath->peerAddress);
 
   if (conn.qLogger) {
     conn.qLogger->addConnectionMigrationUpdate(isIntentional);
   }
-  conn.peerAddress = newPeerAddress;
+
+  // Remember the current congestion controller type to recreate it if needed.
+  // This could be different from the type the connection started with due to
+  // knobs.
+  auto prevPathCCType = conn.congestionController
+      ? conn.congestionController->type()
+      : CongestionControlType::None;
+  if (!isNATRebinding) {
+    conn.pathManager->cacheCurrentCongestionAndRttState();
+  }
+
+  auto switchPathRes = conn.pathManager->switchCurrentPath(readPathId);
+  if (switchPathRes.hasError()) {
+    return quic::make_unexpected(switchPathRes.error());
+  }
+  conn.migrationState.numMigrations++;
+
+  if (!isNATRebinding) {
+    auto ccaRestored =
+        conn.pathManager
+            ->maybeRestoreCongestionControlAndRttStateForCurrentPath();
+    if (!ccaRestored && (prevPathCCType != CongestionControlType::None)) {
+      // A cca was not restored and we had one. We need to create a new one of
+      // the same type.
+      conn.congestionController =
+          conn.congestionControllerFactory->makeCongestionController(
+              conn, prevPathCCType);
+    }
+  }
+
   return {};
 }
 
@@ -1095,6 +1050,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     conn.initialHeaderCipher =
         std::move(serverInitialHeaderCipherResult.value());
     conn.peerAddress = conn.originalPeerAddress;
+    auto pathIdResult = conn.pathManager->addValidatedPath(
+        readData.localAddress, conn.peerAddress);
+    if (pathIdResult.hasError()) {
+      return quic::make_unexpected(pathIdResult.error());
+    }
+    conn.currentPathId = pathIdResult.value();
   }
   BufQueue& udpData = readData.udpPacket.buf;
   uint64_t processedPacketsTotal = 0;
@@ -1250,6 +1211,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     }
 
     if (conn.peerAddress != readData.peerAddress) {
+      // TODO: JBESHAY MIGRATION - this counter will count all packets received
+      // on non-primary paths. Revisit all connection migration counters.
       QUIC_STATS(conn.statsCallback, onPeerAddressChanged);
       auto migrationDenied = (encryptionLevel != EncryptionLevel::AppData) ||
           conn.transportSettings.disableMigration;
@@ -1366,6 +1329,26 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       }
       return {};
     };
+
+    auto readPathRes = conn.pathManager->getOrAddPath(
+        readData.localAddress, readData.peerAddress);
+    if (readPathRes.hasError()) {
+      return quic::make_unexpected(readPathRes.error());
+    }
+    auto& readPath = readPathRes.value().get();
+    if (readPath.status == PathStatus::NotValid) {
+      auto pathChallengeDataResult =
+          conn.pathManager->getNewPathChallengeData(readPath.id);
+      if (pathChallengeDataResult.hasError()) {
+        return quic::make_unexpected(pathChallengeDataResult.error());
+      }
+      conn.pendingEvents.pathChallenges.emplace(
+          readPath.id, PathChallengeFrame(pathChallengeDataResult.value()));
+    }
+
+    if (readPath.status != PathStatus::Validated) {
+      conn.pathManager->onPathPacketReceived(readPath.id);
+    }
 
     for (auto& quicFrame : regularPacket.frames) {
       switch (quicFrame.type()) {
@@ -1587,10 +1570,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           pktHasRetransmittableData = true;
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
           auto simpleResult = updateSimpleFrameOnPacketReceived(
-              conn,
-              simpleFrame,
-              dstConnId,
-              readData.peerAddress != conn.peerAddress);
+              conn, readPath.id, simpleFrame, dstConnId);
           if (simpleResult.hasError()) {
             return quic::make_unexpected(simpleResult.error());
           }
@@ -1645,38 +1625,23 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     // won't increase the limit.
     updateWritableByteLimitOnRecvPacket(conn);
 
-    if (conn.peerAddress != readData.peerAddress) {
+    if (readPath.id != conn.currentPathId && isNonProbingPacket) {
+      // The client is migrating to a different path.
+
       // TODO use new conn id, make sure the other endpoint has new conn id
-      if (isNonProbingPacket) {
-        if (packetNum == ackState.largestRecvdPacketNum) {
-          ShortHeader* shortHeader = regularPacket.header.asShort();
-          bool intentionalMigration = false;
-          if (shortHeader &&
-              shortHeader->getConnectionId() != conn.serverConnectionId) {
-            intentionalMigration = true;
-          }
-          auto migrationResult = onConnectionMigration(
-              conn, readData.peerAddress, intentionalMigration);
-          if (migrationResult.hasError()) {
-            return quic::make_unexpected(migrationResult.error());
-          }
+
+      if (packetNum == ackState.largestRecvdPacketNum) {
+        ShortHeader* shortHeader = regularPacket.header.asShort();
+        bool intentionalMigration = false;
+        if (shortHeader &&
+            shortHeader->getConnectionId() != conn.serverConnectionId) {
+          intentionalMigration = true;
         }
-      } else {
-        // Server will need to response with PathResponse to the new address
-        // while not updating peerAddress to new address
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(
-              packetSize,
-              PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)
-                  ._to_string());
+        auto migrationResult =
+            onConnectionMigration(conn, readPath.id, intentionalMigration);
+        if (migrationResult.hasError()) {
+          return quic::make_unexpected(migrationResult.error());
         }
-        QUIC_STATS(
-            conn.statsCallback,
-            onPacketDropped,
-            PacketDropReason::PEER_ADDRESS_CHANGE);
-        return quic::make_unexpected(QuicError(
-            TransportErrorCode::INVALID_MIGRATION,
-            "Probing not supported yet"));
       }
     }
 

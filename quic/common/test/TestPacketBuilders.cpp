@@ -162,6 +162,12 @@ OutstandingPacketBuilder&& OutstandingPacketBuilder::setTime(
   return std::move(*this);
 }
 
+OutstandingPacketBuilder&& OutstandingPacketBuilder::setPathId(
+    const PathIdType& pathIdIn) {
+  maybePathId = pathIdIn;
+  return std::move(*this);
+}
+
 OutstandingPacketBuilder&& OutstandingPacketBuilder::setEncodedSize(
     const uint32_t& encodedSizeIn) {
   maybeEncodedSize = encodedSizeIn;
@@ -228,6 +234,7 @@ OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
   return OutstandingPacketWrapper{
       (CHECK(maybePacket.has_value()), maybePacket.value()),
       (CHECK(maybeTime.has_value()), maybeTime.value()),
+      (CHECK(maybePathId.has_value()), maybePathId.value()),
       (CHECK(maybeEncodedSize.has_value()), maybeEncodedSize.value()),
       (CHECK(maybeEncodedBodySize.has_value()), maybeEncodedBodySize.value()),
       (CHECK(maybeTotalBytesSent.has_value()), maybeTotalBytesSent.value()),

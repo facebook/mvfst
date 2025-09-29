@@ -24,6 +24,7 @@ void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame);
  */
 Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& frame);
 
 /*
@@ -31,6 +32,7 @@ Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
  */
 void updateSimpleFrameOnPacketSent(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& simpleFrame);
 
 /*
@@ -39,6 +41,7 @@ void updateSimpleFrameOnPacketSent(
 
 void updateSimpleFrameOnPacketLoss(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& frame);
 
 /*
@@ -47,7 +50,7 @@ void updateSimpleFrameOnPacketLoss(
  */
 [[nodiscard]] quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& frameIn,
-    const ConnectionId& dstConnId,
-    bool fromChangedPeerAddress);
+    const ConnectionId& dstConnId);
 } // namespace quic

@@ -253,12 +253,27 @@ void happyEyeballsOnDataReceived(
   connection.happyEyeballsState.finished = true;
   connection.happyEyeballsState.shouldWriteToFirstSocket = true;
   connection.happyEyeballsState.shouldWriteToSecondSocket = false;
-  // If second socket won, update main socket and peerAddress
+
+  // If second socket won, update main socket, peer address and pathId
   if (connection.peerAddress.getFamily() != peerAddress.getFamily()) {
     CHECK(connection.happyEyeballsState.secondSocket);
     socket.swap(connection.happyEyeballsState.secondSocket);
     connection.originalPeerAddress = peerAddress;
     connection.peerAddress = peerAddress;
+
+    auto oldPathId = connection.currentPathId;
+    // Add the path for the second socket. The first socket is handled below
+    // where it is setup.
+    auto localAddr = socket->address();
+    CHECK(localAddr.has_value());
+    auto& remoteAddr = peerAddress;
+    auto addPathRes =
+        connection.pathManager->addValidatedPath(localAddr.value(), remoteAddr);
+    CHECK(!addPathRes.hasError()) << addPathRes.error();
+    connection.currentPathId = addPathRes.value();
+
+    auto removePathRes = connection.pathManager->removePath(oldPathId);
+    CHECK(!removePathRes.hasError()) << removePathRes.error();
   }
   connection.happyEyeballsState.secondSocket->pauseRead();
   (void)connection.happyEyeballsState.secondSocket->close();

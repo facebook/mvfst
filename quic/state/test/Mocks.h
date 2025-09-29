@@ -100,16 +100,4 @@ class MockPacer : public Pacer {
   MOCK_METHOD(void, setExperimental, (bool));
 };
 
-class MockPendingPathRateLimiter : public PendingPathRateLimiter {
- public:
-  MockPendingPathRateLimiter() : PendingPathRateLimiter(0) {}
-
-  MOCK_METHOD(void, onPacketSent, (uint64_t));
-  MOCK_METHOD(
-      uint64_t,
-      currentCredit,
-      (TimePoint, std::chrono::microseconds),
-      (noexcept));
-};
-
 } // namespace quic::test

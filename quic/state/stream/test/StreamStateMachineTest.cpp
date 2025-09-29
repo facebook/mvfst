@@ -53,6 +53,7 @@ std::unique_ptr<QuicServerConnectionState> createConn() {
       !conn->streamManager
            ->setMaxLocalUnidirectionalStreams(kDefaultMaxStreamsUnidirectional)
            .hasError());
+  initializePathManagerState(*conn);
   return conn;
 }
 

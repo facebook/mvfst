@@ -241,6 +241,7 @@ class TestQuicTransport
     conn->observerContainer = observerContainer_;
     transportConn = conn.get();
     conn_.reset(conn.release());
+    initializePathManagerState(*conn_);
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher().value();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();

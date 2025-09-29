@@ -225,8 +225,8 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
       }
       case QuicWriteFrame::Type::QuicSimpleFrame: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
-        auto updatedSimpleFrame =
-            updateSimpleFrameOnPacketClone(conn_, simpleFrame);
+        auto updatedSimpleFrame = updateSimpleFrameOnPacketClone(
+            conn_, packet.metadata.pathId, simpleFrame);
         if (!updatedSimpleFrame) {
           writeSuccess = true;
           break;

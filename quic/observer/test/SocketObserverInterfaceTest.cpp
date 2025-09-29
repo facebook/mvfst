@@ -62,6 +62,7 @@ class SocketObserverInterfaceTest : public ::testing::Test {
         .setWriteCount(writeCount)
         .setDetailsPerStream(detailsPerStream)
         .setTotalAppLimitedTimeUsecs(0us)
+        .setPathId(0)
         .build();
   }
 };

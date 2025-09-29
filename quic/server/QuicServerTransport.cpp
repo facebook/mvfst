@@ -74,6 +74,7 @@ QuicServerTransport::QuicServerTransport(
   conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   setConnectionSetupCallback(connSetupCb);
   setConnectionCallbackFromCtor(connStreamsCb);
+  conn_->pathManager->setPathValidationCallback(this);
 }
 
 QuicServerTransport::~QuicServerTransport() {
@@ -211,7 +212,7 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
   maybeNotifyConnectionIdRetired();
   maybeIssueConnectionIds();
   maybeNotifyTransportReady();
-
+  conn_->pathManager->maybeReapUnusedPaths();
   return {};
 }
 
@@ -359,6 +360,23 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
           dsrResult.value(), 0, conn_->lossState.totalBytesSent - bytesBefore};
       return result;
     };
+    auto pathValidationWrites =
+        [&](auto limit) -> quic::Expected<WriteQuicDataResult, QuicError> {
+      auto result = writePathValidationData(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          destConnId /* dst */,
+          *conn_->oneRttWriteCipher,
+          *conn_->oneRttWriteHeaderCipher,
+          version,
+          limit,
+          writeLoopBeginTime);
+      if (result.hasError()) {
+        return quic::make_unexpected(result.error());
+      }
+      return result.value();
+    };
     // We need a while loop because both paths write streams from the same
     // queue, which can result in empty writes.
     while (packetLimit) {
@@ -385,6 +403,10 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
         // We haven't written anything with either path, so we're done.
         break;
       }
+    }
+    auto written = pathValidationWrites(packetLimit);
+    if (written.hasError()) {
+      return quic::make_unexpected(written.error());
     }
   }
 
@@ -1655,6 +1677,49 @@ void QuicServerTransport::setCongestionControl(CongestionControlType type) {
         << "A congestion controller factory is not set. Using a default per-transport instance.";
   }
   QuicTransportBase::setCongestionControl(type);
+}
+
+void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
+  if (pathInfo.id == conn_->currentPathId) {
+    if (pathInfo.status == PathStatus::NotValid) {
+      // We should fallback to the previously validated path or close the
+      // connection if we don't have one.
+
+      // This will reverse what ServerStateMachine::onConnectionMigration()
+      // did. The reason it's here is that we want to be able to close the
+      // connection, which is only possible from the transport.
+      auto migrationReverted = false;
+      if (conn_->fallbackPathId) {
+        auto fallbackPath = conn_->pathManager->getPath(*conn_->fallbackPathId);
+        if (fallbackPath) {
+          conn_->currentPathId = fallbackPath->id;
+          conn_->peerAddress = fallbackPath->peerAddress;
+          serverConn_->migrationState.numMigrations--;
+          auto ccaRestored =
+              conn_->pathManager
+                  ->maybeRestoreCongestionControlAndRttStateForCurrentPath();
+          if (!ccaRestored) {
+            conn_->congestionController =
+                conn_->congestionControllerFactory->makeCongestionController(
+                    *conn_,
+                    conn_->transportSettings.defaultCongestionController);
+          }
+          conn_->fallbackPathId.reset();
+          migrationReverted = true;
+        }
+      }
+
+      if (!migrationReverted) {
+        closeImpl(QuicError(
+            QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
+            std::string(
+                "Path validation timed out. No fallback path available")));
+      }
+    } else if (pathInfo.status == PathStatus::Validated) {
+      // We're on a validated path. We don't need a fallback anymore.
+      conn_->fallbackPathId.reset();
+    }
+  }
 }
 
 } // namespace quic

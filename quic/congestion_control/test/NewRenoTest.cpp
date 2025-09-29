@@ -28,12 +28,13 @@ CongestionController::LossEvent createLossEvent(
     loss.addLostPacket(OutstandingPacketWrapper(
         std::move(packet),
         Clock::now(),
+        0 /* pathId */,
+        10 /* encodedSize */,
+        0 /* encodedBodySize */,
         10,
-        0,
-        10,
-        0,
+        0 /* inflightBytes */,
         LossState(),
-        0,
+        0 /* writeCount */,
         OutstandingPacketMetadata::DetailsPerStream()));
     loss.lostBytes = packetData.second;
   }
@@ -61,12 +62,13 @@ CongestionController::AckEvent createAckEvent(
       makeAckPacketFromOutstandingPacket(OutstandingPacketWrapper(
           std::move(packet),
           packetSentTime,
+          0 /* pathId */,
+          ackedSize /* encodedSize */,
+          0 /* encodedBodySize */,
           ackedSize,
-          0,
-          ackedSize,
-          0,
+          0 /* inflightBytes */,
           LossState(),
-          0,
+          0 /* writeCount */,
           OutstandingPacketMetadata::DetailsPerStream())));
   return ack;
 }
@@ -82,12 +84,13 @@ OutstandingPacketWrapper createPacket(
   return OutstandingPacketWrapper(
       std::move(packet),
       sendTime,
-      size,
-      0,
+      0 /* pathId */,
+      size /* encodedSize */,
+      0 /* encodedBodySize */,
       size,
       inflight,
       LossState(),
-      0,
+      0 /* writeCount */,
       OutstandingPacketMetadata::DetailsPerStream());
 }
 

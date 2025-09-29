@@ -272,6 +272,7 @@ template <class ClockType = Clock>
  */
 [[nodiscard]] quic::Expected<void, QuicError> markPacketLoss(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     RegularQuicWritePacket& packet,
     bool processed);
 
@@ -310,7 +311,8 @@ template <class ClockType = Clock>
           !conn.outstandings.clonedPacketIdentifiers.count(
               *pkt.maybeClonedPacketIdentifier);
 
-      auto visitorResult = lossVisitor(conn, pkt.packet, processed);
+      auto visitorResult =
+          lossVisitor(conn, conn.currentPathId, pkt.packet, processed);
       if (!visitorResult.has_value()) {
         return quic::make_unexpected(visitorResult.error());
       }

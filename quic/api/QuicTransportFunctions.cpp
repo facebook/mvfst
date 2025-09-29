@@ -139,6 +139,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
             .blockedFrames()
             .windowUpdateFrames()
             .simpleFrames()
+            .pathValidationFrames(connection.currentPathId)
             .resetFrames()
             .streamFrames()
             .pingFrames()
@@ -181,6 +182,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
           .windowUpdateFrames()
           .blockedFrames()
           .simpleFrames()
+          .pathValidationFrames(connection.currentPathId)
           .pingFrames()
           .datagramFrames()
           .immediateAckFrames();
@@ -196,6 +198,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
   auto connectionDataResult = writeConnectionDataToSocket(
       sock,
       connection,
+      connection.currentPathId,
       srcConnId,
       dstConnId,
       std::move(builder),
@@ -703,6 +706,7 @@ bool handleStreamBufMetaWritten(
 
 quic::Expected<void, QuicError> updateConnection(
     QuicConnectionStateBase& conn,
+    const PathInfo& pathInfo,
     Optional<ClonedPacketIdentifier> clonedPacketIdentifier,
     RegularQuicWritePacket packet,
     TimePoint sentTime,
@@ -897,7 +901,7 @@ quic::Expected<void, QuicError> updateConnection(
         retransmittable = true;
         // We don't want this triggered for cloned frames.
         if (!clonedPacketIdentifier.has_value()) {
-          updateSimpleFrameOnPacketSent(conn, simpleFrame);
+          updateSimpleFrameOnPacketSent(conn, pathInfo.id, simpleFrame);
         }
         break;
       }
@@ -994,6 +998,7 @@ quic::Expected<void, QuicError> updateConnection(
       packetIt,
       std::move(packet),
       sentTime,
+      pathInfo.id,
       encodedSize,
       encodedBodySize,
       // these numbers should all _include_ the current packet
@@ -1051,10 +1056,10 @@ quic::Expected<void, QuicError> updateConnection(
     packetProcessor->onPacketSent(pkt);
   }
 
-  if (conn.pathValidationLimiter &&
-      (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation)) {
-    conn.pathValidationLimiter->onPacketSent(pkt.metadata.encodedSize);
+  if (pathInfo.status != PathStatus::Validated) {
+    conn.pathManager->onPathPacketSent(pathInfo.id, pkt.metadata.encodedSize);
   }
+
   conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
   if (pkt.maybeClonedPacketIdentifier) {
     ++conn.outstandings.clonedPacketCount[packetNumberSpace];
@@ -1073,21 +1078,22 @@ uint64_t probePacketWritableBytes(QuicConnectionStateBase& conn) {
   return probeWritableBytes;
 }
 
+uint64_t pathValidationWritableBytes(
+    const QuicConnectionStateBase& conn,
+    PathIdType pathId) {
+  auto* pathInfo = conn.pathManager->getPath(pathId);
+  if (pathInfo && conn.nodeType == QuicNodeType::Server &&
+      pathInfo->status != PathStatus::Validated) {
+    return pathInfo->writableBytes;
+  }
+  return std::numeric_limits<uint64_t>::max();
+}
+
 uint64_t congestionControlWritableBytes(QuicConnectionStateBase& conn) {
-  uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
+  uint64_t writableBytes =
+      pathValidationWritableBytes(conn, conn.currentPathId);
 
-  if (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation) {
-    CHECK(conn.pathValidationLimiter);
-    // 0-RTT and path validation  rate limiting should be mutually exclusive.
-    CHECK(!conn.writableBytesLimit);
-
-    // Use the default RTT measurement when starting a new path challenge (CC is
-    // reset). This shouldn't be an RTT sample, so we do not update the CC with
-    // this value.
-    writableBytes = conn.pathValidationLimiter->currentCredit(
-        std::chrono::steady_clock::now(),
-        conn.lossState.srtt == 0us ? kDefaultInitialRtt : conn.lossState.srtt);
-  } else if (conn.writableBytesLimit) {
+  if (conn.writableBytesLimit) {
     writableBytes = maybeUnvalidatedClientWritableBytes(conn);
   }
 
@@ -1216,6 +1222,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
   auto writeResult = writeConnectionDataToSocket(
       sock,
       connection,
+      connection.currentPathId,
       srcConnId,
       dstConnId,
       builder,
@@ -1346,6 +1353,7 @@ quic::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
   auto writeResult = writeConnectionDataToSocket(
       socket,
       connection,
+      connection.currentPathId,
       srcConnId,
       dstConnId,
       std::move(builder),
@@ -1698,6 +1706,7 @@ void updatePacketLimitForImminentStreams(
 quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
+    PathIdType pathId,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     HeaderBuilder builder,
@@ -1715,6 +1724,11 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
       connection.nodeType == QuicNodeType::Server) {
     return WriteQuicDataResult{0, 0, 0};
   }
+
+  CHECK(connection.pathManager);
+  auto pathInfo = connection.pathManager->getPath(pathId);
+  CHECK(pathInfo);
+  auto peerAddress = pathInfo->peerAddress;
 
   if (connection.loopDetectorCallback) {
     connection.writeDebugState.schedulerName = scheduler.name().str();
@@ -1760,7 +1774,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       sock,
-      connection.peerAddress,
+      peerAddress,
       connection.statsCallback,
       happyEyeballsState);
 
@@ -1830,10 +1844,12 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
       connection.streamManager->writeQueue().rollbackTransaction(
           std::move(writeQueueTransaction));
     });
+
     const auto& dataPlaneFunc =
         connection.transportSettings.dataPathType == DataPathType::ChainedMemory
         ? iobufChainBasedBuildScheduleEncrypt
         : continuousMemoryBuildScheduleEncrypt;
+
     auto ret = dataPlaneFunc(
         connection,
         std::move(header),
@@ -1878,6 +1894,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     // transaction set to skip this step
     auto updateConnResult = updateConnection(
         connection,
+        *pathInfo,
         std::move(result->clonedPacketIdentifier),
         std::move(result->packet->packet),
         sentTime,
@@ -1964,6 +1981,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(
   auto cloningResult = writeConnectionDataToSocket(
       sock,
       connection,
+      connection.currentPathId,
       srcConnId,
       dstConnId,
       builder,
@@ -2002,6 +2020,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(
     auto probingResult = writeConnectionDataToSocket(
         sock,
         connection,
+        connection.currentPathId,
         srcConnId,
         dstConnId,
         builder,
@@ -2042,6 +2061,9 @@ WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
              << conn;
     return WriteDataReason::PROBES;
   }
+  if (hasAlternatePathValidationDataToWrite(conn)) {
+    return WriteDataReason::PATH_VALIDATION;
+  }
   if (hasAckDataToWrite(conn)) {
     VLOG(10) << nodeToString(conn.nodeType) << " needs write because of ACKs "
              << conn;
@@ -2058,6 +2080,27 @@ WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
   }
 
   return hasNonAckDataToWrite(conn);
+}
+
+bool hasAlternatePathValidationDataToWrite(
+    const QuicConnectionStateBase& conn) {
+  // Check path challenges
+  for (const auto& [pathId, _] : conn.pendingEvents.pathChallenges) {
+    if (pathValidationWritableBytes(conn, pathId) > 0) {
+      // This path has writable bytes, we can write path validation data
+      return true;
+    }
+  }
+
+  // Check path responses
+  for (const auto& [pathId, _] : conn.pendingEvents.pathResponses) {
+    if (pathValidationWritableBytes(conn, pathId) > 0) {
+      // This path has writable bytes, we can write path validation data
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn) {
@@ -2118,8 +2161,13 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (!conn.pendingEvents.frames.empty()) {
     return WriteDataReason::SIMPLE;
   }
-  if ((conn.pendingEvents.pathChallenge.has_value())) {
-    return WriteDataReason::PATHCHALLENGE;
+  if ((conn.pendingEvents.pathChallenges.find(conn.currentPathId) !=
+       conn.pendingEvents.pathChallenges.end())) {
+    return WriteDataReason::PATH_VALIDATION;
+  }
+  if ((conn.pendingEvents.pathResponses.find(conn.currentPathId) !=
+       conn.pendingEvents.pathResponses.end())) {
+    return WriteDataReason::PATH_VALIDATION;
   }
   if (conn.pendingEvents.sendPing) {
     return WriteDataReason::PING;
@@ -2215,7 +2263,7 @@ void implicitAckCryptoStream(
       },
       // We shouldn't mark anything as lost from the implicit ACK, as it should
       // be ACKing the entire rangee.
-      [](auto&, auto&, auto) -> quic::Expected<void, QuicError> {
+      [](auto&, auto, auto&, auto) -> quic::Expected<void, QuicError> {
         LOG(FATAL) << "Got loss from implicit crypto ACK.";
         return {};
       },
@@ -2473,6 +2521,88 @@ void updateNegotiatedAckFeatures(QuicConnectionStateBase& conn) {
         ~static_cast<ExtendedAckFeatureMaskType>(
             ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
   }
+}
+
+quic::Expected<WriteQuicDataResult, QuicError> writePathValidationData(
+    QuicAsyncUDPSocket& sock,
+    QuicConnectionStateBase& connection,
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher,
+    QuicVersion version,
+    uint64_t /*packetLimit*/,
+    TimePoint writeLoopBeginTime) {
+  auto builder = ShortHeaderBuilder(connection.oneRttWritePhase);
+  WriteQuicDataResult result;
+  auto& packetsWritten = result.packetsWritten;
+  auto& probesWritten = result.probesWritten;
+  auto& bytesWritten = result.bytesWritten;
+
+  UnorderedSet<PathIdType> pathIdUnion;
+  for (const auto& [pathId, _] : connection.pendingEvents.pathChallenges) {
+    pathIdUnion.insert(pathId);
+  }
+  for (const auto& [pathId, _] : connection.pendingEvents.pathResponses) {
+    pathIdUnion.insert(pathId);
+  }
+
+  for (const auto& pathId : pathIdUnion) {
+    auto schedulerBuilder = FrameScheduler::Builder(
+                                connection,
+                                EncryptionLevel::AppData,
+                                PacketNumberSpace::AppData,
+                                "PathValidationScheduler")
+                                .pathValidationFrames(pathId);
+    auto path = connection.pathManager->getPath(pathId);
+    if (!path) {
+      LOG(ERROR) << "Path not found for pathId=" << pathId;
+      return quic::make_unexpected(QuicError(
+          QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
+          "Inconsistent path state"));
+    }
+    auto pathLimiterFunc =
+        [&path](const QuicConnectionStateBase& conn) -> uint64_t {
+      if (conn.nodeType == QuicNodeType::Client) {
+        return std::numeric_limits<uint64_t>::max();
+      } else {
+        return path->writableBytes;
+      }
+    };
+    QuicAsyncUDPSocket& sendSocket = path->socket ? *path->socket : sock;
+    FrameScheduler scheduler = std::move(schedulerBuilder).build();
+    auto pathValidationWriteResult = writeConnectionDataToSocket(
+        sendSocket,
+        connection,
+        path->id,
+        srcConnId,
+        dstConnId,
+        std::move(builder),
+        PacketNumberSpace::AppData,
+        scheduler,
+        pathLimiterFunc, // Only apply path limit for the server. Client has
+                         // unlimited bytes.
+        1, // packetLimit. Path Validation requires only one packet.
+        aead,
+        headerCipher,
+        version,
+        writeLoopBeginTime);
+    if (!pathValidationWriteResult.has_value()) {
+      return quic::make_unexpected(pathValidationWriteResult.error());
+    }
+    packetsWritten += pathValidationWriteResult->packetsWritten;
+    bytesWritten += pathValidationWriteResult->bytesWritten;
+    VLOG_IF(10, packetsWritten || probesWritten)
+        << nodeToString(connection.nodeType)
+        << " written path validation packets for " << pathId
+        << "to socket packets=" << packetsWritten << " probes=" << probesWritten
+        << " " << connection;
+    if (packetsWritten == 0) {
+      // We couldn't write anymore.
+      break;
+    }
+  }
+  return result;
 }
 
 } // namespace quic

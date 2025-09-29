@@ -26,7 +26,6 @@
 #include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/LossState.h>
 #include <quic/state/OutstandingPacket.h>
-#include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicPathManager.h>
 #include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
@@ -279,7 +278,6 @@ using FrameList = std::vector<QuicSimpleFrame>;
 
 class CongestionControllerFactory;
 class LoopDetectorCallback;
-class PendingPathRateLimiter;
 class EcnL4sTracker;
 
 struct ReadDatagram {
@@ -342,7 +340,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // This limit should be cleared and set back to max after CFIN is received.
   OptionalIntegral<uint64_t> writableBytesLimit;
 
-  std::unique_ptr<PendingPathRateLimiter> pathValidationLimiter;
+  std::unique_ptr<QuicPathManager> pathManager;
 
   // Outstanding packets, packet events, and associated counters wrapped in one
   // class
@@ -420,12 +418,18 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   folly::SocketAddress originalPeerAddress;
 
   // Current peer address.
+  // TODO: JBESHAY MIGRATION - Read this from the current path state instead.
   folly::SocketAddress peerAddress;
 
   // Current path id as tracked by the path manager.
   PathIdType currentPathId;
+  // Previous pathId. This is set if the connection migrated to an unvalidated
+  // new path. The connection will switch back to this path if the new path
+  // fails validation. This will be cleared once the current path is validated.
+  Optional<PathIdType> fallbackPathId;
 
   // Local address. INADDR_ANY if not set.
+  // TODO: JBESHAY MIGRATION - Read this from the current path state instead.
   Optional<folly::SocketAddress> localAddress;
 
   // Local error on the connection.
@@ -449,10 +453,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   struct PendingEvents {
     Resets resets;
-    Optional<PathChallengeFrame> pathChallenge;
 
-    std::unordered_map<PathIdType, PathChallengeFrame> pathChallenges;
-    std::unordered_map<PathIdType, PathResponseFrame> pathResponses;
+    UnorderedMap<PathIdType, PathChallengeFrame> pathChallenges;
+    UnorderedMap<PathIdType, PathResponseFrame> pathResponses;
 
     FrameList frames;
 
@@ -558,9 +561,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // This is only used by the SinglePacketBackpressureBatchWriter.
   PendingWriteBatch pendingWriteBatch_;
 
-  // The outstanding path challenge
-  Optional<PathChallengeFrame> outstandingPathValidation;
-
   // Settings for transports.
   TransportSettings transportSettings;
 
@@ -614,10 +614,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   ReadDebugState readDebugState;
 
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
-
-  // Measure rtt between pathchallenge & path response frame
-  // Use this measured rtt as init rtt (from Transport Settings)
-  TimePoint pathChallengeStartTime;
 
   /**
    * Eerie data app params functions.
@@ -781,6 +777,7 @@ struct AckStateVersion {
 
 using LossVisitor = std::function<quic::Expected<void, QuicError>(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     RegularQuicWritePacket& packet,
     bool processed)>;
 

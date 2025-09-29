@@ -260,6 +260,7 @@ OutstandingPacketWrapper makeTestingWritePacket(
     size_t desiredSize,
     uint64_t totalBytesSent,
     TimePoint sentTime = Clock::now(),
+    PathIdType pathId = 0,
     uint64_t inflightBytes = 0,
     uint64_t writeCount = 0);
 
@@ -269,7 +270,8 @@ CongestionController::AckEvent makeAck(
     PacketNum seq,
     uint64_t ackedSize,
     TimePoint ackedTime,
-    TimePoint sendTime);
+    TimePoint sendTime,
+    PathIdType pathId = 0);
 
 BufQueue bufToQueue(BufPtr buf);
 
@@ -295,6 +297,8 @@ VersionNegotiationPacket createVersionNegotiationPacket();
 RegularQuicWritePacket createPacketWithAckFrames();
 
 RegularQuicWritePacket createPacketWithPaddingFrames();
+
+void initializePathManagerState(QuicConnectionStateBase& conn);
 
 // Helper function which takes in a specific event type and fetches all the
 // instances of that type in QLogger

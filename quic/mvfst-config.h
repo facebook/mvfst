@@ -17,6 +17,9 @@ template <class... Args>
 struct UnorderedMap : folly::F14FastMap<Args...> {};
 
 template <class... Args>
+struct UnorderedNodeMap : folly::F14NodeMap<Args...> {};
+
+template <class... Args>
 struct ValueMap : folly::F14ValueMap<Args...> {};
 
 template <class... Args>

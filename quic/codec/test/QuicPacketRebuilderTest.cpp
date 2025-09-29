@@ -22,17 +22,18 @@ using namespace testing;
 namespace quic::test {
 
 OutstandingPacketWrapper makeDummyOutstandingPacket(
-    const RegularQuicWritePacket& writePacket,
+    RegularQuicWritePacket writePacket,
     uint64_t totalBytesSentOnConnection) {
   OutstandingPacketWrapper packet(
-      writePacket,
+      std::move(writePacket),
       Clock::now(),
-      1000,
-      0,
+      0 /* pathId */,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
       totalBytesSentOnConnection,
-      0,
+      0 /* inflightBytes */,
       LossState(),
-      0,
+      0 /* writeCount */,
       OutstandingPacketMetadata::DetailsPerStream());
   return packet;
 }

@@ -114,6 +114,7 @@ QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
 
   auto& mainPeerId = nodeType == QuicNodeType::Client ? serverConnectionId
                                                       : clientConnectionId;
+
   if (!mainPeerId) {
     return quic::make_unexpected(QuicError(
         TransportErrorCode::INTERNAL_ERROR,

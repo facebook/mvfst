@@ -724,10 +724,15 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         pktHasRetransmittableData = true;
         auto updateResult = updateSimpleFrameOnPacketReceived(
             *conn_,
+            conn_->currentPathId,
             simpleFrame,
-            longHeader ? longHeader->getDestinationConnId()
-                       : shortHeader->getConnectionId(),
-            false);
+            longHeader
+                ? longHeader->getDestinationConnId()
+                : shortHeader
+                      ->getConnectionId()); // TODO: fail if get packets from a
+                                            // different server address
+                                            // TODO: JBESHAY MIGRATION - ^^ This
+                                            // client logic needs fixing
         if (!updateResult.has_value()) {
           return quic::make_unexpected(updateResult.error());
         }
@@ -1910,6 +1915,15 @@ void QuicClientTransportLite::start(
     asyncClose(adjustResult.error());
     return;
   }
+
+  CHECK(socket_->address().has_value());
+  auto addPathRes = clientConn_->pathManager->addValidatedPath(
+      *socket_->address(), conn_->peerAddress);
+  if (addPathRes.hasError()) {
+    asyncClose(addPathRes.error());
+    return;
+  }
+  conn_->currentPathId = addPathRes.value();
 
   auto handshakeResult = startCryptoHandshake();
   if (!handshakeResult.has_value()) {

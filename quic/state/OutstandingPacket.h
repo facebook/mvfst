@@ -25,6 +25,8 @@ enum class OutstandingPacketMark : uint8_t {
 struct OutstandingPacketMetadata {
   // Time that the packet was sent.
   TimePoint time;
+  // Path id of the path on which this packet was sent.
+  PathIdType pathId{0};
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
@@ -119,6 +121,7 @@ struct OutstandingPacketMetadata {
 
   OutstandingPacketMetadata(
       TimePoint timeIn,
+      PathIdType pathIdIn,
       uint16_t encodedSizeIn,
       uint16_t encodedBodySizeIn,
       uint64_t totalBytesSentIn,
@@ -128,6 +131,7 @@ struct OutstandingPacketMetadata {
       DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecsIn = 0us)
       : time(timeIn),
+        pathId(pathIdIn),
         totalBytesSent(totalBytesSentIn),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
         writeCount(writeCount),
@@ -206,6 +210,7 @@ struct OutstandingPacket {
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
+      PathIdType pathIdIn,
       uint16_t encodedSizeIn,
       uint16_t encodedBodySizeIn,
       uint64_t totalBytesSentIn,
@@ -217,6 +222,7 @@ struct OutstandingPacket {
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
+            pathIdIn,
             encodedSizeIn,
             encodedBodySizeIn,
             totalBytesSentIn,
@@ -245,6 +251,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
   OutstandingPacketWrapper(
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
+      PathIdType pathIdIn,
       uint16_t encodedSizeIn,
       uint16_t encodedBodySizeIn,
       uint64_t totalBytesSentIn,
@@ -258,6 +265,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       : OutstandingPacket(
             std::move(packetIn),
             timeIn,
+            pathIdIn,
             encodedSizeIn,
             encodedBodySizeIn,
             totalBytesSentIn,

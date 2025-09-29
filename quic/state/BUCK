@@ -98,13 +98,11 @@ mvfst_cpp_library(
 mvfst_cpp_library(
     name = "quic_state_machine",
     srcs = [
-        "PendingPathRateLimiter.cpp",
         "QuicPathManager.cpp",
         "QuicStreamManager.cpp",
         "StateData.cpp",
     ],
     headers = [
-        "PendingPathRateLimiter.h",
         "QuicPathManager.h",
         "QuicStreamManager.h",
         "QuicStreamUtilities.h",

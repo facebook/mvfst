@@ -60,12 +60,17 @@ struct PathInfo {
 
   // If populated, this is the challenge we are scheduled to send to the peer
   Optional<uint64_t> outstandingChallengeData;
+  // If validating, this is the timestamp the current challenge was first sent.
+  // It is not updated on retransmissions.
+  Optional<TimePoint> firstChallengeSentTimestamp;
   // If validating, this is the timestamp of the last time we sent the
-  // outstanding challenge data
+  // outstanding challenge data. It is updated on retransmissions.
   Optional<TimePoint> lastChallengeSentTimestamp;
   // If validating, this is when we'd timeout and mark the path as not valid
   // if we haven't received a response
-  Optional<TimePoint> pathResponeDeadline;
+  Optional<TimePoint> pathResponseDeadline;
+  // If validated, this is the timestamp of when the path was validated
+  Optional<TimePoint> pathValidationTime;
 
   // If this is a server and this path is not validated, this is the number of
   // bytes we can send on this path.
@@ -134,7 +139,8 @@ class QuicPathManager {
    * Add a new path for the given address tuple if it does not already exist.
    * Returns the PathInfo of the existing or the added path.
    */
-  const PathInfo& getOrAddPath(
+  quic::Expected<std::reference_wrapper<const PathInfo>, QuicError>
+  getOrAddPath(
       const folly::SocketAddress& localAddress,
       const folly::SocketAddress& peerAddress);
 
@@ -184,15 +190,17 @@ class QuicPathManager {
   void onPathChallengeSent(const PathChallengeFrame& frame);
 
   /**
-   * Update the state when the path validation timeout expires
+   * Update the state when the path validation timeout expires.
    */
-  void onPathValidationTimeoutExpired();
+  void onPathValidationTimeoutExpired(TimePoint now = Clock::now());
 
   /**
    * Update the state with a PathResponseFrame that was received. Returns the
    * validated path if any
    */
-  const PathInfo* onPathResponseReceived(const PathResponseFrame& frame);
+  const PathInfo* onPathResponseReceived(
+      const PathResponseFrame& frame,
+      PathIdType incomingPathId);
 
   /**
    * Get the earliest time when a pending path validation timeout should fail
@@ -222,7 +230,7 @@ class QuicPathManager {
   [[nodiscard]] bool maybeRestoreCongestionControlAndRttStateForCurrentPath();
 
   /*
-   * Path path as vali
+   * Mark path as validated
    */
   void markPathValidated(PathIdType pathId);
 
@@ -239,18 +247,34 @@ class QuicPathManager {
    */
   void dropAllSockets();
 
+  [[nodiscard]] quic::Expected<std::unique_ptr<QuicAsyncUDPSocket>, QuicError>
+  switchCurrentPath(PathIdType switchToPathId);
+
+  /*
+   * If the number of tracked paths is equal to the maximum number of active
+   * connection ids, this will delete the oldest path besides the one the
+   * connection is currently using, and retire its connection id.
+   * This is useful for the server to leave headroom for an incoming migration
+   * attempt. This is because the server needs to use a new peer CID when on any
+   * migration path.
+   */
+  void maybeReapUnusedPaths(bool force = false);
+
  private:
+  friend class PathManagerTestAccessor;
+
   PathInfo* getPathByChallengeDataImpl(uint64_t challengeData);
 
   // Map from PathId to PathInfo
-  std::unordered_map<PathIdType, PathInfo> pathIdToInfo_;
+  // Note: This uses a stable reference container
+  UnorderedNodeMap<PathIdType, PathInfo> pathIdToInfo_;
 
   // localAddress, peerAddress
   using PathAddressTuple =
       std::pair<folly::SocketAddress, folly::SocketAddress>;
 
   // Map from PathAddressTuple to PathId
-  std::unordered_map<PathAddressTuple, PathIdType> pathTupleToId_;
+  UnorderedMap<PathAddressTuple, PathIdType> pathTupleToId_;
 
   // Deque of paths that have sent a challenge and are waiting for a response.
   // They are ordered by the time the challenge was sent, earliest in front.

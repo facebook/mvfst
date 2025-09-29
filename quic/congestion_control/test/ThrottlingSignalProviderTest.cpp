@@ -84,6 +84,7 @@ TEST(ThrottlingSignalProviderTest, BasicInitSetGetTest) {
 TEST(ThrottlingSignalProviderTest, TokenBasedDynamicCapOnWritableBytes) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   conn.udpSendPacketLen = 2000;
+  initializePathManagerState(conn);
   auto signalProvider =
       std::make_shared<SimpleThrottlingSignalProvider>(SimulatedTBF::Config{
           .rateBytesPerSecond = 100 * 1000,

@@ -46,6 +46,7 @@ class AckedPacketIteratorTest : public virtual testing::Test {
       OutstandingPacketWrapper sentPacket(
           std::move(regularPacket),
           TimePoint(),
+          0,
           1,
           0,
           packet.packetNum,

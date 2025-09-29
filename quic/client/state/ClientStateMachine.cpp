@@ -95,6 +95,17 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       newConn->transportSettings,
       std::move(*conn->streamManager));
 
+  newConn->pathManager = std::make_unique<QuicPathManager>(*newConn);
+  auto currentPath = conn->pathManager->getPath(conn->currentPathId);
+  if (currentPath) {
+    auto pathIdRes = newConn->pathManager->addValidatedPath(
+        currentPath->localAddress, currentPath->peerAddress);
+    if (pathIdRes.hasError()) {
+      LOG(FATAL) << "error adding validated path to a retry connection";
+    }
+    newConn->currentPathId = pathIdRes.value();
+  }
+
   auto result = markZeroRttPacketsLost(*newConn, markPacketLoss);
   if (result.hasError()) {
     LOG(FATAL) << "error marking packets lost";

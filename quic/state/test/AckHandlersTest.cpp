@@ -44,7 +44,7 @@ uint64_t ul(T val) {
 }
 
 auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
-  return [&lostPackets](QuicConnectionStateBase&, auto& packet, bool)
+  return [&lostPackets](QuicConnectionStateBase&, auto, auto& packet, bool)
              -> quic::Expected<void, quic::QuicError> {
     auto packetNum = packet.header.getPacketSequenceNum();
     lostPackets.push_back(packetNum);
@@ -72,6 +72,7 @@ auto emplacePackets(
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -190,6 +191,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -274,6 +276,7 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
       0,
       0,
       0,
+      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -299,7 +302,7 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackReceiveTime);
@@ -329,7 +332,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
   auto noopLossVisitor =
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
     return {};
   };
 
@@ -352,6 +355,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
   OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
+      0,
       1,
       0,
       0,
@@ -398,7 +402,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       startTime + 30ms);
@@ -420,7 +424,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
   auto noopLossVisitor =
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
     return {};
   };
 
@@ -443,6 +447,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
   OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
+      0,
       1,
       0,
       0,
@@ -489,7 +494,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       startTime + 30ms);
@@ -517,7 +522,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
   auto noopLossVisitor =
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
     return {};
   };
 
@@ -540,6 +545,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
   OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
+      0,
       1,
       0,
       0,
@@ -586,9 +592,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           startTime + 30ms)
           .hasError());
 
@@ -611,7 +616,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
   conn.transportSettings.removeFromLossBufferOnSpurious = true;
 
   auto noopLossVisitor =
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
     return {};
   };
 
@@ -634,6 +639,7 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
   OutstandingPacketWrapper sentPacket(
       std::move(regularPacket),
       startTime,
+      0,
       1,
       0,
       0,
@@ -680,9 +686,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           startTime + 30ms)
           .hasError());
 
@@ -726,6 +731,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -762,9 +768,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
   EXPECT_THAT(packetNumsDestroyed, UnorderedElementsAre(1, 2, 3));
@@ -810,6 +815,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         startTime + std::chrono::milliseconds((packetNum - 1) * 100),
+        0,
         1,
         0,
         packetNum,
@@ -830,16 +836,14 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 3;
   ackState.largestAckedByPeer = 3;
-  ASSERT_FALSE(
-      detectLossPackets(
-          conn,
-          ackState,
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
-          startTime + 250ms,
-          GetParam().pnSpace)
-          .hasError());
+  ASSERT_FALSE(detectLossPackets(
+                   conn,
+                   ackState,
+                   [](auto&, auto, auto&, bool)
+                       -> quic::Expected<void, quic::QuicError> { return {}; },
+                   startTime + 250ms,
+                   GetParam().pnSpace)
+                   .hasError());
 
   // now we get late acks for #2 and #3, triggering #1 to be marked lost.
   ReadAckFrame ackFrame;
@@ -863,9 +867,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           startTime + 260ms)
           .hasError());
 
@@ -883,6 +886,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         startTime + std::chrono::milliseconds((packetNum - 1) * 100),
+        0,
         1,
         0,
         packetNum,
@@ -920,9 +924,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           startTime + 600ms)
           .hasError());
 
@@ -965,6 +968,7 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -999,9 +1003,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
 
@@ -1027,9 +1030,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
 
@@ -1052,9 +1054,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
 
@@ -1086,6 +1087,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -1197,9 +1199,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
           [](auto&, auto) -> quic::Expected<void, quic::QuicError> {
             return {};
           },
-          [](auto&, auto&, auto) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, auto)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
   itr = std::find_if(
@@ -1221,9 +1222,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
           [](auto&, auto) -> quic::Expected<void, quic::QuicError> {
             return {};
           },
-          [](auto&, auto&, auto) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, auto)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now() + 2 * calculatePTO(conn))
           .hasError());
 
@@ -1259,6 +1259,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         Clock::now(),
+        0,
         1,
         0,
         packetNum,
@@ -1380,6 +1381,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         Clock::now(),
+        0,
         1,
         0,
         packetNum,
@@ -1401,6 +1403,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         Clock::now(),
+        0,
         1,
         0,
         packetNum,
@@ -1505,6 +1508,7 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       0,
       0,
       0,
+      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1522,6 +1526,7 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   conn.outstandings.packets.emplace_back(
       std::move(secondPacket),
       Clock::now(),
+      0,
       0,
       0,
       0,
@@ -1554,7 +1559,10 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
                      }
                      return {};
                    },
-                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   [](auto& /* conn */,
+                      auto /*pathId*/,
+                      auto& /* packet */,
+                      bool /* processed */
                       ) -> quic::Expected<void, quic::QuicError> { return {}; },
                    Clock::now())
                    .hasError());
@@ -1585,7 +1593,10 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
                      }
                      return {};
                    },
-                   [](auto& /* conn */, auto& /* packet */, bool /* processed */
+                   [](auto& /* conn */,
+                      auto /* pathId*/,
+                      auto& /* packet */,
+                      bool /* processed */
                       ) -> quic::Expected<void, quic::QuicError> { return {}; },
                    Clock::now())
                    .hasError());
@@ -1610,6 +1621,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       0,
       0,
       0,
+      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1628,9 +1640,8 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
           [](const auto&, const auto&) -> quic::Expected<void, QuicError> {
             return {};
           },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
@@ -1656,9 +1667,8 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
           [](const auto&, const auto&) -> quic::Expected<void, QuicError> {
             return {};
           },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
 }
@@ -1681,6 +1691,7 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       0,
       0,
       0,
+      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -1693,6 +1704,7 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   conn.outstandings.packets.emplace_back(
       std::move(regularPacket2),
       Clock::now(),
+      0,
       0,
       0,
       0,
@@ -1718,9 +1730,8 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
           [](const auto&, const auto&) -> quic::Expected<void, QuicError> {
             return {};
           },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
   EXPECT_EQ(1, conn.outstandings.packets.size());
@@ -1742,6 +1753,7 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         Clock::now(),
+        0,
         0,
         0,
         packetNum / 2,
@@ -1957,6 +1969,7 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   conn.outstandings.packets.emplace_back(
       std::move(regularPacket),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -1985,7 +1998,10 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
           ackFrame,
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           countingAckVisitor,
-          [](auto& /* conn */, auto& /* packet */, bool /* processed */
+          [](auto& /* conn */,
+             auto /* pathId */,
+             auto& /* packet */,
+             bool /* processed */
              ) -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
@@ -2024,6 +2040,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   OutstandingPacketWrapper outstandingPacket(
       std::move(regularPacket),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -2055,7 +2072,10 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
           ackFrame,
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           countingAckVisitor,
-          [](auto& /* conn */, auto& /* packet */, bool /* processed */
+          [](auto& /* conn */,
+             auto /* pathId */,
+             auto& /* packet */,
+             bool /* processed */
              ) -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
@@ -2089,6 +2109,7 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
     conn.outstandings.packets.emplace_back(
         std::move(regularPacket),
         Clock::now(),
+        0,
         1,
         0,
         1 * (packetNum + 1),
@@ -2132,9 +2153,8 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [&](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [&](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
 }
@@ -2154,6 +2174,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   OutstandingPacketWrapper outstandingPacket1(
       std::move(regularPacket1),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -2167,6 +2188,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   OutstandingPacketWrapper outstandingPacket2(
       std::move(regularPacket2),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -2205,7 +2227,10 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
           ackFrame1,
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           countingAckVisitor,
-          [](auto& /* conn */, auto& /* packet */, bool /* processed */
+          [](auto& /* conn */,
+             auto /* pathId */,
+             auto& /* packet */,
+             bool /* processed */
              ) -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
@@ -2222,9 +2247,8 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
           ackFrame2,
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           countingAckVisitor,
-          [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [&](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
   EXPECT_EQ(1, ackVisitorCounter);
@@ -2242,6 +2266,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   OutstandingPacketWrapper outstandingPacket1(
       std::move(regularPacket1),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -2258,6 +2283,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   OutstandingPacketWrapper outstandingPacket2(
       std::move(regularPacket2),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -2294,9 +2320,8 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
           ackFrame,
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           countingAckVisitor,
-          [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [&](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
   EXPECT_EQ(2, ackVisitorCounter);
@@ -2315,6 +2340,7 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
   conn.outstandings.packets.emplace_back(
       std::move(regularPacket),
       sentTime,
+      0,
       1,
       0,
       1,
@@ -2340,9 +2366,8 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [&](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [&](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           receiveTime)
           .hasError());
   EXPECT_EQ(10us, conn.lossState.mrtt);
@@ -2395,6 +2420,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   OutstandingPacketWrapper outstandingPacket(
       std::move(regularPacket),
       Clock::now() - delayUntilLost - 20ms,
+      0,
       1,
       0,
       1,
@@ -2427,7 +2453,10 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
           ackFrame,
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           countingAckVisitor,
-          [](auto& /* conn */, auto& /* packet */, bool /* processed */
+          [](auto& /* conn */,
+             auto /* pathId */,
+             auto& /* packet */,
+             bool /* processed */
              ) -> quic::Expected<void, quic::QuicError> { return {}; },
           Clock::now())
           .hasError());
@@ -2449,6 +2478,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   conn.outstandings.packets.emplace_back(
       std::move(regularPacket),
       sentTime,
+      0,
       111,
       100,
       conn.lossState.totalBytesSent + 111,
@@ -2475,9 +2505,8 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [&](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [&](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           receiveTime)
           .hasError());
   EXPECT_EQ(2468 + 111, conn.lossState.totalBytesSentAtLastAck);
@@ -2522,6 +2551,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -2609,7 +2639,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackTime);
@@ -2651,6 +2681,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0, /* pathId */
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -2740,7 +2771,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackTime);
@@ -2781,6 +2812,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -2850,7 +2882,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackTime);
@@ -2911,7 +2943,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestamps) {
       [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
       [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
           -> quic::Expected<void, quic::QuicError> { return {}; },
-      [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackTime);
@@ -3009,7 +3041,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsGaps) {
       [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
       [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
           -> quic::Expected<void, quic::QuicError> { return {}; },
-      [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackTime);
@@ -3072,7 +3104,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
         [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
             -> quic::Expected<void, quic::QuicError> { return {}; },
-        [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
           return {};
         },
         ackTime);
@@ -3103,7 +3135,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsDuplicatesAll) {
         [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
             -> quic::Expected<void, quic::QuicError> { return {}; },
-        [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
           return {};
         },
         ackTime);
@@ -3170,7 +3202,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
         [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
             -> quic::Expected<void, quic::QuicError> { return {}; },
-        [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
           return {};
         },
         ackTime);
@@ -3288,7 +3320,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
         [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
             -> quic::Expected<void, quic::QuicError> { return {}; },
-        [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
           return {};
         },
         ackTime);
@@ -3345,7 +3377,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsOutOfOrderAcks) {
         [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
         [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
             -> quic::Expected<void, quic::QuicError> { return {}; },
-        [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
           return {};
         },
         ackTime);
@@ -3421,7 +3453,7 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsMaxCheck) {
       [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
       [](const auto& /*outstandingPacket*/, const auto& /*frame*/)
           -> quic::Expected<void, quic::QuicError> { return {}; },
-      [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       ackTime);
@@ -3542,6 +3574,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -3609,9 +3642,8 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           ackTime)
           .hasError());
 }
@@ -3650,6 +3682,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -3715,9 +3748,8 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           ackTime)
           .hasError());
 }
@@ -3765,6 +3797,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -3847,9 +3880,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             ackTime)
             .hasError());
   }
@@ -3908,9 +3940,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             ackTime)
             .hasError());
   }
@@ -3969,9 +4000,8 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             ackTime)
             .hasError());
   }
@@ -4011,6 +4041,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -4093,9 +4124,8 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             ackTime)
             .hasError());
   }
@@ -4123,9 +4153,8 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             ackTime)
             .hasError());
   }
@@ -4161,6 +4190,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         getSentTime(packetNum),
+        0 /* pathId */,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         1 * (packetNum + 1) /* totalBytesSentIn */,
@@ -4228,9 +4258,8 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           ackTime)
           .hasError());
 }
@@ -4267,6 +4296,7 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -4345,9 +4375,8 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             ackData.ackTime)
             .hasError());
   }
@@ -4411,16 +4440,14 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
-  ASSERT_FALSE(
-      detectLossPackets(
-          conn,
-          ackState,
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
-          checkTime,
-          GetParam().pnSpace)
-          .hasError());
+  ASSERT_FALSE(detectLossPackets(
+                   conn,
+                   ackState,
+                   [](auto&, auto, auto&, bool)
+                       -> quic::Expected<void, quic::QuicError> { return {}; },
+                   checkTime,
+                   GetParam().pnSpace)
+                   .hasError());
 
   // now we get acks for packets marked lost, triggering spuriousLossDetected
   EXPECT_CALL(
@@ -4447,9 +4474,8 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             startTime + 30ms)
             .hasError());
   }
@@ -4516,16 +4542,14 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
   auto& ackState = getAckState(conn, GetParam().pnSpace);
   ackState.largestNonDsrSequenceNumberAckedByPeer = 10;
   ackState.largestAckedByPeer = 10;
-  ASSERT_FALSE(
-      detectLossPackets(
-          conn,
-          ackState,
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
-          checkTime,
-          GetParam().pnSpace)
-          .hasError());
+  ASSERT_FALSE(detectLossPackets(
+                   conn,
+                   ackState,
+                   [](auto&, auto, auto&, bool)
+                       -> quic::Expected<void, quic::QuicError> { return {}; },
+                   checkTime,
+                   GetParam().pnSpace)
+                   .hasError());
 
   // now we get acks for packets marked lost, triggering spuriousLossDetected
   EXPECT_CALL(
@@ -4554,9 +4578,8 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
             [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
             [](const auto&, const auto&)
                 -> quic::Expected<void, quic::QuicError> { return {}; },
-            [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-              return {};
-            },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
             startTime + 510ms)
             .hasError());
   }
@@ -4585,6 +4608,7 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
       0,
       0,
       0,
+      0,
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -4603,9 +4627,8 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
           [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
           [](const auto&, const auto&)
               -> quic::Expected<void, quic::QuicError> { return {}; },
-          [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-            return {};
-          },
+          [](auto&, auto, auto&, bool)
+              -> quic::Expected<void, quic::QuicError> { return {}; },
           ackReceiveTime)
           .hasError());
   EXPECT_EQ(conn.lossState.lrtt, 1us);
@@ -4643,6 +4666,7 @@ class AckEventForAppDataTest : public Test {
                ->setMaxLocalUnidirectionalStreams(
                    kDefaultMaxStreamsUnidirectional)
                .hasError());
+    initializePathManagerState(*conn);
     return conn;
   }
 
@@ -4741,8 +4765,11 @@ class AckEventForAppDataTest : public Test {
   void sendAppDataPacket(
       const RegularQuicPacketBuilder::Packet& packet,
       const TimePoint timepoint = Clock::now()) {
+    auto pathInfo = conn_->pathManager->getPath(conn_->currentPathId);
+    ASSERT_TRUE(pathInfo);
     CHECK(!updateConnection(
                *conn_,
+               *pathInfo,
                std::nullopt,
                packet.packet,
                timepoint,
@@ -4797,7 +4824,7 @@ class AckEventForAppDataTest : public Test {
           }
           return {};
         },
-        [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
           return {};
         },
         timepoint);
@@ -7662,6 +7689,7 @@ TEST_P(AckHandlersTest, SkippedPacketAckedProtocolViolation) {
   OutstandingPacketWrapper outstandingPacket1(
       std::move(regularPacket1),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -7682,6 +7710,7 @@ TEST_P(AckHandlersTest, SkippedPacketAckedProtocolViolation) {
   OutstandingPacketWrapper outstandingPacket2(
       std::move(regularPacket2),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -7709,7 +7738,7 @@ TEST_P(AckHandlersTest, SkippedPacketAckedProtocolViolation) {
       [&](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       Clock::now());
@@ -7738,7 +7767,7 @@ TEST_P(AckHandlersTest, FuturePacketAckedProtocolViolation) {
       [&](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       Clock::now());
@@ -7767,6 +7796,7 @@ TEST_P(AckHandlersTest, SkippedPacketNumberClearedAfterDistance) {
   OutstandingPacketWrapper outstandingPacket1(
       std::move(regularPacket1),
       Clock::now(),
+      0,
       1,
       0,
       1,
@@ -7791,7 +7821,7 @@ TEST_P(AckHandlersTest, SkippedPacketNumberClearedAfterDistance) {
       [&](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [&](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [&](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       Clock::now());
@@ -7829,6 +7859,7 @@ TEST_P(AckHandlersTest, InflightBytesDecrementOnAckIncludesLostBytes) {
     OutstandingPacketWrapper sentPacket(
         std::move(regularPacket),
         startTime + std::chrono::milliseconds(packetNum),
+        /* pathId */ 0,
         /* encodedSizeIn */ kPktSize,
         /* encodedBodySizeIn */ 0,
         /* totalBytesSentIn */ static_cast<uint64_t>(packetNum + 1),
@@ -7863,7 +7894,7 @@ TEST_P(AckHandlersTest, InflightBytesDecrementOnAckIncludesLostBytes) {
       [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
         return {};
       },
       startTime + 10ms);

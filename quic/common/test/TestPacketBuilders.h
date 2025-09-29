@@ -52,6 +52,7 @@ struct AckPacketBuilder : public AckPacketBuilderFields {
 struct OutstandingPacketBuilderFields {
   Optional<RegularQuicWritePacket> maybePacket;
   Optional<TimePoint> maybeTime;
+  Optional<PathIdType> maybePathId;
   Optional<uint16_t> maybeEncodedSize;
   Optional<uint16_t> maybeEncodedBodySize;
   Optional<uint64_t> maybeTotalBytesSent;
@@ -70,6 +71,7 @@ struct OutstandingPacketBuilder : public OutstandingPacketBuilderFields {
   using Builder = OutstandingPacketBuilder;
   Builder&& setPacket(const RegularQuicWritePacket&);
   Builder&& setTime(const TimePoint& timeIn);
+  Builder&& setPathId(const PathIdType& pathIdIn);
   Builder&& setEncodedSize(const uint32_t& encodedSizeIn);
   Builder&& setEncodedBodySize(const uint32_t& encodedBodySizeIn);
   Builder&& setTotalBytesSent(const uint64_t& totalBytesSentIn);

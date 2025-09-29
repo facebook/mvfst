@@ -72,12 +72,6 @@ struct CongestionAndRttState {
 
 struct ConnectionMigrationState {
   uint32_t numMigrations{0};
-
-  // Previous validated peer addresses, not containing current peer address
-  std::vector<folly::SocketAddress> previousPeerAddresses;
-
-  // Congestion state and rtt stats of last validated peer
-  Optional<CongestionAndRttState> lastCongestionAndRtt;
 };
 
 /**
@@ -190,6 +184,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     pendingOneRttData = std::make_unique<std::vector<ServerEvents::ReadData>>();
     streamManager = std::make_unique<QuicStreamManager>(
         *this, this->nodeType, transportSettings);
+    pathManager = std::make_unique<QuicPathManager>(*this);
     connIdsRetiringSoon.emplace(SmallVec<ConnectionId, 5>{});
   }
 };
@@ -232,7 +227,7 @@ void maybeUpdateTransportFromAppToken(
 
 [[nodiscard]] quic::Expected<void, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,
-    const folly::SocketAddress& newPeerAddress,
+    PathIdType readPathId,
     bool isIntentional = false);
 
 } // namespace quic

@@ -580,6 +580,7 @@ OutstandingPacketWrapper makeTestingWritePacket(
     size_t desiredSize,
     uint64_t totalBytesSent,
     TimePoint sentTime /* = Clock::now() */,
+    PathIdType pathId /* = 0*/,
     uint64_t inflightBytes /* = 0 */,
     uint64_t writeCount /* = 0 */) {
   LongHeader longHeader(
@@ -592,6 +593,7 @@ OutstandingPacketWrapper makeTestingWritePacket(
   return OutstandingPacketWrapper(
       packet,
       sentTime,
+      pathId,
       desiredSize,
       0,
       totalBytesSent,
@@ -605,7 +607,8 @@ CongestionController::AckEvent makeAck(
     PacketNum seq,
     uint64_t ackedSize,
     TimePoint ackedTime,
-    TimePoint sentTime) {
+    TimePoint sentTime,
+    PathIdType pathId /*= 0*/) {
   CHECK(sentTime < ackedTime);
   RegularQuicWritePacket packet(
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), seq));
@@ -621,6 +624,7 @@ CongestionController::AckEvent makeAck(
   ack.largestNewlyAckedPacket = seq;
   OutstandingPacketMetadata opm(
       sentTime,
+      pathId,
       ackedSize /* encodedSize */,
       ackedSize /* encodedBodySize */,
       0 /* totalBytesSent */,
@@ -735,6 +739,17 @@ RegularQuicWritePacket createPacketWithPaddingFrames() {
   PaddingFrame paddingFrame{20};
   packet.frames.emplace_back(paddingFrame);
   return packet;
+}
+
+void initializePathManagerState(QuicConnectionStateBase& conn) {
+  if (!conn.pathManager) {
+    conn.pathManager = std::make_unique<QuicPathManager>(conn);
+  }
+  auto addPathRes = conn.pathManager->addValidatedPath(
+      folly::SocketAddress("::1", 12345), conn.peerAddress);
+  CHECK(!addPathRes.hasError())
+      << "Failed to add validated path: " << addPathRes.error();
+  conn.currentPathId = addPathRes.value();
 }
 
 std::vector<int> getQLogEventIndices(

@@ -1573,6 +1573,9 @@ void QuicTransportBaseLite::closeImpl(
   peekLooper_->stop();
   writeLooper_->stop();
 
+  // Drop any alternate paths
+  conn_->pathManager->dropAllSockets();
+
   cancelAllAppCallbacks(cancelCode);
 
   // Clear out all the pending events, we don't need them any more.
@@ -2346,20 +2349,10 @@ void QuicTransportBaseLite::ackTimeoutExpired() noexcept {
 }
 
 void QuicTransportBaseLite::pathValidationTimeoutExpired() noexcept {
-  CHECK(conn_->outstandingPathValidation);
-
-  conn_->pendingEvents.schedulePathValidationTimeout = false;
-  conn_->outstandingPathValidation.reset();
-  if (conn_->qLogger) {
-    conn_->qLogger->addPathValidationEvent(false);
-  }
-
-  // TODO junqiw probing is not supported, so pathValidation==connMigration
-  // We decide to close conn when pathValidation to migrated path fails.
-  [[maybe_unused]] auto self = sharedGuard();
-  closeImpl(QuicError(
-      QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
-      std::string("Path validation timed out")));
+  // Pass the signal to the path manager. Responding to the result of the path
+  // validation is handled in the path validation callback in the client/server
+  // transport.
+  conn_->pathManager->onPathValidationTimeoutExpired();
 }
 
 void QuicTransportBaseLite::drainTimeoutExpired() noexcept {
@@ -3308,16 +3301,16 @@ void QuicTransportBaseLite::schedulePathValidationTimeout() {
       cancelTimeout(&pathValidationTimeout_);
     }
   } else if (!isTimeoutScheduled(&pathValidationTimeout_)) {
-    auto pto = conn_->lossState.srtt +
-        std::max(4 * conn_->lossState.rttvar, kGranularity) +
-        conn_->lossState.maxAckDelay;
-
-    auto validationTimeout =
-        std::max(3 * pto, 6 * conn_->transportSettings.initialRtt);
-    auto timeoutMs =
-        folly::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
-    VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;
-    scheduleTimeout(&pathValidationTimeout_, timeoutMs);
+    auto nextTimeout = conn_->pathManager->getEarliestChallengeTimeout();
+    if (nextTimeout.has_value()) {
+      auto timeoutMs = *nextTimeout > Clock::now()
+          ? std::chrono::ceil<std::chrono::milliseconds>(
+                *nextTimeout - Clock::now())
+          : 0ms;
+      VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms "
+               << *this;
+      scheduleTimeout(&pathValidationTimeout_, timeoutMs);
+    }
   }
 }
 

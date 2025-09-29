@@ -36,6 +36,7 @@ struct CipherInfo {
 class QuicServerTransport
     : public QuicTransportBase,
       public ServerHandshake::HandshakeCallback,
+      public QuicPathManager::PathValidationCallback,
       public std::enable_shared_from_this<QuicServerTransport> {
  public:
   using Ptr = std::shared_ptr<QuicServerTransport>;
@@ -253,6 +254,8 @@ class QuicServerTransport
   bool hasReadCipher() const;
   void registerAllTransportKnobParamHandlers();
   bool shouldWriteNewSessionTicket();
+
+  void onPathValidationResult(const PathInfo& pathInfo) override;
 
   folly::Executor* getFollyEventbase() const {
     // TODO (jbeshay): handle nullptr

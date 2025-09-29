@@ -43,6 +43,7 @@ TEST(OutstandingPacketTest, BasicPacketDestructionCallback) {
     OutstandingPacketWrapper testPacket(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -92,6 +93,7 @@ TEST(OutstandingPacketTest, BasicPacketDestructionDequeDestroy) {
       OutstandingPacketWrapper testPacket(
           std::move(regularPacket),
           sentTime,
+          0,
           1,
           0,
           packetNum,
@@ -131,6 +133,7 @@ TEST(OutstandingPacketTest, BasicPacketDestructionNoCallback) {
       OutstandingPacketWrapper testPacket(
           std::move(regularPacket),
           sentTime,
+          0,
           1,
           0,
           packetNum,
@@ -166,6 +169,7 @@ TEST(OutstandingPacketTest, PacketMoveConstuctorCallback) {
     auto testPacket = std::make_unique<OutstandingPacketWrapper>(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -208,6 +212,7 @@ TEST(OutstandingPacketTest, PacketMoveAssignCallback) {
     auto testPacket = std::make_unique<OutstandingPacketWrapper>(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -250,6 +255,7 @@ TEST(OutstandingPacketTest, PacketMoveAssignExistingPacketCallback) {
     OutstandingPacketWrapper testPacket1(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum,
@@ -269,6 +275,7 @@ TEST(OutstandingPacketTest, PacketMoveAssignExistingPacketCallback) {
     OutstandingPacketWrapper testPacket2(
         std::move(regularPacket),
         sentTime,
+        0,
         1,
         0,
         packetNum + 1,
@@ -321,6 +328,7 @@ TEST(OutstandingPacketTest, DequeMoveAssignPacketDestructionCallback) {
       OutstandingPacketWrapper testPacket(
           std::move(regularPacket),
           sentTime,
+          0,
           1,
           0,
           packetNum,

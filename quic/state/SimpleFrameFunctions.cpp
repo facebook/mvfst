@@ -13,11 +13,14 @@
 
 namespace quic {
 void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame) {
+  CHECK(frame.type() != QuicSimpleFrame::Type::PathChallengeFrame);
+  CHECK(frame.type() != QuicSimpleFrame::Type::PathResponseFrame);
   conn.pendingEvents.frames.emplace_back(std::move(frame));
 }
 
 Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame:
@@ -26,16 +29,32 @@ Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
         return std::nullopt;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::PathChallengeFrame:
-      // Path validation timer expired, path validation failed;
-      // or a different path validation was scheduled
-      if (!conn.outstandingPathValidation ||
-          *frame.asPathChallengeFrame() != *conn.outstandingPathValidation) {
+    case QuicSimpleFrame::Type::PathChallengeFrame: {
+      // Path challenges should only be cloned if we're on
+      // the same path and the path has not been validated yet.
+      // TODO: Should we disable probes completely if we only have packets for
+      // alternate paths?
+      const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
+      auto pathInfo =
+          conn.pathManager->getPathByChallengeData(pathChallenge.pathData);
+      if (!pathInfo || pathInfo->status != PathStatus::Validating ||
+          pathInfo->id != conn.currentPathId) {
         return std::nullopt;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::PathResponseFrame:
+    }
+    case QuicSimpleFrame::Type::PathResponseFrame: {
+      // Path responses should only be cloned if we're on
+      // the same path and the path has not failed validation.
+      // TODO: Should we disable probes completely if we only have packets for
+      // alternate paths?
+      auto pathInfo = conn.pathManager->getPath(pathId);
+      if (!pathInfo || pathInfo->status == PathStatus::NotValid ||
+          pathInfo->id != conn.currentPathId) {
+        return std::nullopt;
+      }
       return QuicSimpleFrame(frame);
+    }
     case QuicSimpleFrame::Type::NewConnectionIdFrame:
     case QuicSimpleFrame::Type::MaxStreamsFrame:
     case QuicSimpleFrame::Type::HandshakeDoneFrame:
@@ -51,16 +70,32 @@ Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
 
 void updateSimpleFrameOnPacketSent(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& simpleFrame) {
   switch (simpleFrame.type()) {
-    case QuicSimpleFrame::Type::PathChallengeFrame:
-      conn.outstandingPathValidation =
-          std::move(conn.pendingEvents.pathChallenge);
-      conn.pendingEvents.pathChallenge.reset();
-      conn.pendingEvents.schedulePathValidationTimeout = true;
-      // Start the clock to measure Rtt
-      conn.pathChallengeStartTime = Clock::now();
+    case QuicSimpleFrame::Type::PathChallengeFrame: {
+      const PathChallengeFrame& pathChallenge =
+          *simpleFrame.asPathChallengeFrame();
+      conn.pathManager->onPathChallengeSent(pathChallenge);
+
+      auto it = conn.pendingEvents.pathChallenges.find(pathId);
+      if (it != conn.pendingEvents.pathChallenges.end() &&
+          it->second.pathData == pathChallenge.pathData) {
+        conn.pendingEvents.pathChallenges.erase(it);
+      }
       break;
+    }
+    case QuicSimpleFrame::Type::PathResponseFrame: {
+      const PathResponseFrame& pathResponse =
+          *simpleFrame.asPathResponseFrame();
+
+      auto it = conn.pendingEvents.pathResponses.find(pathId);
+      if (it != conn.pendingEvents.pathResponses.end() &&
+          it->second.pathData == pathResponse.pathData) {
+        conn.pendingEvents.pathResponses.erase(it);
+      }
+      break;
+    }
     default: {
       auto& frames = conn.pendingEvents.frames;
       auto itr = std::find(frames.begin(), frames.end(), simpleFrame);
@@ -73,6 +108,7 @@ void updateSimpleFrameOnPacketSent(
 
 void updateSimpleFrameOnPacketLoss(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame: {
@@ -84,14 +120,28 @@ void updateSimpleFrameOnPacketLoss(
     }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
-      if (conn.outstandingPathValidation &&
-          pathChallenge == *conn.outstandingPathValidation) {
-        conn.pendingEvents.pathChallenge = pathChallenge;
+      // Find the path by the challenge data rather than the path id. This
+      // avoids having to do extra checks to confirm the challenge data in the
+      // frame is still current for the path.
+      auto maybePath =
+          conn.pathManager->getPathByChallengeData(pathChallenge.pathData);
+      if (maybePath && maybePath->status == PathStatus::Validating) {
+        // This path is still pending validation. We need to resend this path
+        // challenge frame
+        conn.pendingEvents.pathChallenges.insert_or_assign(
+            maybePath->id, pathChallenge);
       }
       break;
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
-      conn.pendingEvents.frames.emplace_back(*frame.asPathResponseFrame());
+      auto maybePath = conn.pathManager->getPath(pathId);
+      // Retransmit the path response only if we are still validating or have
+      // validated the path. If it's not valid, we shouldn't retransmit the
+      // path response.
+      if (maybePath && maybePath->status != PathStatus::NotValid) {
+        const PathResponseFrame& pathResponse = *frame.asPathResponseFrame();
+        conn.pendingEvents.pathResponses.insert_or_assign(pathId, pathResponse);
+      }
       break;
     }
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {
@@ -99,6 +149,7 @@ void updateSimpleFrameOnPacketLoss(
       break;
     }
     case QuicSimpleFrame::Type::NewConnectionIdFrame:
+    // If a NEW_CONNECTION_ID frame is lost, transmit it on the primary path.
     case QuicSimpleFrame::Type::MaxStreamsFrame:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame:
     case QuicSimpleFrame::Type::KnobFrame:
@@ -111,9 +162,9 @@ void updateSimpleFrameOnPacketLoss(
 
 quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
+    PathIdType pathId,
     const QuicSimpleFrame& frame,
-    const ConnectionId& dstConnId,
-    bool fromChangedPeerAddress) {
+    const ConnectionId& dstConnId) {
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame: {
       const StopSendingFrame& stopSending = *frame.asStopSendingFrame();
@@ -131,43 +182,24 @@ quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
-      auto rotatedIdResult = conn.retireAndSwitchPeerConnectionIds();
-      if (!rotatedIdResult.has_value()) {
-        return quic::make_unexpected(QuicError(
-            TransportErrorCode::INVALID_MIGRATION,
-            "Failed to retire peer connection id"));
-      }
-      if (!rotatedIdResult.value()) {
-        return quic::make_unexpected(QuicError(
-            TransportErrorCode::INVALID_MIGRATION,
-            "No more connection ids to use for new path."));
-      }
+      // TODO: JBESHAY MIGRATION - Rotate connection IDs in the transport where
+      // paths will be managed.
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
-
-      conn.pendingEvents.frames.emplace_back(
-          PathResponseFrame(pathChallenge.pathData));
+      conn.pendingEvents.pathResponses.insert_or_assign(
+          pathId, PathResponseFrame(pathChallenge.pathData));
       return false;
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
       const PathResponseFrame& pathResponse = *frame.asPathResponseFrame();
-      // Ignore the response if outstandingPathValidation is std::nullopt or
-      // the path data doesn't match what's in outstandingPathValidation
-      if (fromChangedPeerAddress || !conn.outstandingPathValidation ||
-          pathResponse.pathData != conn.outstandingPathValidation->pathData) {
-        return false;
-      }
-      if (conn.qLogger) {
-        conn.qLogger->addPathValidationEvent(true);
-      }
-      // TODO update source token,
-      conn.outstandingPathValidation.reset();
-      conn.pendingEvents.schedulePathValidationTimeout = false;
+      auto validatedPath =
+          conn.pathManager->onPathResponseReceived(pathResponse, pathId);
 
-      // stop the clock to measure init rtt
-      std::chrono::microseconds sampleRtt =
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              Clock::now() - conn.pathChallengeStartTime);
-      updateRtt(conn, sampleRtt, 0us);
+      // If this is the current path that just got validated, we should update
+      // the RTT.
+      if (validatedPath && validatedPath->id == conn.currentPathId) {
+        CHECK(validatedPath->rttSample.has_value());
+        updateRtt(conn, validatedPath->rttSample.value(), 0us);
+      }
 
       return false;
     }

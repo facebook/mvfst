@@ -41,12 +41,13 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet,
+      std::move(packet),
       Clock::now(),
-      0,
-      0,
-      0,
-      0,
+      conn.currentPathId,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
       LossState(),
       conn.writeCount,
       OutstandingPacketMetadata::DetailsPerStream());
@@ -68,14 +69,15 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet,
+      std::move(packet),
       Clock::now(),
-      0,
-      0,
-      0,
-      0,
+      conn.currentPathId,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
       LossState(),
-      0,
+      0 /* writeCount */,
       OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packetCount[PacketNumberSpace::Handshake]++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
@@ -90,14 +92,15 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet,
+      std::move(packet),
       Clock::now(),
-      0,
-      0,
-      0,
-      0,
+      conn.currentPathId,
+      0 /* encodedSize */,
+      0 /* encodedBodySize */,
+      0 /* totalBytesSent */,
+      0 /* inflightBytes */,
       LossState(),
-      0,
+      0 /* writeCount */,
       OutstandingPacketMetadata::DetailsPerStream());
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
@@ -214,7 +217,6 @@ void verifyStreamFrames(
         builder.frames_.begin(), builder.frames_.begin() + expectedIds.size());
   }
 }
-
 } // namespace
 
 namespace quic::test {
@@ -240,6 +242,8 @@ class QuicPacketSchedulerTestBase {
     conn->flowControlState.peerAdvertisedMaxOffset = maxOffset;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
         initialMaxOffset;
+
+    initializePathManagerState(*conn);
     return conn;
   }
 
@@ -1272,6 +1276,7 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
 TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  initializePathManagerState(conn);
   auto streamResult = conn.streamManager->setMaxLocalBidirectionalStreams(10);
   ASSERT_FALSE(streamResult.hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
@@ -1313,6 +1318,7 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   EXPECT_EQ(conn.udpSendPacketLen, bufferLength);
   auto updateResult = updateConnection(
       conn,
+      *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
       std::nullopt,
       result->packet->packet,
       Clock::now(),
@@ -1360,6 +1366,8 @@ TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   conn.udpSendPacketLen = 1000;
   auto result = conn.streamManager->setMaxLocalBidirectionalStreams(10);
   ASSERT_FALSE(result.hasError());
+  initializePathManagerState(conn);
+
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -1391,6 +1399,7 @@ TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   EXPECT_EQ(encodedSize, conn.udpSendPacketLen);
   auto updateResult = updateConnection(
       conn,
+      *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
       std::nullopt,
       packetResult->packet->packet,
       Clock::now(),
@@ -1948,6 +1957,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
       conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
+  initializePathManagerState(conn);
 
   auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
   auto stream = conn.streamManager->findStream(streamId);
@@ -1971,7 +1981,14 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, std::nullopt, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packet1,
+          Clock::now(),
+          1000,
+          0,
+          false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2001,7 +2018,14 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */)
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packet2,
+          Clock::now(),
+          1000,
+          0,
+          false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
@@ -2019,6 +2043,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
       conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
+  initializePathManagerState(conn);
 
   auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
   auto dsrStream = conn.streamManager->createNextBidirectionalStream().value();
@@ -2049,7 +2074,14 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, std::nullopt, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packet1,
+          Clock::now(),
+          1000,
+          0,
+          false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2069,6 +2101,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
       conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
+  initializePathManagerState(conn);
 
   auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
   conn.streamManager->setStreamPriority(
@@ -2094,7 +2127,14 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, std::nullopt, packet1, Clock::now(), 1000, 0, false /* isDSR */)
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packet1,
+          Clock::now(),
+          1000,
+          0,
+          false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2124,7 +2164,14 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */)
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packet2,
+          Clock::now(),
+          1000,
+          0,
+          false /* isDSR */)
           .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
@@ -2174,7 +2221,14 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
   ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_TRUE(updateConnection(
-      conn, std::nullopt, packet1, Clock::now(), 1200, 0, false /* isDSR */));
+      conn,
+      *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+      std::nullopt,
+      packet1,
+      Clock::now(),
+      1200,
+      0,
+      false /* isDSR */));
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(highPriStreamId, writeStreamFrame1.streamId);
@@ -2209,7 +2263,14 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
   ASSERT_FALSE(scheduler.writeStreams(builder2).hasError());
   auto packet2 = std::move(builder2).buildPacket().packet;
   ASSERT_TRUE(updateConnection(
-      conn, std::nullopt, packet2, Clock::now(), 1000, 0, false /* isDSR */));
+      conn,
+      *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+      std::nullopt,
+      packet2,
+      Clock::now(),
+      1000,
+      0,
+      false /* isDSR */));
   ASSERT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame3 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(highPriStreamId, writeStreamFrame3.streamId);
@@ -2227,6 +2288,7 @@ TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   conn.flowControlState.peerAdvertisedMaxOffset = 1000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
   conn.udpSendPacketLen = 2000;
+  initializePathManagerState(conn);
 
   auto streamId1 = (*conn.streamManager->createNextBidirectionalStream())->id;
   auto streamId2 = (*conn.streamManager->createNextBidirectionalStream())->id;
@@ -2257,7 +2319,14 @@ TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   auto packet1 = std::move(builder1).buildPacket().packet;
   ASSERT_FALSE(
       updateConnection(
-          conn, std::nullopt, packet1, Clock::now(), 1200, 0, false /* isDSR */)
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packet1,
+          Clock::now(),
+          1200,
+          0,
+          false /* isDSR */)
           .hasError());
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2283,6 +2352,7 @@ TEST_P(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   auto* stream = *(conn.streamManager->createNextBidirectionalStream());
   stream->flowControlState.peerAdvertisedMaxOffset = 100000;
+  initializePathManagerState(conn);
 
   ASSERT_FALSE(
       writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false)
@@ -2327,6 +2397,7 @@ TEST_P(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   auto* stream = *(conn.streamManager->createNextBidirectionalStream());
   stream->flowControlState.peerAdvertisedMaxOffset = 100000;
+  initializePathManagerState(conn);
 
   ASSERT_FALSE(
       writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false)
@@ -2765,6 +2836,7 @@ TEST_P(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
 TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  initializePathManagerState(conn);
   ASSERT_FALSE(
       conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
@@ -2803,15 +2875,17 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
       packetResult1.value().packet->body.computeChainDataLength() +
       packetResult1.value().packet->header.computeChainDataLength() +
       cipherOverhead;
-  ASSERT_FALSE(updateConnection(
-                   conn,
-                   std::nullopt,
-                   packetResult1.value().packet->packet,
-                   Clock::now(),
-                   encodedSize1,
-                   0,
-                   false /* isDSRPacket */)
-                   .hasError());
+  ASSERT_FALSE(
+      updateConnection(
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packetResult1.value().packet->packet,
+          Clock::now(),
+          encodedSize1,
+          0,
+          false /* isDSRPacket */)
+          .hasError());
 
   // We shouldn't send the reliable reset just yet, because we haven't yet
   // egressed all the stream data upto the reliable offset.
@@ -2833,15 +2907,17 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
       packetResult1.value().packet->body.computeChainDataLength() +
       packetResult2.value().packet->header.computeChainDataLength() +
       cipherOverhead;
-  ASSERT_FALSE(updateConnection(
-                   conn,
-                   std::nullopt,
-                   packetResult2.value().packet->packet,
-                   Clock::now(),
-                   encodedSize2,
-                   0,
-                   false /* isDSRPacket */)
-                   .hasError());
+  ASSERT_FALSE(
+      updateConnection(
+          conn,
+          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+          std::nullopt,
+          packetResult2.value().packet->packet,
+          Clock::now(),
+          encodedSize2,
+          0,
+          false /* isDSRPacket */)
+          .hasError());
 
   // Now we should have egressed all the stream data upto the reliable offset,
   // so we should have sent the reliable reset.

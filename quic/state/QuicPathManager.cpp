@@ -10,15 +10,15 @@
 
 namespace quic {
 
-// The maximum number of paths that can be tracked by the path manager.
-constexpr uint32_t kMaxPathCount = 256;
+// The maximum number of paths that can be concurrently tracked by the path
+// manager.
+constexpr uint32_t kMaxPathCount = 8;
 
 QuicPathManager::QuicPathManager(
     QuicConnectionStateBase& conn,
     PathValidationCallback* callback)
     : conn_(conn), pathValidationCallback_(callback) {
-  nextPathId_ = folly::Random::rand32(
-      std::numeric_limits<uint32_t>::max() - kMaxPathCount);
+  nextPathId_ = folly::Random::rand32(std::numeric_limits<uint32_t>::max() / 2);
 }
 
 quic::Expected<PathIdType, QuicError> QuicPathManager::addPath(
@@ -29,6 +29,14 @@ quic::Expected<PathIdType, QuicError> QuicPathManager::addPath(
   if (it != pathTupleToId_.end()) {
     return quic::make_unexpected(
         QuicError(LocalErrorCode::PATH_MANAGER_ERROR, "Path already exists"));
+  }
+
+  if (pathIdToInfo_.size() >= kMaxPathCount) {
+    maybeReapUnusedPaths();
+    if (pathIdToInfo_.size() >= kMaxPathCount) {
+      return quic::make_unexpected(
+          QuicError(LocalErrorCode::PATH_MANAGER_ERROR, "Too many paths"));
+    }
   }
 
   PathIdType id = generatePathId();
@@ -47,52 +55,35 @@ quic::Expected<PathIdType, QuicError> QuicPathManager::addPath(
   return id;
 }
 
-const PathInfo& QuicPathManager::getOrAddPath(
+quic::Expected<std::reference_wrapper<const PathInfo>, QuicError>
+QuicPathManager::getOrAddPath(
     const folly::SocketAddress& localAddress,
     const folly::SocketAddress& peerAddress) {
   auto it = pathTupleToId_.find({localAddress, peerAddress});
   if (it != pathTupleToId_.end()) {
-    return *CHECK_NOTNULL(getPath(it->second));
+    return std::cref(*CHECK_NOTNULL(getPath(it->second)));
   }
-  PathIdType id = generatePathId();
-  pathTupleToId_[{localAddress, peerAddress}] = id;
+  auto idRes = addPath(localAddress, peerAddress, nullptr);
+  if (idRes.hasError()) {
+    return quic::make_unexpected(idRes.error());
+  }
 
-  pathIdToInfo_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(id),
-      std::forward_as_tuple(
-          id,
-          localAddress,
-          peerAddress,
-          nullptr, // Socket
-          PathStatus::NotValid));
-
-  return pathIdToInfo_.at(id);
+  return std::cref(pathIdToInfo_.at(idRes.value()));
 }
 
 quic::Expected<PathIdType, QuicError> QuicPathManager::addValidatedPath(
     const folly::SocketAddress& localAddress,
     const folly::SocketAddress& peerAddress) {
-  if (pathTupleToId_.find({localAddress, peerAddress}) !=
-      pathTupleToId_.end()) {
-    return quic::make_unexpected(
-        QuicError(LocalErrorCode::PATH_MANAGER_ERROR, "Path already exists"));
+  auto idRes = addPath(localAddress, peerAddress, nullptr);
+  if (idRes.hasError()) {
+    return quic::make_unexpected(idRes.error());
   }
 
-  PathIdType id = generatePathId();
-  pathTupleToId_[{localAddress, peerAddress}] = id;
+  auto& pathInfo = pathIdToInfo_.at(idRes.value());
+  pathInfo.status = PathStatus::Validated;
+  pathInfo.pathValidationTime = Clock::now();
 
-  pathIdToInfo_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(id),
-      std::forward_as_tuple(
-          id,
-          localAddress,
-          peerAddress,
-          nullptr, // Socket
-          PathStatus::Validated));
-
-  return id;
+  return pathInfo.id;
 }
 
 quic::Expected<void, QuicError> QuicPathManager::removePath(PathIdType pathId) {
@@ -112,6 +103,15 @@ quic::Expected<void, QuicError> QuicPathManager::removePath(PathIdType pathId) {
 
   pathTupleToId_.erase({it->second.localAddress, it->second.peerAddress});
   pathIdToInfo_.erase(it);
+
+  // Remove the path from the pending response list if present
+  pathsPendingResponse_.erase(
+      std::remove(
+          pathsPendingResponse_.begin(), pathsPendingResponse_.end(), pathId),
+      pathsPendingResponse_.end());
+  conn_.pendingEvents.schedulePathValidationTimeout =
+      !pathsPendingResponse_.empty();
+
   return {};
 }
 
@@ -148,6 +148,8 @@ Expected<uint64_t, QuicError> QuicPathManager::getNewPathChallengeData(
       (static_cast<uint64_t>(pathId) << 32) + folly::Random::rand32();
 
   it->second.outstandingChallengeData = challengeData;
+  it->second.firstChallengeSentTimestamp.reset();
+  it->second.lastChallengeSentTimestamp.reset();
   return challengeData;
 }
 
@@ -160,10 +162,12 @@ PathInfo* QuicPathManager::getPathByChallengeDataImpl(uint64_t challengeData) {
   // Higher 32 bits are path id, lower 32 bits are random
   auto pathId = static_cast<uint32_t>(challengeData >> 32);
   auto it = pathIdToInfo_.find(pathId);
-  if (it == pathIdToInfo_.end()) {
-    return nullptr;
-  } else {
+  if (it != pathIdToInfo_.end() &&
+      it->second.outstandingChallengeData.has_value() &&
+      it->second.outstandingChallengeData.value() == challengeData) {
     return &it->second;
+  } else {
+    return nullptr;
   }
 }
 
@@ -176,69 +180,76 @@ void QuicPathManager::onPathChallengeSent(
   auto maybePath = getPathByChallengeDataImpl(pathChallenge.pathData);
   if (maybePath) {
     auto& path = *maybePath;
-    conn_.pendingEvents.pathChallenges.erase(path.id);
+    VLOG(6) << "Path challenge sent for path=" << path.id << " at "
+            << Clock::now().time_since_epoch().count();
 
     if (path.status != PathStatus::Validated) {
       path.lastChallengeSentTimestamp = Clock::now();
-      VLOG(6) << "Path challenge sent for path=" << path.id << " at "
-              << path.lastChallengeSentTimestamp->time_since_epoch().count();
 
-      auto pto = conn_.lossState.srtt +
-          std::max(4 * conn_.lossState.rttvar, kGranularity) +
-          conn_.lossState.maxAckDelay;
-      auto validationTimeout =
-          std::max(3 * pto, 6 * conn_.transportSettings.initialRtt);
-      auto timeoutMs =
-          std::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
-      path.pathResponeDeadline = *path.lastChallengeSentTimestamp + timeoutMs;
+      if (!path.firstChallengeSentTimestamp.has_value()) {
+        // This path challenge data has not been sent before. Update the
+        // timeout.
+        path.firstChallengeSentTimestamp = path.lastChallengeSentTimestamp;
 
-      if (path.status == PathStatus::Validating &&
-          pathsPendingResponse_.size() > 1) {
-        // The path is already in the pending response list and there are other
-        // paths in the list, remove it and add it again at the back to maintain
-        // the order of the list.
+        auto pto = conn_.lossState.srtt +
+            std::max(4 * conn_.lossState.rttvar, kGranularity) +
+            conn_.lossState.maxAckDelay;
+        auto validationTimeout =
+            std::max(3 * pto, 6 * conn_.transportSettings.initialRtt);
+        auto timeoutMs =
+            std::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
+        path.pathResponseDeadline =
+            *path.firstChallengeSentTimestamp + timeoutMs;
+
+        // The path may already be in the pending response list. Remove it and
+        // add it again at the back to maintain the order of the list.
         pathsPendingResponse_.erase(
             std::remove(
                 pathsPendingResponse_.begin(),
                 pathsPendingResponse_.end(),
                 path.id),
             pathsPendingResponse_.end());
+        pathsPendingResponse_.emplace_back(path.id);
+        path.status = PathStatus::Validating;
+
+        // Signal the transport to schedule the path validation timeout if it's
+        // not already scheduled
+        conn_.pendingEvents.schedulePathValidationTimeout = true;
       }
-      pathsPendingResponse_.emplace_back(path.id);
-
-      path.status = PathStatus::Validating;
-
-      // Signal the transport to schedule the path validation timeout if it's
-      // not already scheduled
-      conn_.pendingEvents.schedulePathValidationTimeout = true;
     }
   }
 }
 
 const PathInfo* QuicPathManager::onPathResponseReceived(
-    const PathResponseFrame& pathResponse) {
+    const PathResponseFrame& pathResponse,
+    PathIdType incomingPathId) {
   auto maybePath = getPathByChallengeDataImpl(pathResponse.pathData);
-  if (!maybePath) {
-    // This is either a stale response or a response from a path that was has
-    // timed out and failed validation. Either way, we can ignore it.
+  if (!maybePath || maybePath->id != incomingPathId) {
+    // We can ignore this path response. This is either:
+    // - a duplicate response
+    // - a response from a path that was has timed out and failed validation.
+    // - a response that was received on the wrong path
     return nullptr;
   }
   auto& path = *maybePath;
-  CHECK(path.status == PathStatus::Validating) << "Inconsistent path state";
-  CHECK(path.lastChallengeSentTimestamp.has_value())
-      << "Inconsistent path state. Missing last challenge sent timestamp";
+  if (path.status == PathStatus::Validated) {
+    // We've already validated this path. Ignore the duplicate response.
+    return nullptr;
+  }
 
   path.status = PathStatus::Validated;
+  path.pathValidationTime = Clock::now();
 
   VLOG(6) << "Path response received for path=" << path.id << " at "
-          << Clock::now().time_since_epoch().count();
+          << path.pathValidationTime->time_since_epoch().count();
 
   path.rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
       Clock::now() - *path.lastChallengeSentTimestamp);
 
   path.outstandingChallengeData.reset();
+  path.firstChallengeSentTimestamp.reset();
   path.lastChallengeSentTimestamp.reset();
-  path.pathResponeDeadline.reset();
+  path.pathResponseDeadline.reset();
 
   // Remove the path from the pending response list
   pathsPendingResponse_.erase(
@@ -273,13 +284,12 @@ Optional<TimePoint> QuicPathManager::getEarliestChallengeTimeout() const {
   auto pathInfo = getPath(pathsPendingResponse_.front());
   CHECK(pathInfo) << "Inconsistent path state";
 
-  return pathInfo->pathResponeDeadline;
+  return pathInfo->pathResponseDeadline;
 }
 
-void QuicPathManager::onPathValidationTimeoutExpired() {
+void QuicPathManager::onPathValidationTimeoutExpired(TimePoint timeNow) {
   VLOG(6) << "Path validation timeout expired";
   auto it = pathsPendingResponse_.begin();
-  auto timeNow = Clock::now();
   while (it != pathsPendingResponse_.end()) {
     auto pathId = *it;
     auto pathInfoIt = pathIdToInfo_.find(pathId);
@@ -287,18 +297,16 @@ void QuicPathManager::onPathValidationTimeoutExpired() {
     auto& pathInfo = pathInfoIt->second;
 
     if (pathInfo.status == PathStatus::Validating) {
-      CHECK(pathInfo.pathResponeDeadline.has_value())
+      CHECK(pathInfo.pathResponseDeadline.has_value())
           << "Inconsistent path state";
 
-      if (timeNow > *pathInfo.pathResponeDeadline) {
+      if (timeNow > *pathInfo.pathResponseDeadline) {
         // The path has timed out and failed validation
         pathInfo.status = PathStatus::NotValid;
         pathInfo.outstandingChallengeData.reset();
+        pathInfo.firstChallengeSentTimestamp.reset();
         pathInfo.lastChallengeSentTimestamp.reset();
-        pathInfo.pathResponeDeadline.reset();
-
-        // TODO: JBESHAY MIGRATION - We will probably need some callback to
-        // comunicate this back to the transport, at least for the client.
+        pathInfo.pathResponseDeadline.reset();
 
         // Remove the path from the pending
         it = pathsPendingResponse_.erase(it);
@@ -417,6 +425,72 @@ void QuicPathManager::onPathPacketReceived(PathIdType pathId) {
 void QuicPathManager::dropAllSockets() {
   for (auto& kv : pathIdToInfo_) {
     kv.second.socket.reset();
+  }
+}
+
+quic::Expected<std::unique_ptr<QuicAsyncUDPSocket>, QuicError>
+QuicPathManager::switchCurrentPath(PathIdType switchToPathId) {
+  if (switchToPathId == conn_.currentPathId) {
+    return {};
+  }
+
+  auto it = pathIdToInfo_.find(switchToPathId);
+  if (it == pathIdToInfo_.end()) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::PATH_NOT_EXISTS,
+        std::string("Cannot switch to non-existent path id")));
+  }
+  auto& switchToPath = it->second;
+
+  conn_.currentPathId = switchToPath.id;
+  conn_.localAddress = switchToPath.localAddress;
+  conn_.peerAddress = switchToPath.peerAddress;
+
+  return std::move(switchToPath.socket);
+}
+
+void QuicPathManager::maybeReapUnusedPaths(bool force) {
+  // We only need to maintain the current path and the fallback path when it is
+  // set.
+  auto shouldReap = conn_.fallbackPathId.has_value() ? pathIdToInfo_.size() > 2
+                                                     : pathIdToInfo_.size() > 1;
+  if (!shouldReap) {
+    return;
+  }
+
+  // Find the path with the smallest id that is
+  // - not the current path or the fallback path
+  // - not pending validation
+  // - validated but earlier than maxAge ago
+  PathIdType minPathId = nextPathId_;
+  for (auto& it : pathIdToInfo_) {
+    if (it.first == conn_.currentPathId) {
+      continue;
+    }
+    if (conn_.fallbackPathId && it.first == *conn_.fallbackPathId) {
+      continue;
+    }
+    if (!force &&
+        (it.second.status == PathStatus::Validating ||
+         it.second.outstandingChallengeData)) {
+      // Besides force, the first condition covers the path after the path
+      // challenge as been written. The second condition covers the path before
+      // the path challenge has been written.
+      continue;
+    }
+    if (!force && it.second.pathValidationTime &&
+        (Clock::now() - it.second.pathValidationTime.value()) <
+            kTimeToRetainUnusedPaths) {
+      continue;
+    }
+    if (it.first < minPathId) {
+      minPathId = it.first;
+    }
+  }
+  if (minPathId != nextPathId_) {
+    // We found a path to reap
+    auto removeResult = removePath(minPathId);
+    CHECK(!removeResult.hasError()) << removeResult.error();
   }
 }
 

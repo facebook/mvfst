@@ -35,6 +35,7 @@ class TestQuicTransport
     headerCipher = test::createNoOpHeaderCipher().value();
     setConnectionSetupCallback(connSetupCb);
     setConnectionCallbackFromCtor(connCb);
+    test::initializePathManagerState(*conn_);
   }
 
   ~TestQuicTransport() override {
@@ -118,6 +119,19 @@ class TestQuicTransport
              : conn_->transportSettings.writeConnectionDataPacketsLimit),
         *aead,
         Clock::now());
+    auto pathValidationResult = writePathValidationData(
+        *socket_,
+        *conn_,
+        *conn_->clientConnectionId,
+        *conn_->serverConnectionId,
+        *conn_->oneRttWriteCipher,
+        *conn_->oneRttWriteHeaderCipher,
+        getVersion(),
+        1,
+        Clock::now());
+    if (result.hasError()) {
+      return quic::make_unexpected(result.error());
+    }
     return {};
   }
 

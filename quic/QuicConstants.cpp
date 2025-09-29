@@ -121,8 +121,8 @@ std::string_view writeDataReasonString(WriteDataReason reason) {
       return "Simple";
     case WriteDataReason::RESET:
       return "Reset";
-    case WriteDataReason::PATHCHALLENGE:
-      return "PathChallenge";
+    case WriteDataReason::PATH_VALIDATION:
+      return "PathValidation";
     case WriteDataReason::PING:
       return "Ping";
     case WriteDataReason::DATAGRAM:

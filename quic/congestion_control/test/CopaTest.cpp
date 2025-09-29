@@ -32,12 +32,13 @@ class CopaTest : public Test {
       loss.addLostPacket(OutstandingPacketWrapper(
           std::move(packet),
           Clock::now(),
-          10,
-          0,
+          0 /* pathId */,
+          10 /* encodedSize */,
+          0 /* encodedBodySize */,
           totalSentBytes,
-          0,
+          0 /* inflightBytes */,
           LossState(),
-          0,
+          0 /* writeCount */,
           OutstandingPacketMetadata::DetailsPerStream()));
       loss.lostBytes = packetData.second;
     }
@@ -56,12 +57,13 @@ class CopaTest : public Test {
     return OutstandingPacketWrapper(
         std::move(packet),
         Clock::now(),
-        size,
-        0,
+        0 /* pathId */,
+        size /* encodedSize */,
+        0 /* encodedBodySize */,
         totalSent,
         inflight,
         LossState(),
-        0,
+        0 /* writeCount */,
         OutstandingPacketMetadata::DetailsPerStream());
   }
 

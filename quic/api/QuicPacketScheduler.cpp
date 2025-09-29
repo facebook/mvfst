@@ -765,21 +765,10 @@ SimpleFrameScheduler::SimpleFrameScheduler(const QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
 bool SimpleFrameScheduler::hasPendingSimpleFrames() const {
-  // TODO: JBESHAY MIGRATION - Remove the first condition when the
-  // PathValidationScheduler is wired.
-  return conn_.pendingEvents.pathChallenge ||
-      !conn_.pendingEvents.frames.empty();
+  return !conn_.pendingEvents.frames.empty();
 }
 
 bool SimpleFrameScheduler::writeSimpleFrames(PacketBuilderInterface& builder) {
-  // TODO: JBESHAY MIGRATION - Remove this when the PathValidationScheduler is
-  // wired.
-  auto& pathChallenge = conn_.pendingEvents.pathChallenge;
-  if (pathChallenge &&
-      !writeSimpleFrame(QuicSimpleFrame(*pathChallenge), builder)) {
-    return false;
-  }
-
   bool framesWritten = false;
   for (auto& frame : conn_.pendingEvents.frames) {
     auto bytesWritten = writeSimpleFrame(QuicSimpleFrame(frame), builder);

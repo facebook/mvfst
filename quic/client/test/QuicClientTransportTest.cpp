@@ -28,7 +28,9 @@ class QuicClientTransportMock : public QuicClientTransport {
             nullptr /* Initialized through the QuicTransportBaseLite constructor
                      */
             ,
-            handshakeFactory) {}
+            handshakeFactory) {
+    initializePathManagerState(*clientConn_);
+  }
 
   void readWithRecvmsg(
       QuicAsyncUDPSocket& sock,

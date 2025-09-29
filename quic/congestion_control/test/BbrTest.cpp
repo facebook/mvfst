@@ -752,10 +752,8 @@ TEST_F(BbrTest, BytesCounting) {
   };
   auto ackFrameVisitor =
       [](auto&, auto&) -> quic::Expected<void, quic::QuicError> { return {}; };
-  auto lossVisitor =
-      [](auto&, auto&, bool) -> quic::Expected<void, quic::QuicError> {
-    return {};
-  };
+  auto lossVisitor = [](auto&, auto /* pathId */, auto&, bool)
+      -> quic::Expected<void, quic::QuicError> { return {}; };
   ASSERT_FALSE(processAckFrame(
                    conn,
                    PacketNumberSpace::AppData,

@@ -933,7 +933,12 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
 
   // change the address to a new server which does not have the connection.
   auto server2Addr = server2->getAddress();
-  client->getNonConstConn().peerAddress = server2Addr;
+  auto& conn = client->getNonConstConn();
+  conn.peerAddress = server2Addr;
+  auto pathIdRes = conn.pathManager->addValidatedPath(
+      client->getLocalAddress(), conn.peerAddress);
+  ASSERT_FALSE(pathIdRes.hasError());
+  conn.currentPathId = pathIdRes.value();
 
   NiceMock<MockReadCallback> readCb2;
   bool resetRecvd = false;
@@ -978,7 +983,12 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
 
   // change the address to a new server which does not have the connection.
   auto server2Addr = server2->getAddress();
-  client->getNonConstConn().peerAddress = server2Addr;
+  auto& conn = client->getNonConstConn();
+  conn.peerAddress = server2Addr;
+  auto pathIdRes = conn.pathManager->addValidatedPath(
+      client->getLocalAddress(), conn.peerAddress);
+  ASSERT_FALSE(pathIdRes.hasError());
+  conn.currentPathId = pathIdRes.value();
 
   NiceMock<MockReadCallback> readCb2;
   bool resetRecvd = false;
@@ -995,9 +1005,9 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
       .ensure([&] { eventbase_.terminateLoopSoon(); });
   eventbase_.loopForever();
 
-  EXPECT_TRUE(resetRecvd);
-  EXPECT_TRUE(token1.has_value());
-  EXPECT_TRUE(token2.has_value());
+  ASSERT_TRUE(resetRecvd);
+  ASSERT_TRUE(token1.has_value());
+  ASSERT_TRUE(token2.has_value());
   EXPECT_EQ(token1.value(), token2.value());
 }
 
@@ -3022,62 +3032,72 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   client->close(std::nullopt);
 }
 
-TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeNoAvailablePeerIds) {
-  auto& conn = client->getNonConstConn();
+// TODO: JBESHAY MIGRATION - Rewrite the following two tests with the client
+// migration support. According to RFC9000, there is no requirement for the
+// client to use a new connection id whenever it receives a path challenge. This
+// was probably used as a proxy for detecting that a passive migration
+// happened in the older implementation of connection migration.
 
-  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  ASSERT_FALSE(builder.encodePacketHeader().hasError());
-  PathChallengeFrame pathChallenge(123);
-  ASSERT_TRUE(builder.canBuildPacket());
-  ASSERT_FALSE(
-      writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder).hasError());
+// TEST_F(QuicClientTransportAfterStartTest,
+// RecvPathChallengeNoAvailablePeerIds) {
+//   auto& conn = client->getNonConstConn();
 
-  auto packet = std::move(builder).buildPacket();
-  auto data = packetToBuf(packet);
+//   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId,
+//   1); RegularQuicPacketBuilder builder(
+//       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+//   ASSERT_FALSE(builder.encodePacketHeader().hasError());
+//   PathChallengeFrame pathChallenge(123);
+//   ASSERT_TRUE(builder.canBuildPacket());
+//   ASSERT_FALSE(
+//       writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder).hasError());
 
-  EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  EXPECT_THROW(deliverData(data->coalesce(), false), std::runtime_error);
-}
+//   auto packet = std::move(builder).buildPacket();
+//   auto data = packetToBuf(packet);
 
-TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeAvailablePeerId) {
-  auto& conn = client->getNonConstConn();
-  auto originalCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
-  auto secondCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+//   EXPECT_TRUE(conn.pendingEvents.frames.empty());
+//   EXPECT_THROW(deliverData(data->coalesce(), false), std::runtime_error);
+// }
 
-  conn.serverConnectionId = originalCid.connId;
+// TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeAvailablePeerId) {
+//   auto& conn = client->getNonConstConn();
+//   auto originalCid = ConnectionIdData(
+//       ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}),
+//       1);
+//   auto secondCid = ConnectionIdData(
+//       ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}),
+//       2);
 
-  conn.peerConnectionIds.push_back(originalCid);
-  conn.peerConnectionIds.push_back(secondCid);
+//   conn.serverConnectionId = originalCid.connId;
 
-  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  ASSERT_FALSE(builder.encodePacketHeader().hasError());
-  PathChallengeFrame pathChallenge(123);
-  ASSERT_TRUE(builder.canBuildPacket());
-  ASSERT_FALSE(
-      writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder).hasError());
+//   conn.peerConnectionIds.push_back(originalCid);
+//   conn.peerConnectionIds.push_back(secondCid);
 
-  auto packet = std::move(builder).buildPacket();
-  auto data = packetToBuf(packet);
+//   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId,
+//   1); RegularQuicPacketBuilder builder(
+//       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+//   ASSERT_FALSE(builder.encodePacketHeader().hasError());
+//   PathChallengeFrame pathChallenge(123);
+//   ASSERT_TRUE(builder.canBuildPacket());
+//   ASSERT_FALSE(
+//       writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder).hasError());
 
-  EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  deliverData(data->coalesce(), false);
+//   auto packet = std::move(builder).buildPacket();
+//   auto data = packetToBuf(packet);
 
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 2);
+//   EXPECT_TRUE(conn.pendingEvents.frames.empty());
+//   deliverData(data->coalesce(), false);
 
-  // The RetireConnectionId frame will be enqueued before the PathResponse.
-  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
-  EXPECT_EQ(retireFrame->sequenceNumber, 1);
+//   EXPECT_EQ(conn.pendingEvents.frames.size(), 2);
 
-  PathResponseFrame& pathResponse =
-      *conn.pendingEvents.frames[1].asPathResponseFrame();
-  EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
-}
+//   // The RetireConnectionId frame will be enqueued before the PathResponse.
+//   auto retireFrame =
+//   conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
+//   EXPECT_EQ(retireFrame->sequenceNumber, 1);
+
+//   PathResponseFrame& pathResponse =
+//       *conn.pendingEvents.frames[1].asPathResponseFrame();
+//   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
+// }
 
 bool verifyFramePresent(
     std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
@@ -4442,8 +4462,11 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  auto result =
-      markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
+  auto result = markPacketLoss(
+      client->getNonConstConn(),
+      client->getNonConstConn().currentPathId,
+      *forceLossPacket,
+      false);
   ASSERT_FALSE(result.hasError());
   ASSERT_TRUE(client->getConn().streamManager->hasLoss());
 
@@ -4468,8 +4491,11 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  auto result =
-      markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
+  auto result = markPacketLoss(
+      client->getNonConstConn(),
+      client->getNonConstConn().currentPathId,
+      *forceLossPacket,
+      false);
   ASSERT_FALSE(result.hasError());
   auto streamResult =
       client->getNonConstConn().streamManager->getStream(streamId);
