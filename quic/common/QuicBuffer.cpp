@@ -220,6 +220,38 @@ std::unique_ptr<QuicBuffer> QuicBuffer::clone() const {
   return tmp;
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::cloneCoalesced() const {
+  // Calculate the total length of data across the entire chain
+  const std::size_t totalLength = computeChainDataLength();
+
+  // Get headroom from first buffer (this) and tailroom from last buffer
+  const std::size_t newHeadroom = headroom();
+  const std::size_t newTailroom = prev()->tailroom();
+
+  // Create new buffer with capacity for headroom + data + tailroom
+  const std::size_t newCapacity = newHeadroom + totalLength + newTailroom;
+  auto newBuffer = create(newCapacity);
+  if (!newBuffer) {
+    return nullptr;
+  }
+
+  // Advance to leave headroom space
+  newBuffer->advance(newHeadroom);
+
+  // Copy data from all buffers in the chain
+  const QuicBuffer* current = this;
+  do {
+    if (current->length() > 0) {
+      std::memcpy(
+          newBuffer->writableTail(), current->data(), current->length());
+      newBuffer->append(current->length());
+    }
+    current = current->next();
+  } while (current != this);
+
+  return newBuffer;
+}
+
 ByteRange QuicBuffer::coalesce() {
   if (isChained()) {
     const std::size_t newHeadroom = headroom();

@@ -187,6 +187,21 @@ class QuicBuffer {
     return cloneOneImpl();
   }
 
+  /**
+   * Copy a QuicBuffer chain into a single buffer.
+   *
+   * Semantically similar to .clone().coalesce(), but without the intermediate
+   * allocations.
+   *
+   * The new QuicBuffer will have at least as much headroom as the first
+   * QuicBuffer in the chain, and at least as much tailroom as the last
+   * QuicBuffer in the chain.
+   *
+   * @return  A QuicBuffer for which isChained() == false, and whose data is the
+   *          same as coalesce(). Returns nullptr if we fail to allocate memory.
+   */
+  std::unique_ptr<QuicBuffer> cloneCoalesced() const;
+
   ByteRange coalesce();
 
   // Removes the rest of the chain from this IOBuf, and returns it. If there is
