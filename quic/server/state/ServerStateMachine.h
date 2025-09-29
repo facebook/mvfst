@@ -70,10 +70,6 @@ struct CongestionAndRttState {
   std::chrono::microseconds mrtt;
 };
 
-struct ConnectionMigrationState {
-  uint32_t numMigrations{0};
-};
-
 /**
  * State used during processing of MAX_PACING_RATE_KNOB frames.
  */
@@ -94,9 +90,6 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   std::unique_ptr<std::vector<ServerEvents::ReadData>> pendingZeroRttData;
   // One rtt protected packets
   std::unique_ptr<std::vector<ServerEvents::ReadData>> pendingOneRttData;
-
-  // Current state of connection migration
-  ConnectionMigrationState migrationState;
 
   // Parameters to generate server chosen connection id
   Optional<ServerConnectionIdParams> serverConnIdParams;

@@ -274,6 +274,7 @@ TEST_P(
     QuicServerTransportAllowMigrationTest,
     ReceiveReorderedDataFromChangedPeerAddress) {
   auto& conn = server->getConn();
+  auto initialPathId = conn.currentPathId;
 
   auto data = IOBuf::copyBuffer("bad data");
   auto firstPacket = packetToBuf(createStreamPacket(
@@ -293,10 +294,9 @@ TEST_P(
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  EXPECT_EQ(conn.migrationState.numMigrations, 0);
-
   // Receive second packet first
   deliverData(std::move(secondPacket));
+  EXPECT_EQ(conn.currentPathId, initialPathId);
 
   auto peerAddress = server->getConn().peerAddress;
 
@@ -307,7 +307,7 @@ TEST_P(
 
   // No migration for reordered packet
   EXPECT_EQ(conn.peerAddress, peerAddress);
-  EXPECT_EQ(conn.migrationState.numMigrations, 0);
+  EXPECT_EQ(conn.currentPathId, initialPathId);
 }
 
 TEST_P(
@@ -326,7 +326,6 @@ TEST_P(
   auto& conn = server->getConn();
 
   ASSERT_FALSE(conn.fallbackPathId.has_value());
-  ASSERT_EQ(conn.migrationState.numMigrations, 0);
 
   auto peerAddress = conn.peerAddress;
   auto firstPathId = conn.currentPathId;
@@ -353,7 +352,6 @@ TEST_P(
   auto pathChallengeData =
       conn.pendingEvents.pathChallenges.at(newPathId).pathData;
   EXPECT_EQ(conn.peerAddress, newPeer);
-  EXPECT_EQ(conn.migrationState.numMigrations, 1);
   EXPECT_EQ(conn.lossState.srtt, 0us);
   EXPECT_EQ(conn.lossState.lrtt, 0us);
   EXPECT_EQ(conn.lossState.rttvar, 0us);
@@ -412,7 +410,6 @@ TEST_P(
       0 /* largestAcked */));
 
   deliverData(std::move(nextPacketData), false);
-  EXPECT_EQ(conn.migrationState.numMigrations, 2);
   ASSERT_EQ(conn.currentPathId, firstPathId);
 
   // First path is already validated
@@ -440,8 +437,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  ASSERT_EQ(conn.migrationState.numMigrations, 0);
-
   auto peerAddress = server->getConn().peerAddress;
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
@@ -465,7 +460,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   auto pathChallengeData =
       conn.pendingEvents.pathChallenges.at(newPath->id).pathData;
   EXPECT_EQ(conn.peerAddress, newPeer);
-  EXPECT_EQ(conn.migrationState.numMigrations, 1);
   EXPECT_EQ(conn.lossState.srtt, 0us);
   EXPECT_EQ(conn.lossState.lrtt, 0us);
   EXPECT_EQ(conn.lossState.rttvar, 0us);
@@ -608,53 +602,6 @@ TEST_P(
   ASSERT_TRUE(newPath2);
   EXPECT_NE(newPath2->id, newPath->id);
   EXPECT_EQ(newPath2->status, PathStatus::NotValid);
-}
-
-TEST_P(QuicServerTransportAllowMigrationTest, TooManyMigrations) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
-  server->getNonConstConn().qLogger = qLogger;
-  server->getNonConstConn().transportSettings.disableMigration = false;
-
-  auto data = IOBuf::copyBuffer("bad data");
-  auto packetData = packetToBuf(createStreamPacket(
-      *clientConnectionId,
-      *server->getConn().serverConnectionId,
-      clientNextAppDataPacketNum++,
-      2,
-      *data,
-      0 /* cipherOverhead */,
-      0 /* largestAcked */));
-
-  uint16_t maxNumMigrationsAllowed =
-      server->getConn().transportSettings.maxNumMigrationsAllowed;
-  for (uint16_t i = 0; i < maxNumMigrationsAllowed; ++i) {
-    folly::SocketAddress newPeer("100.101.102.103", 23456 + i);
-    EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
-    deliverData(packetData->clone(), false, &newPeer);
-  }
-  EXPECT_EQ(
-      server->getConn().migrationState.numMigrations, maxNumMigrationsAllowed);
-
-  folly::SocketAddress newPeer("200.101.102.103", 23456);
-  try {
-    EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
-    deliverData(packetData->clone(), false, &newPeer);
-  } catch (const std::runtime_error& ex) {
-    EXPECT_EQ(std::string(ex.what()), "Invalid migration");
-  }
-  EXPECT_TRUE(server->getConn().localConnectionError);
-  EXPECT_EQ(
-      server->getConn().localConnectionError->message, "Too many migrations");
-  EXPECT_TRUE(server->isClosed());
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
-  EXPECT_EQ(event->packetSize, 0);
-  EXPECT_EQ(
-      event->dropReason,
-      PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, RetiringConnIdIssuesNewIds) {

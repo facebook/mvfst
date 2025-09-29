@@ -1694,7 +1694,6 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
         if (fallbackPath) {
           conn_->currentPathId = fallbackPath->id;
           conn_->peerAddress = fallbackPath->peerAddress;
-          serverConn_->migrationState.numMigrations--;
           auto ccaRestored =
               conn_->pathManager
                   ->maybeRestoreCongestionControlAndRttStateForCurrentPath();

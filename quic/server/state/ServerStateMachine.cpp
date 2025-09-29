@@ -743,21 +743,6 @@ quic::Expected<void, QuicError> onConnectionMigration(
     QuicServerConnectionState& conn,
     PathIdType readPathId,
     bool isIntentional) {
-  if (conn.migrationState.numMigrations >=
-      conn.transportSettings.maxNumMigrationsAllowed) {
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(
-          0,
-          PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)._to_string());
-    }
-    QUIC_STATS(
-        conn.statsCallback,
-        onPacketDropped,
-        PacketDropReason::PEER_ADDRESS_CHANGE);
-    return quic::make_unexpected(QuicError(
-        TransportErrorCode::INVALID_MIGRATION, "Too many migrations"));
-  }
-
   auto* readPath = conn.pathManager->getPath(readPathId);
   auto* connPath = conn.pathManager->getPath(conn.currentPathId);
   if (!readPath || !connPath) {
@@ -792,11 +777,14 @@ quic::Expected<void, QuicError> onConnectionMigration(
     conn.pathManager->cacheCurrentCongestionAndRttState();
   }
 
+  VLOG(4) << "Client migrating to a different path. " << connPath->peerAddress
+          << " (" << connPath->id << ") --> " << readPath->peerAddress << " ("
+          << readPath->id << ")";
+
   auto switchPathRes = conn.pathManager->switchCurrentPath(readPathId);
   if (switchPathRes.hasError()) {
     return quic::make_unexpected(switchPathRes.error());
   }
-  conn.migrationState.numMigrations++;
 
   if (!isNATRebinding) {
     auto ccaRestored =
@@ -810,7 +798,6 @@ quic::Expected<void, QuicError> onConnectionMigration(
               conn, prevPathCCType);
     }
   }
-
   return {};
 }
 

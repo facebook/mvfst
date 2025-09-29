@@ -193,8 +193,6 @@ struct TransportSettings {
   bool connectUDP{false};
   // Maximum number of consecutive PTOs before the connection is torn down.
   uint16_t maxNumPTOs{kDefaultMaxNumPTO};
-  // Maximum number of connection ids to issue to peer
-  uint16_t maxNumMigrationsAllowed{kMaxNumMigrationsAllowed};
   // Whether to listen to socket error
   bool enableSocketErrMsgCallback{true};
   // Whether pacing is enabled.
