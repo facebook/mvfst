@@ -1259,6 +1259,75 @@ TEST_P(
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION));
 }
 
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    PathValidationTimeoutResetUnderlyingTransportInCallback) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  auto& conn = server->getNonConstConn();
+  conn.qLogger = qLogger;
+
+  auto firstPath = conn.pathManager->getPath(conn.currentPathId);
+  ASSERT_TRUE(firstPath);
+
+  // Add additional peer id so PathResponse completes.
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  // Deliver a stream packet from a new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("bad data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+
+    // Migrate to unvalidated peer
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  // Step 1: New path is created and is validating
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+  EXPECT_EQ(newPath->status, PathStatus::Validating);
+
+  // Deliver a path probe packet from a new peer address
+  auto incomingPathChallengeData = 123;
+  folly::SocketAddress newPeer2("100.101.102.104", 23456);
+  {
+    auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
+    auto packetData = packetToBuf(packet);
+    deliverData(std::move(packetData), true, &newPeer2);
+  }
+
+  // The fallback path is reaped
+  ASSERT_FALSE(conn.pathManager->removePath(firstPath->id).hasError());
+
+  // Delete the underlying transport in the PathValidationResult path.
+  // This will crash if the pathValidationTimeout does not keep a pointer to the
+  // transport.
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _))
+      .WillOnce(Invoke([&](QuicServerTransport*, const auto&, const auto&) {
+        server.reset();
+      }));
+
+  // Cancel the path validation timeout and trigger it immediately
+  ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+  server->pathValidationTimeout().cancelTimerCallback();
+  auto& nonConstNewPath =
+      quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath->id);
+  nonConstNewPath.pathResponseDeadline = Clock::now() - 1ms;
+  server->pathValidationTimeout().timeoutExpired();
+
+  // The server transport has been deleted.
+  ASSERT_EQ(server.get(), nullptr);
+}
+
 TEST_P(QuicServerTransportAllowMigrationTest, ReapUnusedValidatedPaths) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   auto& conn = server->getNonConstConn();

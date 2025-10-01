@@ -2352,6 +2352,7 @@ void QuicTransportBaseLite::pathValidationTimeoutExpired() noexcept {
   // Pass the signal to the path manager. Responding to the result of the path
   // validation is handled in the path validation callback in the client/server
   // transport.
+  [[maybe_unused]] auto self = sharedGuard();
   conn_->pathManager->onPathValidationTimeoutExpired();
 }
 
