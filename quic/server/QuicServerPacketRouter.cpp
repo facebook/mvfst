@@ -185,23 +185,22 @@ void TakeoverPacketHandler::processForwardedPacket(
   // The 'client' here is the local server that is taking over the port
   // First we decode the actual client and time from the packet
   // and send it to the worker_ to handle it properly
-
-  Cursor cursor(data.get());
-  if (!cursor.canAdvance(sizeof(TakeoverProtocolVersion))) {
+  CHECK(!data->isChained());
+  ContiguousReadCursor cursor(data->data(), data->length());
+  uint32_t protocol = 0;
+  if (!cursor.tryReadBE(protocol)) {
     VLOG(4) << "Cannot read takeover protocol version. Dropping.";
     return;
   }
-  uint32_t protocol =
-      cursor.readBE<std::underlying_type<TakeoverProtocolVersion>::type>();
   if (protocol != static_cast<uint32_t>(takeoverProtocol_)) {
     VLOG(4) << "Unexpected takeover protocol version=" << protocol;
     return;
   }
-  if (!cursor.canAdvance(sizeof(uint16_t))) {
+  uint16_t addrLen = 0;
+  if (!cursor.tryReadBE(addrLen)) {
     VLOG(4) << "Malformed packet received. Dropping.";
     return;
   }
-  uint16_t addrLen = cursor.readBE<uint16_t>();
   if (addrLen > kMaxBufSizeForTakeoverEncapsulation) {
     VLOG(2) << "Buffer size for takeover encapsulation: " << addrLen
             << " exceeds the max limit: "
@@ -209,21 +208,14 @@ void TakeoverPacketHandler::processForwardedPacket(
     return;
   }
   struct sockaddr* sockaddr = nullptr;
-  uint8_t sockaddrBuf[kMaxBufSizeForTakeoverEncapsulation];
-  auto addrData = cursor.peek();
+  auto addrData = cursor.peekBytes();
   if (addrData.size() >= addrLen) {
-    // the address is contiguous in the queue
     sockaddr = (struct sockaddr*)addrData.data();
     cursor.skip(addrLen);
   } else {
-    // the address is not contiguous, copy it to a local buffer
-    if (!cursor.canAdvance(addrLen)) {
-      VLOG(4) << "Cannot extract peerAddress address of length=" << addrLen
-              << " from the forwarded packet. Dropping the packet.";
-      return;
-    }
-    cursor.pull(sockaddrBuf, addrLen);
-    sockaddr = (struct sockaddr*)sockaddrBuf;
+    VLOG(4) << "Cannot extract peerAddress address of length=" << addrLen
+            << " from the forwarded packet. Dropping the packet.";
+    return;
   }
   folly::SocketAddress peerAddress;
   try {
@@ -235,14 +227,14 @@ void TakeoverPacketHandler::processForwardedPacket(
     return;
   }
   // decode the packetReceiveTime
-  if (!cursor.canAdvance(sizeof(uint64_t))) {
+  uint64_t pktReceiveEpoch = 0;
+  if (!cursor.tryReadBE(pktReceiveEpoch)) {
     VLOG(4) << "Malformed packet received without packetReceiveTime. Dropping.";
     return;
   }
-  auto pktReceiveEpoch = cursor.readBE<uint64_t>();
   Clock::duration tick(pktReceiveEpoch);
   TimePoint clientPacketReceiveTime(tick);
-  data->trimStart(cursor - data.get());
+  data->trimStart(cursor.getCurrentPosition());
   QUIC_STATS(worker_->getStatsCallback(), onForwardedPacketProcessed);
   ReceivedUdpPacket packet(std::move(data));
   packet.timings.receiveTimePoint = clientPacketReceiveTime;
