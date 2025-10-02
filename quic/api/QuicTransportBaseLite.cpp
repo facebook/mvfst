@@ -2317,19 +2317,22 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
   // idle timeout is expired, just close the connection and drain or
   // send connection close immediately depending on 'drain'
   DCHECK_NE(closeState_, CloseState::CLOSED);
-  uint64_t numOpenStreans = conn_->streamManager->streamCount();
   auto localError =
       drain ? LocalErrorCode::IDLE_TIMEOUT : LocalErrorCode::SHUTTING_DOWN;
   auto sendCloseImmediately =
       conn_->transportSettings.alwaysSendConnectionCloseOnIdleTimeout ? true
                                                                       : !drain;
+
+  auto localIdleTimeout = conn_->transportSettings.idleTimeout;
+  auto peerIdleTimeout =
+      conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
+  auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
+  auto idleTimeoutCount = idleTimeout.count();
   closeImpl(
       quic::QuicError(
           QuicErrorCode(localError),
           fmt::format(
-              "{}, num non control streams: {}",
-              toString(localError),
-              numOpenStreans - conn_->streamManager->numControlStreams())),
+              "{}: {} seconds", toString(localError), idleTimeoutCount / 1000)),
       drain /* drainConnection */,
       sendCloseImmediately);
 }

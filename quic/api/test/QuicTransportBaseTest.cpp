@@ -808,7 +808,7 @@ TEST_P(QuicTransportImplTestBase, IdleTimeoutStreamMaessage) {
   EXPECT_CALL(readCb1, readError(stream1, _))
       .Times(1)
       .WillOnce(Invoke([](auto, auto error) {
-        EXPECT_EQ("Idle timeout, num non control streams: 2", error.message);
+        EXPECT_EQ("Idle timeout: 60 seconds", error.message);
       }));
   transport->invokeIdleTimeout();
 }
