@@ -414,7 +414,7 @@ CodecResult QuicReadCodec::parsePacket(
   if (queue.empty()) {
     return CodecResult(Nothing());
   }
-  DCHECK(!queue.front()->isChained());
+  CHECK(!queue.front()->isChained());
   ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
   uint8_t initialByte = 0;
   if (!cursor.tryReadBE(initialByte)) {
