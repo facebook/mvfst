@@ -788,7 +788,7 @@ TEST_P(QuicTransportImplTestBase, DelayConnCallback) {
   transport.reset();
 }
 
-TEST_P(QuicTransportImplTestBase, IdleTimeoutStreamMaessage) {
+TEST_P(QuicTransportImplTestBase, IdleTimeoutStreamMessage) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   auto stream3 = transport->createUnidirectionalStream().value();
