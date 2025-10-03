@@ -104,6 +104,10 @@ quic::Expected<void, QuicError> QuicPathManager::removePath(PathIdType pathId) {
   pathTupleToId_.erase({it->second.localAddress, it->second.peerAddress});
   pathIdToInfo_.erase(it);
 
+  // Remove any pending path events
+  conn_.pendingEvents.pathChallenges.erase(pathId);
+  conn_.pendingEvents.pathResponses.erase(pathId);
+
   // Remove the path from the pending response list if present
   pathsPendingResponse_.erase(
       std::remove(

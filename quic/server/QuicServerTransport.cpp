@@ -362,7 +362,7 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
     };
     auto pathValidationWrites =
         [&](auto limit) -> quic::Expected<WriteQuicDataResult, QuicError> {
-      auto result = writePathValidationData(
+      auto result = writePathValidationDataForAlternatePaths(
           *socket_,
           *conn_,
           srcConnId /* src */,

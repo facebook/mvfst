@@ -119,7 +119,7 @@ class TestQuicTransport
              : conn_->transportSettings.writeConnectionDataPacketsLimit),
         *aead,
         Clock::now());
-    auto pathValidationResult = writePathValidationData(
+    auto pathValidationResult = writePathValidationDataForAlternatePaths(
         *socket_,
         *conn_,
         *conn_->clientConnectionId,

@@ -106,7 +106,7 @@ writeQuicDataToSocket(
  * besides the connection's current path.
  */
 [[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>
-writePathValidationData(
+writePathValidationDataForAlternatePaths(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,

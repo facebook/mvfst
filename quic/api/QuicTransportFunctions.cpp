@@ -2086,7 +2086,8 @@ bool hasAlternatePathValidationDataToWrite(
     const QuicConnectionStateBase& conn) {
   // Check path challenges
   for (const auto& [pathId, _] : conn.pendingEvents.pathChallenges) {
-    if (pathValidationWritableBytes(conn, pathId) > 0) {
+    if (pathId != conn.currentPathId &&
+        pathValidationWritableBytes(conn, pathId) > 0) {
       // This path has writable bytes, we can write path validation data
       return true;
     }
@@ -2094,7 +2095,8 @@ bool hasAlternatePathValidationDataToWrite(
 
   // Check path responses
   for (const auto& [pathId, _] : conn.pendingEvents.pathResponses) {
-    if (pathValidationWritableBytes(conn, pathId) > 0) {
+    if (pathId != conn.currentPathId &&
+        pathValidationWritableBytes(conn, pathId) > 0) {
       // This path has writable bytes, we can write path validation data
       return true;
     }
@@ -2523,7 +2525,8 @@ void updateNegotiatedAckFeatures(QuicConnectionStateBase& conn) {
   }
 }
 
-quic::Expected<WriteQuicDataResult, QuicError> writePathValidationData(
+quic::Expected<WriteQuicDataResult, QuicError>
+writePathValidationDataForAlternatePaths(
     QuicAsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -2541,10 +2544,14 @@ quic::Expected<WriteQuicDataResult, QuicError> writePathValidationData(
 
   UnorderedSet<PathIdType> pathIdUnion;
   for (const auto& [pathId, _] : connection.pendingEvents.pathChallenges) {
-    pathIdUnion.insert(pathId);
+    if (pathId != connection.currentPathId) {
+      pathIdUnion.insert(pathId);
+    }
   }
   for (const auto& [pathId, _] : connection.pendingEvents.pathResponses) {
-    pathIdUnion.insert(pathId);
+    if (pathId != connection.currentPathId) {
+      pathIdUnion.insert(pathId);
+    }
   }
 
   for (const auto& pathId : pathIdUnion) {
@@ -2562,12 +2569,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writePathValidationData(
           "Inconsistent path state"));
     }
     auto pathLimiterFunc =
-        [&path](const QuicConnectionStateBase& conn) -> uint64_t {
-      if (conn.nodeType == QuicNodeType::Client) {
-        return std::numeric_limits<uint64_t>::max();
-      } else {
-        return path->writableBytes;
-      }
+        [pathId](const QuicConnectionStateBase& conn) -> uint64_t {
+      return pathValidationWritableBytes(conn, pathId);
     };
     QuicAsyncUDPSocket& sendSocket = path->socket ? *path->socket : sock;
     FrameScheduler scheduler = std::move(schedulerBuilder).build();

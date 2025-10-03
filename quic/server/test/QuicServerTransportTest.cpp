@@ -1397,6 +1397,44 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    PathResponseOnCurrentPathSubjectToConnectionWritableBytes) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  auto& conn = server->getNonConstConn();
+  conn.qLogger = qLogger;
+  conn.transportSettings.disableMigration = true;
+
+  // Deliver a path challenge from the current peer
+  {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero, *conn.serverConnectionId, 10);
+    RegularQuicPacketBuilder builder(
+        conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+    ASSERT_FALSE(builder.encodePacketHeader().hasError());
+    PathChallengeFrame pathChallenge(123);
+    ASSERT_TRUE(builder.canBuildPacket());
+    ASSERT_FALSE(
+        writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder).hasError());
+
+    auto packet = std::move(builder).buildPacket();
+    auto packetData = packetToBuf(packet);
+    deliverData(std::move(packetData), false, &conn.peerAddress);
+  }
+
+  // A path response should be enqueued
+  ASSERT_TRUE(conn.pendingEvents.pathResponses.size() == 1);
+
+  // Aritifically block the congestion controller to ensure that a write is not
+  // attempted by the probe writer or the frame scheduler writer.
+  conn.transportSettings.enableWritableBytesLimit = true;
+  conn.writableBytesLimit = 0;
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(1);
+
+  // A write should not be attempted by PathValidation
+  EXPECT_EQ(shouldWriteData(conn), WriteDataReason::NO_WRITE);
+}
+
 TEST_F(QuicServerTransportTest, TestAckRstStream) {
   auto streamId = server->createUnidirectionalStream().value();
   auto streamResult =
