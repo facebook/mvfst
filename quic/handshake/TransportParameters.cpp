@@ -19,8 +19,12 @@ quic::Expected<Optional<uint64_t>, QuicError> getIntegerParameter(
   if (it == parameters.end()) {
     return Optional<uint64_t>(std::nullopt);
   }
-  auto parameterCursor = Cursor(it->value.get());
-  auto parameter = quic::follyutils::decodeQuicInteger(parameterCursor);
+
+  auto byteRange = it->value->coalesce();
+
+  auto parameterCursor =
+      ContiguousReadCursor(byteRange.data(), byteRange.size());
+  auto parameter = quic::decodeQuicInteger(parameterCursor);
   if (!parameter) {
     return quic::make_unexpected(QuicError(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
