@@ -2647,6 +2647,13 @@ class QuicServerTakeoverTest : public Test {
     // Disable packet forwarding on the new server and send packet
     // This packet should be dropped since it's not an initial packet
     newServer_->stopPacketForwarding(0ms);
+    // Add synchronization barrier to ensure stopPacketForwarding completes
+    // before sending test packets.
+    for (auto* evb : evbs2) {
+      evb->runInEventBaseThreadAndWait([]() {
+        // Barrier ensures all pending async operations complete
+      });
+    }
     std::atomic<bool> posted{false};
     EXPECT_CALL(*newTransInfoCb_, onPacketReceived())
         .WillRepeatedly(Invoke([&] {
