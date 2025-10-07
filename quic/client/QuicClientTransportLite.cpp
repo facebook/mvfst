@@ -1936,6 +1936,17 @@ void QuicClientTransportLite::addNewPeerAddress(
     folly::SocketAddress peerAddress) {
   CHECK(peerAddress.isInitialized());
 
+  if (peerAddress.getIPAddress().isZero()) {
+    // Using the wildcard address as the peer address is a special case which is
+    // interpreted as pointing to localhost since the address cannot appear on
+    // the wire. We update the peer address here to keep the connection
+    // state consistent with what will actually be in the IP headers.
+    peerAddress = folly::SocketAddress(
+        peerAddress.getFamily() == AF_INET6 ? folly::IPAddress("::1")
+                                            : folly::IPAddress("127.0.0.1"),
+        peerAddress.getPort());
+  }
+
   if (happyEyeballsEnabled_) {
     conn_->udpSendPacketLen = std::min(
         conn_->udpSendPacketLen,
