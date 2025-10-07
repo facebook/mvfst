@@ -4656,6 +4656,9 @@ class AckEventForAppDataTest : public Test {
         kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
+    // Disable packet number skipping. These tests are simpler to write for
+    // contiguous packet numbers
+    conn->transportSettings.skipOneInNPacketSequenceNumber = 0;
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher().value();
     CHECK(
