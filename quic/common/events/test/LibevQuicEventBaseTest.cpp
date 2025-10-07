@@ -19,6 +19,11 @@ struct EvLoop : public quic::LibevQuicEventBase::EvLoopWeak {
     ev_loop_destroy(evLoop_);
   }
 
+  EvLoop(const EvLoop&) = delete;
+  EvLoop& operator=(const EvLoop&) = delete;
+  EvLoop(EvLoop&&) = delete;
+  EvLoop& operator=(EvLoop&&) = delete;
+
   struct ev_loop* get() override {
     return evLoop_;
   }
