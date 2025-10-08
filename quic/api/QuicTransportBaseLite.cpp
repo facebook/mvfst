@@ -2956,9 +2956,13 @@ void QuicTransportBaseLite::setIdleTimer() {
   scheduleTimeout(&idleTimeout_, idleTimeout);
   auto idleTimeoutCount = idleTimeout.count();
   if (conn_->transportSettings.enableKeepalive) {
-    std::chrono::milliseconds keepaliveTimeout = std::chrono::milliseconds(
-        idleTimeoutCount - static_cast<int64_t>(idleTimeoutCount * .15));
-    scheduleTimeout(&keepaliveTimeout_, keepaliveTimeout);
+    auto keepAliveTimeout = conn_->transportSettings.keepAliveTimeout;
+    if (keepAliveTimeout == 0ms) {
+      keepAliveTimeout = std::chrono::milliseconds(
+          idleTimeoutCount - static_cast<int64_t>(idleTimeoutCount * .15));
+    }
+
+    scheduleTimeout(&keepaliveTimeout_, keepAliveTimeout);
   }
 }
 

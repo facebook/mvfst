@@ -502,6 +502,9 @@ struct TransportSettings {
 
   // Whether a ConnectionClose frame should be sent on IdleTimeout
   bool alwaysSendConnectionCloseOnIdleTimeout{false};
+
+  // TODO(T239869314): Remove this after experiment is done.
+  std::chrono::milliseconds keepAliveTimeout{0};
 };
 
 } // namespace quic
