@@ -4412,7 +4412,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
   const auto& readCbs = client->getReadCallbacks();
   const auto& conn = client->getConn();
   // ReadCallbacks are not affected by resetting send state
-  EXPECT_EQ(1, readCbs.contains(streamId));
+  EXPECT_TRUE(readCbs.contains(streamId));
   // readable list can still be populated after a reset.
   EXPECT_FALSE(writableContains(*conn.streamManager, streamId));
   auto packet = packetToBuf(createAckPacket(
@@ -4522,7 +4522,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   const auto& readCbs = client->getReadCallbacks();
   const auto& conn = client->getConn();
   // ReadCallback are not affected by resetting send state.
-  EXPECT_EQ(1, readCbs.contains(streamId));
+  EXPECT_TRUE(readCbs.contains(streamId));
   // readable list can still be populated after a reset.
   EXPECT_FALSE(writableContains(*conn.streamManager, streamId));
 
@@ -4583,11 +4583,11 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
   }
   EXPECT_TRUE(dataDelivered);
   const auto& readCbs = client->getReadCallbacks();
-  EXPECT_EQ(1, readCbs.contains(streamId));
-  EXPECT_EQ(0, conn.streamManager->readableStreams().contains(streamId));
+  EXPECT_TRUE(readCbs.contains(streamId));
+  EXPECT_FALSE(conn.streamManager->readableStreams().contains(streamId));
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
   client->close(std::nullopt);
-  EXPECT_EQ(0, readCbs.contains(streamId));
+  EXPECT_FALSE(readCbs.contains(streamId));
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(client->isClosed());
 }
@@ -4634,7 +4634,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
 
   const auto& readCbs = client->getReadCallbacks();
   const auto& conn = client->getConn();
-  EXPECT_EQ(0, readCbs.contains(streamId));
+  EXPECT_FALSE(readCbs.contains(streamId));
   // readable list can still be populated after a reset.
   EXPECT_FALSE(writableContains(*conn.streamManager, streamId));
   auto packet = packetToBuf(createAckPacket(
@@ -4679,8 +4679,8 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   }
   EXPECT_TRUE(dataDelivered);
   const auto& readCbs = client->getReadCallbacks();
-  EXPECT_EQ(readCbs.contains(streamId), 1);
-  EXPECT_EQ(conn.streamManager->readableStreams().contains(streamId), 0);
+  EXPECT_TRUE(readCbs.contains(streamId));
+  EXPECT_FALSE(conn.streamManager->readableStreams().contains(streamId));
 
   AckBlocks sentPackets;
   auto fizzClientWriteChain25 =
@@ -4698,10 +4698,10 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   deliverData(ackPacket->coalesce());
   EXPECT_FALSE(conn.streamManager->hasDeliverable());
   EXPECT_TRUE(conn.streamManager->streamExists(streamId));
-  EXPECT_EQ(readCbs.contains(streamId), 1);
+  EXPECT_TRUE(readCbs.contains(streamId));
   client->close(std::nullopt);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
-  EXPECT_EQ(readCbs.contains(streamId), 0);
+  EXPECT_FALSE(readCbs.contains(streamId));
   EXPECT_TRUE(client->isClosed());
 }
 
