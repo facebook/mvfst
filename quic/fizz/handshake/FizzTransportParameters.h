@@ -67,18 +67,22 @@ inline void removeDuplicateParams(std::vector<TransportParameter>& params) {
 
 inline void decodeVarintParams(
     std::vector<TransportParameter>& parameters,
-    Cursor& cursor) {
+    ContiguousReadCursor& cursor) {
   while (!cursor.isAtEnd()) {
-    auto id = quic::follyutils::decodeQuicInteger(cursor);
+    auto id = quic::decodeQuicInteger(cursor);
     if (!id) {
       throw std::runtime_error("Could not parse transport parameter id.");
     }
-    auto len = quic::follyutils::decodeQuicInteger(cursor);
+    auto len = quic::decodeQuicInteger(cursor);
     if (!len) {
       throw std::runtime_error("Could not parse transport parameter length.");
     }
-    BufPtr val;
-    cursor.clone(val, len.value().first);
+    if (cursor.remaining() < len.value().first) {
+      throw std::runtime_error("Not enough bytes to read transport parameter");
+    }
+    BufPtr val = BufHelpers::create(len.value().first);
+    CHECK(cursor.tryPull(val->writableData(), len.value().first));
+    val->append(len.value().first);
     parameters.emplace_back(
         static_cast<TransportParameterId>(id.value().first), std::move(val));
   }
@@ -127,7 +131,9 @@ inline quic::Optional<quic::ClientTransportParameters> getClientExtension(
     return std::nullopt;
   }
   quic::ClientTransportParameters parameters;
-  quic::Cursor cursor(it->extension_data.get());
+  auto extensionCoalesced = it->extension_data->coalesce();
+  quic::ContiguousReadCursor cursor(
+      extensionCoalesced.data(), extensionCoalesced.size());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
@@ -141,7 +147,9 @@ inline quic::Optional<quic::ServerTransportParameters> getServerExtension(
     return std::nullopt;
   }
   quic::ServerTransportParameters parameters;
-  quic::Cursor cursor(it->extension_data.get());
+  auto extensionCoalesced = it->extension_data->coalesce();
+  quic::ContiguousReadCursor cursor(
+      extensionCoalesced.data(), extensionCoalesced.size());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
@@ -155,7 +163,9 @@ inline quic::Optional<quic::TicketTransportParameters> getTicketExtension(
     return std::nullopt;
   }
   quic::TicketTransportParameters parameters;
-  quic::Cursor cursor(it->extension_data.get());
+  auto extensionCoalesced = it->extension_data->coalesce();
+  quic::ContiguousReadCursor cursor(
+      extensionCoalesced.data(), extensionCoalesced.size());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
