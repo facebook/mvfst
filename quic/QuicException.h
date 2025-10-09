@@ -95,6 +95,8 @@ class QuicApplicationException : public std::runtime_error {
   ApplicationErrorCode errorCode_;
 };
 
+bool isCryptoError(TransportErrorCode code);
+
 /**
  * Convert the error code to a string.
  */

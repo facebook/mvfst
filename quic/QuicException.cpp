@@ -49,6 +49,13 @@ QuicApplicationException::QuicApplicationException(
     ApplicationErrorCode errorCode)
     : std::runtime_error(msg), errorCode_(errorCode) {}
 
+bool isCryptoError(TransportErrorCode code) {
+  return (static_cast<std::underlying_type<TransportErrorCode>::type>(code) &
+          static_cast<std::underlying_type<TransportErrorCode>::type>(
+              TransportErrorCode::CRYPTO_ERROR_MAX)) ==
+      static_cast<std::underlying_type<TransportErrorCode>::type>(code);
+}
+
 folly::StringPiece toString(LocalErrorCode code) {
   switch (code) {
     case LocalErrorCode::NO_ERROR:
@@ -154,11 +161,7 @@ std::string toString(TransportErrorCode code) {
       return cryptoErrorToString(code);
   }
 
-  auto codeVal =
-      static_cast<std::underlying_type<TransportErrorCode>::type>(code);
-  if ((codeVal &
-       static_cast<std::underlying_type<TransportErrorCode>::type>(
-           TransportErrorCode::CRYPTO_ERROR_MAX)) == codeVal) {
+  if (isCryptoError(code)) {
     return cryptoErrorToString(code);
   }
 
