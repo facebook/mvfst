@@ -717,6 +717,7 @@ quic::Expected<void, QuicError> updateConnection(
   // AckFrame, PaddingFrame and Datagrams are not retx-able.
   bool retransmittable = false;
   bool isPing = false;
+  bool hasDatagram = false;
   uint32_t connWindowUpdateSent = 0;
   uint32_t ackFrameCounter = 0;
   uint32_t streamBytesSent = 0;
@@ -917,6 +918,7 @@ quic::Expected<void, QuicError> updateConnection(
       }
       case QuicWriteFrame::Type::DatagramFrame: {
         // do not mark Datagram frames as retransmittable
+        hasDatagram = true;
         break;
       }
       case QuicWriteFrame::Type::ImmediateAckFrame: {
@@ -971,7 +973,11 @@ quic::Expected<void, QuicError> updateConnection(
     conn.oneRttWritePacketsSentInCurrentPhase++;
   }
 
-  if (!retransmittable && !isPing) {
+  bool hasDatagramAndShouldTrack = hasDatagram &&
+      conn.transportSettings.datagramConfig.trackingMode ==
+          DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
+
+  if (!retransmittable && !isPing && !hasDatagramAndShouldTrack) {
     DCHECK(!clonedPacketIdentifier);
     return {};
   }
@@ -1060,7 +1066,9 @@ quic::Expected<void, QuicError> updateConnection(
     conn.pathManager->onPathPacketSent(pathInfo.id, pkt.metadata.encodedSize);
   }
 
-  conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
+  if (retransmittable) {
+    conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
+  }
   if (pkt.maybeClonedPacketIdentifier) {
     ++conn.outstandings.clonedPacketCount[packetNumberSpace];
     ++conn.lossState.timeoutBasedRtxCount;

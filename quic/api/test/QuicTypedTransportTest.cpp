@@ -43,6 +43,18 @@ class TransportTypeNames {
   }
 };
 
+bool hasStreamFrame(const quic::RegularQuicWritePacket::Vec& frames) {
+  return std::any_of(frames.begin(), frames.end(), [](const auto& frame) {
+    return frame.type() == quic::QuicWriteFrame::Type::WriteStreamFrame;
+  });
+}
+
+bool hasDatagramFrame(const quic::RegularQuicWritePacket::Vec& frames) {
+  return std::any_of(frames.begin(), frames.end(), [](const auto& frame) {
+    return frame.type() == quic::QuicWriteFrame::Type::DatagramFrame;
+  });
+}
+
 } // namespace
 
 namespace quic::test {
@@ -5334,6 +5346,564 @@ TYPED_TEST(
     EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
   }
   this->deliverPackets(std::move(pktBatch2), pktBatch2RecvTime, packetTosValue);
+
+  this->destroyTransport();
+}
+
+template <typename T>
+class QuicTypedTransportAfterStartTestDatagram
+    : public QuicTypedTransportAfterStartTest<T> {
+ public:
+  ~QuicTypedTransportAfterStartTestDatagram() override = default;
+
+  void SetUp() override {
+    QuicTypedTransportAfterStartTest<T>::SetUp();
+
+    // Clear outstanding packets
+    this->getNonConstConn().outstandings.reset();
+
+    // Enable DATAGRAM support by setting maxWriteFrameSize > 0
+    this->getNonConstConn().transportSettings.datagramConfig.enabled = true;
+    this->getNonConstConn().datagramState.maxWriteFrameSize = 1200;
+
+    // Set up mock congestion controller
+    auto mockCongestionController =
+        std::make_unique<MockCongestionController>();
+    mockCongestionController_ = mockCongestionController.get();
+    this->getNonConstConn().congestionController =
+        std::move(mockCongestionController);
+    ON_CALL(*mockCongestionController_, getWritableBytes())
+        .WillByDefault(Return(1000));
+  }
+
+  void setWritableBytes(uint64_t writableBytes) {
+    ON_CALL(*mockCongestionController_, getWritableBytes())
+        .WillByDefault(Return(writableBytes));
+  }
+
+  MockCongestionController* getMockCongestionController() const {
+    return mockCongestionController_;
+  }
+
+  struct State {
+    uint64_t bytesSent{0};
+    uint64_t bodyBytesSent{0};
+    uint64_t bytesInFlight{0};
+    uint64_t totalPacketsSent{0};
+    size_t outstandingPackets{0};
+    TimePoint lastRetransmittablePacketSentTime;
+    Optional<TimePoint> maybeLastPacketSentTime;
+    auto operator<=>(const State&) const = default;
+  };
+
+  State buildState() {
+    return State{
+        .bytesSent = this->getTransport()->getTransportInfo().bytesSent,
+        .bodyBytesSent = this->getTransport()->getTransportInfo().bodyBytesSent,
+        .bytesInFlight = this->getTransport()->getTransportInfo().bytesInFlight,
+        .totalPacketsSent =
+            this->getTransport()->getTransportInfo().totalPacketsSent,
+        .outstandingPackets = this->getConn().outstandings.packets.size(),
+        .lastRetransmittablePacketSentTime =
+            this->getConn().lossState.lastRetransmittablePacketSentTime,
+        .maybeLastPacketSentTime =
+            this->getConn().lossState.maybeLastPacketSentTime};
+  }
+
+  struct WriteResult {
+    std::string bufWritten;
+  };
+
+  WriteResult writeToNewStream() {
+    const std::string bufToWrite = "StreamData";
+    const auto maybeStreamId =
+        this->getTransport()->createBidirectionalStream();
+    CHECK(maybeStreamId.has_value());
+    const auto& streamId = maybeStreamId.value();
+    const auto mvfstWriteStreamResult = this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer(bufToWrite), false /* eof */);
+    CHECK(mvfstWriteStreamResult.has_value());
+    return WriteResult{.bufWritten = bufToWrite};
+  }
+
+  WriteResult writeDatagram() {
+    const std::string bufToWrite = "DatagramBuf";
+    const auto mvfstWriteDatagramResult = this->getTransport()->writeDatagram(
+        folly::IOBuf::copyBuffer(bufToWrite));
+    CHECK(mvfstWriteDatagramResult.has_value())
+        << "DATAGRAM write should always succeed";
+    return WriteResult{.bufWritten = bufToWrite};
+  }
+
+ private:
+  MockCongestionController* mockCongestionController_{nullptr};
+};
+
+TYPED_TEST_SUITE(
+    QuicTypedTransportAfterStartTestDatagram,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
+/**
+ * Test DATAGRAM congestion control mode.
+ *
+ * If nothing is written, then initial state should == post loop state.
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTestDatagram, NoWritesJustLoop) {
+  const auto initialState = this->buildState();
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+  this->loopForWrites();
+  const auto postLoopState = this->buildState();
+  EXPECT_EQ(initialState, postLoopState);
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * Mode = Constrained.
+ * PacketContents = Datagram only.
+ * WritableBytes = 1000.
+ *
+ * DATAGRAM-only packets SHOULD NOT be inserted into outstandings, congestion
+ * controller SHOULD NOT be notified, but we SHOULD observe bytes written.
+ *
+ * lastRetransmittablePacketSentTime SHOULD be updated.
+ * maybeLastPacketSentTime SHOULD be updated.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    Constrained_DatagramOnlyPacket_WritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::Constrained;
+  this->setWritableBytes(1000);
+
+  const auto initialState = this->buildState();
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+  const auto datagramWriteResult = this->writeDatagram();
+  this->loopForWrites();
+  const auto postLoopState = this->buildState();
+  EXPECT_NE(initialState, postLoopState);
+
+  // Verify that packets and data was written
+  EXPECT_GE(
+      postLoopState.bytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size());
+  EXPECT_GE(
+      postLoopState.bodyBytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size());
+  EXPECT_EQ(postLoopState.totalPacketsSent, initialState.totalPacketsSent + 1);
+
+  // Verify no packets were added to outstandings
+  EXPECT_TRUE(this->getConn().outstandings.packets.empty());
+
+  // Verify loss state updates
+  EXPECT_EQ(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_NE(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * Mode = Constrained.
+ * PacketContents = Datagram only.
+ * WritableBytes = 0.
+ *
+ * With no writable bytes, NO packets should be written.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    Constrained_DatagramOnlyPacket_NoWritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::Constrained;
+  this->setWritableBytes(0);
+
+  const auto initialState = this->buildState();
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+  const auto datagramWriteResult = this->writeDatagram();
+  this->loopForWrites();
+  const auto postLoopState = this->buildState();
+
+  // With no writable bytes, no packets should be sent
+  EXPECT_EQ(initialState.bytesSent, postLoopState.bytesSent);
+  EXPECT_EQ(initialState.bodyBytesSent, postLoopState.bodyBytesSent);
+  EXPECT_EQ(initialState.totalPacketsSent, postLoopState.totalPacketsSent);
+
+  // Verify no packets were added to outstandings
+  EXPECT_TRUE(this->getConn().outstandings.packets.empty());
+
+  // Verify loss state remains unchanged
+  EXPECT_EQ(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_EQ(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * Mode = ConstrainedAndTracked.
+ * PacketContents = Datagram only.
+ * WritableBytes = 1000.
+ *
+ * DATAGRAM-only packets SHOULD be inserted into outstandings, congestion
+ * controller SHOULD be notified, and we SHOULD observe bytes written.
+ *
+ * lastRetransmittablePacketSentTime SHOULD NOT be updated.
+ * maybeLastPacketSentTime SHOULD be updated.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    ConstrainedAndTracked_DatagramOnlyPacket_WritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
+  this->setWritableBytes(1000);
+
+  const auto initialState = this->buildState();
+  const auto datagramWriteResult = this->writeDatagram();
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+
+  // On loop, congestion controller should be notified
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_))
+      .Times(1)
+      .WillOnce(Invoke([datagramWriteResult](const auto& pkt) {
+        // Verify the packet has encoded size > the buffer
+        EXPECT_GT(
+            pkt.metadata.encodedSize, datagramWriteResult.bufWritten.size());
+
+        // Verify the packet has an encoded body size >= the buffer
+        EXPECT_GE(
+            pkt.metadata.encodedBodySize,
+            datagramWriteResult.bufWritten.size());
+      }));
+
+  // Loop, and inspect the write interval (based on outstandings)
+  auto maybeWriteInterval = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+  const auto postLoopState = this->buildState();
+  EXPECT_NE(initialState, postLoopState);
+
+  // Verify that packets and data was written
+  EXPECT_GE(
+      postLoopState.bytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size());
+  EXPECT_GE(
+      postLoopState.bodyBytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size());
+  EXPECT_EQ(postLoopState.totalPacketsSent, initialState.totalPacketsSent + 1);
+
+  // Verify one packet was added to outstandings
+  EXPECT_THAT(this->getConn().outstandings.packets, SizeIs(1));
+
+  // Verify loss state updates
+  EXPECT_EQ(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_NE(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * Mode = ConstrainedAndTracked.
+ * PacketContents = Datagram only.
+ * WritableBytes = 0.
+ *
+ * With no writable bytes, NO packets should be written.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    ConstrainedAndTracked_DatagramOnlyPacket_NoWritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
+  this->setWritableBytes(0);
+
+  const auto initialState = this->buildState();
+  const auto datagramWriteResult = this->writeDatagram();
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+
+  // Loop, no packets should be written
+  auto maybeWriteInterval = this->loopForWrites();
+  EXPECT_EQ(0, this->getNumPacketsWritten(maybeWriteInterval));
+  const auto postLoopState = this->buildState();
+
+  // With no writable bytes, no packets should be sent
+  EXPECT_EQ(initialState.bytesSent, postLoopState.bytesSent);
+  EXPECT_EQ(initialState.bodyBytesSent, postLoopState.bodyBytesSent);
+  EXPECT_EQ(initialState.totalPacketsSent, postLoopState.totalPacketsSent);
+
+  // Verify no packets were added to outstandings
+  EXPECT_TRUE(this->getConn().outstandings.packets.empty());
+
+  // Verify loss state remains unchanged
+  EXPECT_EQ(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_EQ(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * Mode = Constrained.
+ * PacketContents = Mixed (datagram frame + stream data).
+ * WritableBytes = 1000.
+ *
+ * Mixed packets SHOULD ALWAYS be inserted into outstandings, congestion
+ * controller SHOULD ALWAYS be notified, and we SHOULD observe bytes written.
+ *
+ * lastRetransmittablePacketSentTime SHOULD NOT be updated.
+ * maybeLastPacketSentTime SHOULD be updated.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    Constrained_MixedPacket_WritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::Constrained;
+  this->setWritableBytes(1000);
+
+  const auto initialState = this->buildState();
+  const auto datagramWriteResult = this->writeDatagram();
+  const auto streamWriteResult = this->writeToNewStream();
+
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+
+  // On loop, congestion controller should be notified
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_))
+      .Times(1)
+      .WillOnce(
+          Invoke([datagramWriteResult, streamWriteResult](const auto& pkt) {
+            // Verify the packet has encoded size > the buffer
+            EXPECT_GT(
+                pkt.metadata.encodedSize,
+                datagramWriteResult.bufWritten.size() +
+                    streamWriteResult.bufWritten.size());
+
+            // Verify the packet has an encoded body size >= the buffer
+            EXPECT_GE(
+                pkt.metadata.encodedBodySize,
+                datagramWriteResult.bufWritten.size() +
+                    streamWriteResult.bufWritten.size());
+          }));
+
+  // Loop, and inspect the write interval (based on outstandings)
+  auto maybeWriteInterval = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+  const auto postLoopState = this->buildState();
+  EXPECT_NE(initialState, postLoopState);
+
+  // Verify that packets and data was written
+  EXPECT_GE(
+      postLoopState.bytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size() +
+          streamWriteResult.bufWritten.size());
+  EXPECT_GE(
+      postLoopState.bodyBytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size() +
+          streamWriteResult.bufWritten.size());
+  EXPECT_EQ(postLoopState.totalPacketsSent, initialState.totalPacketsSent + 1);
+
+  // Verify mixed packet in outstandings
+  EXPECT_THAT(
+      this->getConn().outstandings.packets,
+      UnorderedElementsAre(Field(
+          &OutstandingPacketWrapper::packet,
+          Field(
+              &RegularQuicWritePacket::frames,
+              AllOf(Truly(hasStreamFrame), Truly(hasDatagramFrame))))));
+
+  // Verify loss state updates
+  EXPECT_NE(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_NE(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * Mode = Constrained.
+ * PacketContents = Mixed (datagram frame + stream data).
+ * WritableBytes = 0.
+ *
+ * With no writable bytes, NO packets should be written.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    Constrained_MixedPacket_NoWritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::Constrained;
+  this->setWritableBytes(0);
+
+  const auto initialState = this->buildState();
+  const auto datagramWriteResult = this->writeDatagram();
+  const auto streamWriteResult = this->writeToNewStream();
+
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+
+  // Loop, no packets should be written
+  auto maybeWriteInterval = this->loopForWrites();
+  EXPECT_EQ(0, this->getNumPacketsWritten(maybeWriteInterval));
+  const auto postLoopState = this->buildState();
+
+  // With no writable bytes, no packets should be sent
+  EXPECT_EQ(initialState.bytesSent, postLoopState.bytesSent);
+  EXPECT_EQ(initialState.bodyBytesSent, postLoopState.bodyBytesSent);
+  EXPECT_EQ(initialState.totalPacketsSent, postLoopState.totalPacketsSent);
+
+  // Verify no packets were added to outstandings
+  EXPECT_TRUE(this->getConn().outstandings.packets.empty());
+
+  // Verify loss state remains unchanged
+  EXPECT_EQ(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_EQ(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * CongestionControlMode = ConstrainedAndTracked.
+ * PacketContents = Mixed (datagram frame + stream data).
+ * WritableBytes = 1000.
+ *
+ * Mixed packets SHOULD ALWAYS be inserted into outstandings, congestion
+ * controller SHOULD ALWAYS be notified, and we SHOULD observe bytes written.
+ *
+ * lastRetransmittablePacketSentTime SHOULD be updated.
+ * maybeLastPacketSentTime SHOULD be updated.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    ConstrainedAndTracked_MixedPacket_WritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
+  this->setWritableBytes(1000);
+
+  const auto initialState = this->buildState();
+  const auto datagramWriteResult = this->writeDatagram();
+  const auto streamWriteResult = this->writeToNewStream();
+
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+
+  // On loop, congestion controller should be notified
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_))
+      .Times(1)
+      .WillOnce(
+          Invoke([datagramWriteResult, streamWriteResult](const auto& pkt) {
+            // Verify the packet has encoded size > the buffer
+            EXPECT_GT(
+                pkt.metadata.encodedSize,
+                datagramWriteResult.bufWritten.size() +
+                    streamWriteResult.bufWritten.size());
+
+            // Verify the packet has an encoded body size >= the buffer
+            EXPECT_GE(
+                pkt.metadata.encodedBodySize,
+                datagramWriteResult.bufWritten.size() +
+                    streamWriteResult.bufWritten.size());
+          }));
+
+  // Loop, and inspect the write interval (based on outstandings)
+  auto maybeWriteInterval = this->loopForWrites();
+  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+  const auto postLoopState = this->buildState();
+  EXPECT_NE(initialState, postLoopState);
+
+  // Verify that packets and data was written
+  EXPECT_GE(
+      postLoopState.bytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size() +
+          streamWriteResult.bufWritten.size());
+  EXPECT_GE(
+      postLoopState.bodyBytesSent,
+      initialState.bodyBytesSent + datagramWriteResult.bufWritten.size() +
+          streamWriteResult.bufWritten.size());
+  EXPECT_EQ(postLoopState.totalPacketsSent, initialState.totalPacketsSent + 1);
+
+  // Verify one packet was added to outstandings
+  EXPECT_THAT(this->getConn().outstandings.packets, SizeIs(1));
+
+  // Verify loss state updates
+  EXPECT_NE(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_NE(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
+
+  this->destroyTransport();
+}
+
+/**
+ * Test handling of DATAGRAM frames.
+ *
+ * CongestionControlMode = ConstrainedAndTracked.
+ * PacketContents = Mixed (datagram frame + stream data).
+ * WritableBytes = 0.
+ *
+ * With no writable bytes, NO packets should be written.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    ConstrainedAndTracked_MixedPacket_NoWritableBytes) {
+  this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
+      DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
+  this->setWritableBytes(0);
+
+  const auto initialState = this->buildState();
+  const auto datagramWriteResult = this->writeDatagram();
+  const auto streamWriteResult = this->writeToNewStream();
+
+  EXPECT_CALL(*this->getMockCongestionController(), onPacketSent(_)).Times(0);
+
+  // Loop, no packets should be written
+  auto maybeWriteInterval = this->loopForWrites();
+  EXPECT_EQ(0, this->getNumPacketsWritten(maybeWriteInterval));
+  const auto postLoopState = this->buildState();
+
+  // With no writable bytes, no packets should be sent
+  EXPECT_EQ(initialState.bytesSent, postLoopState.bytesSent);
+  EXPECT_EQ(initialState.bodyBytesSent, postLoopState.bodyBytesSent);
+  EXPECT_EQ(initialState.totalPacketsSent, postLoopState.totalPacketsSent);
+
+  // Verify no packets were added to outstandings
+  EXPECT_TRUE(this->getConn().outstandings.packets.empty());
+
+  // Verify loss state remains unchanged
+  EXPECT_EQ(
+      initialState.lastRetransmittablePacketSentTime,
+      postLoopState.lastRetransmittablePacketSentTime);
+  EXPECT_EQ(
+      initialState.maybeLastPacketSentTime,
+      postLoopState.maybeLastPacketSentTime);
 
   this->destroyTransport();
 }

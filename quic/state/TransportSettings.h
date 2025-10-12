@@ -126,10 +126,19 @@ struct CongestionControlConfig {
 };
 
 struct DatagramConfig {
+  enum class CongestionControlMode : uint8_t {
+    // DATAGRAM-only packets are constrained but not tracked (legacy behavior)
+    Constrained = 0,
+    // DATAGRAM-only packets are both constrained and tracked in outstandings
+    ConstrainedAndTracked = 1
+  };
+
   bool enabled{false};
   bool framePerPacket{true};
   bool recvDropOldDataFirst{false};
   bool sendDropOldDataFirst{false};
+  // Mode for tracking DATAGRAM-only packets in bytes-in-flight
+  CongestionControlMode trackingMode{CongestionControlMode::Constrained};
   uint32_t readBufSize{kDefaultMaxDatagramsBuffered};
   uint32_t writeBufSize{kDefaultMaxDatagramsBuffered};
 };
