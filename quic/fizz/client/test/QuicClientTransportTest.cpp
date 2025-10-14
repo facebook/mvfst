@@ -10,7 +10,6 @@
 
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <folly/futures/Future.h>
-#include <folly/io/Cursor.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <quic/QuicConstants.h>

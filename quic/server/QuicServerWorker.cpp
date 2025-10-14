@@ -7,7 +7,6 @@
 
 #include <fmt/format.h>
 #include <folly/chrono/Conv.h>
-#include <folly/io/Cursor.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/system/ThreadId.h>

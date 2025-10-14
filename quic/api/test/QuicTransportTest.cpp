@@ -9,7 +9,6 @@
 #include <gtest/gtest.h>
 
 #include <folly/Random.h>
-#include <folly/io/Cursor.h>
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>

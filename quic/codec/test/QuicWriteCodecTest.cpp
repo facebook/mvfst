@@ -8,7 +8,6 @@
 #include <quic/codec/QuicWriteCodec.h>
 
 #include <folly/Random.h>
-#include <folly/io/Cursor.h>
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/QuicConstants.h>

@@ -7,7 +7,6 @@
 
 #include <quic/codec/QuicReadCodec.h>
 
-#include <folly/io/Cursor.h>
 #include <folly/portability/GTest.h>
 #include <quic/QuicException.h>
 #include <quic/common/StringUtils.h>

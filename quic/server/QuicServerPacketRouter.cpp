@@ -5,7 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/io/Cursor.h>
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
 

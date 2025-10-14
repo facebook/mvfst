@@ -219,7 +219,6 @@ mvfst_cpp_library(
         "QuicStreamAsyncTransport.h",
     ],
     deps = [
-        "//folly/io:iobuf",
         "//quic/common/events:folly_eventbase",
     ],
     exported_deps = [

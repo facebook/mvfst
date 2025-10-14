@@ -8,7 +8,6 @@
 #include <folly/portability/GTest.h>
 
 #include <folly/Random.h>
-#include <folly/io/Cursor.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicReadCodec.h>
