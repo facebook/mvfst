@@ -62,6 +62,7 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    # @autodeps-skip
     name = "tls_exception",
     srcs = select({
         "DEFAULT": ["QuicTLSExceptionFizz.cpp"],
