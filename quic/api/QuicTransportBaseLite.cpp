@@ -75,6 +75,16 @@ QuicTransportBaseLite::QuicTransportBaseLite(
           [this]() { invokePeekDataAndCallbacks(); },
           LooperType::PeekLooper)) {}
 
+QuicTransportBaseLite::~QuicTransportBaseLite() {
+  resetConnectionCallbacks();
+  cancelTimeout(&drainTimeout_);
+
+  // closeImpl and closeUdpSocket should have been triggered by destructor of
+  // derived class to ensure that observers are properly notified
+  DCHECK_NE(CloseState::OPEN, closeState_);
+  DCHECK(!socket_.get()); // should be no socket
+}
+
 void QuicTransportBaseLite::onNetworkData(
     const folly::SocketAddress& localAddress,
     NetworkData&& networkData,

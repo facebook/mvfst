@@ -23,6 +23,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       std::unique_ptr<QuicAsyncUDPSocket> socket,
       bool useConnectionEndWithErrorCallback = false);
 
+  ~QuicTransportBaseLite() override;
+
   /**
    * Invoked when we have to write some data to the wire.
    * The subclass may use this to start writing data to the socket.
@@ -412,9 +414,13 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     QuicTransportBaseLite* transport_;
   };
 
-  // DrainTimeout is a bit different from other timeouts. It needs to hold a
-  // shared_ptr to the transport, since if a DrainTimeout is scheduled,
-  // transport cannot die.
+  // DrainTimeout holds a raw pointer to the transport. This is fine because the
+  // DrainTimeout is owned by the transport, and destroying the DrainTimeout
+  // cancels it. I.e., destroying the transport destroys the DrainTimeout, which
+  // cancels the timeout callback.
+  // NOTE: The logic for canceling the callback is in the implementation of the
+  // QuicTimer. So as a safeguard, we explicitly cancel this timeout in the
+  // transport destructor.
   class DrainTimeout : public QuicTimerCallback {
    public:
     ~DrainTimeout() override = default;

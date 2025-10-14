@@ -69,16 +69,7 @@ Optional<ConnectionId> QuicTransportBase::getClientChosenDestConnectionId()
   return conn_->clientChosenDestConnectionId;
 }
 
-QuicTransportBase::~QuicTransportBase() {
-  resetConnectionCallbacks();
-  // Just in case this ended up hanging around.
-  cancelTimeout(&drainTimeout_);
-
-  // closeImpl and closeUdpSocket should have been triggered by destructor of
-  // derived class to ensure that observers are properly notified
-  DCHECK_NE(CloseState::OPEN, closeState_);
-  DCHECK(!socket_.get()); // should be no socket
-}
+QuicTransportBase::~QuicTransportBase() = default;
 
 bool QuicTransportBase::replaySafe() const {
   return (conn_->oneRttWriteCipher != nullptr);
