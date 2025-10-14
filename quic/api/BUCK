@@ -136,6 +136,7 @@ mvfst_cpp_library(
         "//quic/codec:types",
         "//quic/common:looper",
         "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/handshake:handshake",
         "//quic/handshake:transport_parameters",
         "//quic/state:quic_state_machine",
     ],

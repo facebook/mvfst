@@ -16,6 +16,7 @@
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/handshake/HandshakeLayer.h>
 #include <quic/server/handshake/ServerTransportParametersExtension.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -196,6 +197,13 @@ class QuicServerTransport
       uint16_t keyLength) const override {
     return serverConn_->serverHandshakeLayer->getExportedKeyingMaterial(
         label, context, keyLength);
+  }
+
+  Optional<Handshake::TLSSummary> getTLSSummary() const override {
+    if (serverConn_->serverHandshakeLayer) {
+      return serverConn_->serverHandshakeLayer->getTLSSummary();
+    }
+    return std::nullopt;
   }
 
   Optional<std::string> getSni();

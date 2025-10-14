@@ -2289,4 +2289,12 @@ QuicClientTransportLite::getPeerCertificate() const {
   return nullptr;
 }
 
+Optional<Handshake::TLSSummary> QuicClientTransportLite::getTLSSummary() const {
+  const auto clientHandshakeLayer = clientConn_->clientHandshakeLayer;
+  if (clientHandshakeLayer) {
+    return clientHandshakeLayer->getTLSSummary();
+  }
+  return std::nullopt;
+}
+
 } // namespace quic

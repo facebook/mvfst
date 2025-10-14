@@ -255,6 +255,8 @@ class QuicClientTransportLite
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;
 
+  Optional<Handshake::TLSSummary> getTLSSummary() const override;
+
   class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
    public:
     explicit HappyEyeballsConnAttemptDelayTimeout(

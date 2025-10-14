@@ -14,6 +14,7 @@
 #include <quic/api/TransportInfo.h>
 #include <quic/codec/Types.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
+#include <quic/handshake/HandshakeLayer.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/state/StateData.h>
 
@@ -813,6 +814,13 @@ class QuicSocketLite {
       const folly::AsyncTransportCertificate>
   getSelfCertificate() const {
     return nullptr;
+  }
+
+  /**
+   * Get TLS summary information from the handshake
+   */
+  [[nodiscard]] virtual Optional<Handshake::TLSSummary> getTLSSummary() const {
+    return std::nullopt;
   }
 
   /**
