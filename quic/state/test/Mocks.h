@@ -59,6 +59,7 @@ class MockPacketProcessor : public PacketProcessor {
       (const OutstandingPacketWrapper&),
       (override));
   MOCK_METHOD(Optional<PrewriteRequest>, prewrite, (), (override));
+  MOCK_METHOD(void, postwrite, (), (override));
 };
 
 class MockThrottlingSignalProvider : public ThrottlingSignalProvider {

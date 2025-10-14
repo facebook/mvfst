@@ -1341,6 +1341,15 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
         conn_->outstandings.numOutstanding();
 
     updatePacketProcessorsPrewriteRequests();
+    // postwrites should be called in all cases if prewrites were
+    // successfully (did not throw) called. Since there are multiple
+    // exit branches for this function, the easiest way to do this
+    // is via SCOPE_EXIT registration after prewrite return.
+    SCOPE_EXIT {
+      for (const auto& pp : conn_->packetProcessors) {
+        pp->postwrite();
+      }
+    };
 
     // if we're starting to write from app limited, notify observers
     if (conn_->appLimitedTracker.isAppLimited() &&

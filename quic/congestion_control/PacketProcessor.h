@@ -31,6 +31,13 @@ class PacketProcessor {
   }
 
   /**
+   * Guaranteed to be called once if prewrite was successfully
+   * called. Postwrite is called directly before the end of
+   * the write loop.
+   */
+  virtual void postwrite() {}
+
+  /**
    * Called each time a packet is sent.
    *
    * Every call to onPacketSent() will (eventually) trigger a corresponding call

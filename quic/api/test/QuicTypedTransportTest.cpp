@@ -1085,6 +1085,86 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
+/**
+ * Verify PacketProcessor postwrite methods are invoked on all
+ * attached processors.
+ */
+TYPED_TEST(QuicTypedTransportAfterStartTest, PacketProcessorPostwriteInvoked) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // First packet processor
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+  bool postWriteFlagOne = false;
+  EXPECT_CALL(*rawPacketProcessor, postwrite())
+      .Times(1)
+      .WillOnce([&postWriteFlagOne]() { postWriteFlagOne = true; });
+
+  // Second packet processor
+  auto mockPacketProcessor2 = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor2 = mockPacketProcessor2.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor2));
+
+  bool postWriteFlagTwo = false;
+  EXPECT_CALL(*rawPacketProcessor2, postwrite())
+      .Times(1)
+      .WillOnce([&postWriteFlagTwo]() { postWriteFlagTwo = true; });
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  const auto bufLength = 1000;
+  auto buf = buildRandomInputData(bufLength);
+  auto typedTestWriteChain16 =
+      this->getTransport()->writeChain(streamId, std::move(buf), false);
+  this->loopForWrites();
+  ASSERT_FALSE(this->getConn().outstandings.packets.empty());
+  EXPECT_TRUE(postWriteFlagOne);
+  EXPECT_TRUE(postWriteFlagTwo);
+  this->destroyTransport();
+}
+
+/**
+ * Verify PacketProcessor postwrite methods are invoked even
+ * on error cases resuling in early exits.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorPostwriteInvokedOnError) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // First packet processor
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+  bool postWriteFlag = false;
+  EXPECT_CALL(*rawPacketProcessor, postwrite())
+      .Times(1)
+      .WillOnce([&postWriteFlag]() { postWriteFlag = true; });
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketSent(_)).WillRepeatedly([]() {
+    throw std::runtime_error("Intentionally fail");
+  });
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  const auto bufLength = 1000;
+  auto buf = buildRandomInputData(bufLength);
+  auto typedTestWriteChain16 =
+      this->getTransport()->writeChain(streamId, std::move(buf), false);
+  // The write-loop itself will not throw, but as a result of immediately
+  // throwing, it will not produce any outstanding packets.
+  this->loopForWrites();
+  ASSERT_TRUE(this->getConn().outstandings.packets.empty());
+  // Now, ensure it also still executed the postwrite even though it threw
+  // an exception.
+  EXPECT_TRUE(postWriteFlag);
+  this->destroyTransport();
+}
+
 TYPED_TEST(
     QuicTypedTransportAfterStartTest,
     StreamAckedIntervalsDeliveryCallbacks) {
