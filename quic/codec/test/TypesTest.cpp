@@ -24,9 +24,14 @@ std::pair<uint8_t, BufPtr> encodeShortHeader(const ShortHeader& header) {
   CHECK(!builder.encodePacketHeader().hasError());
   auto packet = std::move(builder).buildPacket();
   BufPtr out;
-  Cursor cursor(&packet.header);
-  auto initialByte = cursor.readBE<uint8_t>();
-  cursor.clone(out, cursor.totalLength());
+  ContiguousReadCursor cursor(packet.header.data(), packet.header.length());
+  uint8_t initialByte = 0;
+  cursor.tryReadBE(initialByte);
+
+  size_t remainingLen = cursor.remaining();
+  out = BufHelpers::create(remainingLen);
+  cursor.tryPull(out->writableData(), remainingLen);
+  out->append(remainingLen);
   return std::make_pair(initialByte, std::move(out));
 }
 

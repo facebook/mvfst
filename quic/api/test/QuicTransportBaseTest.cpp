@@ -67,6 +67,7 @@ BufPtr encodeStreamBuffer(
   appender.push(dataBuf->coalesce());
   appender.writeBE<uint64_t>(data.offset);
   appender.writeBE<uint8_t>(data.eof);
+  buf->coalesce();
   return buf;
 }
 
@@ -79,6 +80,7 @@ BufPtr encodeCryptoBuffer(StreamBuffer data) {
   appender.writeBE<uint32_t>(dataBuf->length());
   appender.push(dataBuf->coalesce());
   appender.writeBE<uint64_t>(data.offset);
+  buf->coalesce();
   return buf;
 }
 
@@ -104,28 +106,36 @@ BufPtr encodeDatagramFrame(BufQueue data) {
   return buf;
 }
 
-std::pair<BufPtr, uint32_t> decodeDatagramFrame(Cursor& cursor) {
-  BufPtr outData;
-  auto len = cursor.readBE<uint32_t>();
-  cursor.clone(outData, len);
+std::pair<BufPtr, uint32_t> decodeDatagramFrame(ContiguousReadCursor& cursor) {
+  uint32_t len = 0;
+  cursor.tryReadBE(len);
+  BufPtr outData = BufHelpers::create(len);
+  cursor.tryPull(outData->writableData(), len);
+  outData->append(len);
   return std::make_pair(std::move(outData), len);
 }
 
-std::pair<BufPtr, uint64_t> decodeDataBuffer(Cursor& cursor) {
-  BufPtr outData;
-  auto len = cursor.readBE<uint32_t>();
-  cursor.clone(outData, len);
-  uint64_t offset = cursor.readBE<uint64_t>();
+std::pair<BufPtr, uint64_t> decodeDataBuffer(ContiguousReadCursor& cursor) {
+  uint32_t len = 0;
+  cursor.tryReadBE(len);
+  BufPtr outData = BufHelpers::create(len);
+  cursor.tryPull(outData->writableData(), len);
+  outData->append(len);
+  uint64_t offset = 0;
+  cursor.tryReadBE(offset);
   return std::make_pair(std::move(outData), offset);
 }
 
-std::pair<StreamId, StreamBuffer> decodeStreamBuffer(Cursor& cursor) {
-  auto streamId = cursor.readBE<StreamId>();
+std::pair<StreamId, StreamBuffer> decodeStreamBuffer(
+    ContiguousReadCursor& cursor) {
+  StreamId streamId = 0;
+  cursor.tryReadBE(streamId);
   auto dataBuffer = decodeDataBuffer(cursor);
-  bool eof = (bool)cursor.readBE<uint8_t>();
+  uint8_t eof = 0;
+  cursor.tryReadBE(eof);
   return std::make_pair(
       streamId,
-      StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof));
+      StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, (bool)eof));
 }
 
 struct StreamGroupIdBuf {
@@ -134,26 +144,32 @@ struct StreamGroupIdBuf {
   StreamBuffer buf;
 };
 
-StreamGroupIdBuf decodeStreamGroupBuffer(Cursor& cursor) {
-  auto streamId = cursor.readBE<StreamId>();
-  auto groupId = cursor.readBE<StreamGroupId>();
+StreamGroupIdBuf decodeStreamGroupBuffer(ContiguousReadCursor& cursor) {
+  StreamId streamId = 0;
+  cursor.tryReadBE(streamId);
+  StreamGroupId groupId = 0;
+  cursor.tryReadBE(groupId);
   auto dataBuffer = decodeDataBuffer(cursor);
-  bool eof = (bool)cursor.readBE<uint8_t>();
+  uint8_t eof = 0;
+  cursor.tryReadBE(eof);
   return StreamGroupIdBuf{
       .id = streamId,
       .groupId = groupId,
-      .buf = StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof)};
+      .buf = StreamBuffer(
+          std::move(dataBuffer.first), dataBuffer.second, (bool)eof)};
 }
 
-StreamBuffer decodeCryptoBuffer(Cursor& cursor) {
+StreamBuffer decodeCryptoBuffer(ContiguousReadCursor& cursor) {
   auto dataBuffer = decodeDataBuffer(cursor);
   return StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, false);
 }
 
-MaxStreamsFrame decodeMaxStreamsFrame(Cursor& cursor) {
-  bool isBidi = cursor.readBE<uint8_t>();
-  auto maxStreams = cursor.readBE<uint64_t>();
-  return MaxStreamsFrame(maxStreams, isBidi);
+MaxStreamsFrame decodeMaxStreamsFrame(ContiguousReadCursor& cursor) {
+  uint8_t isBidi = 0;
+  cursor.tryReadBE(isBidi);
+  uint64_t maxStreams = 0;
+  cursor.tryReadBE(maxStreams);
+  return MaxStreamsFrame(maxStreams, (bool)isBidi);
 }
 
 class TestPingCallback : public QuicSocket::PingCallback {
@@ -292,12 +308,15 @@ class TestQuicTransport
     if (udpPacket.buf.empty()) {
       return {};
     }
-    Cursor cursor(udpPacket.buf.front());
+    ContiguousReadCursor cursor(
+        udpPacket.buf.front()->data(), udpPacket.buf.front()->length());
     while (!cursor.isAtEnd()) {
       // create server chosen connId with processId = 0 and workerId = 0
       ServerConnectionIdParams params(0, 0, 0);
       conn_->serverConnectionId = *connIdAlgo_->encodeConnectionId(params);
-      auto type = static_cast<TestFrameType>(cursor.readBE<uint8_t>());
+      uint8_t typeInt = 0;
+      cursor.tryReadBE(typeInt);
+      auto type = static_cast<TestFrameType>(typeInt);
       if (type == TestFrameType::CRYPTO) {
         auto cryptoBuffer = decodeCryptoBuffer(cursor);
         auto cryptoResult = appendDataToReadBuffer(

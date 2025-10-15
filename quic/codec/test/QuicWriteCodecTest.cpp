@@ -122,9 +122,10 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
   EXPECT_CALL(pktBuilder, _insert(_, _))
       .WillRepeatedly(WithArgs<0, 1>(Invoke([&](BufPtr& buf, size_t limit) {
         pktBuilder.remaining_ -= limit;
-        std::unique_ptr<folly::IOBuf> cloneBuf;
-        Cursor cursor(buf.get());
-        cursor.clone(cloneBuf, limit);
+        BufPtr cloneBuf = BufHelpers::create(buf->length());
+        ContiguousReadCursor cursor(buf->data(), buf->length());
+        cursor.tryPull(cloneBuf->writableData(), buf->length());
+        cloneBuf->append(buf->length());
         pktBuilder.appender_.insert(std::move(cloneBuf));
       })));
 
@@ -142,14 +143,14 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
           })));
 
   EXPECT_CALL(pktBuilder, insert(_, _))
-      .WillRepeatedly(
-          WithArgs<0, 1>(Invoke([&](const BufQueue& buf, size_t limit) {
-            pktBuilder.remaining_ -= limit;
-            std::unique_ptr<folly::IOBuf> cloneBuf;
-            Cursor cursor(buf.front());
-            cursor.clone(cloneBuf, limit);
-            pktBuilder.appender_.insert(std::move(cloneBuf));
-          })));
+      .WillRepeatedly(WithArgs<0, 1>(Invoke([&](const BufQueue& buf,
+                                                size_t limit) {
+        pktBuilder.remaining_ -= limit;
+        BufPtr cloneBuf = BufHelpers::create(buf.front()->length());
+        ContiguousReadCursor cursor(buf.front()->data(), buf.front()->length());
+        cursor.tryPull(cloneBuf->writableData(), buf.front()->length());
+        pktBuilder.appender_.insert(std::move(cloneBuf));
+      })));
 
   EXPECT_CALL(pktBuilder, push(_, _))
       .WillRepeatedly(
@@ -925,7 +926,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   auto wireBuf = std::move(builtOut.second);
-  Cursor cursor(wireBuf.get());
+  ContiguousReadCursor cursor(wireBuf->data(), wireBuf->length());
   BufQueue queue;
   queue.append(wireBuf->clone());
   auto decodedFrame = quic::parseFrame(
@@ -1631,7 +1632,7 @@ TEST_P(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
   EXPECT_TRUE(ackFrameWriteResult.has_value());
   auto builtOut = std::move(pktBuilder).buildLongHeaderPacket();
   auto wireBuf = std::move(builtOut.second);
-  Cursor cursor(wireBuf.get());
+  ContiguousReadCursor cursor(wireBuf->data(), wireBuf->length());
   BufQueue queue;
   queue.append(wireBuf->clone());
   auto decodedFrameResult = quic::parseFrame(
@@ -2232,7 +2233,7 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
-    Cursor cursor(wireBuf.get());
+    ContiguousReadCursor cursor(wireBuf->data(), wireBuf->length());
     BufQueue queue;
     queue.append(wireBuf->clone());
     QuicFrame decodedFrame = parseQuicFrame(queue);
