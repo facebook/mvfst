@@ -346,6 +346,17 @@ class QuicBufferEqualTo {
  public:
   [[nodiscard]] bool operator()(const QuicBuffer* a, const QuicBuffer* b)
       const noexcept;
+
+  [[nodiscard]] bool operator()(
+      const std::unique_ptr<QuicBuffer>& a,
+      const std::unique_ptr<QuicBuffer>& b) const noexcept {
+    return operator()(a.get(), b.get());
+  }
+
+  [[nodiscard]] bool operator()(const QuicBuffer& a, const QuicBuffer& b)
+      const noexcept {
+    return operator()(&a, &b);
+  }
 };
 
 } // namespace quic
