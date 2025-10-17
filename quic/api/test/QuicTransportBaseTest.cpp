@@ -103,6 +103,7 @@ BufPtr encodeDatagramFrame(BufQueue data) {
   dataBuf->coalesce();
   appender.writeBE<uint32_t>(dataBuf->length());
   appender.push(dataBuf->coalesce());
+  buf->coalesce();
   return buf;
 }
 
