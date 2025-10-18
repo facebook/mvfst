@@ -27,6 +27,7 @@ class QuicClientTransportLite
     : virtual public QuicTransportBaseLite,
       public QuicAsyncUDPSocket::ReadCallback,
       public QuicAsyncUDPSocket::ErrMessageCallback,
+      public QuicPathManager::PathValidationCallback,
       public std::enable_shared_from_this<QuicClientTransportLite> {
  public:
   QuicClientTransportLite(
@@ -198,6 +199,14 @@ class QuicClientTransportLite
   void setSelfOwning();
 
   void onNetworkSwitch(std::unique_ptr<QuicAsyncUDPSocket> newSock) override;
+
+  quic::Expected<PathIdType, QuicError> startPathProbe(
+      std::unique_ptr<QuicAsyncUDPSocket> probeSocket,
+      QuicPathManager::PathValidationCallback* probeResultCallback = nullptr);
+
+  quic::Expected<void, QuicError> migrateConnection(PathIdType pathId);
+
+  quic::Expected<void, QuicError> removePath(PathIdType pathId);
 
   /**
    * Set callback for various transport stats (such as packet received, dropped
@@ -376,6 +385,8 @@ class QuicClientTransportLite
 
   quic::Expected<void, QuicError> maybeIssueConnectionIds();
 
+  void onPathValidationResult(const PathInfo& pathInfo) override;
+
   // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
@@ -426,5 +437,9 @@ class QuicClientTransportLite
 
   // Output buf/accessor to be used for continuous memory writes.
   std::unique_ptr<BufAccessor> bufAccessor_;
+
+  using PathValidationCallbackMap =
+      UnorderedMap<PathIdType, QuicPathManager::PathValidationCallback*>;
+  PathValidationCallbackMap pathValidationCallbacks_;
 };
 } // namespace quic

@@ -280,6 +280,22 @@ quic::Expected<void, QuicError> processServerInitialParams(
   } else {
     conn.peerAdvertisedReliableStreamResetSupport = false;
   }
+
+  auto disableActiveMigrationTpIter = findParameter(
+      serverParams.parameters,
+      static_cast<TransportParameterId>(
+          TransportParameterId::disable_migration));
+  if (disableActiveMigrationTpIter != serverParams.parameters.end()) {
+    if (!disableActiveMigrationTpIter->value->empty()) {
+      return quic::make_unexpected(QuicError(
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+          "Disable active migration parameter must be empty"));
+    }
+    conn.peerSupportsActiveConnectionMigration = false;
+  } else {
+    conn.peerSupportsActiveConnectionMigration = true;
+  }
+
   if (conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS ||
       conn.version == QuicVersion::QUIC_V1_ALIAS2 ||

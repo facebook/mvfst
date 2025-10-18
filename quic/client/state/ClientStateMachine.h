@@ -79,6 +79,10 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   uint64_t peerAdvertisedInitialMaxStreamsBidi{0};
   uint64_t peerAdvertisedInitialMaxStreamsUni{0};
 
+  // The server's advertised active connection migration support
+  // (disable_active_migration) transport parameter.
+  bool peerSupportsActiveConnectionMigration{true};
+
   struct HappyEyeballsState {
     // Delay timer
     QuicTimerCallback* connAttemptDelayTimeout{nullptr};

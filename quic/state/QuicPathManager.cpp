@@ -498,4 +498,22 @@ void QuicPathManager::maybeReapUnusedPaths(bool force) {
   }
 }
 
+quic::Expected<void, QuicError> QuicPathManager::addSocketToPath(
+    PathIdType pathId,
+    std::unique_ptr<QuicAsyncUDPSocket> socket) {
+  auto it = pathIdToInfo_.find(pathId);
+  if (it == pathIdToInfo_.end()) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::PATH_NOT_EXISTS,
+        std::string("Could not add socket for non-existent path id")));
+  }
+  if (pathId == conn_.currentPathId) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::PATH_MANAGER_ERROR,
+        std::string("Cannot add socket for current connection path")));
+  }
+
+  it->second.socket = std::move(socket);
+  return {};
+}
 } // namespace quic

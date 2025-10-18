@@ -102,6 +102,8 @@ QuicClientTransportLite::QuicClientTransportLite(
       conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
       conn_->transportSettings.advertisedExtendedAckFeatures));
 
+  conn_->pathManager->setPathValidationCallback(this);
+
   VLOG(10) << "client created " << *conn_;
 }
 
@@ -423,6 +425,17 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         TransportErrorCode::PROTOCOL_VIOLATION, "Invalid connection id"));
   }
 
+  auto readPath = conn_->pathManager->getPath(localAddress, peerAddress);
+  if (!readPath) {
+    // Drop packets that are not from known peers, i.e., current, probing, or
+    // migration paths.
+    // This should not close the connection since these packets can be from a
+    // spurious sender cloning the server's packets.
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::PEER_ADDRESS_CHANGE);
+    return {};
+  }
+
   // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
   auto addResult = addPacketToAckState(*conn_, ackState, packetNum, udpPacket);
@@ -724,15 +737,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         pktHasRetransmittableData = true;
         auto updateResult = updateSimpleFrameOnPacketReceived(
             *conn_,
-            conn_->currentPathId,
+            readPath->id,
             simpleFrame,
-            longHeader
-                ? longHeader->getDestinationConnId()
-                : shortHeader
-                      ->getConnectionId()); // TODO: fail if get packets from a
-                                            // different server address
-                                            // TODO: JBESHAY MIGRATION - ^^ This
-                                            // client logic needs fixing
+            longHeader ? longHeader->getDestinationConnId()
+                       : shortHeader->getConnectionId());
         if (!updateResult.has_value()) {
           return quic::make_unexpected(updateResult.error());
         }
@@ -1180,6 +1188,19 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
         packetLimit);
     if (!result.has_value()) {
       return quic::make_unexpected(result.error());
+    }
+
+    auto pathValidationResult = writePathValidationDataForAlternatePaths(
+        *socket_,
+        *conn_,
+        srcConnId /* src */,
+        destConnId /* dst */,
+        *conn_->oneRttWriteCipher,
+        *conn_->oneRttWriteHeaderCipher,
+        version,
+        packetLimit); // TODO: jbeshay MIGRATION - is packet limit needed here?
+    if (!pathValidationResult.has_value()) {
+      return quic::make_unexpected(pathValidationResult.error());
     }
   }
   return maybeInitiateKeyUpdate(*conn_);
@@ -1904,7 +1925,6 @@ void QuicClientTransportLite::start(
       this,
       this,
       socketOptions_);
-
   if (!socketResult.has_value()) {
     asyncClose(socketResult.error());
     return;
@@ -2062,51 +2082,150 @@ void QuicClientTransportLite::asyncClose(QuicError error) {
 
 void QuicClientTransportLite::onNetworkSwitch(
     std::unique_ptr<QuicAsyncUDPSocket> newSock) {
-  if (!conn_->oneRttWriteCipher) {
+  // Start a probe and immediately migrate to the new path.
+  auto probePathId = startPathProbe(std::move(newSock));
+  if (probePathId.hasError()) {
+    VLOG(4) << "Failed to start path probe: " << probePathId.error();
+    asyncClose(probePathId.error());
     return;
   }
-  if (socket_ && newSock) {
-    auto sock = std::move(socket_);
-    socket_ = nullptr;
-    if (auto err = sock->setErrMessageCallback(nullptr); !err.has_value()) {
-      asyncClose(err.error());
-      return;
-    }
-    sock->pauseRead();
-    if (auto err = sock->close(); !err.has_value()) {
-      asyncClose(err.error());
-      return;
-    }
 
-    socket_ = std::move(newSock);
-    if (auto err = socket_->setAdditionalCmsgsFunc(
-            [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
-        !err.has_value()) {
-      asyncClose(err.error());
-      return;
-    }
-    auto setupResult = happyEyeballsSetUpSocket(
-        *socket_,
-        conn_->localAddress,
-        conn_->peerAddress,
-        conn_->transportSettings,
-        conn_->socketTos.value,
-        this,
-        this,
-        socketOptions_);
-    if (!setupResult.has_value()) {
-      asyncClose(setupResult.error());
-      return;
-    }
-    if (conn_->qLogger) {
-      conn_->qLogger->addConnectionMigrationUpdate(true);
-    }
-
-    auto adjustResult = adjustGROBuffers();
-    if (!adjustResult.has_value()) {
-      asyncClose(adjustResult.error());
-    }
+  auto migrateResult = migrateConnection(probePathId.value());
+  if (migrateResult.hasError()) {
+    VLOG(4) << "Failed to migrate connection: " << migrateResult.error();
+    asyncClose(migrateResult.error());
+    return;
   }
+}
+
+quic::Expected<PathIdType, QuicError> QuicClientTransportLite::startPathProbe(
+    std::unique_ptr<QuicAsyncUDPSocket> probeSocket,
+    QuicPathManager::PathValidationCallback* probeResultCallback) {
+  if (!clientConn_->peerSupportsActiveConnectionMigration) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "Peer does not support active connection migration"));
+  }
+  if (!conn_->oneRttWriteCipher) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "Cannot initiate probe before handshake is complete"));
+  }
+
+  if (!socket_) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "Cannot initiate probe without a primary socket"));
+  }
+
+  if (!probeSocket) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "Cannot initiate probe without a socket"));
+  }
+
+  if (!probeSocket->isBound() || probeSocket->address().hasError()) {
+    return quic::make_unexpected(
+        QuicError(LocalErrorCode::INTERNAL_ERROR, "Probe socket not bound"));
+  }
+
+  if (probeSocket->address()->getFamily() != socket_->address()->getFamily()) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "Probe socket address family mismatch"));
+  }
+
+  if (auto res = probeSocket->setErrMessageCallback(nullptr); res.hasError()) {
+    return quic::make_unexpected(res.error());
+  }
+
+  // Set up the socket and start reading from it
+  auto setupResult = happyEyeballsSetUpSocket(
+      *probeSocket,
+      std::nullopt, // Empty local address. The socket
+                    // is already bound.
+      conn_->peerAddress,
+      conn_->transportSettings,
+      conn_->socketTos.value,
+      this,
+      this,
+      socketOptions_);
+  if (!setupResult.has_value()) {
+    return quic::make_unexpected(setupResult.error());
+  }
+
+  if (auto res = probeSocket->setAdditionalCmsgsFunc(
+          [&]() { return getAdditionalCmsgsForAsyncUDPSocket(); });
+      res.hasError()) {
+    return quic::make_unexpected(res.error());
+  }
+
+  auto localAddress = probeSocket->address().value();
+  // Add the path
+  auto pathIdRes = conn_->pathManager->addPath(
+      localAddress, conn_->peerAddress, std::move(probeSocket));
+  if (pathIdRes.hasError()) {
+    return quic::make_unexpected(pathIdRes.error());
+  }
+  auto pathId = pathIdRes.value();
+
+  // Set the callback
+  if (probeResultCallback) {
+    pathValidationCallbacks_[pathId] = probeResultCallback;
+  }
+
+  // Schedule a path challenge for the new path
+  auto pathChallengeDataResult =
+      conn_->pathManager->getNewPathChallengeData(pathId);
+  if (pathChallengeDataResult.hasError()) {
+    return quic::make_unexpected(pathChallengeDataResult.error());
+  }
+  conn_->pendingEvents.pathChallenges.emplace(
+      pathId, PathChallengeFrame(pathChallengeDataResult.value()));
+
+  // Schedule a write.
+  updateWriteLooper(true);
+
+  return pathId;
+}
+
+quic::Expected<void, QuicError> QuicClientTransportLite::removePath(
+    PathIdType pathId) {
+  return conn_->pathManager->removePath(pathId);
+}
+
+quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
+    PathIdType pathId) {
+  auto oldPathId = conn_->currentPathId;
+
+  auto switchPathResult = conn_->pathManager->switchCurrentPath(pathId);
+  if (switchPathResult.hasError()) {
+    return quic::make_unexpected(switchPathResult.error());
+  }
+
+  auto newSocket = std::move(switchPathResult.value());
+  if (newSocket) {
+    // The new path has an associated socket.
+
+    // Cache the socket for the old path in case we need to switch to it later.
+    // The oldPathId is no longer the current path. So this cannot fail.
+    auto addSocketResult =
+        conn_->pathManager->addSocketToPath(oldPathId, std::move(socket_));
+    CHECK(!addSocketResult.hasError()) << addSocketResult.error();
+
+    socket_ = std::move(newSocket);
+  }
+
+  auto adjustResult = adjustGROBuffers();
+  if (adjustResult.hasError()) {
+    return quic::make_unexpected(adjustResult.error());
+  }
+
+  if (conn_->qLogger) {
+    conn_->qLogger->addConnectionMigrationUpdate(true);
+  }
+
+  return {};
 }
 
 void QuicClientTransportLite::setTransportStatsCallback(
@@ -2295,6 +2414,17 @@ Optional<Handshake::TLSSummary> QuicClientTransportLite::getTLSSummary() const {
     return clientHandshakeLayer->getTLSSummary();
   }
   return std::nullopt;
+}
+
+void QuicClientTransportLite::onPathValidationResult(const PathInfo& pathInfo) {
+  std::string statusStr =
+      (pathInfo.status == PathStatus::Validated) ? "VALID" : "NOT VALID";
+  VLOG(4) << "onPathValidationResult: pathId=" << pathInfo.id
+          << ", status=" << statusStr;
+  if (auto it = pathValidationCallbacks_.find(pathInfo.id);
+      it != pathValidationCallbacks_.end() && it->second) {
+    it->second->onPathValidationResult(pathInfo);
+  }
 }
 
 } // namespace quic

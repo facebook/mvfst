@@ -43,6 +43,7 @@ constexpr auto kCipherUnavailable = "cipher unavailable";
 constexpr auto kParse = "parse";
 constexpr auto kNonRegular = "non regular";
 constexpr auto kAlreadyClosed = "already closed";
+constexpr auto kPeerAddressChanged = "peer address changed";
 constexpr auto kUdpTruncated = "udp truncated";
 constexpr auto kNoData = "no data";
 constexpr auto kUnexpectedProtectionLevel = "unexpected protection level";

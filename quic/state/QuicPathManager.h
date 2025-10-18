@@ -247,6 +247,14 @@ class QuicPathManager {
    */
   void dropAllSockets();
 
+  /*
+   * Update an existing path with a socket. This is useful for tracking an old
+   * path after migration in case it needs to be restored later.
+   */
+  [[nodiscard]] quic::Expected<void, QuicError> addSocketToPath(
+      PathIdType pathId,
+      std::unique_ptr<QuicAsyncUDPSocket> socket);
+
   [[nodiscard]] quic::Expected<std::unique_ptr<QuicAsyncUDPSocket>, QuicError>
   switchCurrentPath(PathIdType switchToPathId);
 

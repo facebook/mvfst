@@ -1122,112 +1122,59 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
-  client->getNonConstConn().oneRttWriteCipher = test::createNoOpAead();
+  auto& conn = client->getNonConstConn();
+  conn.oneRttWriteCipher = test::createNoOpAead();
+  conn.oneRttWriteHeaderCipher = test::createNoOpHeaderCipherNoThrow();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 
   folly::SocketAddress v4Address("0.0.0.0", 0);
   client->addNewPeerAddress(v4Address);
+  auto validatedPathId =
+      conn.pathManager->addValidatedPath(client->getLocalAddress(), v4Address);
+  ASSERT_FALSE(validatedPathId.hasError());
+  conn.currentPathId = validatedPathId.value();
 
-  auto newSocket =
-      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
-  ON_CALL(*newSocket, setReuseAddr(_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setAdditionalCmsgsFunc(_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setDFAndTurnOffPMTU())
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setErrMessageCallback(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setTosOrTrafficClass(_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, init(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, applyOptions(testing::_, testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, bind(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, connect(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, close())
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, resumeWrite(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setGRO(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setRecvTos(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, getRecvTos()).WillByDefault(testing::Return(false));
-  ON_CALL(*newSocket, setCmsgs(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, appendCmsgs(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, getTimestamping()).WillByDefault(testing::Return(0));
-  ON_CALL(*newSocket, setReusePort(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setRcvBuf(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setSndBuf(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setFD(testing::_, testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-
+  auto newSocket = getMockSocketWithExpectations(qEvb_);
   auto newSocketPtr = newSocket.get();
-  EXPECT_CALL(*sock, pauseRead());
-  EXPECT_CALL(*sock, close());
-  EXPECT_CALL(*newSocketPtr, bind(_));
+
+  // EXPECT_CALL(*sock, pauseRead());
+  // EXPECT_CALL(*sock, close());
+  // EXPECT_CALL(*newSocketPtr, bind(_));
   EXPECT_CALL(*newSocketPtr, close());
+  EXPECT_CALL(*newSocketPtr, isBound()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*newSocketPtr, address())
+      .WillRepeatedly(Return(folly::SocketAddress("1.2.3.4", 1234)));
 
   client->setQLogger(mockQLogger);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true));
+
   client->onNetworkSwitch(std::move(newSocket));
+  ASSERT_NE(conn.currentPathId, validatedPathId.value());
+
+  // The client doesn't have a fallback when migrating to unvalidated path.
+  ASSERT_FALSE(conn.fallbackPathId.has_value());
+
+  // New path is created. It's not yet valid but has a path challenge pending
+  auto newPathRes = conn.pathManager->getPath(
+      newSocketPtr->address().value(), conn.peerAddress);
+  ASSERT_TRUE(newPathRes);
+  EXPECT_EQ(newPathRes->status, PathStatus::NotValid);
+  ASSERT_NO_THROW(conn.pendingEvents.pathChallenges.at(conn.currentPathId));
+
+  loopForWrites();
+
+  // The path challenge was written and the path is now validating
+  EXPECT_THROW(
+      conn.pendingEvents.pathChallenges.at(conn.currentPathId),
+      std::out_of_range);
+  EXPECT_EQ(newPathRes->status, PathStatus::Validating);
 
   client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
-  auto newSocket =
-      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb_);
-  ON_CALL(*newSocket, setReuseAddr(_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setAdditionalCmsgsFunc(_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setDFAndTurnOffPMTU())
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setErrMessageCallback(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setTosOrTrafficClass(_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, init(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, applyOptions(testing::_, testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, bind(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, connect(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, close())
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, resumeWrite(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setGRO(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setRecvTos(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, getRecvTos()).WillByDefault(testing::Return(false));
-  ON_CALL(*newSocket, setCmsgs(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, appendCmsgs(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, getTimestamping()).WillByDefault(testing::Return(0));
-  ON_CALL(*newSocket, setReusePort(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setRcvBuf(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setSndBuf(testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
-  ON_CALL(*newSocket, setFD(testing::_, testing::_))
-      .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
+  auto newSocket = getMockSocketWithExpectations(qEvb_);
   auto newSocketPtr = newSocket.get();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
@@ -3678,6 +3625,38 @@ TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 0);
   EXPECT_EQ(event->dropReason, kAlreadyClosed);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, DropPacketFromUnknownPeerAddress) {
+  // Expect the packet to be dropped with PEER_ADDRESS_CHANGE reason
+  expectQuicStatsPacketDrop(PacketDropReason::PEER_ADDRESS_CHANGE);
+
+  // Create a valid stream packet
+  StreamId streamId = client->createBidirectionalStream().value();
+  auto expected = IOBuf::copyBuffer("hello");
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *expected,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  // Deliver the packet from an unknown peer address (different from serverAddr)
+  folly::SocketAddress unknownPeer("::1", 54321);
+  deliverDataWithoutErrorCheck(unknownPeer, packet->coalesce(), false);
+
+  // No data was delivered
+  auto readData = client->read(streamId, 0);
+  ASSERT_TRUE(readData.has_value());
+  EXPECT_EQ(readData.value().first, nullptr);
+
+  // Verify that the connection is still open and not closed
+  EXPECT_FALSE(client->isClosed());
+  EXPECT_FALSE(client->getConn().localConnectionError.has_value());
+
+  client->closeNow(std::nullopt);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvalidStream) {
