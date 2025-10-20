@@ -53,7 +53,6 @@ mvfst_cpp_library(
     deps = [
         "//folly/lang:bits",
         "//quic:constants",
-        "//quic:exception",
     ],
     external_deps = [
         "glog",
