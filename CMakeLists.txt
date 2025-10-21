@@ -41,10 +41,9 @@ fb_activate_static_library_option()
 set(QUIC_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Dependencies
-find_package(Boost 1.62
+find_package(Boost 1.69
   REQUIRED COMPONENTS
   iostreams
-  system
   thread
   filesystem
   regex
