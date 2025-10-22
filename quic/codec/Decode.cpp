@@ -1427,7 +1427,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
         LongHeader(
             type,
             std::move(parsedLongHeaderInvariant.invariant),
-            token ? token->to<std::string>() : std::string()),
+            token ? token->toString() : std::string()),
         PacketLength(0, 0));
   }
 
@@ -1481,7 +1481,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
       LongHeader(
           type,
           std::move(parsedLongHeaderInvariant.invariant),
-          token ? token->to<std::string>() : std::string()),
+          token ? token->toString() : std::string()),
       PacketLength(pktLen->first, pktLen->second));
 }
 
