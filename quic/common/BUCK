@@ -230,9 +230,9 @@ mvfst_cpp_library(
         "//folly:likely",
     ],
     exported_deps = [
-        "//folly:range",
         "//folly:utility",
         "//folly/lang:bits",
+        "//quic:constants",
     ],
 )
 

@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Range.h>
 #include <folly/Utility.h>
 #include <folly/lang/Bits.h>
+#include <quic/QuicConstants.h>
 #include <memory>
 
 namespace quic {
@@ -67,8 +67,8 @@ class ContiguousReadCursor {
     return true;
   }
 
-  folly::ByteRange peekBytes() const noexcept {
-    return folly::ByteRange(data_, end_);
+  ByteRange peekBytes() const noexcept {
+    return ByteRange(data_, end_);
   }
 
   // lambda that returns bool if should rollback to where data_ was before
