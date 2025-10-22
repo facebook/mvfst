@@ -34,9 +34,9 @@ class FizzAead final : public Aead {
    * Forward calls to fizz::Aead, catching any exceptions and converting them to
    * quic::Expected.
    */
-  quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError> inplaceEncrypt(
-      std::unique_ptr<folly::IOBuf>&& plaintext,
-      const folly::IOBuf* associatedData,
+  quic::Expected<BufPtr, QuicError> inplaceEncrypt(
+      BufPtr&& plaintext,
+      const Buf* associatedData,
       uint64_t seqNum) const override {
     try {
       return fizzAead->inplaceEncrypt(
@@ -47,9 +47,9 @@ class FizzAead final : public Aead {
     }
   }
 
-  std::unique_ptr<folly::IOBuf> decrypt(
-      std::unique_ptr<folly::IOBuf>&& ciphertext,
-      const folly::IOBuf* associatedData,
+  BufPtr decrypt(
+      BufPtr&& ciphertext,
+      const Buf* associatedData,
       uint64_t seqNum) const override {
     fizz::Aead::AeadOptions options;
     options.bufferOpt = fizz::Aead::BufferOption::AllowInPlace;
@@ -57,18 +57,18 @@ class FizzAead final : public Aead {
         std::move(ciphertext), associatedData, seqNum, options);
   }
 
-  Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
-      std::unique_ptr<folly::IOBuf>&& ciphertext,
-      const folly::IOBuf* associatedData,
+  Optional<BufPtr> tryDecrypt(
+      BufPtr&& ciphertext,
+      const Buf* associatedData,
       uint64_t seqNum) const override {
     fizz::Aead::AeadOptions options;
     options.bufferOpt = fizz::Aead::BufferOption::AllowInPlace;
     auto result = fizzAead->tryDecrypt(
         std::move(ciphertext), associatedData, seqNum, options);
     if (result.has_value()) {
-      return Optional<std::unique_ptr<folly::IOBuf>>(std::move(result.value()));
+      return Optional<BufPtr>(std::move(result.value()));
     } else {
-      return Optional<std::unique_ptr<folly::IOBuf>>();
+      return Optional<BufPtr>();
     }
   }
 

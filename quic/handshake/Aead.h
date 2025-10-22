@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <folly/io/IOBuf.h>
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
@@ -15,8 +15,8 @@
 namespace quic {
 
 struct TrafficKey {
-  std::unique_ptr<folly::IOBuf> key;
-  std::unique_ptr<folly::IOBuf> iv;
+  BufPtr key;
+  BufPtr iv;
 };
 
 /**
@@ -32,19 +32,18 @@ class Aead {
    * Encrypts plaintext inplace. Returns quic::Expected with the encrypted
    * buffer or an error.
    */
-  [[nodiscard]] virtual quic::Expected<std::unique_ptr<folly::IOBuf>, QuicError>
-  inplaceEncrypt(
-      std::unique_ptr<folly::IOBuf>&& plaintext,
-      const folly::IOBuf* associatedData,
+  [[nodiscard]] virtual quic::Expected<BufPtr, QuicError> inplaceEncrypt(
+      BufPtr&& plaintext,
+      const Buf* associatedData,
       uint64_t seqNum) const = 0;
 
   /**
    * Decrypt ciphertext. Will throw if the ciphertext does not decrypt
    * successfully.
    */
-  virtual std::unique_ptr<folly::IOBuf> decrypt(
-      std::unique_ptr<folly::IOBuf>&& ciphertext,
-      const folly::IOBuf* associatedData,
+  virtual BufPtr decrypt(
+      BufPtr&& ciphertext,
+      const Buf* associatedData,
       uint64_t seqNum) const {
     auto plaintext = tryDecrypt(std::move(ciphertext), associatedData, seqNum);
     if (!plaintext) {
@@ -57,9 +56,9 @@ class Aead {
    * Decrypt ciphertext. Will return std::nullopt if the ciphertext does not
    * decrypt successfully. May still throw from errors unrelated to ciphertext.
    */
-  virtual Optional<std::unique_ptr<folly::IOBuf>> tryDecrypt(
-      std::unique_ptr<folly::IOBuf>&& ciphertext,
-      const folly::IOBuf* associatedData,
+  virtual Optional<BufPtr> tryDecrypt(
+      BufPtr&& ciphertext,
+      const Buf* associatedData,
       uint64_t seqNum) const = 0;
 
   /**

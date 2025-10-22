@@ -8,7 +8,7 @@ mvfst_cpp_library(
         "Aead.h",
     ],
     exported_deps = [
-        "//folly/io:iobuf",
+        "//quic:constants",
         "//quic:exception",
         "//quic/common:expected",
         "//quic/common:optional",
