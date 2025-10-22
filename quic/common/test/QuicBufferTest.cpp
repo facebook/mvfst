@@ -892,4 +892,106 @@ TEST(QuicBufferTest, RangeToString) {
   EXPECT_EQ(binaryRange.toString().size(), 11); // Should include the null byte
 }
 
+TEST(QuicBufferTest, TestToStringSingleBuffer) {
+  // Create a single buffer with headroom and tailroom
+  const std::string kData = "hello";
+  auto buf = QuicBuffer::copyBuffer(kData, 3 /* headroom */, 4 /* tailroom */);
+
+  // Capture state before toString()
+  auto* dataPtrBefore = buf->data();
+  auto headroomBefore = buf->headroom();
+  auto tailroomBefore = buf->tailroom();
+  auto lengthBefore = buf->length();
+
+  // Convert to string
+  auto out = buf->toString();
+  EXPECT_EQ(out, kData);
+
+  // Verify buffer is unchanged
+  EXPECT_EQ(buf->data(), dataPtrBefore);
+  EXPECT_EQ(buf->headroom(), headroomBefore);
+  EXPECT_EQ(buf->tailroom(), tailroomBefore);
+  EXPECT_EQ(buf->length(), lengthBefore);
+  EXPECT_FALSE(buf->isChained());
+}
+
+TEST(QuicBufferTest, TestToStringChain) {
+  // Create a chain: "hello" + " world" + "!!!" => "hello world!!!"
+  auto b1 = QuicBuffer::copyBuffer(std::string("hello"), 5 /* headroom */, 0);
+  auto b2 = QuicBuffer::copyBuffer(std::string(" world"), 0, 0);
+  auto b3 = QuicBuffer::copyBuffer(std::string("!!!"), 0, 15 /* tailroom */);
+
+  auto headroomFirstBefore = b1->headroom();
+  auto tailroomLastBefore = b3->tailroom();
+
+  b1->appendToChain(std::move(b2));
+  b1->appendToChain(std::move(b3));
+
+  // Sanity checks
+  EXPECT_TRUE(b1->isChained());
+  EXPECT_EQ(b1->computeChainDataLength(), 14);
+
+  // Capture ring pointers after chain is formed
+  auto* b1NextBefore = b1->next();
+  auto* b1PrevBefore = b1->prev();
+
+  // Convert to string
+  auto out = b1->toString();
+  EXPECT_EQ(out, std::string("hello world!!!"));
+
+  // Verify chain structure and buffer metadata unchanged
+  EXPECT_TRUE(b1->isChained());
+  EXPECT_EQ(b1->headroom(), headroomFirstBefore);
+  EXPECT_EQ(b1->prev()->tailroom(), tailroomLastBefore);
+  EXPECT_EQ(b1->computeChainDataLength(), 14);
+
+  // Verify next/prev still form a ring and head unchanged
+  EXPECT_EQ(b1->next(), b1NextBefore);
+  EXPECT_EQ(b1->prev(), b1PrevBefore);
+}
+
+TEST(QuicBufferTest, TestToStringWithEmptyBuffers) {
+  // Chain with empty buffers interleaved
+  auto b1 = QuicBuffer::copyBuffer(std::string("hello"), 3 /* headroom */, 0);
+  auto bEmpty1 = QuicBuffer::create(50); // empty
+  auto b2 = QuicBuffer::copyBuffer(std::string(" world"), 0, 0);
+  auto bEmpty2 = QuicBuffer::create(50); // empty
+  auto b3 = QuicBuffer::copyBuffer(std::string("!"), 0, 12 /* tailroom */);
+
+  b1->appendToChain(std::move(bEmpty1));
+  b1->appendToChain(std::move(b2));
+  b1->appendToChain(std::move(bEmpty2));
+  b1->appendToChain(std::move(b3));
+
+  auto totalBefore = b1->computeChainDataLength();
+  EXPECT_EQ(totalBefore, 12); // "hello world!" => 12 chars
+
+  auto out = b1->toString();
+  EXPECT_EQ(out, std::string("hello world!"));
+
+  // Verify unchanged
+  EXPECT_EQ(b1->computeChainDataLength(), totalBefore);
+  EXPECT_TRUE(b1->isChained());
+}
+
+TEST(QuicBufferTest, TestToStringAllEmpty) {
+  auto b1 = QuicBuffer::create(10);
+  auto b2 = QuicBuffer::create(10);
+  auto b3 = QuicBuffer::create(10);
+
+  b1->appendToChain(std::move(b2));
+  b1->appendToChain(std::move(b3));
+
+  EXPECT_TRUE(b1->empty());
+  EXPECT_EQ(b1->computeChainDataLength(), 0);
+
+  auto out = b1->toString();
+  EXPECT_TRUE(out.empty());
+
+  // Chain still intact and empty
+  EXPECT_TRUE(b1->empty());
+  EXPECT_TRUE(b1->isChained());
+  EXPECT_EQ(b1->computeChainDataLength(), 0);
+}
+
 } // namespace quic

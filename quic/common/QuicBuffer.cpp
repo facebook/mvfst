@@ -480,4 +480,22 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
   return true;
 }
 
+std::string QuicBuffer::toString() const {
+  const std::size_t totalLength = computeChainDataLength();
+  std::string out;
+  out.resize(totalLength);
+
+  std::size_t offset = 0;
+  const QuicBuffer* current = this;
+  do {
+    if (current->length() > 0) {
+      std::memcpy(out.data() + offset, current->data(), current->length());
+      offset += current->length();
+    }
+    current = current->next();
+  } while (current != this);
+
+  return out;
+}
+
 } // namespace quic

@@ -217,6 +217,11 @@ class QuicBuffer {
 
   FillIovResult fillIov(struct iovec* iov, size_t len) const;
 
+  /**
+   * Non-destructively convert this QuicBuffer chain into a std::string.
+   */
+  std::string toString() const;
+
   void clear() noexcept;
 
   class Iterator {
