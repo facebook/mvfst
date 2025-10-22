@@ -859,4 +859,37 @@ TEST(QuicBufferTest, TestFromStringEmpty) {
   EXPECT_TRUE(buf->empty());
 }
 
+TEST(QuicBufferTest, RangeToString) {
+  // Test basic ByteRange to string conversion
+  const uint8_t data[] = "Hello, World!";
+  ByteRange range(data, 13);
+  EXPECT_EQ(range.toString(), "Hello, World!");
+
+  // Test empty range
+  ByteRange emptyRange(nullptr, nullptr);
+  EXPECT_EQ(emptyRange.toString(), "");
+
+  // Test range with subset of data
+  ByteRange subRange(data, 5);
+  EXPECT_EQ(subRange.toString(), "Hello");
+
+  // Test range constructed with begin/end pointers
+  ByteRange pointerRange(data, data + 7);
+  EXPECT_EQ(pointerRange.toString(), "Hello, ");
+
+  // Test StringPiece (Range<const char*>) to string
+  const char* strData = "StringPiece test";
+  StringPiece strPiece(strData, 11);
+  EXPECT_EQ(strPiece.toString(), "StringPiece");
+
+  // Test with binary data (including null bytes)
+  const uint8_t binaryData[] = {
+      0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x00, 0x57, 0x6F, 0x72, 0x6C, 0x64};
+  ByteRange binaryRange(binaryData, 11);
+  std::string expectedBinary =
+      std::string(reinterpret_cast<const char*>(binaryData), 11);
+  EXPECT_EQ(binaryRange.toString(), expectedBinary);
+  EXPECT_EQ(binaryRange.toString().size(), 11); // Should include the null byte
+}
+
 } // namespace quic

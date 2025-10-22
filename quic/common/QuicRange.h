@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <string>
+
 namespace quic {
 template <class Iter>
 struct Range {
@@ -52,6 +54,12 @@ struct Range {
   reference operator[](size_t index) const {
     // Return the value at the specified index
     return *(begin_ + index);
+  }
+
+  std::string toString() const {
+    return std::string(
+        reinterpret_cast<const char*>(begin_),
+        reinterpret_cast<const char*>(end_));
   }
 };
 
