@@ -106,49 +106,57 @@ PacingRate PacingRate::Builder::build() && {
   return PacingRate(interval_, burstSize_);
 }
 
-Expected<bool, QuicError>
-QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
-  const auto end = peerConnectionIds.end();
-  auto replacementConnIdDataIt{end};
-  auto currentConnIdDataIt{end};
-
-  auto& mainPeerId = nodeType == QuicNodeType::Client ? serverConnectionId
-                                                      : clientConnectionId;
-
-  if (!mainPeerId) {
+Expected<ConnectionId, QuicError>
+QuicConnectionStateBase::getNextAvailablePeerConnectionId() {
+  auto& currentPeerCid = nodeType == QuicNodeType::Client ? serverConnectionId
+                                                          : clientConnectionId;
+  if (!currentPeerCid.has_value()) {
     return quic::make_unexpected(QuicError(
-        TransportErrorCode::INTERNAL_ERROR,
-        "Attempting to retire null peer conn id"));
+        LocalErrorCode::INTERNAL_ERROR,
+        std::string("Current peer connection id not set")));
   }
 
-  if (mainPeerId->size() == 0) {
-    // No need to rotate CIDs if peer's CID is 0 length.
-    return true;
+  if (currentPeerCid->size() == 0) {
+    // If it's a zero length id, re-use it.
+    return currentPeerCid.value();
   }
 
-  // Retrieve the sequence number of the current cId, and find an unused
-  // ConnectionIdData.
-  for (auto it = peerConnectionIds.begin(); it != end; it++) {
-    if (replacementConnIdDataIt != end && currentConnIdDataIt != end) {
-      break;
-    }
-
-    if (it->connId == mainPeerId) {
-      currentConnIdDataIt = it;
-    } else if (replacementConnIdDataIt == end) {
-      replacementConnIdDataIt = it;
+  for (auto& cidData : peerConnectionIds) {
+    if (!cidData.inUse) {
+      CHECK(cidData.connId != currentPeerCid)
+          << "Current CID not marked in use";
+      cidData.inUse = true;
+      return cidData.connId;
     }
   }
-  if (replacementConnIdDataIt == end) {
-    return false;
-  }
-  DCHECK(currentConnIdDataIt != end);
-  pendingEvents.frames.emplace_back(
-      RetireConnectionIdFrame(currentConnIdDataIt->sequenceNumber));
-  mainPeerId = replacementConnIdDataIt->connId;
 
-  peerConnectionIds.erase(currentConnIdDataIt);
-  return true;
+  return quic::make_unexpected(QuicError(
+      LocalErrorCode::INTERNAL_ERROR,
+      std::string("No available peer connection ids")));
+}
+
+void QuicConnectionStateBase::retirePeerConnectionId(ConnectionId peerCid) {
+  if (peerCid.size() == 0) {
+    // Nothing to retire
+    return;
+  }
+
+  auto cidData = std::find_if(
+      peerConnectionIds.begin(),
+      peerConnectionIds.end(),
+      [&](const auto& data) { return data.connId == peerCid; });
+
+  if (cidData == peerConnectionIds.end()) {
+    // Nothing to retire
+    return;
+  }
+
+  pendingEvents.frames.push_back(
+      RetireConnectionIdFrame(cidData->sequenceNumber));
+
+  peerConnectionIds.erase(cidData);
+
+  return;
 }
 
 } // namespace quic

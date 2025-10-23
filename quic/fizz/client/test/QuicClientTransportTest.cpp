@@ -1128,6 +1128,16 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 
+  auto originalCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid = ConnectionIdData(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  conn.serverConnectionId = originalCid.connId;
+  originalCid.inUse = true;
+
+  conn.peerConnectionIds.push_back(originalCid);
+  conn.peerConnectionIds.push_back(secondCid);
+
   folly::SocketAddress v4Address("0.0.0.0", 0);
   client->addNewPeerAddress(v4Address);
   auto validatedPathId =
@@ -1138,9 +1148,6 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto newSocket = getMockSocketWithExpectations(qEvb_);
   auto newSocketPtr = newSocket.get();
 
-  // EXPECT_CALL(*sock, pauseRead());
-  // EXPECT_CALL(*sock, close());
-  // EXPECT_CALL(*newSocketPtr, bind(_));
   EXPECT_CALL(*newSocketPtr, close());
   EXPECT_CALL(*newSocketPtr, isBound()).WillRepeatedly(Return(true));
   EXPECT_CALL(*newSocketPtr, address())
@@ -1148,6 +1155,8 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
 
   client->setQLogger(mockQLogger);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true));
+
+  ASSERT_TRUE(conn.peerSupportsActiveConnectionMigration);
 
   client->onNetworkSwitch(std::move(newSocket));
   ASSERT_NE(conn.currentPathId, validatedPathId.value());
@@ -1337,73 +1346,6 @@ TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
   client->setQLogger(nullptr);
   CHECK(client->getQLogger() == nullptr);
 
-  client->closeNow(std::nullopt);
-}
-
-TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
-  auto originalCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 2);
-  auto& conn = client->getNonConstConn();
-  conn.serverConnectionId = originalCid.connId;
-
-  conn.peerConnectionIds.push_back(originalCid);
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), false);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-  client->closeNow(std::nullopt);
-}
-
-TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
-  auto originalCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
-  auto secondCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
-
-  auto& conn = client->getNonConstConn();
-  conn.serverConnectionId = originalCid.connId;
-
-  conn.peerConnectionIds.push_back(originalCid);
-  conn.peerConnectionIds.push_back(secondCid);
-
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
-  EXPECT_EQ(retireFrame->sequenceNumber, 1);
-
-  auto replacedCid = conn.serverConnectionId;
-  EXPECT_NE(originalCid.connId, *replacedCid);
-  EXPECT_EQ(secondCid.connId, *replacedCid);
-  client->closeNow(std::nullopt);
-}
-
-TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
-  auto originalCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{1, 2, 3, 4}), 1);
-  auto secondCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
-  auto thirdCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{3, 3, 3, 3}), 3);
-
-  auto& conn = client->getNonConstConn();
-  conn.serverConnectionId = originalCid.connId;
-
-  conn.peerConnectionIds.push_back(originalCid);
-  conn.peerConnectionIds.push_back(secondCid);
-  conn.peerConnectionIds.push_back(thirdCid);
-
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
-
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
-  EXPECT_EQ(retireFrame->sequenceNumber, 1);
-
-  // Uses the first unused connection id.
-  auto replacedCid = conn.serverConnectionId;
-  EXPECT_NE(originalCid.connId, *replacedCid);
-  EXPECT_EQ(secondCid.connId, *replacedCid);
   client->closeNow(std::nullopt);
 }
 
@@ -2806,7 +2748,9 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdUsing0LenCid) {
     deliverData(data->coalesce(), false);
     FAIL();
   } catch (const std::runtime_error& e) {
-    EXPECT_EQ(std::string(e.what()), "Protocol violation");
+    EXPECT_EQ(
+        std::string(e.what()),
+        "TransportError: Protocol violation, Endpoint is already using 0-len connection ids.");
   }
   EXPECT_EQ(conn.peerConnectionIds.size(), 1);
 }

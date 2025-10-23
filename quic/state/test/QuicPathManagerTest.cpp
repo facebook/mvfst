@@ -689,4 +689,350 @@ TEST_F(QuicPathManagerTest, WritableBytesMaxLimit) {
   EXPECT_LE(path->writableBytes, maxLimit);
 }
 
+// Connection ID Management Tests
+
+TEST_F(QuicPathManagerTest, AssignDestinationCidForPath_Success) {
+  // Setup: Initialize current peer connection ID (required for
+  // getNextAvailablePeerConnectionId)
+  connState_->serverConnectionId =
+      ConnectionId::createAndMaybeCrash({0, 0, 0, 0});
+
+  // Add peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 2);
+
+  // Create a new path
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType pathId = result.value();
+
+  // Verify path doesn't have a destination CID initially
+  auto path = manager_->getPath(pathId);
+  ASSERT_NE(path, nullptr);
+  EXPECT_FALSE(path->destinationConnectionId.has_value());
+
+  // Assign a destination CID to the path
+  auto assignResult = manager_->assignDestinationCidForPath(pathId);
+  EXPECT_FALSE(assignResult.hasError());
+
+  // Verify the path now has a destination CID
+  path = manager_->getPath(pathId);
+  ASSERT_TRUE(path->destinationConnectionId.has_value());
+
+  // Verify the assigned CID is one of the peer CIDs and is marked as in use
+  auto assignedCid = path->destinationConnectionId.value();
+  auto cidIt = std::find_if(
+      connState_->peerConnectionIds.begin(),
+      connState_->peerConnectionIds.end(),
+      [&assignedCid](const auto& cidData) {
+        return cidData.connId == assignedCid;
+      });
+  ASSERT_NE(cidIt, connState_->peerConnectionIds.end());
+  EXPECT_TRUE(cidIt->inUse);
+}
+
+TEST_F(QuicPathManagerTest, AssignDestinationCidForPath_CurrentPathError) {
+  // Setup: Initialize current peer connection ID
+  connState_->serverConnectionId =
+      ConnectionId::createAndMaybeCrash({0, 0, 0, 0});
+
+  // Add peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  // Try to assign CID to current path - should fail
+  auto assignResult =
+      manager_->assignDestinationCidForPath(connState_->currentPathId);
+  EXPECT_TRUE(assignResult.hasError());
+  EXPECT_EQ(assignResult.error().code, LocalErrorCode::PATH_MANAGER_ERROR);
+}
+
+TEST_F(QuicPathManagerTest, AssignDestinationCidForPath_NonExistentPath) {
+  // Setup: Initialize current peer connection ID
+  connState_->serverConnectionId =
+      ConnectionId::createAndMaybeCrash({0, 0, 0, 0});
+
+  // Add peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  // Try to assign CID to non-existent path
+  PathIdType nonExistentPathId = 99999;
+  auto assignResult = manager_->assignDestinationCidForPath(nonExistentPathId);
+  EXPECT_TRUE(assignResult.hasError());
+  EXPECT_EQ(assignResult.error().code, LocalErrorCode::PATH_NOT_EXISTS);
+}
+
+TEST_F(QuicPathManagerTest, AssignDestinationCidForPath_NoAvailableCids) {
+  // Setup: Initialize current peer connection ID
+  connState_->serverConnectionId =
+      ConnectionId::createAndMaybeCrash({0, 0, 0, 0});
+
+  // Add peer connection IDs but mark all as in use
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+  connState_->peerConnectionIds[0].inUse = true;
+
+  // Create a new path
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType pathId = result.value();
+
+  // Try to assign CID when none are available - should fail
+  auto assignResult = manager_->assignDestinationCidForPath(pathId);
+  EXPECT_TRUE(assignResult.hasError());
+  EXPECT_EQ(assignResult.error().code, LocalErrorCode::INTERNAL_ERROR);
+}
+
+TEST_F(QuicPathManagerTest, SetDestinationCidForPath_Success) {
+  // Create a new path
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType pathId = result.value();
+
+  // Set a specific destination CID for the path
+  auto customCid = ConnectionId::createAndMaybeCrash({9, 9, 9, 9});
+  auto setResult = manager_->setDestinationCidForPath(pathId, customCid);
+  EXPECT_FALSE(setResult.hasError());
+
+  // Verify the path has the specified CID
+  auto path = manager_->getPath(pathId);
+  ASSERT_NE(path, nullptr);
+  ASSERT_TRUE(path->destinationConnectionId.has_value());
+  EXPECT_EQ(path->destinationConnectionId.value(), customCid);
+}
+
+TEST_F(QuicPathManagerTest, SetDestinationCidForPath_NonExistentPath) {
+  // Try to set CID for non-existent path
+  PathIdType nonExistentPathId = 99999;
+  auto customCid = ConnectionId::createAndMaybeCrash({9, 9, 9, 9});
+  auto setResult =
+      manager_->setDestinationCidForPath(nonExistentPathId, customCid);
+  EXPECT_TRUE(setResult.hasError());
+  EXPECT_EQ(setResult.error().code, LocalErrorCode::PATH_NOT_EXISTS);
+}
+
+TEST_F(QuicPathManagerTest, RemovePath_RetiresPeerConnectionId) {
+  // Setup: Initialize current peer connection ID
+  connState_->serverConnectionId =
+      ConnectionId::createAndMaybeCrash({0, 0, 0, 0});
+
+  // Add peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  // Create a new path and assign a CID
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType pathId = result.value();
+
+  auto assignResult = manager_->assignDestinationCidForPath(pathId);
+  ASSERT_FALSE(assignResult.hasError());
+
+  auto path = manager_->getPath(pathId);
+  ASSERT_NE(path, nullptr);
+  ASSERT_TRUE(path->destinationConnectionId.has_value());
+  auto assignedCid = path->destinationConnectionId.value();
+
+  // Clear pending frames before deletion
+  connState_->pendingEvents.frames.clear();
+
+  // Remove the path
+  auto removeResult = manager_->removePath(pathId);
+  EXPECT_FALSE(removeResult.hasError());
+
+  // Verify RETIRE_CONNECTION_ID frame was generated
+  bool foundRetireFrame = false;
+  for (const auto& frame : connState_->pendingEvents.frames) {
+    if (frame.asRetireConnectionIdFrame()) {
+      foundRetireFrame = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundRetireFrame);
+
+  // Verify the CID was removed from peerConnectionIds
+  auto cidStillExists = std::find_if(
+                            connState_->peerConnectionIds.begin(),
+                            connState_->peerConnectionIds.end(),
+                            [&assignedCid](const auto& cidData) {
+                              return cidData.connId == assignedCid;
+                            }) != connState_->peerConnectionIds.end();
+  EXPECT_FALSE(cidStillExists);
+}
+
+TEST_F(QuicPathManagerTest, RemovePath_WithoutDestinationCid) {
+  // Create a new path without assigning a destination CID
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType pathId = result.value();
+
+  // Clear pending frames before deletion
+  connState_->pendingEvents.frames.clear();
+
+  // Remove the path - should succeed without retiring CID
+  auto removeResult = manager_->removePath(pathId);
+  EXPECT_FALSE(removeResult.hasError());
+
+  // Verify no RETIRE_CONNECTION_ID frame was generated
+  bool foundRetireFrame = false;
+  for (const auto& frame : connState_->pendingEvents.frames) {
+    if (frame.asRetireConnectionIdFrame()) {
+      foundRetireFrame = true;
+      break;
+    }
+  }
+  EXPECT_FALSE(foundRetireFrame);
+}
+
+TEST_F(QuicPathManagerTest, SwitchCurrentPath_CachesOldCid_Client) {
+  // Setup for client
+  connState_->nodeType = QuicNodeType::Client;
+  connState_->serverConnectionId = ConnectionId::createAndMaybeCrash({1, 2, 3});
+
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType oldPathId = connState_->currentPathId = result.value();
+  auto oldCid = *connState_->serverConnectionId;
+
+  // Add peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3}), 0);
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({4, 5, 6}), 1);
+
+  // Create a new path with a destination CID
+  result = manager_->addPath(localAddr2_, peerAddr2_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType newPathId = result.value();
+
+  auto newCid = ConnectionId::createAndMaybeCrash({4, 5, 6});
+  auto setResult = manager_->setDestinationCidForPath(newPathId, newCid);
+  ASSERT_FALSE(setResult.hasError());
+
+  // Switch to the new path
+  auto switchResult = manager_->switchCurrentPath(newPathId);
+  EXPECT_FALSE(switchResult.hasError());
+
+  // Verify the server connection ID was updated
+  EXPECT_EQ(*connState_->serverConnectionId, newCid);
+
+  // Verify the old CID was cached in the old path
+  auto oldPath = manager_->getPath(oldPathId);
+  ASSERT_NE(oldPath, nullptr);
+  EXPECT_EQ(oldPath->destinationConnectionId, oldCid);
+}
+
+TEST_F(QuicPathManagerTest, SwitchCurrentPath_CachesOldCid_Server) {
+  // Setup for server
+  connState_->nodeType = QuicNodeType::Server;
+  connState_->clientConnectionId = ConnectionId::createAndMaybeCrash({1, 2, 3});
+
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType oldPathId = connState_->currentPathId = result.value();
+  auto oldCid = *connState_->clientConnectionId;
+
+  // Add peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3}), 0);
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({7, 8, 9}), 1);
+
+  // Create a new path with a destination CID
+  result = manager_->addPath(localAddr2_, peerAddr2_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType newPathId = result.value();
+
+  auto newCid = ConnectionId::createAndMaybeCrash({7, 8, 9});
+  auto setResult = manager_->setDestinationCidForPath(newPathId, newCid);
+  ASSERT_FALSE(setResult.hasError());
+
+  // Switch to the new path
+  auto switchResult = manager_->switchCurrentPath(newPathId);
+  EXPECT_FALSE(switchResult.hasError());
+
+  // Verify the client connection ID was updated
+  EXPECT_EQ(*connState_->clientConnectionId, newCid);
+
+  // Verify the old CID was cached in the old path
+  auto oldPath = manager_->getPath(oldPathId);
+  ASSERT_NE(oldPath, nullptr);
+  EXPECT_EQ(oldPath->destinationConnectionId, oldCid);
+}
+
+TEST_F(QuicPathManagerTest, SwitchCurrentPath_WithoutDestinationCid) {
+  // Create a new path without a destination CID
+  auto result = manager_->addPath(localAddr2_, peerAddr2_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType newPathId = result.value();
+
+  // Mark the new path as validated
+
+  // Clear pending frames
+  connState_->pendingEvents.frames.clear();
+
+  // Switch to the new path - should succeed without retiring CID
+  auto switchResult = manager_->switchCurrentPath(newPathId);
+  EXPECT_FALSE(switchResult.hasError());
+
+  // Verify no RETIRE_CONNECTION_ID frame was generated
+  bool foundRetireFrame = false;
+  for (const auto& frame : connState_->pendingEvents.frames) {
+    if (frame.asRetireConnectionIdFrame()) {
+      foundRetireFrame = true;
+      break;
+    }
+  }
+  EXPECT_FALSE(foundRetireFrame);
+}
+
+TEST_F(QuicPathManagerTest, MultiplePathsWithDifferentDestinationCids) {
+  // Setup: Initialize current peer connection ID
+  connState_->serverConnectionId =
+      ConnectionId::createAndMaybeCrash({0, 0, 0, 0});
+
+  // Add multiple peer connection IDs
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 1, 1, 1}), 1);
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({2, 2, 2, 2}), 2);
+  connState_->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({3, 3, 3, 3}), 3);
+
+  // Create multiple paths
+  auto result1 = manager_->addPath(localAddr1_, peerAddr1_);
+  auto result2 = manager_->addPath(localAddr2_, peerAddr2_);
+  ASSERT_TRUE(result1.has_value());
+  ASSERT_TRUE(result2.has_value());
+
+  // Assign CIDs to both paths
+  auto assign1 = manager_->assignDestinationCidForPath(result1.value());
+  auto assign2 = manager_->assignDestinationCidForPath(result2.value());
+  EXPECT_FALSE(assign1.hasError());
+  EXPECT_FALSE(assign2.hasError());
+
+  // Verify each path has a different destination CID
+  auto path1 = manager_->getPath(result1.value());
+  auto path2 = manager_->getPath(result2.value());
+  ASSERT_NE(path1, nullptr);
+  ASSERT_NE(path2, nullptr);
+  ASSERT_TRUE(path1->destinationConnectionId.has_value());
+  ASSERT_TRUE(path2->destinationConnectionId.has_value());
+  EXPECT_NE(
+      path1->destinationConnectionId.value(),
+      path2->destinationConnectionId.value());
+
+  // Verify both CIDs are marked as in use
+  int inUseCount = 0;
+  for (const auto& cidData : connState_->peerConnectionIds) {
+    if (cidData.inUse) {
+      inUseCount++;
+    }
+  }
+  EXPECT_EQ(inUseCount, 2);
+}
+
 } // namespace quic::test

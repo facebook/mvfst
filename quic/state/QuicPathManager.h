@@ -50,10 +50,17 @@ struct PathInfo {
   folly::SocketAddress localAddress;
   // Peer address
   folly::SocketAddress peerAddress;
+
+  // If set, use this when writing packets on this path.
+  // Otherwise, use the one used by the primary path.
+  Optional<ConnectionId> destinationConnectionId;
+
   // Socket to use for writing.
   // If null, the existing transport's socket will be used.
   std::unique_ptr<QuicAsyncUDPSocket> socket;
+
   PathStatus status{PathStatus::NotValid};
+
   // If the path was validated through a path challenge, this is an RTT sample
   // from the challenge-reponse pair
   Optional<std::chrono::microseconds> rttSample;
@@ -218,14 +225,27 @@ class QuicPathManager {
   void cacheCurrentCongestionAndRttState();
 
   /*
-   * Restores the congestion control and rtt state of the current path from the
-   * cached state. If no state is cached for the current path, this will reset
-   * the rtt state to the default and signal the caller to reset the congestion
-   * controller.
+   * Assign a destination connection id for the given path. This will be one of
+   * the peer's destination connection ids.
+   */
+  Expected<void, QuicError> assignDestinationCidForPath(PathIdType pathId);
+
+  /*
+   * Set the given destination connection id for the specified path.
+   */
+  Expected<void, QuicError> setDestinationCidForPath(
+      PathIdType pathId,
+      ConnectionId cid);
+
+  /*
+   * Restores the congestion control and rtt state of the current path from
+   * the cached state. If no state is cached for the current path, this will
+   * reset the rtt state to the default and signal the caller to reset the
+   * congestion controller.
    *
    * Returns true, if a congestion controller is restored.
-   * If it returns false, the caller is responsible for resetting the congestion
-   * controller.
+   * If it returns false, the caller is responsible for resetting the
+   * congestion controller.
    */
   [[nodiscard]] bool maybeRestoreCongestionControlAndRttStateForCurrentPath();
 

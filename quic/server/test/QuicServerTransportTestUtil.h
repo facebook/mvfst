@@ -571,7 +571,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
       }
       if (!idleTimeout) {
         throw std::runtime_error(
-            toString(server->getConn().localConnectionError->code));
+            toString(*server->getConn().localConnectionError));
       }
     }
   }

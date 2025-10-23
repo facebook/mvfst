@@ -1811,76 +1811,14 @@ TEST_F(
     deliverData(std::move(packetData), true, &newPeer);
     FAIL();
   } catch (const std::runtime_error& ex) {
-    EXPECT_EQ(std::string(ex.what()), "Invalid migration");
+    EXPECT_EQ(
+        std::string(ex.what()),
+        "TransportError: Invalid migration, Migration disabled");
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
       server->getConn().localConnectionError->message, "Migration disabled");
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
-}
-
-TEST_F(QuicServerTransportTest, SwitchServerCidsNoOtherIds) {
-  auto& conn = server->getNonConstConn();
-
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), false);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-}
-
-TEST_F(QuicServerTransportTest, SwitchServerCidsOneOtherCid) {
-  auto& conn = server->getNonConstConn();
-  auto originalCid = conn.clientConnectionId;
-  auto secondCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
-  conn.peerConnectionIds.push_back(secondCid);
-
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
-  EXPECT_EQ(retireFrame->sequenceNumber, 0);
-
-  auto replacedCid = conn.clientConnectionId;
-  EXPECT_NE(originalCid, *replacedCid);
-  EXPECT_EQ(secondCid.connId, *replacedCid);
-}
-
-TEST_F(QuicServerTransportTest, SwitchServerCidsMultipleCids) {
-  auto& conn = server->getNonConstConn();
-  auto originalCid = conn.clientConnectionId;
-  auto secondCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{5, 6, 7, 8}), 2);
-  auto thirdCid = ConnectionIdData(
-      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{3, 3, 3, 3}), 3);
-
-  conn.peerConnectionIds.push_back(secondCid);
-  conn.peerConnectionIds.push_back(thirdCid);
-
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
-
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
-  EXPECT_EQ(retireFrame->sequenceNumber, 0);
-
-  // Uses the first unused connection id.
-  auto replacedCid = conn.clientConnectionId;
-  EXPECT_NE(originalCid, *replacedCid);
-  EXPECT_EQ(secondCid.connId, *replacedCid);
-}
-
-TEST_F(
-    QuicServerTransportTest,
-    TestRetireAndSwitchPeerConnectionIdsEmptyPeerCid) {
-  auto& conn = server->getNonConstConn();
-
-  conn.clientConnectionId = ConnectionId::createZeroLength();
-  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
-
-  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
-  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
 }
 
 TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFrames) {
@@ -2646,7 +2584,9 @@ TEST_F(
   try {
     recvClientFinished(true, &newPeer);
   } catch (const std::runtime_error& ex) {
-    EXPECT_EQ(std::string(ex.what()), "Invalid migration");
+    EXPECT_EQ(
+        std::string(ex.what()),
+        "TransportError: Invalid migration, Migration not allowed during handshake");
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
@@ -2706,7 +2646,9 @@ TEST_F(
   try {
     recvClientFinished(true, &newPeer);
   } catch (const std::runtime_error& ex) {
-    EXPECT_EQ(std::string(ex.what()), "Invalid migration");
+    EXPECT_EQ(
+        std::string(ex.what()),
+        "TransportError: Invalid migration, Migration not allowed during handshake");
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
@@ -2873,7 +2815,9 @@ TEST_F(
   try {
     deliverData(std::move(packetData), true, &newPeer);
   } catch (const std::runtime_error& ex) {
-    EXPECT_EQ(std::string(ex.what()), "Invalid migration");
+    EXPECT_EQ(
+        std::string(ex.what()),
+        "TransportError: Invalid migration, Migration not allowed during handshake");
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
@@ -2904,7 +2848,9 @@ TEST_F(
   try {
     recvClientFinished();
   } catch (const std::runtime_error& ex) {
-    EXPECT_EQ(std::string(ex.what()), "Invalid migration");
+    EXPECT_EQ(
+        std::string(ex.what()),
+        "TransportError: Invalid migration, Migration disabled");
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(

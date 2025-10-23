@@ -462,8 +462,9 @@ std::shared_ptr<QuicTransportBaseLite> QuicServerTransport::sharedGuard() {
 void QuicServerTransport::setClientConnectionId(
     const ConnectionId& clientConnectionId) {
   conn_->clientConnectionId = clientConnectionId;
-  conn_->peerConnectionIds.emplace_back(
+  auto& cid = conn_->peerConnectionIds.emplace_back(
       clientConnectionId, kInitialConnectionIdSequenceNumber);
+  cid.inUse = true;
 }
 
 void QuicServerTransport::setClientChosenDestConnectionId(

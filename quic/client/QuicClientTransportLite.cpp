@@ -406,18 +406,31 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
   if (!conn_->serverConnectionId && longHeader) {
     conn_->serverConnectionId = longHeader->getSourceConnId();
-    conn_->peerConnectionIds.emplace_back(
+    auto& cid = conn_->peerConnectionIds.emplace_back(
         longHeader->getSourceConnId(), kInitialConnectionIdSequenceNumber);
+    cid.inUse = true;
     conn_->readCodec->setServerConnectionId(*conn_->serverConnectionId);
+    // TODO: JBESHAY MIGRATION - consolidate tracking the peer connection id
+    // in one place.
+    auto setCidRes = conn_->pathManager->setDestinationCidForPath(
+        conn_->currentPathId, cid.connId);
+    if (setCidRes.hasError()) {
+      return quic::make_unexpected(setCidRes.error());
+    }
   }
 
   // Error out if the connection id on the packet is not the one that is
   // expected.
   bool connidMatched = true;
-  if ((longHeader &&
-       longHeader->getDestinationConnId() != *conn_->clientConnectionId) ||
-      (shortHeader &&
-       shortHeader->getConnectionId() != *conn_->clientConnectionId)) {
+  auto& destinationCidInPacket = longHeader ? longHeader->getDestinationConnId()
+                                            : shortHeader->getConnectionId();
+
+  if (std::find_if(
+          conn_->selfConnectionIds.begin(),
+          conn_->selfConnectionIds.end(),
+          [&](const auto& cidData) {
+            return cidData.connId == destinationCidInPacket;
+          }) == conn_->selfConnectionIds.end()) {
     connidMatched = false;
   }
   if (!connidMatched) {
@@ -434,6 +447,15 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::PEER_ADDRESS_CHANGE);
     return {};
+  }
+
+  if (conn_->currentPathId == readPath->id &&
+      destinationCidInPacket != conn_->clientConnectionId) {
+    // The server is using a new CID for the current path.
+    conn_->clientConnectionId = destinationCidInPacket;
+    conn_->readCodec->setClientConnectionId(conn_->clientConnectionId.value());
+    VLOG(4) << "The server switched its dest cid to: "
+            << destinationCidInPacket.hex();
   }
 
   // Add the packet to the AckState associated with the packet number space.
@@ -1193,7 +1215,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
     auto pathValidationResult = writePathValidationDataForAlternatePaths(
         *socket_,
         *conn_,
-        srcConnId /* src */,
+        srcConnId /* src - not used since these are short header packets */,
         destConnId /* dst */,
         *conn_->oneRttWriteCipher,
         *conn_->oneRttWriteHeaderCipher,
@@ -2182,6 +2204,14 @@ quic::Expected<PathIdType, QuicError> QuicClientTransportLite::startPathProbe(
   }
   conn_->pendingEvents.pathChallenges.emplace(
       pathId, PathChallengeFrame(pathChallengeDataResult.value()));
+
+  // Assign it a new connection id to use. This is done as the last step to
+  // avoid assigning a connection id then returning an error leaving a
+  // connection id mistakenly marked as in use.
+  auto connIdRes = conn_->pathManager->assignDestinationCidForPath(pathId);
+  if (connIdRes.hasError()) {
+    return quic::make_unexpected(connIdRes.error());
+  }
 
   // Schedule a write.
   updateWriteLooper(true);

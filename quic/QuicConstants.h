@@ -395,6 +395,7 @@ enum class LocalErrorCode : uint64_t {
   CONGESTION_CONTROL_ERROR = 0x4000001E,
   PATH_NOT_EXISTS = 0x4000001F,
   PATH_MANAGER_ERROR = 0x40000020,
+  NO_AVAILABLE_CID = 0x40000021,
 };
 
 enum class QuicNodeType : bool {

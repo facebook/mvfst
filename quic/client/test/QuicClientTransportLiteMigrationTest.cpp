@@ -29,6 +29,17 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
       : QuicTransportBaseLite(evb, std::move(socket)),
         QuicClientTransportLite(evb, nullptr, handshakeFactory) {
     initializePathManagerState(*clientConn_);
+    // Set up server connection ID (current peer connection ID)
+    clientConn_->serverConnectionId =
+        ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
+    clientConn_->peerConnectionIds
+        .emplace_back(*clientConn_->serverConnectionId, 0)
+        .inUse = true;
+    // Add peer connection IDs
+    clientConn_->peerConnectionIds.emplace_back(
+        ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+    clientConn_->peerConnectionIds.emplace_back(
+        ConnectionId::createAndMaybeCrash({9, 10, 11, 12}), 2);
   }
 
   QuicClientConnectionState* getConn() {
@@ -355,6 +366,74 @@ TEST_F(
 TEST_F(QuicClientTransportLiteMigrationTest, CannotStartProbeWithoutSocket) {
   auto res = quicClient_->startPathProbe(nullptr, nullptr);
   EXPECT_EQ(res.error().code, LocalErrorCode::INTERNAL_ERROR);
+}
+
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    StartPathProbeAssignsConnectionId) {
+  auto conn = quicClient_->getConn();
+
+  // Create a probe socket
+  folly::SocketAddress localAddr("::", 12345);
+  auto probeSock = createProbeSocketMock(localAddr);
+
+  // Start the path probe
+  TestPathValidationCallback callback;
+  auto res = quicClient_->startPathProbe(std::move(probeSock), &callback);
+  ASSERT_TRUE(res.has_value()) << "startPathProbe failed: " << res.error();
+  auto pathId = res.value();
+
+  // Verify the path was created and has a destination connection ID assigned
+  auto pathInfo = conn->pathManager->getPath(pathId);
+  ASSERT_NE(pathInfo, nullptr);
+  ASSERT_TRUE(pathInfo->destinationConnectionId.has_value())
+      << "Path should have a destination connection ID assigned";
+
+  // Verify the assigned CID is one of the peer CIDs and is marked as in use
+  auto assignedCid = pathInfo->destinationConnectionId.value();
+  bool foundInUse = false;
+  for (const auto& cidData : conn->peerConnectionIds) {
+    if (cidData.connId == assignedCid) {
+      EXPECT_TRUE(cidData.inUse)
+          << "Assigned connection ID should be marked as in use";
+      foundInUse = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundInUse)
+      << "Assigned CID should be one of the peer connection IDs";
+
+  // Verify it's not the current server connection ID
+  EXPECT_NE(assignedCid, *conn->serverConnectionId)
+      << "Assigned CID should be different from current server connection ID";
+}
+
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    StartPathProbeFailsWhenNoAvailableConnectionIds) {
+  auto conn = quicClient_->getConn();
+
+  // Mark all peer connection IDs as in use
+  for (auto& cidData : conn->peerConnectionIds) {
+    cidData.inUse = true;
+  }
+
+  // Create a probe socket
+  folly::SocketAddress localAddr("::", 12345);
+  auto probeSock = createProbeSocketMock(localAddr);
+
+  // Attempt to start the path probe - should fail due to no available CIDs
+  TestPathValidationCallback callback;
+  auto res = quicClient_->startPathProbe(std::move(probeSock), &callback);
+
+  // Verify startPathProbe returns an error
+  ASSERT_TRUE(res.hasError()) << "Expected startPathProbe to fail";
+  EXPECT_EQ(res.error().code, LocalErrorCode::INTERNAL_ERROR)
+      << "Expected INTERNAL_ERROR when no connection IDs available";
+  EXPECT_TRUE(
+      res.error().message.find("available") != std::string::npos ||
+      res.error().message.find("connection id") != std::string::npos)
+      << "Error message should mention connection IDs or availability";
 }
 
 } // namespace quic::test

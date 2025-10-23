@@ -697,6 +697,8 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   void setConnectionIds() {
     originalConnId = client->getConn().clientConnectionId;
+    ConnectionIdData clientCidData(*originalConnId, 0);
+    client->getNonConstConn().selfConnectionIds.emplace_back(clientCidData);
     ServerConnectionIdParams params(0, 0, 0);
     serverChosenConnId = *connIdAlgo_->encodeConnectionId(params);
   }
@@ -877,7 +879,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       }
       if (!idleTimeout) {
         throw std::runtime_error(
-            toString(client->getConn().localConnectionError->code));
+            toString(*client->getConn().localConnectionError));
       }
     }
   }

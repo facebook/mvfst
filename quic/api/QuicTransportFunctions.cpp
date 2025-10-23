@@ -2582,12 +2582,15 @@ writePathValidationDataForAlternatePaths(
     };
     QuicAsyncUDPSocket& sendSocket = path->socket ? *path->socket : sock;
     FrameScheduler scheduler = std::move(schedulerBuilder).build();
+    auto destCid = path->destinationConnectionId
+        ? path->destinationConnectionId.value()
+        : dstConnId;
     auto pathValidationWriteResult = writeConnectionDataToSocket(
         sendSocket,
         connection,
         path->id,
-        srcConnId,
-        dstConnId,
+        srcConnId, /* not used since these are short header packets */
+        destCid,
         std::move(builder),
         PacketNumberSpace::AppData,
         scheduler,

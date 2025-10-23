@@ -41,6 +41,15 @@ class QuicServerTransportAllowMigrationTest
     : public QuicServerTransportAfterStartTestBase,
       public WithParamInterface<MigrationParam> {
  public:
+  void SetUpChild() override {
+    QuicServerTransportAfterStartTestBase::SetUpChild();
+    // Add peer connection IDs
+    server->getNonConstConn().peerConnectionIds.emplace_back(
+        ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+    server->getNonConstConn().peerConnectionIds.emplace_back(
+        ConnectionId::createAndMaybeCrash({9, 10, 11, 12}), 2);
+  }
+
   bool getDisableMigration() override {
     return false;
   }
@@ -143,6 +152,38 @@ INSTANTIATE_TEST_SUITE_P(
         MigrationParam{4},
         MigrationParam{9},
         MigrationParam{50}));
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    SendsCorrectNumberOfNewConnectionIdsBasedOnParam) {
+  auto& conn = server->getNonConstConn();
+
+  auto expectedPeerLimit =
+      GetParam().clientSentActiveConnIdTransportParam.value_or(
+          kDefaultActiveConnectionIdLimit);
+  ASSERT_EQ(conn.peerActiveConnectionIdLimit, expectedPeerLimit);
+
+  // The server should issue active_connection_id_limit - 1
+  // NEW_CONNECTION_IDs, since one is in use for the handshake.
+  auto expectedCountCIDIssued =
+      std::min(kMaxActiveConnectionIdLimit, expectedPeerLimit) - 1;
+  ASSERT_GE(expectedCountCIDIssued, 0);
+
+  // Count the number of NEW_CONNECTION_ID frames in outstanding packets.
+  size_t numNewConnIdFrames = 0;
+  for (const auto& pkt : conn.outstandings.packets) {
+    for (const auto& frame : pkt.packet.frames) {
+      if (auto simpleFrame = frame.asQuicSimpleFrame()) {
+        if (simpleFrame->type() ==
+            QuicSimpleFrame::Type::NewConnectionIdFrame) {
+          ++numNewConnIdFrames;
+        }
+      }
+    }
+  }
+
+  EXPECT_EQ(numNewConnIdFrames, expectedCountCIDIssued);
+}
 
 TEST_P(
     QuicServerTransportAllowMigrationTest,
@@ -1462,6 +1503,86 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedNewPath) {
 
   auto pathFound = conn.pathManager->getPath(pathIdRes.value());
   EXPECT_TRUE(pathFound);
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    MigrationUpdatesDestinationConnectionId) {
+  auto& conn = server->getNonConstConn();
+
+  // Add multiple peer connection IDs
+  auto newCid1 = ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
+  auto newCid2 = ConnectionId::createAndMaybeCrash({5, 6, 7, 8});
+  conn.peerConnectionIds.emplace_back(newCid1, 1);
+  conn.peerConnectionIds.emplace_back(newCid2, 2);
+
+  // Create a new path
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+
+  // Deliver a path challenge from the new peer address
+  auto incomingPathChallengeData = 456;
+  {
+    auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
+    auto packetData = packetToBuf(packet);
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  // Verify new path was created
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_NE(conn.currentPathId, newPath->id);
+
+  // Verify a destination CID was assigned to the new path
+  // (This should happen automatically during path validation)
+  EXPECT_TRUE(newPath->destinationConnectionId.has_value());
+
+  // Get the challenge to send back
+  auto outstandingChallenge = getFirstOutstandingPathChallenge();
+  ASSERT_TRUE(outstandingChallenge);
+
+  // Client migrates and validates the path
+  {
+    auto data = IOBuf::copyBuffer("migration data");
+    auto streamPacket = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(streamPacket), true, &newPeer);
+  }
+
+  // Send path response to validate
+  {
+    auto packetData = packetToBuf(
+        makePacketWithPathResponseFrame(outstandingChallenge->pathData));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  // Verify migration succeeded
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+  EXPECT_EQ(newPath->status, PathStatus::Validated);
+}
+
+TEST_P(QuicServerTransportAllowMigrationTest, InitialClientCidMarkedInUse) {
+  auto& conn = server->getNonConstConn();
+
+  // Verify the initial client connection ID is marked as in use
+  ASSERT_FALSE(conn.peerConnectionIds.empty());
+
+  // The initial CID should be in the peerConnectionIds and marked as in use
+  bool foundInUseCid = false;
+  for (const auto& cidData : conn.peerConnectionIds) {
+    if (cidData.connId == *conn.clientConnectionId &&
+        cidData.sequenceNumber == kInitialConnectionIdSequenceNumber) {
+      EXPECT_TRUE(cidData.inUse);
+      foundInUseCid = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundInUseCid);
 }
 
 } // namespace quic::test

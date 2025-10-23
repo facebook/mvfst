@@ -1043,6 +1043,11 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       return quic::make_unexpected(pathIdResult.error());
     }
     conn.currentPathId = pathIdResult.value();
+    auto setCidRes = conn.pathManager->setDestinationCidForPath(
+        conn.currentPathId, clientConnectionId);
+    if (setCidRes.hasError()) {
+      return quic::make_unexpected(setCidRes.error());
+    }
   }
   BufQueue& udpData = readData.udpPacket.buf;
   uint64_t processedPacketsTotal = 0;
@@ -1323,7 +1328,9 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       return quic::make_unexpected(readPathRes.error());
     }
     auto& readPath = readPathRes.value().get();
-    if (readPath.status == PathStatus::NotValid) {
+    if (readPath.status == PathStatus::NotValid &&
+        !conn.pendingEvents.pathChallenges.count(readPath.id)) {
+      // Send a path challenge for this path if it doesn't have one pending
       auto pathChallengeDataResult =
           conn.pathManager->getNewPathChallengeData(readPath.id);
       if (pathChallengeDataResult.hasError()) {
@@ -1331,6 +1338,16 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       }
       conn.pendingEvents.pathChallenges.emplace(
           readPath.id, PathChallengeFrame(pathChallengeDataResult.value()));
+    }
+    if (conn.currentPathId != readPath.id &&
+        !readPath.destinationConnectionId) {
+      // Assign this path a destination connection id if it doesn't have one.
+      auto assignCidRes =
+          conn.pathManager->assignDestinationCidForPath(readPath.id);
+      if (assignCidRes.hasError()) {
+        // TODO: JBESHAY MIGRATION Should we drop the packet instead?
+        return quic::make_unexpected(assignCidRes.error());
+      }
     }
 
     if (readPath.status != PathStatus::Validated) {
@@ -1612,23 +1629,52 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     // won't increase the limit.
     updateWritableByteLimitOnRecvPacket(conn);
 
-    if (readPath.id != conn.currentPathId && isNonProbingPacket) {
-      // The client is migrating to a different path.
-
-      // TODO use new conn id, make sure the other endpoint has new conn id
-
-      if (packetNum == ackState.largestRecvdPacketNum) {
-        ShortHeader* shortHeader = regularPacket.header.asShort();
-        bool intentionalMigration = false;
-        if (shortHeader &&
+    if (readPath.id != conn.currentPathId) {
+      if (!readPath.destinationConnectionId) {
+        // This is a new alternate path that doesn't have an assigned
+        // destination connection id assigned.
+        if (auto shortHeader = regularPacket.header.asShort(); shortHeader &&
             shortHeader->getConnectionId() != conn.serverConnectionId) {
-          intentionalMigration = true;
+          // The client is using a new destination connection id, we must switch
+          // to a new peer connection id as well. Otherwise, we could just use
+          // the primary path destination connection id. This is allowed by RFC
+          // 9000 Section 9.5
+          auto newCidRes =
+              conn.pathManager->assignDestinationCidForPath(readPath.id);
+          if (newCidRes.hasError()) {
+            return quic::make_unexpected(newCidRes.error());
+          }
         }
-        auto migrationResult =
-            onConnectionMigration(conn, readPath.id, intentionalMigration);
-        if (migrationResult.hasError()) {
-          return quic::make_unexpected(migrationResult.error());
+      }
+
+      if (isNonProbingPacket) {
+        // The client is migrating to a different path.
+        if (packetNum == ackState.largestRecvdPacketNum) {
+          ShortHeader* shortHeader = regularPacket.header.asShort();
+          bool intentionalMigration = false;
+          if (shortHeader &&
+              shortHeader->getConnectionId() != conn.serverConnectionId) {
+            intentionalMigration = true;
+          }
+          auto migrationResult =
+              onConnectionMigration(conn, readPath.id, intentionalMigration);
+          if (migrationResult.hasError()) {
+            return quic::make_unexpected(migrationResult.error());
+          }
         }
+      }
+    } else {
+      if (auto shortHeader = regularPacket.header.asShort(); shortHeader &&
+          shortHeader->getConnectionId() != conn.serverConnectionId) {
+        // The client has switched the destination connection id it's using for
+        // this server
+
+        conn.serverConnectionId =
+            regularPacket.header.asShort()->getConnectionId();
+        conn.readCodec->setServerConnectionId(conn.serverConnectionId.value());
+
+        VLOG(4) << "Client using new connection id for this server: "
+                << conn.serverConnectionId.value();
       }
     }
 

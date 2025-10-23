@@ -374,4 +374,175 @@ TEST_F(
   EXPECT_EQ(conn->nextSelfConnectionIdSequence, expectedFinalSequence);
 }
 
+TEST_F(QuicClientTransportLiteTest, GetNextAvailablePeerConnectionId_Success) {
+  auto conn = quicClient_->getConn();
+
+  // Set up server connection ID
+  conn->serverConnectionId = ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
+
+  // Add additional peer connection IDs (not in use)
+  conn->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+  conn->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({9, 10, 11, 12}), 2);
+
+  // Mark the first one as already in use
+  conn->peerConnectionIds[0].inUse = true;
+
+  // Get next available CID
+  auto result = conn->getNextAvailablePeerConnectionId();
+  ASSERT_FALSE(result.hasError());
+
+  // Should get the second CID since first is in use
+  EXPECT_EQ(result.value(), conn->peerConnectionIds[1].connId);
+  EXPECT_TRUE(conn->peerConnectionIds[1].inUse);
+}
+
+TEST_F(
+    QuicClientTransportLiteTest,
+    GetNextAvailablePeerConnectionId_ZeroLength) {
+  auto conn = quicClient_->getConn();
+
+  // Set up zero-length server connection ID
+  conn->serverConnectionId = ConnectionId::createZeroLength();
+
+  // Get next available CID - should return the zero-length CID
+  auto result = conn->getNextAvailablePeerConnectionId();
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(result.value().size(), 0);
+}
+
+TEST_F(
+    QuicClientTransportLiteTest,
+    GetNextAvailablePeerConnectionId_NoAvailable) {
+  auto conn = quicClient_->getConn();
+
+  // Set up server connection ID
+  conn->serverConnectionId = ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
+
+  // Add peer connection IDs but mark them all as in use
+  conn->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+  conn->peerConnectionIds[0].inUse = true;
+
+  // Try to get next available CID - should fail
+  auto result = conn->getNextAvailablePeerConnectionId();
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, LocalErrorCode::INTERNAL_ERROR);
+}
+
+TEST_F(QuicClientTransportLiteTest, RetirePeerConnectionId_Success) {
+  auto conn = quicClient_->getConn();
+
+  // Set up peer connection IDs
+  auto cidToRetire = ConnectionId::createAndMaybeCrash({5, 6, 7, 8});
+  conn->peerConnectionIds.emplace_back(cidToRetire, 1);
+  conn->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({9, 10, 11, 12}), 2);
+
+  // Clear pending frames
+  conn->pendingEvents.frames.clear();
+
+  // Retire the CID
+  conn->retirePeerConnectionId(cidToRetire);
+
+  // Verify RETIRE_CONNECTION_ID frame was generated
+  bool foundRetireFrame = false;
+  for (const auto& frame : conn->pendingEvents.frames) {
+    if (auto retireFrame = frame.asRetireConnectionIdFrame()) {
+      EXPECT_EQ(retireFrame->sequenceNumber, 1);
+      foundRetireFrame = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundRetireFrame);
+
+  // Verify CID was removed from peerConnectionIds
+  auto cidIt = std::find_if(
+      conn->peerConnectionIds.begin(),
+      conn->peerConnectionIds.end(),
+      [&cidToRetire](const auto& cidData) {
+        return cidData.connId == cidToRetire;
+      });
+  EXPECT_EQ(cidIt, conn->peerConnectionIds.end());
+}
+
+TEST_F(QuicClientTransportLiteTest, RetirePeerConnectionId_ZeroLength) {
+  auto conn = quicClient_->getConn();
+
+  // Clear pending frames
+  conn->pendingEvents.frames.clear();
+
+  // Try to retire zero-length CID - should be a no-op
+  auto zeroCid = ConnectionId::createZeroLength();
+  conn->retirePeerConnectionId(zeroCid);
+
+  // No frame should be generated
+  EXPECT_TRUE(conn->pendingEvents.frames.empty());
+}
+
+TEST_F(QuicClientTransportLiteTest, RetirePeerConnectionId_NonExistent) {
+  auto conn = quicClient_->getConn();
+
+  // Set up peer connection IDs
+  conn->peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+
+  // Clear pending frames
+  conn->pendingEvents.frames.clear();
+
+  // Try to retire non-existent CID - should be a no-op
+  auto nonExistentCid = ConnectionId::createAndMaybeCrash({99, 99, 99, 99});
+  conn->retirePeerConnectionId(nonExistentCid);
+
+  // No frame should be generated and peerConnectionIds unchanged
+  EXPECT_TRUE(conn->pendingEvents.frames.empty());
+  EXPECT_EQ(conn->peerConnectionIds.size(), 1);
+}
+
+TEST_F(QuicClientTransportLiteTest, SetDestinationCidForPath_Success) {
+  auto conn = quicClient_->getConn();
+
+  // Create a new path
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  auto pathIdRes = conn->pathManager->addPath(
+      folly::SocketAddress("0.0.0.0", 0), newPeer, nullptr);
+  ASSERT_FALSE(pathIdRes.hasError());
+  auto newPathId = pathIdRes.value();
+
+  // Set a specific destination CID for the path
+  auto customCid = ConnectionId::createAndMaybeCrash({99, 99, 99, 99});
+  auto setResult =
+      conn->pathManager->setDestinationCidForPath(newPathId, customCid);
+  EXPECT_FALSE(setResult.hasError());
+
+  // Verify the path has the specified CID
+  auto pathInfo = conn->pathManager->getPath(newPathId);
+  ASSERT_TRUE(pathInfo);
+  ASSERT_TRUE(pathInfo->destinationConnectionId.has_value());
+  EXPECT_EQ(pathInfo->destinationConnectionId.value(), customCid);
+}
+
+TEST_F(QuicClientTransportLiteTest, InitialServerCidMarkedInUse) {
+  auto conn = quicClient_->getConn();
+
+  // Set up initial server connection ID
+  auto initialServerCid = ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
+  conn->serverConnectionId = initialServerCid;
+  conn->peerConnectionIds.emplace_back(initialServerCid, 0);
+  conn->peerConnectionIds.back().inUse = true;
+
+  // Verify the initial server CID is marked as in use
+  bool foundInUseCid = false;
+  for (const auto& cidData : conn->peerConnectionIds) {
+    if (cidData.connId == initialServerCid &&
+        cidData.sequenceNumber == kInitialConnectionIdSequenceNumber) {
+      EXPECT_TRUE(cidData.inUse);
+      foundInUseCid = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundInUseCid);
+}
+
 } // namespace quic::test

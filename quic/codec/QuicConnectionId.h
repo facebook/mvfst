@@ -116,6 +116,7 @@ struct ConnectionIdData {
   ConnectionId connId;
   uint64_t sequenceNumber;
   Optional<StatelessResetToken> token;
+  bool inUse{false}; // Only used for peer connection ids
 };
 
 /**
