@@ -235,7 +235,7 @@ class QuicServerTransport
   void registerTransportKnobParamHandler(
       uint64_t paramId,
       std::function<quic::Expected<void, QuicError>(
-          QuicServerTransport*,
+          QuicServerTransport&,
           TransportKnobParam::Val)>&& handler);
 
  private:
@@ -290,7 +290,7 @@ class QuicServerTransport
   folly::F14FastMap<
       uint64_t,
       std::function<quic::Expected<void, QuicError>(
-          QuicServerTransport*,
+          QuicServerTransport&,
           TransportKnobParam::Val)>>
       transportKnobParamHandlers_;
   ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;

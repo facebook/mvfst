@@ -3950,7 +3950,7 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   int flag = 0;
   server->registerKnobParamHandler(
       199,
-      [&](QuicServerTransport* /* server_conn */,
+      [&](QuicServerTransport& /* server_conn */,
           TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         EXPECT_EQ(std::get<uint64_t>(val), 10);
         flag = 1;
@@ -3958,7 +3958,7 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
       });
   server->registerKnobParamHandler(
       200,
-      [&](QuicServerTransport* /* server_conn */,
+      [&](QuicServerTransport& /* server_conn */,
           const TransportKnobParam::Val& /* val */)
           -> quic::Expected<void, QuicError> {
         flag = 2;
@@ -3974,7 +3974,7 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   // overwrite will fail, the new handler won't be called
   server->registerKnobParamHandler(
       199,
-      [&](QuicServerTransport* /* server_conn */,
+      [&](QuicServerTransport& /* server_conn */,
           TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         EXPECT_EQ(std::get<uint64_t>(val), 30);
         flag = 3;

@@ -113,7 +113,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
   void registerKnobParamHandler(
       uint64_t paramId,
       std::function<quic::Expected<void, QuicError>(
-          QuicServerTransport*,
+          QuicServerTransport&,
           TransportKnobParam::Val)>&& handler) {
     registerTransportKnobParamHandler(paramId, std::move(handler));
   }

@@ -527,7 +527,7 @@ void QuicServerTransport::handleTransportKnobParams(
       knobParamId = TransportKnobParamId::_from_integral(param.id);
     }
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
-      auto result = (maybeParamHandler->second)(this, param.val);
+      auto result = (maybeParamHandler->second)(*this, param.val);
       if (result.has_value()) {
         QUIC_STATS(conn_->statsCallback, onTransportKnobApplied, knobParamId);
       } else {
@@ -757,7 +757,7 @@ void QuicServerTransport::setShouldRegisterKnobParamHandlerFn(
 void QuicServerTransport::registerTransportKnobParamHandler(
     uint64_t paramId,
     std::function<quic::Expected<void, QuicError>(
-        QuicServerTransport*,
+        QuicServerTransport&,
         TransportKnobParam::Val)>&& handler) {
   // No validation callback, allow all parameters
   if (!shouldRegisterKnobParamHandlerFn_) {
@@ -823,10 +823,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         if (static_cast<bool>(std::get<uint64_t>(val))) {
           server_conn->udpSendPacketLen = server_conn->peerMaxUdpPayloadSize;
           VLOG(3)
@@ -837,10 +836,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         auto cctype =
             static_cast<CongestionControlType>(std::get<uint64_t>(val));
         VLOG(3) << "Knob param received, set congestion control type to "
@@ -848,15 +846,14 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         if (cctype == server_conn->congestionController->type()) {
           return {};
         }
-        serverTransport->setCongestionControl(cctype);
+        serverTransport.setCongestionControl(cctype);
         return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         auto val = std::get<uint64_t>(value);
         uint8_t numerator = (val / 100);
         uint8_t denominator = (val - (numerator * 100));
@@ -869,10 +866,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         auto val = std::get<uint64_t>(value);
         auto numerator = (uint8_t)(val / 100);
         auto denominator = (uint8_t)(val - (numerator * 100));
@@ -885,10 +881,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-
         // Safely check if value is a uint64_t
         const uint64_t* valPtr = std::get_if<uint64_t>(&value);
         if (!valPtr) {
@@ -902,7 +896,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         const uint64_t val = *valPtr;
 
         auto& maxPacingRateKnobState =
-            serverTransport->serverConn_->maxPacingRateKnobState;
+            serverTransport.serverConn_->maxPacingRateKnobState;
         if (maxPacingRateKnobState.frameOutOfOrderDetected) {
           return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
@@ -914,7 +908,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             maxPacingRateKnobState.lastMaxRateBytesPerSec == val) {
           maxPacingRateKnobState.frameOutOfOrderDetected = true;
           QUIC_STATS(
-              serverTransport->serverConn_->statsCallback,
+              serverTransport.serverConn_->statsCallback,
               onTransportKnobOutOfOrder,
               TransportKnobParamId::MAX_PACING_RATE_KNOB);
           return quic::make_unexpected(QuicError(
@@ -924,7 +918,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
         VLOG(3) << "Knob param received, set max pacing rate to ("
                 << unsigned(val) << " bytes per second)";
-        (void)serverTransport->setMaxPacingRate(val);
+        (void)serverTransport.setMaxPacingRate(val);
         maxPacingRateKnobState.lastMaxRateBytesPerSec = val;
         return {};
       });
@@ -932,10 +926,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-
         // Safely check if value is a string
         const std::string* valPtr = std::get_if<std::string>(&value);
         if (!valPtr) {
@@ -975,10 +967,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
 
-        if (serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum >=
+        if (serverTransport.serverConn_->maybeLastMaxPacingRateKnobSeqNum >=
             make_optional(expectedSeqNum.value())) {
           QUIC_STATS(
-              serverTransport->serverConn_->statsCallback,
+              serverTransport.serverConn_->statsCallback,
               onTransportKnobOutOfOrder,
               TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
           return quic::make_unexpected(QuicError(
@@ -991,17 +983,16 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             "and sequence number {}",
             maybeRateBytesPerSec.value(),
             expectedSeqNum.value());
-        (void)serverTransport->setMaxPacingRate(maybeRateBytesPerSec.value());
-        serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum =
+        (void)serverTransport.setMaxPacingRate(maybeRateBytesPerSec.value());
+        serverTransport.serverConn_->maybeLastMaxPacingRateKnobSeqNum =
             expectedSeqNum.value();
         return {};
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         if (server_conn->congestionController) {
           auto enableExperimental = static_cast<bool>(std::get<uint64_t>(val));
           server_conn->congestionController->setExperimental(
@@ -1018,11 +1009,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        serverTransport->serverConn_->transportSettings.paddingModulo = val;
+        serverTransport.serverConn_->transportSettings.paddingModulo = val;
         VLOG(3) << fmt::format(
             "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
             val);
@@ -1031,12 +1021,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        serverTransport->serverConn_->transportSettings
-            .fixedShortHeaderPadding = val;
+        serverTransport.serverConn_->transportSettings.fixedShortHeaderPadding =
+            val;
         VLOG(3) << fmt::format(
             "FIXED_SHORT_HEADER_PADDING_KNOB KnobParam received, setting fixedShortHeaderPadding={}",
             val);
@@ -1044,10 +1033,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         if (server_conn->pacer) {
           auto enableExperimental = static_cast<bool>(std::get<uint64_t>(val));
           server_conn->pacer->setExperimental(enableExperimental);
@@ -1060,12 +1048,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: " << val;
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.enableKeepalive = static_cast<bool>(val);
         if (val >= 5000) {
           server_conn->transportSettings.keepAliveTimeout =
@@ -1075,10 +1062,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-
         const std::string* valPtr = std::get_if<std::string>(&value);
         if (!valPtr) {
           auto errMsg =
@@ -1120,7 +1105,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               ackFrequencyConfig.minRttDivisor,
               ackFrequencyConfig.useSmallThresholdDuringStartup,
               val);
-          serverTransport->conn_->transportSettings.ccaConfig
+          serverTransport.conn_->transportSettings.ccaConfig
               .ackFrequencyConfig = ackFrequencyConfig;
         } else {
           auto errMsg = fmt::format(
@@ -1133,11 +1118,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACING_TIMER_TICK),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.pacingTickInterval =
             std::chrono::microseconds(val);
         VLOG(3) << "PACING_TIMER_TICK KnobParam received: " << val;
@@ -1145,11 +1129,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<std::string>(value);
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         uint8_t level;
         bool incremental;
         bool parseSuccess = false;
@@ -1173,12 +1156,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<std::string>(value);
         try {
-          serverTransport->conn_->transportSettings.ccaConfig =
+          serverTransport.conn_->transportSettings.ccaConfig =
               parseCongestionControlConfig(val);
           VLOG(3) << "CC_CONFIG KnobParam received: " << val;
           return {};
@@ -1191,11 +1173,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CONNECTION_MIGRATION),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.disableMigration =
             !static_cast<bool>(val);
         VLOG(3) << "CONNECTION_MIGRATION KnobParam received: "
@@ -1204,9 +1185,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEY_UPDATE_INTERVAL),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
         if (val < 1000 || val > 8ul * 1000 * 1000) {
           std::string errMsg = fmt::format(
@@ -1215,7 +1195,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.initiateKeyUpdate = val > 0;
         server_conn->transportSettings.keyUpdatePacketCountInterval = val;
         VLOG(3) << "KEY_UPDATE_INTERVAL KnobParam received: " << val;
@@ -1224,12 +1204,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         bool autotuneReceiveStreamFlowControl =
             static_cast<bool>(std::get<uint64_t>(value));
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.autotuneReceiveStreamFlowControl =
             autotuneReceiveStreamFlowControl;
         VLOG(3) << "AUTOTUNE_RECV_STREAM_FLOW_CONTROL KnobParam received: "
@@ -1239,12 +1218,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         bool inflightReorderingThreshold =
             static_cast<bool>(std::get<uint64_t>(value));
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.useInflightReorderingThreshold =
             inflightReorderingThreshold;
         VLOG(3) << "INFLIGHT_REORDERING_THRESHOLD KnobParam received: "
@@ -1253,11 +1231,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_MIN_BURST_PACKETS),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.minBurstPackets =
             val <= kMinBurstPacketsLimit ? val : kMinBurstPacketsLimit;
         VLOG(3) << "PACER_MIN_BURST_PACKETS KnobParam received: " << val;
@@ -1265,11 +1242,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.writeConnectionDataPacketsLimit =
             val <= kMaxWriteConnectionDataPacketLimit
             ? val
@@ -1279,11 +1255,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         bool useNewPriorityQueue = static_cast<bool>(std::get<uint64_t>(value));
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         VLOG(3) << "USE_NEW_PRIORITY_QUEUE KnobParam received: "
                 << useNewPriorityQueue;
         auto refreshResult = serverConn->streamManager->updatePriorityQueueImpl(
@@ -1301,11 +1276,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MIN_STREAM_BUF_THRESH),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = static_cast<uint16_t>(std::get<uint64_t>(value));
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.minStreamBufThresh =
             val <= kMinStreamBufThreshLimit ? val : kMinStreamBufThreshLimit;
         VLOG(3) << "MIN_STREAM_BUF_THRESH KnobParam received: " << val;
@@ -1314,11 +1288,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto val = static_cast<uint16_t>(std::get<uint64_t>(value));
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.excessCwndPctForImminentStreams =
             val <= kMaxExcessCwndPctForImminentStreams
             ? val
@@ -1329,12 +1302,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::ALLOW_DUPLICATE_PROBES),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         bool allowDuplicateProbesInSameWrite =
             static_cast<bool>(std::get<uint64_t>(value));
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.allowDuplicateProbesInSameWrite =
             allowDuplicateProbesInSameWrite;
         VLOG(3) << "ALLOW_DUPLICATE_CLONES KnobParam received: "
@@ -1343,12 +1315,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         bool sendCloseOnIdleTimeout =
             static_cast<bool>(std::get<uint64_t>(value));
-        auto server_conn = serverTransport->serverConn_;
+        auto server_conn = serverTransport.serverConn_;
         server_conn->transportSettings.alwaysSendConnectionCloseOnIdleTimeout =
             sendCloseOnIdleTimeout;
         VLOG(3) << "SEND_CLOSE_ON_IDLE_TIMEOUT KnobParam received: "
@@ -1357,16 +1328,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_PTO),
-      [](QuicServerTransport* serverTransport,
+      [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
         auto maxPTOCount = std::get<uint64_t>(value);
         if (maxPTOCount < 3 || maxPTOCount > 15) {
           return quic::make_unexpected(QuicError(
               TransportErrorCode::INTERNAL_ERROR,
               "MAX_PTO KnobParam value out of bounds"));
         }
-        auto serverConn = serverTransport->serverConn_;
+        auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.maxNumPTOs = maxPTOCount;
         VLOG(3) << "MAX_PTO KnobParam received: " << maxPTOCount;
         return {};
