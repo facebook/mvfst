@@ -1081,10 +1081,13 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         CHECK(serverTransport);
         auto val = std::get<uint64_t>(value);
+        VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: " << val;
         auto server_conn = serverTransport->serverConn_;
         server_conn->transportSettings.enableKeepalive = static_cast<bool>(val);
-        VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: "
-                << static_cast<bool>(val);
+        if (val >= 5000) {
+          server_conn->transportSettings.keepAliveTimeout =
+              std::chrono::milliseconds(val);
+        }
         return {};
       });
   registerTransportKnobParamHandler(

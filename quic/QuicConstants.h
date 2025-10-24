@@ -199,7 +199,11 @@ BETTER_ENUM(
     SHORT_HEADER_PADDING_KNOB = 0x6666,
     // Set fixed short header padding size
     FIXED_SHORT_HEADER_PADDING_KNOB = 0x6667,
-    // Keepalive timer enabled
+    // Keepalive timer enabled. The value is interpreted as follows:
+    // - [1,4999] mean keep alive is enabled with the defaut interval of
+    // 0.85 * idle timeout
+    // - >= 5000 mean keep alive is enabled with the specified interval in
+    // milliseconds
     KEEPALIVE_ENABLED = 0x7777,
     // Remove from loss buffer on spurious loss
     REMOVE_FROM_LOSS_BUFFER = 0x8888,
