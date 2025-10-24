@@ -1355,6 +1355,22 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << sendCloseOnIdleTimeout;
         return {};
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::MAX_PTO),
+      [](QuicServerTransport* serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        CHECK(serverTransport);
+        auto maxPTOCount = std::get<uint64_t>(value);
+        if (maxPTOCount < 3 || maxPTOCount > 15) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              "MAX_PTO KnobParam value out of bounds"));
+        }
+        auto serverConn = serverTransport->serverConn_;
+        serverConn->transportSettings.maxNumPTOs = maxPTOCount;
+        VLOG(3) << "MAX_PTO KnobParam received: " << maxPTOCount;
+        return {};
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
