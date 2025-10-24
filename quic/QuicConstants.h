@@ -191,8 +191,6 @@ BETTER_ENUM(
     DEFAULT_RTT_FACTOR_KNOB = 0x2222,
     // Set max pacing rate in bytes per second to be used if pacing is enabled
     MAX_PACING_RATE_KNOB = 0x4444,
-    // Use adaptive loss detection thresholds for reordering and timeout
-    ADAPTIVE_LOSS_DETECTION = 0x5556,
     // Enable experimental pacer settings
     PACER_EXPERIMENTAL = 0x5557,
     // Set short header padding modulo size
@@ -205,28 +203,18 @@ BETTER_ENUM(
     // - >= 5000 mean keep alive is enabled with the specified interval in
     // milliseconds
     KEEPALIVE_ENABLED = 0x7777,
-    // Remove from loss buffer on spurious loss
-    REMOVE_FROM_LOSS_BUFFER = 0x8888,
     // Knob for setting max pacing rate, with sequence number
     MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999,
     // Control ACK_FREQUENCY policy
     ACK_FREQUENCY_POLICY = 0x10000,
-    // Controls whether to fire write loops early when pacing
-    FIRE_LOOP_EARLY = 0x10001,
     // Controls the timer tick used for pacing
     PACING_TIMER_TICK = 0x10002,
     // Controls default stream priority
     DEFAULT_STREAM_PRIORITY = 0x10003,
-    // Controls write loop time fraction in terms of srtt
-    WRITE_LOOP_TIME_FRACTION = 0x10004,
-    // Controls number of times a stream gets a write in incremental mode
-    WRITES_PER_STREAM = 0x10005,
     // Control connection migration
     CONNECTION_MIGRATION = 0x10006,
     // Control server-initiated key update interval
     KEY_UPDATE_INTERVAL = 0x10007,
-    // Controls new stream blocked condition.
-    USE_NEW_STREAM_BLOCKED_CONDITION = 0x10008,
     // Controls autotune flow control on streams.
     AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009,
     // Controls whether to use the inflight reordering heuristic.

@@ -4116,25 +4116,6 @@ TEST_F(QuicServerTransportTest, TestConnMigrationKnobHandler) {
   EXPECT_EQ(transportSettings.disableMigration, true);
 }
 
-TEST_F(QuicServerTransportTest, TestNewStreamBlockedConditionKnobHandler) {
-  auto& transportSettings = server->getNonConstConn().transportSettings;
-
-  // useNewStreamBlockedCondition is disabled by default
-  ASSERT_FALSE(transportSettings.useNewStreamBlockedCondition);
-
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
-        .val = uint64_t(1)}});
-  EXPECT_TRUE(transportSettings.useNewStreamBlockedCondition);
-
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
-        .val = uint64_t(0)}});
-  EXPECT_FALSE(transportSettings.useNewStreamBlockedCondition);
-}
-
 TEST_F(QuicServerTransportTest, TestAutotuneStreamFlowControlKnobHandler) {
   auto& transportSettings = server->getNonConstConn().transportSettings;
 
@@ -4287,15 +4268,6 @@ TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
       HTTPPriorityQueue::Priority(
           server->getTransportSettings().defaultPriority),
       HTTPPriorityQueue::Priority(4, false));
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
-        .val = uint64_t(2)}});
-  EXPECT_EQ(server->getTransportSettings().writeLimitRttFraction, 2);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::WRITES_PER_STREAM),
-        .val = uint64_t(5)}});
-  EXPECT_EQ(server->getTransportSettings().priorityQueueWritesPerStream, 5);
 }
 
 TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {

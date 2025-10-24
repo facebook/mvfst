@@ -1042,23 +1042,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             val);
         return {};
       });
-
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::ADAPTIVE_LOSS_DETECTION),
-      [](QuicServerTransport* serverTransport,
-         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto server_conn = serverTransport->serverConn_;
-        auto useAdaptiveLossReorderingThresholds =
-            static_cast<bool>(std::get<uint64_t>(val));
-        server_conn->transportSettings.useAdaptiveLossReorderingThresholds =
-            useAdaptiveLossReorderingThresholds;
-        VLOG(3) << fmt::format(
-            "ADAPTIVE_LOSS_DETECTION KnobParam received, UseAdaptiveLossReorderingThresholds is now set to {}",
-            useAdaptiveLossReorderingThresholds);
-        return {};
-      });
-
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
       [](QuicServerTransport* serverTransport,
@@ -1088,17 +1071,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
           server_conn->transportSettings.keepAliveTimeout =
               std::chrono::milliseconds(val);
         }
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::REMOVE_FROM_LOSS_BUFFER),
-      [](QuicServerTransport* serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto val = std::get<uint64_t>(value);
-        // Temporarily disabled while we investigate some related bugs.
-        VLOG(3) << "REMOVE_FROM_LOSS_BUFFER KnobParam received: "
-                << static_cast<bool>(val);
         return {};
       });
   registerTransportKnobParamHandler(
@@ -1160,17 +1132,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::FIRE_LOOP_EARLY),
-      [](QuicServerTransport* serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto val = std::get<uint64_t>(value);
-        serverTransport->writeLooper_->setFireLoopEarly(static_cast<bool>(val));
-        VLOG(3) << "FIRE_LOOP_EARLY KnobParam received: "
-                << static_cast<bool>(val);
-        return {};
-      });
-  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACING_TIMER_TICK),
       [](QuicServerTransport* serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
@@ -1208,30 +1169,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverConn->transportSettings.defaultPriority =
             HTTPPriorityQueue::Priority(level, incremental);
         VLOG(3) << "DEFAULT_STREAM_PRIORITY KnobParam received: " << val;
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::WRITE_LOOP_TIME_FRACTION),
-      [](QuicServerTransport* serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto val = std::get<uint64_t>(value);
-        auto serverConn = serverTransport->serverConn_;
-        serverConn->transportSettings.writeLimitRttFraction = val;
-        VLOG(3) << "WRITE_LOOP_TIME_FRACTION KnobParam received: " << val;
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::WRITES_PER_STREAM),
-      [](QuicServerTransport* serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        auto val = std::get<uint64_t>(value);
-        auto serverConn = serverTransport->serverConn_;
-        serverConn->transportSettings.priorityQueueWritesPerStream = val;
-        serverConn->streamManager->setWriteQueueMaxNextsPerStream(
-            serverConn->transportSettings.priorityQueueWritesPerStream);
-        VLOG(3) << "WRITES_PER_STREAM KnobParam received: " << val;
         return {};
       });
   registerTransportKnobParamHandler(
@@ -1282,21 +1219,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         server_conn->transportSettings.initiateKeyUpdate = val > 0;
         server_conn->transportSettings.keyUpdatePacketCountInterval = val;
         VLOG(3) << "KEY_UPDATE_INTERVAL KnobParam received: " << val;
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(
-          TransportKnobParamId::USE_NEW_STREAM_BLOCKED_CONDITION),
-      [](QuicServerTransport* serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        CHECK(serverTransport);
-        bool useNewStreamBlockedCondition =
-            static_cast<bool>(std::get<uint64_t>(value));
-        auto server_conn = serverTransport->serverConn_;
-        server_conn->transportSettings.useNewStreamBlockedCondition =
-            useNewStreamBlockedCondition;
-        VLOG(3) << "USE_NEW_STREAM_BLOCKED_CONDITION KnobParam received: "
-                << useNewStreamBlockedCondition;
         return {};
       });
   registerTransportKnobParamHandler(
