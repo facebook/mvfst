@@ -339,9 +339,10 @@ TEST_F(
   auto customTransportParams = getSupportedExtTransportParams(clientConn);
   EXPECT_THAT(
       customTransportParams,
-      Contains(testing::Field(
-          &TransportParameter::parameter,
-          testing::Eq(TransportParameterId::reliable_stream_reset))));
+      Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::reliable_stream_reset))));
   auto it = findParameter(
       customTransportParams, TransportParameterId::reliable_stream_reset);
   EXPECT_TRUE(it->value->empty());
@@ -356,9 +357,10 @@ TEST_F(
   auto customTransportParams = getSupportedExtTransportParams(clientConn);
   EXPECT_THAT(
       customTransportParams,
-      Not(Contains(testing::Field(
-          &TransportParameter::parameter,
-          testing::Eq(TransportParameterId::reliable_stream_reset)))));
+      Not(Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::reliable_stream_reset)))));
 }
 
 struct maxStreamGroupsAdvertizedtestStruct {

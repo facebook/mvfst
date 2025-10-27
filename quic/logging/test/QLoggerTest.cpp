@@ -1399,16 +1399,18 @@ TEST_F(QLoggerTest, PrettyStream) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-  }));
+  q->setDcid(
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+          }));
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(q->logs.size(), 0);
 
@@ -1510,16 +1512,18 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-  }));
+  q->setDcid(
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+          }));
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(q->logs.size(), 0);
 
@@ -1750,16 +1754,18 @@ TEST_F(QLoggerTest, PrettyDatagram) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-  }));
+  q->setDcid(
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+          }));
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(q->logs.size(), 0);
 
@@ -1907,16 +1913,18 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
   rng.seed(
       std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-  q->setDcid(ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-      static_cast<uint8_t>(
-          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
-  }));
+  q->setDcid(
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+              static_cast<uint8_t>(folly::Random::rand32(
+                  0, std::numeric_limits<uint8_t>::max(), rng)),
+          }));
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(q->logs.size(), 0);
 

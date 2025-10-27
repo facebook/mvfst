@@ -1117,8 +1117,9 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
 
   EXPECT_CALL(*rawConnIdAlgo, canParseNonConst(_)).WillOnce(Return(true));
   EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
-      .WillOnce(Return(quic::make_unexpected(QuicError(
-          TransportErrorCode::INTERNAL_ERROR, "This CID has COVID-19"))));
+      .WillOnce(Return(
+          quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR, "This CID has COVID-19"))));
   EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
   EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
@@ -2237,8 +2238,10 @@ class QuicServerTest : public Test {
                   [&, expected = std::shared_ptr<folly::IOBuf>(data->clone())](
                       auto, const auto& networkData, const auto&) mutable {
                     EXPECT_GT(networkData.getPackets().size(), 0);
-                    EXPECT_TRUE(folly::IOBufEqualTo()(
-                        *networkData.getPackets()[0].buf.front(), *expected));
+                    EXPECT_TRUE(
+                        folly::IOBufEqualTo()(
+                            *networkData.getPackets()[0].buf.front(),
+                            *expected));
                     std::unique_lock<std::mutex> lg(m);
                     calledOnNetworkData = true;
                     cv.notify_one();
@@ -2407,8 +2410,9 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   EXPECT_CALL(*transport, onNetworkData(_, _, _))
       .WillOnce(Invoke([&](auto, const auto& networkData, const auto&) {
         EXPECT_GT(networkData.getPackets().size(), 0);
-        EXPECT_TRUE(folly::IOBufEqualTo()(
-            *networkData.getPackets()[0].buf.front(), *initialData));
+        EXPECT_TRUE(
+            folly::IOBufEqualTo()(
+                *networkData.getPackets()[0].buf.front(), *initialData));
       }));
 
   static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
@@ -2511,8 +2515,9 @@ class QuicServerTakeoverTest : public Test {
               .WillOnce(Invoke([&, expected = data.get()](
                                    auto, const auto& networkData, const auto&) {
                 EXPECT_GT(networkData.getPackets().size(), 0);
-                EXPECT_TRUE(folly::IOBufEqualTo()(
-                    *networkData.getPackets()[0].buf.front(), *expected));
+                EXPECT_TRUE(
+                    folly::IOBufEqualTo()(
+                        *networkData.getPackets()[0].buf.front(), *expected));
                 baton.post();
               }));
           return transport;
@@ -2619,8 +2624,9 @@ class QuicServerTakeoverTest : public Test {
         .WillOnce(Invoke([&, expected = data.get()](
                              auto, const auto& networkData, const auto&) {
           EXPECT_GT(networkData.getPackets().size(), 0);
-          EXPECT_TRUE(folly::IOBufEqualTo()(
-              *networkData.getPackets()[0].buf.front(), *expected));
+          EXPECT_TRUE(
+              folly::IOBufEqualTo()(
+                  *networkData.getPackets()[0].buf.front(), *expected));
           b1.post();
         }));
     // new quic server receives the packet and forwards it
@@ -3093,8 +3099,9 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
             .WillOnce(Invoke([&, expected = data.get()](
                                  auto, const auto& networkData, const auto&) {
               EXPECT_GT(networkData.getPackets().size(), 0);
-              EXPECT_TRUE(folly::IOBufEqualTo()(
-                  *networkData.getPackets()[0].buf.front(), *expected));
+              EXPECT_TRUE(
+                  folly::IOBufEqualTo()(
+                      *networkData.getPackets()[0].buf.front(), *expected));
               b.post();
             }));
         return transport;

@@ -805,8 +805,9 @@ TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
   quicStreamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(5),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          std::move(bufWritten1), 5, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              std::move(bufWritten1), 5, false)));
   ASSERT_FALSE(
       updateFlowControlOnWriteToSocket(*quicStreamState, 4).hasError());
 
@@ -817,8 +818,9 @@ TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
   quicStreamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(9),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          std::move(bufWritten2), 9, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              std::move(bufWritten2), 9, false)));
   ASSERT_FALSE(
       updateFlowControlOnWriteToSocket(*quicStreamState, 2).hasError());
 

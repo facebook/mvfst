@@ -83,14 +83,16 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
       folly::range(cipherBytes.packetNumber));
   ASSERT_FALSE(encryptResult.hasError());
   EXPECT_EQ(
-      quic::hexlify(std::string(
-          reinterpret_cast<const char*>(cipherBytes.initial.data()),
-          cipherBytes.initial.size())),
+      quic::hexlify(
+          std::string(
+              reinterpret_cast<const char*>(cipherBytes.initial.data()),
+              cipherBytes.initial.size())),
       GetParam().initialByte);
   EXPECT_EQ(
-      quic::hexlify(std::string(
-          reinterpret_cast<const char*>(cipherBytes.packetNumber.data()),
-          cipherBytes.packetNumber.size())),
+      quic::hexlify(
+          std::string(
+              reinterpret_cast<const char*>(cipherBytes.packetNumber.data()),
+              cipherBytes.packetNumber.size())),
       GetParam().packetNumberBytes);
   auto decryptResult = cipher->decryptLongHeader(
       cipherBytes.sample,
@@ -98,14 +100,16 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
       folly::range(cipherBytes.packetNumber));
   ASSERT_FALSE(decryptResult.hasError());
   EXPECT_EQ(
-      quic::hexlify(std::string(
-          reinterpret_cast<const char*>(cipherBytes.initial.data()),
-          cipherBytes.initial.size())),
+      quic::hexlify(
+          std::string(
+              reinterpret_cast<const char*>(cipherBytes.initial.data()),
+              cipherBytes.initial.size())),
       GetParam().decryptedInitialByte);
   EXPECT_EQ(
-      quic::hexlify(std::string(
-          reinterpret_cast<const char*>(cipherBytes.packetNumber.data()),
-          cipherBytes.packetNumber.size())),
+      quic::hexlify(
+          std::string(
+              reinterpret_cast<const char*>(cipherBytes.packetNumber.data()),
+              cipherBytes.packetNumber.size())),
       GetParam().decryptedPacketNumberBytes);
 }
 

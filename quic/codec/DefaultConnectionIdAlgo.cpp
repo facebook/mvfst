@@ -37,9 +37,10 @@ quic::Expected<void, quic::QuicError> setVersionBitsInConnId(
     quic::ConnectionId& connId,
     quic::ConnectionIdVersion version) noexcept {
   if (UNLIKELY(connId.size() == 0)) {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR,
-        "ConnectionId is too small for version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "ConnectionId is too small for version"));
   }
   // clear 0-1 bits
   connId.data()[0] &= (~kShortVersionBitsMask);
@@ -54,9 +55,10 @@ quic::Expected<void, quic::QuicError> setVersionBitsInConnId(
 quic::Expected<quic::ConnectionIdVersion, quic::QuicError>
 getVersionBitsFromConnId(const quic::ConnectionId& connId) noexcept {
   if (UNLIKELY(connId.size() == 0)) {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR,
-        "ConnectionId is too small for version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "ConnectionId is too small for version"));
   }
   uint8_t version = 0;
   version = (kShortVersionBitsMask & connId.data()[0]) >> 6;
@@ -72,9 +74,10 @@ quic::Expected<void, quic::QuicError> setHostIdBitsInConnId(
     quic::ConnectionIdVersion version) noexcept {
   if (version == quic::ConnectionIdVersion::V1) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV1Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V1"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V1"));
     }
     uint16_t hostIdV1 = hostId;
     // clear 2 - 7 bits
@@ -93,9 +96,10 @@ quic::Expected<void, quic::QuicError> setHostIdBitsInConnId(
     return {};
   } else if (version == quic::ConnectionIdVersion::V2) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV2Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V2"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V2"));
     }
     connId.data()[1] = hostId >> 16;
     connId.data()[2] = hostId >> 8;
@@ -103,9 +107,10 @@ quic::Expected<void, quic::QuicError> setHostIdBitsInConnId(
     return {};
   } else if (version == quic::ConnectionIdVersion::V3) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V3"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V3"));
     }
     connId.data()[1] = hostId >> 24;
     connId.data()[2] = hostId >> 16;
@@ -113,8 +118,10 @@ quic::Expected<void, quic::QuicError> setHostIdBitsInConnId(
     connId.data()[4] = hostId;
     return {};
   } else {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR, "Unsupported CID version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "Unsupported CID version"));
   }
 }
 
@@ -125,9 +132,10 @@ quic::Expected<uint32_t, quic::QuicError> getHostIdBitsInConnId(
     const quic::ConnectionId& connId,
     quic::ConnectionIdVersion version) noexcept {
   if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV1Size)) {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR,
-        "ConnectionId is too small for hostid"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "ConnectionId is too small for hostid"));
   }
   if (version == quic::ConnectionIdVersion::V1) {
     uint16_t hostId = 0;
@@ -142,9 +150,10 @@ quic::Expected<uint32_t, quic::QuicError> getHostIdBitsInConnId(
     return hostId;
   } else if (version == quic::ConnectionIdVersion::V2) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV2Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V2"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V2"));
     }
     uint32_t hostId = 0;
     hostId |= connId.data()[1] << 16;
@@ -153,9 +162,10 @@ quic::Expected<uint32_t, quic::QuicError> getHostIdBitsInConnId(
     return hostId;
   } else if (version == quic::ConnectionIdVersion::V3) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V3"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V3"));
     }
     uint32_t hostId = 0;
     hostId |= connId.data()[1] << 24;
@@ -164,8 +174,10 @@ quic::Expected<uint32_t, quic::QuicError> getHostIdBitsInConnId(
     hostId |= connId.data()[4];
     return hostId;
   } else {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR, "Unsupported CID version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "Unsupported CID version"));
   }
 }
 
@@ -178,9 +190,10 @@ quic::Expected<void, quic::QuicError> setWorkerIdBitsInConnId(
     quic::ConnectionIdVersion version) noexcept {
   if (version == quic::ConnectionIdVersion::V1) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV1Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for workerid"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for workerid"));
     }
     // clear 18-23 bits
     connId.data()[2] &= 0xc0;
@@ -193,23 +206,27 @@ quic::Expected<void, quic::QuicError> setWorkerIdBitsInConnId(
     return {};
   } else if (version == quic::ConnectionIdVersion::V2) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV2Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V2"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V2"));
     }
     connId.data()[4] = workerId;
     return {};
   } else if (version == quic::ConnectionIdVersion::V3) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for hostid V3"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for hostid V3"));
     }
     connId.data()[5] = workerId;
     return {};
   } else {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR, "Unsupported CID version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "Unsupported CID version"));
   }
 }
 
@@ -221,9 +238,10 @@ quic::Expected<uint8_t, quic::QuicError> getWorkerIdFromConnId(
     quic::ConnectionIdVersion version) noexcept {
   if (version == quic::ConnectionIdVersion::V1) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV1Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for workerid"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for workerid"));
     }
     // get 18 - 23 bits from the connId
     uint8_t workerId = connId.data()[2] << 2;
@@ -232,21 +250,25 @@ quic::Expected<uint8_t, quic::QuicError> getWorkerIdFromConnId(
     return workerId;
   } else if (version == quic::ConnectionIdVersion::V2) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV2Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for workerid V2"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for workerid V2"));
     }
     return connId.data()[4];
   } else if (version == quic::ConnectionIdVersion::V3) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for workerid V3"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for workerid V3"));
     }
     return connId.data()[5];
   } else {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR, "Unsupported CID version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "Unsupported CID version"));
   }
 }
 
@@ -259,9 +281,10 @@ quic::Expected<void, quic::QuicError> setProcessIdBitsInConnId(
     quic::ConnectionIdVersion version) noexcept {
   if (version == quic::ConnectionIdVersion::V1) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV1Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for processid"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for processid"));
     }
     // clear the 26th bit
     connId.data()[3] &= (~kProcessIdV1BitMask);
@@ -269,9 +292,10 @@ quic::Expected<void, quic::QuicError> setProcessIdBitsInConnId(
     return {};
   } else if (version == quic::ConnectionIdVersion::V2) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV2Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for processid V2"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for processid V2"));
     }
     // clear the 40th bit
     connId.data()[5] &= (~kProcessIdV2BitMask);
@@ -279,17 +303,20 @@ quic::Expected<void, quic::QuicError> setProcessIdBitsInConnId(
     return {};
   } else if (version == quic::ConnectionIdVersion::V3) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for processid V3"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for processid V3"));
     }
     // clear the 40th bit
     connId.data()[6] &= (~kProcessIdV3BitMask);
     connId.data()[6] |= (kProcessIdV3BitMask & (processId << 7));
     return {};
   } else {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR, "Unsupported CID version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "Unsupported CID version"));
   }
 }
 
@@ -301,34 +328,39 @@ quic::Expected<uint8_t, quic::QuicError> getProcessIdBitsFromConnId(
     quic::ConnectionIdVersion version) noexcept {
   if (version == quic::ConnectionIdVersion::V1) {
     if (connId.size() < quic::kMinSelfConnectionIdV1Size) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for processid"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for processid"));
     }
     uint8_t processId = 0;
     processId = (kProcessIdV1BitMask & connId.data()[3]) >> 5;
     return processId;
   } else if (version == quic::ConnectionIdVersion::V2) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV2Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for processid V2"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for processid V2"));
     }
     uint8_t processId = 0;
     processId = (kProcessIdV2BitMask & connId.data()[5]) >> 7;
     return processId;
   } else if (version == quic::ConnectionIdVersion::V3) {
     if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdV3Size)) {
-      return quic::make_unexpected(quic::QuicError(
-          quic::TransportErrorCode::INTERNAL_ERROR,
-          "ConnectionId is too small for processid V3"));
+      return quic::make_unexpected(
+          quic::QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR,
+              "ConnectionId is too small for processid V3"));
     }
     uint8_t processId = 0;
     processId = (kProcessIdV3BitMask & connId.data()[6]) >> 7;
     return processId;
   } else {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::INTERNAL_ERROR, "Unsupported CID version"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::INTERNAL_ERROR,
+            "Unsupported CID version"));
   }
 }
 } // namespace

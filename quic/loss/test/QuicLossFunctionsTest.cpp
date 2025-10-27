@@ -2854,14 +2854,15 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
     // This matches the stream packet index to the one used by the packet.
-    op.packet.frames.emplace_back(WriteStreamFrame{
-        0,
-        10,
-        100,
-        false,
-        true,
-        std::nullopt,
-        op.packet.header.getPacketSequenceNum()});
+    op.packet.frames.emplace_back(
+        WriteStreamFrame{
+            0,
+            10,
+            100,
+            false,
+            true,
+            std::nullopt,
+            op.packet.header.getPacketSequenceNum()});
     op.isDSRPacket = true;
     conn->outstandings.dsrCount++;
   }
@@ -3046,14 +3047,15 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
   }
   // Add some DSR frames
   for (auto& op : conn->outstandings.packets) {
-    op.packet.frames.emplace_back(WriteStreamFrame{
-        0,
-        10,
-        100,
-        false,
-        true,
-        std::nullopt,
-        op.packet.header.getPacketSequenceNum()});
+    op.packet.frames.emplace_back(
+        WriteStreamFrame{
+            0,
+            10,
+            100,
+            false,
+            true,
+            std::nullopt,
+            op.packet.header.getPacketSequenceNum()});
     op.isDSRPacket = true;
     conn->outstandings.dsrCount++;
   }

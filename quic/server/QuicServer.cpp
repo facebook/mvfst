@@ -258,8 +258,9 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
   worker->setCongestionControllerFactory(ccFactory_);
   if (rateLimit_) {
-    worker->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(
-        rateLimit_->count, rateLimit_->window));
+    worker->setRateLimiter(
+        std::make_unique<SlidingWindowRateLimiter>(
+            rateLimit_->count, rateLimit_->window));
   }
   worker->setUnfinishedHandshakeLimit(unfinishedHandshakeLimitFn_);
   worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);

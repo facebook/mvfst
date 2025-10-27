@@ -58,9 +58,10 @@ TEST(OutstandingPacketTest, BasicPacketDestructionCallback) {
   EXPECT_EQ(maxPackets, packets.size());
   EXPECT_CALL(
       *rawPacketProcessor,
-      onPacketDestroyed(testing::Property(
-          &OutstandingPacket::getPacketSequenceNum,
-          AllOf(Lt(maxPackets + 1), Gt(0)))))
+      onPacketDestroyed(
+          testing::Property(
+              &OutstandingPacket::getPacketSequenceNum,
+              AllOf(Lt(maxPackets + 1), Gt(0)))))
       .Times(maxPackets);
 
   // Erase all packets and check the number of destructors
@@ -110,9 +111,10 @@ TEST(OutstandingPacketTest, BasicPacketDestructionDequeDestroy) {
     // callbacks.
     EXPECT_CALL(
         *rawPacketProcessor,
-        onPacketDestroyed(testing::Property(
-            &OutstandingPacket::getPacketSequenceNum,
-            AllOf(Lt(maxPackets + 1), Gt(0)))))
+        onPacketDestroyed(
+            testing::Property(
+                &OutstandingPacket::getPacketSequenceNum,
+                AllOf(Lt(maxPackets + 1), Gt(0)))))
         .Times(maxPackets);
   }
 }

@@ -581,13 +581,14 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     client->addNewPeerAddress(serverAddr);
     client->setHostname(hostname_);
     ON_CALL(*sock, write(testing::_, testing::_, testing::_))
-        .WillByDefault(testing::Invoke([&](const folly::SocketAddress&,
-                                           const struct iovec* vec,
-                                           size_t iovec_len) {
-          socketWrites.push_back(
-              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
-          return getTotalIovecLen(vec, iovec_len);
-        }));
+        .WillByDefault(
+            testing::Invoke([&](const folly::SocketAddress&,
+                                const struct iovec* vec,
+                                size_t iovec_len) {
+              socketWrites.push_back(
+                  copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+              return getTotalIovecLen(vec, iovec_len);
+            }));
     ON_CALL(*sock, address()).WillByDefault(testing::Return(serverAddr));
 
     setupCryptoLayer();

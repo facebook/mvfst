@@ -468,8 +468,9 @@ TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition3) {
   stream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf), 0, false)));
   auto result = sendAckSMHandler(stream, streamFrame);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);
@@ -490,8 +491,9 @@ TEST_F(QuicResetSentStateTest, ResetSentToClosedTransition4) {
   stream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf), 0, false)));
   auto result = sendAckSMHandler(stream, streamFrame);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::ResetSent);
@@ -1077,8 +1079,9 @@ TEST_F(QuicUnidirectionalStreamTest, OpenFinalAckStreamFrame) {
   stream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(1),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf), 1, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf), 1, false)));
   auto result = sendAckSMHandler(stream, streamFrame);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::Closed);

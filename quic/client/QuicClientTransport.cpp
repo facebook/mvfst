@@ -104,10 +104,11 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsgWrapper(
         if (conn_->loopDetectorCallback) {
           conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
         }
-        onReadError(folly::AsyncSocketException(
-            folly::AsyncSocketException::INTERNAL_ERROR,
-            "::recvmmsg() failed",
-            errno));
+        onReadError(
+            folly::AsyncSocketException(
+                folly::AsyncSocketException::INTERNAL_ERROR,
+                "::recvmmsg() failed",
+                errno));
         break;
       case NoReadReason::READ_OK:
       case NoReadReason::EMPTY_DATA:

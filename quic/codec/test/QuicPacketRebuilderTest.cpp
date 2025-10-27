@@ -159,13 +159,15 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf), 0, true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf), 0, true)));
   conn.cryptoState->oneRttStream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(cryptoBuf), 0, true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(cryptoBuf), 0, true)));
   // Write an updated ackState that should be used when rebuilding the AckFrame
   conn.ackStates.appDataAckState.acks.insert(1000, 1200);
   conn.ackStates.appDataAckState.largestRecvdPacketTime = quic::Clock::now();
@@ -321,8 +323,9 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(), 0, true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(), 0, true)));
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -387,8 +390,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf), 0, true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf), 0, true)));
   // Do not add the buf to crypto stream's retransmission buffer,
   // imagine it was cleared
 
@@ -503,8 +507,9 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf), 0, true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf), 0, true)));
 
   // new builder has a much smaller writable bytes limit
   ShortHeader shortHeader2(
@@ -613,13 +618,17 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf1), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf1), 0, false)));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(buf1->computeChainDataLength()),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf2), buf1->computeChainDataLength(), true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf2),
+              buf1->computeChainDataLength(),
+              true)));
   MockQuicPacketBuilder mockBuilder;
   size_t packetLimit = 1200;
   EXPECT_CALL(mockBuilder, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
@@ -691,13 +700,15 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(buf1), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(buf1), 0, false)));
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(buf1->computeChainDataLength()),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(), buf1->computeChainDataLength(), true)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(), buf1->computeChainDataLength(), true)));
 
   MockQuicPacketBuilder mockBuilder;
   size_t packetLimit = 1200;

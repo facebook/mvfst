@@ -35,13 +35,14 @@ uint64_t writeProbingDataToSocketForTest(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "test")
-                                           .streamFrames()
-                                           .cryptoFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "test")
+                                     .streamFrames()
+                                     .cryptoFrames())
                                  .build();
   auto result = writeProbingDataToSocket(
       sock,
@@ -71,10 +72,11 @@ void writeCryptoDataProbesToSocketForTest(
   auto encryptionLevel =
       protectionTypeToEncryptionLevel(longHeaderTypeToProtectionType(type));
   auto pnSpace = LongHeader::typeToPacketNumberSpace(type);
-  auto scheduler = std::move(FrameScheduler::Builder(
-                                 conn, encryptionLevel, pnSpace, "Crypto")
-                                 .cryptoFrames())
-                       .build();
+  auto scheduler =
+      std::move(
+          FrameScheduler::Builder(conn, encryptionLevel, pnSpace, "Crypto")
+              .cryptoFrames())
+          .build();
   CHECK(!writeProbingDataToSocket(
              sock,
              conn,
@@ -2026,13 +2028,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
               OptionalIntegral<uint64_t>(frameOffset)),
           testing::Field(
               &PacketStreamDetails::streamIntervals,
-              testing::ElementsAre(Interval<uint64_t>(
-                  frameOffset, frameOffset + frameLen - 1)))));
+              testing::ElementsAre(
+                  Interval<uint64_t>(
+                      frameOffset, frameOffset + frameLen - 1)))));
   const auto pktMatcher = testing::Field(
       &OutstandingPacketWrapper::metadata,
-      testing::AllOf(testing::Field(
-          &OutstandingPacketMetadata::detailsPerStream,
-          testing::UnorderedElementsAre(streamMatcher))));
+      testing::AllOf(
+          testing::Field(
+              &OutstandingPacketMetadata::detailsPerStream,
+              testing::UnorderedElementsAre(streamMatcher))));
 
   EXPECT_THAT(conn->outstandings.packets, ElementsAre(pktMatcher));
 }
@@ -2074,9 +2078,10 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
               testing::ElementsAre(Interval<uint64_t>(0, 14)))));
   const auto pktMatcher = testing::Field(
       &OutstandingPacketWrapper::metadata,
-      testing::AllOf(testing::Field(
-          &OutstandingPacketMetadata::detailsPerStream,
-          testing::UnorderedElementsAre(streamMatcher))));
+      testing::AllOf(
+          testing::Field(
+              &OutstandingPacketMetadata::detailsPerStream,
+              testing::UnorderedElementsAre(streamMatcher))));
 
   EXPECT_THAT(conn->outstandings.packets, ElementsAre(pktMatcher));
 }
@@ -2118,13 +2123,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 OptionalIntegral<uint64_t>(frame1Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    frame1Offset, frame1Offset + frame1Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame1Offset + frame1Len - 1)))));
     const auto pktMatcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
   }
@@ -2157,13 +2164,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    frame1Offset, frame1Offset + frame1Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame1Offset + frame1Len - 1)))));
     const auto pktMatcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
   }
@@ -2204,13 +2213,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 OptionalIntegral<uint64_t>(frame2Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    frame1Offset, frame2Offset + frame2Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame2Offset + frame2Len - 1)))));
     const auto pktMatcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
   }
@@ -2245,13 +2256,15 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
                 OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    frame1Offset, frame2Offset + frame2Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame2Offset + frame2Len - 1)))));
     const auto pktMatcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
   }
@@ -2315,23 +2328,26 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                   OptionalIntegral<uint64_t>(frameOffset)),
               testing::Field(
                   &PacketStreamDetails::streamIntervals,
-                  testing::ElementsAre(Interval<uint64_t>(
-                      frameOffset, frameOffset + frameLen - 1)))));
+                  testing::ElementsAre(
+                      Interval<uint64_t>(
+                          frameOffset, frameOffset + frameLen - 1)))));
     };
 
     const auto pkt1Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame1Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame1Offset)))));
 
     const auto pkt2Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame2Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame2Offset)))));
 
     EXPECT_THAT(
         conn->outstandings.packets, ElementsAre(pkt1Matcher, pkt2Matcher));
@@ -2368,14 +2384,16 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
                 // contains frame1 and frame2
-                testing::ElementsAre(Interval<uint64_t>(
-                    frame1Offset, frame2Offset + frameLen - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame2Offset + frameLen - 1)))));
 
     const auto pkt3Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamDetailsMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamDetailsMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pkt3Matcher));
   }
@@ -2458,30 +2476,34 @@ TEST_F(
                   OptionalIntegral<uint64_t>(frameOffset)),
               testing::Field(
                   &PacketStreamDetails::streamIntervals,
-                  testing::ElementsAre(Interval<uint64_t>(
-                      frameOffset, frameOffset + frameLen - 1)))));
+                  testing::ElementsAre(
+                      Interval<uint64_t>(
+                          frameOffset, frameOffset + frameLen - 1)))));
     };
 
     const auto pkt1Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame1Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame1Offset)))));
 
     const auto pkt2Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame2Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame2Offset)))));
 
     const auto pkt3Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame3Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame3Offset)))));
 
     EXPECT_THAT(
         conn->outstandings.packets,
@@ -2526,9 +2548,10 @@ TEST_F(
 
     const auto pkt4Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamDetailsMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamDetailsMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pkt4Matcher));
   }
@@ -2613,30 +2636,34 @@ TEST_F(
                   OptionalIntegral<uint64_t>(frameOffset)),
               testing::Field(
                   &PacketStreamDetails::streamIntervals,
-                  testing::ElementsAre(Interval<uint64_t>(
-                      frameOffset, frameOffset + frameLen - 1)))));
+                  testing::ElementsAre(
+                      Interval<uint64_t>(
+                          frameOffset, frameOffset + frameLen - 1)))));
     };
 
     const auto pkt1Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame1Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame1Offset)))));
 
     const auto pkt2Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame2Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame2Offset)))));
 
     const auto pkt3Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                getStreamDetailsMatcher(frame3Offset)))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame3Offset)))));
 
     EXPECT_THAT(
         conn->outstandings.packets,
@@ -2681,9 +2708,10 @@ TEST_F(
 
     const auto pkt4Matcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(streamDetailsMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamDetailsMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pkt4Matcher));
   }
@@ -2751,8 +2779,9 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 OptionalIntegral<uint64_t>(stream1Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    stream1Offset, stream1Offset + stream1Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        stream1Offset, stream1Offset + stream1Len - 1)))));
     auto stream2DetailsMatcher = testing::Pair(
         stream2Id,
         testing::AllOf(
@@ -2765,8 +2794,9 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 OptionalIntegral<uint64_t>(stream2Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    stream2Offset, stream2Offset + stream2Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        stream2Offset, stream2Offset + stream2Len - 1)))));
     auto stream3DetailsMatcher = testing::Pair(
         stream3Id,
         testing::AllOf(
@@ -2778,17 +2808,19 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 OptionalIntegral<uint64_t>(stream3Offset)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    stream3Offset, stream3Offset + stream3Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        stream3Offset, stream3Offset + stream3Len - 1)))));
 
     const auto pktMatcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                stream1DetailsMatcher,
-                stream2DetailsMatcher,
-                stream3DetailsMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    stream1DetailsMatcher,
+                    stream2DetailsMatcher,
+                    stream3DetailsMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, ElementsAre(pktMatcher));
   }
@@ -2823,8 +2855,9 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    stream1Offset, stream1Offset + stream1Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        stream1Offset, stream1Offset + stream1Len - 1)))));
     auto stream2DetailsMatcher = testing::Pair(
         stream2Id,
         testing::AllOf(
@@ -2835,8 +2868,9 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    stream2Offset, stream2Offset + stream2Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        stream2Offset, stream2Offset + stream2Len - 1)))));
     auto stream3DetailsMatcher = testing::Pair(
         stream3Id,
         testing::AllOf(
@@ -2847,17 +2881,19 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                 OptionalIntegral<uint64_t>(/* empty */)),
             testing::Field(
                 &PacketStreamDetails::streamIntervals,
-                testing::ElementsAre(Interval<uint64_t>(
-                    stream3Offset, stream3Offset + stream3Len - 1)))));
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        stream3Offset, stream3Offset + stream3Len - 1)))));
 
     const auto pktMatcher = testing::Field(
         &OutstandingPacketWrapper::metadata,
-        testing::AllOf(testing::Field(
-            &OutstandingPacketMetadata::detailsPerStream,
-            testing::UnorderedElementsAre(
-                stream1DetailsMatcher,
-                stream2DetailsMatcher,
-                stream3DetailsMatcher))));
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    stream1DetailsMatcher,
+                    stream2DetailsMatcher,
+                    stream3DetailsMatcher))));
 
     EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
   }
@@ -4785,13 +4821,15 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
   ASSERT_FALSE(handshakeStream->retransmissionBuffer.empty());
   auto lossBufferData1 = folly::IOBuf::copyBuffer(
       "I don't see the dialup info in the meeting invite");
-  initialStream->insertIntoLossBuffer(std::make_unique<WriteStreamBuffer>(
-      ChainedByteRangeHead(lossBufferData1), 0, false));
+  initialStream->insertIntoLossBuffer(
+      std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(lossBufferData1), 0, false));
 
   auto lossBufferData2 =
       folly::IOBuf::copyBuffer("Traffic Protocol Weekly Sync");
-  handshakeStream->insertIntoLossBuffer(std::make_unique<WriteStreamBuffer>(
-      ChainedByteRangeHead(lossBufferData2), 0, false));
+  handshakeStream->insertIntoLossBuffer(
+      std::make_unique<WriteStreamBuffer>(
+          ChainedByteRangeHead(lossBufferData2), 0, false));
 
   handshakeConfirmed(*conn);
   EXPECT_TRUE(initialStream->pendingWrites.empty());
@@ -4945,8 +4983,9 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
                            auto) {
         EXPECT_GT(bufPtr->length(), 0);
         EXPECT_GE(vec[0].iov_len, buf->length());
-        EXPECT_TRUE(folly::IOBufEqualTo()(
-            *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
+        EXPECT_TRUE(
+            folly::IOBufEqualTo()(
+                *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
         EXPECT_EQ(iovec_len, 1);
         return getTotalIovecLen(vec, iovec_len);
       }));
@@ -5018,8 +5057,9 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
                            QuicAsyncUDPSocket::WriteOptions options) {
         EXPECT_LE(options.gso, conn->udpSendPacketLen);
         EXPECT_GT(vec[0].iov_len, 0);
-        EXPECT_TRUE(folly::IOBufEqualTo()(
-            *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
+        EXPECT_TRUE(
+            folly::IOBufEqualTo()(
+                *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
         EXPECT_EQ(iovec_len, 1);
         return getTotalIovecLen(vec, iovec_len);
       }));
@@ -5071,8 +5111,9 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
             bufPtr->length(),
             conn->udpSendPacketLen *
                 conn->transportSettings.writeConnectionDataPacketsLimit);
-        EXPECT_TRUE(folly::IOBufEqualTo()(
-            *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
+        EXPECT_TRUE(
+            folly::IOBufEqualTo()(
+                *folly::IOBuf::wrapIov(vec, iovec_len), *bufPtr));
         EXPECT_EQ(iovec_len, 1);
         return getTotalIovecLen(vec, iovec_len);
       }));

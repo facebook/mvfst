@@ -1028,13 +1028,17 @@ class QuicClientTransportTest : public QuicClientTransportTestBase {
 };
 
 TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
-  client->onReadError(folly::AsyncSocketException(
-      folly::AsyncSocketException::INTERNAL_ERROR, "Where you wanna go", -1));
+  client->onReadError(
+      folly::AsyncSocketException(
+          folly::AsyncSocketException::INTERNAL_ERROR,
+          "Where you wanna go",
+          -1));
   EXPECT_FALSE(client->isClosed());
-  client->onReadError(folly::AsyncSocketException(
-      folly::AsyncSocketException::INTERNAL_ERROR,
-      "He never saw it coming at all",
-      -1));
+  client->onReadError(
+      folly::AsyncSocketException(
+          folly::AsyncSocketException::INTERNAL_ERROR,
+          "He never saw it coming at all",
+          -1));
   eventbase_->loopOnce();
   EXPECT_TRUE(client->isClosed());
 }
@@ -1737,7 +1741,7 @@ class QuicClientTransportHappyEyeballsTest
     cmsgbuf.hdr.cmsg_level = SOL_IPV6;
     cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
 
-    struct sock_extended_err err {};
+    struct sock_extended_err err{};
 
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
@@ -1786,7 +1790,7 @@ class QuicClientTransportHappyEyeballsTest
     cmsgbuf.hdr.cmsg_level = SOL_IPV6;
     cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
 
-    struct sock_extended_err err {};
+    struct sock_extended_err err{};
 
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
@@ -1835,7 +1839,7 @@ class QuicClientTransportHappyEyeballsTest
     cmsgbuf.hdr.cmsg_level = SOL_IP;
     cmsgbuf.hdr.cmsg_type = IP_RECVERR;
 
-    struct sock_extended_err err {};
+    struct sock_extended_err err{};
 
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
@@ -1885,7 +1889,7 @@ class QuicClientTransportHappyEyeballsTest
     cmsgbuf.hdr.cmsg_level = SOL_IP;
     cmsgbuf.hdr.cmsg_type = IP_RECVERR;
 
-    struct sock_extended_err err {};
+    struct sock_extended_err err{};
 
     err.ee_errno = EBADF;
     auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
@@ -4870,8 +4874,9 @@ TEST_F(QuicClientTransportAfterStartTest, SetCongestionControlBbr) {
   // Change to BBR, which requires enable pacing first
   client->setCongestionControllerFactory(
       std::make_shared<DefaultCongestionControllerFactory>());
-  client->setPacingTimer(std::make_shared<quic::HighResQuicTimer>(
-      qEvb_->getBackingEventBase(), 1ms));
+  client->setPacingTimer(
+      std::make_shared<quic::HighResQuicTimer>(
+          qEvb_->getBackingEventBase(), 1ms));
   client->getNonConstConn().transportSettings.pacingEnabled = true;
   client->setCongestionControl(CongestionControlType::BBR);
   cc = client->getConn().congestionController.get();

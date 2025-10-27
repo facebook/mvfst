@@ -270,8 +270,10 @@ void ServerHandshake::onHandshakeDone() {
 
 void ServerHandshake::addProcessingActions(fizz::server::AsyncActions actions) {
   if (actionGuard_) {
-    onError(std::make_pair(
-        "Processing action while pending", TransportErrorCode::INTERNAL_ERROR));
+    onError(
+        std::make_pair(
+            "Processing action while pending",
+            TransportErrorCode::INTERNAL_ERROR));
     return;
   }
   actionGuard_ = folly::DelayedDestruction::DestructorGuard(conn_);
@@ -362,9 +364,10 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   explicit ActionMoveVisitor(ServerHandshake& server) : server_(server) {}
 
   void operator()(fizz::DeliverAppData&) {
-    server_.onError(std::make_pair(
-        "Unexpected data on crypto stream",
-        TransportErrorCode::PROTOCOL_VIOLATION));
+    server_.onError(
+        std::make_pair(
+            "Unexpected data on crypto stream",
+            TransportErrorCode::PROTOCOL_VIOLATION));
   }
 
   void operator()(fizz::WriteToSocket& write) {
@@ -403,13 +406,15 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
               fe->getAlert().value());
       alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
           TransportErrorCode::CRYPTO_ERROR);
-      server_.onError(std::make_pair(
-          errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum)));
+      server_.onError(
+          std::make_pair(
+              errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum)));
     } else {
-      server_.onError(std::make_pair(
-          errMsg.toStdString(),
-          static_cast<TransportErrorCode>(
-              fizz::AlertDescription::internal_error)));
+      server_.onError(
+          std::make_pair(
+              errMsg.toStdString(),
+              static_cast<TransportErrorCode>(
+                  fizz::AlertDescription::internal_error)));
     }
   }
 
@@ -426,9 +431,10 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   }
 
   void operator()(fizz::EndOfData&) {
-    server_.onError(std::make_pair(
-        "Unexpected close notify received",
-        TransportErrorCode::INTERNAL_ERROR));
+    server_.onError(
+        std::make_pair(
+            "Unexpected close notify received",
+            TransportErrorCode::INTERNAL_ERROR));
   }
 
   void operator()(fizz::SecretAvailable& secretAvailable) {
@@ -539,8 +545,10 @@ void ServerHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   auto headerCipherResult = buildHeaderCipher(secret);
   if (headerCipherResult.hasError()) {
     LOG(ERROR) << "Failed to build header cipher";
-    onError(std::make_pair(
-        "Failed to build header cipher", TransportErrorCode::INTERNAL_ERROR));
+    onError(
+        std::make_pair(
+            "Failed to build header cipher",
+            TransportErrorCode::INTERNAL_ERROR));
     return;
   }
   std::unique_ptr<PacketNumberCipher> headerCipher =

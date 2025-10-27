@@ -1400,8 +1400,9 @@ struct SinglePacketBackpressureBatchWriterTest : public ::testing::Test {
 TEST_F(SinglePacketBackpressureBatchWriterTest, TestAppendRequestsFlush) {
   auto batchWriter = makeBatchWriter();
   CHECK(batchWriter);
-  CHECK(dynamic_cast<quic::SinglePacketBackpressureBatchWriter*>(
-      batchWriter.get()));
+  CHECK(
+      dynamic_cast<quic::SinglePacketBackpressureBatchWriter*>(
+          batchWriter.get()));
   EXPECT_TRUE(batchWriter->empty());
 
   auto buf = folly::IOBuf::copyBuffer("append attempt");
@@ -1415,8 +1416,9 @@ TEST_F(SinglePacketBackpressureBatchWriterTest, TestAppendRequestsFlush) {
 TEST_F(SinglePacketBackpressureBatchWriterTest, TestFailedWriteCachedOnEAGAIN) {
   auto batchWriter = makeBatchWriter();
   CHECK(batchWriter);
-  CHECK(dynamic_cast<quic::SinglePacketBackpressureBatchWriter*>(
-      batchWriter.get()));
+  CHECK(
+      dynamic_cast<quic::SinglePacketBackpressureBatchWriter*>(
+          batchWriter.get()));
   EXPECT_TRUE(batchWriter->empty());
 
   std::string testString = "append attempt";

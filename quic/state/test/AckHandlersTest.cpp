@@ -991,8 +991,10 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
 
   EXPECT_CALL(
       *rawPacketProcessor,
-      onPacketDestroyed(testing::Property(
-          &OutstandingPacket::getPacketSequenceNum, AllOf(Lt(1000), Gt(1)))))
+      onPacketDestroyed(
+          testing::Property(
+              &OutstandingPacket::getPacketSequenceNum,
+              AllOf(Lt(1000), Gt(1)))))
       .Times(998);
 
   ASSERT_FALSE(
@@ -1316,22 +1318,24 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   StreamId start = 45;
   std::vector<StreamId> ids(45 - 33 + 1);
   std::generate(ids.begin(), ids.end(), [&]() { return start--; });
-  EXPECT_TRUE(std::equal(
-      streams.rbegin(),
-      streams.rbegin() + (45 - 33 + 1),
-      ids.begin(),
-      ids.end(),
-      [](const auto& frame, auto id) { return frame.streamId == id; }));
+  EXPECT_TRUE(
+      std::equal(
+          streams.rbegin(),
+          streams.rbegin() + (45 - 33 + 1),
+          ids.begin(),
+          ids.end(),
+          [](const auto& frame, auto id) { return frame.streamId == id; }));
 
   start = 21;
   std::vector<StreamId> ids2(10);
   std::generate(ids2.begin(), ids2.end(), [&]() { return start--; });
-  EXPECT_TRUE(std::equal(
-      streams.rbegin() + (45 - 33 + 1),
-      streams.rend(),
-      ids2.begin(),
-      ids2.end(),
-      [](const auto& frame, auto id) { return frame.streamId == id; }));
+  EXPECT_TRUE(
+      std::equal(
+          streams.rbegin() + (45 - 33 + 1),
+          streams.rend(),
+          ids2.begin(),
+          ids2.end(),
+          [](const auto& frame, auto id) { return frame.streamId == id; }));
 
   std::vector<PacketNum> remainingPackets(11 + 5);
   std::iota(remainingPackets.begin(), remainingPackets.begin() + 11, 22);
@@ -1343,19 +1347,21 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
       actualPacketNumbers.push_back(op.packet.header.getPacketSequenceNum());
     }
   }
-  EXPECT_TRUE(std::equal(
-      actualPacketNumbers.begin(),
-      actualPacketNumbers.end(),
-      remainingPackets.begin(),
-      remainingPackets.end()));
+  EXPECT_TRUE(
+      std::equal(
+          actualPacketNumbers.begin(),
+          actualPacketNumbers.end(),
+          remainingPackets.begin(),
+          remainingPackets.end()));
 
   std::vector<PacketNum> actualLostPackets = {10, 11};
 
-  EXPECT_TRUE(std::equal(
-      actualLostPackets.begin(),
-      actualLostPackets.end(),
-      lostPackets.begin(),
-      lostPackets.end()));
+  EXPECT_TRUE(
+      std::equal(
+          actualLostPackets.begin(),
+          actualLostPackets.end(),
+          lostPackets.begin(),
+          lostPackets.end()));
 }
 
 TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
@@ -1458,12 +1464,13 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   StreamId start = 20;
   std::vector<StreamId> ids(20 - 10 + 1);
   std::generate(ids.begin(), ids.end(), [&]() { return start--; });
-  EXPECT_TRUE(std::equal(
-      streams.rbegin() + 1,
-      streams.rend(),
-      ids.begin(),
-      ids.end(),
-      [](const auto& frame, auto id) { return frame.streamId == id; }));
+  EXPECT_TRUE(
+      std::equal(
+          streams.rbegin() + 1,
+          streams.rend(),
+          ids.begin(),
+          ids.end(),
+          [](const auto& frame, auto id) { return frame.streamId == id; }));
 
   std::vector<PacketNum> remainingPackets(5);
   remainingPackets[0] = 23;
@@ -1482,11 +1489,12 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         return packet.packet.header.getPacketSequenceNum();
       });
 
-  EXPECT_TRUE(std::equal(
-      actualPacketNumbers.begin(),
-      actualPacketNumbers.end(),
-      remainingPackets.begin(),
-      remainingPackets.end()));
+  EXPECT_TRUE(
+      std::equal(
+          actualPacketNumbers.begin(),
+          actualPacketNumbers.end(),
+          remainingPackets.begin(),
+          remainingPackets.end()));
 }
 
 TEST_P(AckHandlersTest, AckVisitorForAckTest) {
@@ -7054,9 +7062,10 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
-                                         .setStreamID(s1Id)
-                                         .build())),
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .build())),
             // pkt2
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
@@ -7126,9 +7135,10 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
-                                         .setStreamID(s1Id)
-                                         .build()))));
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .build()))));
   }
 
   // deliver ACK for packet2
@@ -7208,9 +7218,10 @@ TEST_F(
             // pkt2
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
-                                         .setStreamID(s1Id)
-                                         .build()))));
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .build()))));
   }
 
   // deliver ACK for packet1
@@ -7356,9 +7367,10 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
-                                         .setStreamID(s1Id)
-                                         .build())),
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .build())),
             // pkt2
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
@@ -7432,9 +7444,10 @@ TEST_F(
             // pkt1
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
-                                         .setStreamID(s1Id)
-                                         .build()))));
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .build()))));
   }
 
   // deliver ACK for packet 2
@@ -7650,9 +7663,10 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
             // pkt3
             Field(
                 &AckEvent::AckPacket::detailsPerStream,
-                UnorderedElementsAre(AckEventStreamDetailsMatcherBuilder()
-                                         .setStreamID(s1Id)
-                                         .build()))));
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .build()))));
   }
 
   // deliver ACK for packet 4

@@ -93,8 +93,9 @@ class ConnectionWriteCallback {
    * Invoked when a connection is being torn down after
    * notifyPendingWriteOnConnection has been called
    */
-  virtual void onConnectionWriteError(QuicError
-                                      /* error */) noexcept {}
+  virtual void onConnectionWriteError(
+      QuicError
+      /* error */) noexcept {}
 };
 
 /**

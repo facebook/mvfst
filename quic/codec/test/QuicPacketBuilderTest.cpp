@@ -738,10 +738,11 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   BufPtr integrityTagObtained = BufHelpers::create(kRetryIntegrityTagLen);
   cursor.tryPull(integrityTagObtained->writableData(), kRetryIntegrityTagLen);
   integrityTagObtained->append(kRetryIntegrityTagLen);
-  EXPECT_TRUE(folly::IOBufEqualTo()(
-      *integrityTagObtained,
-      folly::IOBuf::wrapBufferAsValue(
-          integrityTag.data(), integrityTag.size())));
+  EXPECT_TRUE(
+      folly::IOBufEqualTo()(
+          *integrityTagObtained,
+          folly::IOBuf::wrapBufferAsValue(
+              integrityTag.data(), integrityTag.size())));
 }
 
 TEST_F(QuicPacketBuilderTest, RetryPacketGiganticToken) {

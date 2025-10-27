@@ -47,8 +47,9 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   explicit FollyQuicAsyncUDPSocket(std::shared_ptr<FollyQuicEventBase> qEvb)
       : evb_(std::move(qEvb)),
-        follySocketPtr(std::make_unique<folly::AsyncUDPSocket>(
-            evb_ ? evb_->getBackingEventBase() : nullptr)),
+        follySocketPtr(
+            std::make_unique<folly::AsyncUDPSocket>(
+                evb_ ? evb_->getBackingEventBase() : nullptr)),
         follySocket_(*follySocketPtr) {
     if (evb_) {
       CHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());

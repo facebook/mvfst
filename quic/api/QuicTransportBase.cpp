@@ -404,8 +404,9 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
     if (stream->streamReadError) {
       switch (stream->streamReadError->type()) {
         case QuicErrorCode::Type::LocalErrorCode:
-          return quic::make_unexpected(ConsumeError{
-              *stream->streamReadError->asLocalErrorCode(), std::nullopt});
+          return quic::make_unexpected(
+              ConsumeError{
+                  *stream->streamReadError->asLocalErrorCode(), std::nullopt});
         default:
           return quic::make_unexpected(
               ConsumeError{LocalErrorCode::INTERNAL_ERROR, std::nullopt});

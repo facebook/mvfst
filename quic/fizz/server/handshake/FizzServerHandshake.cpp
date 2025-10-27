@@ -102,13 +102,14 @@ void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
 }
 
 std::unique_ptr<Aead> FizzServerHandshake::buildAead(ByteRange secret) {
-  return FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
-      *state_.context()->getFactory(),
-      *state_.keyScheduler(),
-      *state_.cipher(),
-      secret,
-      kQuicKeyLabel,
-      kQuicIVLabel));
+  return FizzAead::wrap(
+      fizz::Protocol::deriveRecordAeadWithLabel(
+          *state_.context()->getFactory(),
+          *state_.keyScheduler(),
+          *state_.cipher(),
+          secret,
+          kQuicKeyLabel,
+          kQuicIVLabel));
 }
 
 quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>

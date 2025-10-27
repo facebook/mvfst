@@ -682,8 +682,9 @@ void updateRttForLargestAckedPacket(
     CHECK(!ackEvent.rttSampleNoAckDelay.has_value());
     ackEvent.rttSample = rttSample;
     ackEvent.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
-        ? OptionalMicros(std::chrono::ceil<std::chrono::microseconds>(
-              rttSample - frame.ackDelay))
+        ? OptionalMicros(
+              std::chrono::ceil<std::chrono::microseconds>(
+                  rttSample - frame.ackDelay))
         : std::nullopt;
 
     // update transport RTT

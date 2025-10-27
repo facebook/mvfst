@@ -706,8 +706,9 @@ TEST_F(ClientHandshakeECHPolicyTest, TestECHPolicyHandshake) {
   kex->setPrivateKey(fizz::test::getPrivateKey(fizz::test::kP256Key));
   echDecrypter = std::make_shared<fizz::ech::ECHConfigManager>(
       std::make_shared<fizz::DefaultFactory>());
-  echDecrypter->addDecryptionConfig(fizz::ech::DecrypterParams{
-      .echConfig = getParsedECHConfig(), .kex = kex->clone()});
+  echDecrypter->addDecryptionConfig(
+      fizz::ech::DecrypterParams{
+          .echConfig = getParsedECHConfig(), .kex = kex->clone()});
 
   // Try handshake flow with ECHPolicy set on FizzClientContext.
   quic::test::ClientHandshakeECHPolicyTest::SetUp();

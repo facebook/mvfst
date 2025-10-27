@@ -573,9 +573,11 @@ void updateFlowControlStateWithSettings(
 }
 
 MaxDataFrame generateMaxDataFrame(const QuicConnectionStateBase& conn) {
-  return MaxDataFrame(std::max(
-      conn.flowControlState.sumCurReadOffset + conn.flowControlState.windowSize,
-      conn.flowControlState.advertisedMaxOffset));
+  return MaxDataFrame(
+      std::max(
+          conn.flowControlState.sumCurReadOffset +
+              conn.flowControlState.windowSize,
+          conn.flowControlState.advertisedMaxOffset));
 }
 
 MaxStreamDataFrame generateMaxStreamDataFrame(const QuicStreamState& stream) {

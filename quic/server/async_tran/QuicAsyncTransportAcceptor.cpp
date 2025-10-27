@@ -96,10 +96,10 @@ quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
   CHECK_EQ(evb, evb_);
 
   // wait for onTransportReady before invoking asyncTransportHook_
-  auto* connSetupCallback =
-      CHECK_NOTNULL(std::make_unique<ServerTransportConnectionSetupCallback>(
-                        &asyncTransportHook_)
-                        .release());
+  auto* connSetupCallback = CHECK_NOTNULL(
+      std::make_unique<ServerTransportConnectionSetupCallback>(
+          &asyncTransportHook_)
+          .release());
   // create quic socket
   auto transport = quic::QuicServerTransport::make(
       evb, std::move(sock), connSetupCallback, connSetupCallback, ctx);

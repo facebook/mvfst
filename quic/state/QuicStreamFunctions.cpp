@@ -531,9 +531,10 @@ void appendPendingStreamReset(
 }
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
-  return stream.finalWriteOffset.value_or(std::max<uint64_t>(
-      stream.currentWriteOffset + stream.pendingWrites.chainLength(),
-      stream.writeBufMeta.offset + stream.writeBufMeta.length));
+  return stream.finalWriteOffset.value_or(
+      std::max<uint64_t>(
+          stream.currentWriteOffset + stream.pendingWrites.chainLength(),
+          stream.writeBufMeta.offset + stream.writeBufMeta.length));
 }
 
 Optional<uint64_t> getLargestWriteOffsetTxed(const QuicStreamState& stream) {

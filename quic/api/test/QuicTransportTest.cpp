@@ -3914,8 +3914,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   streamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(51),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(retxBufferData), 51, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(retxBufferData), 51, false)));
 
   folly::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
@@ -3969,8 +3970,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   streamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(51),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(retxBufferData), 51, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(retxBufferData), 51, false)));
   auto lossBufferData = folly::IOBuf::copyBuffer("And I'm lost");
   ChainedByteRangeHead lossBufferRch(lossBufferData);
   streamState->lossBuffer.emplace_back(std::move(lossBufferRch), 31, false);
@@ -4649,8 +4651,9 @@ TEST_F(QuicTransportTest, NoPacingTimerStillPaced) {
 TEST_F(QuicTransportTest, SetPacingTimerThenEnablesPacing) {
   TransportSettings transportSettings;
   transportSettings.pacingEnabled = true;
-  transport_->setPacingTimer(std::make_shared<HighResQuicTimer>(
-      &evb_, transportSettings.pacingTimerResolution));
+  transport_->setPacingTimer(
+      std::make_shared<HighResQuicTimer>(
+          &evb_, transportSettings.pacingTimerResolution));
   transport_->setTransportSettings(transportSettings);
   transport_->getConnectionState().canBePaced = true;
   EXPECT_TRUE(isConnectionPaced(transport_->getConnectionState()));
@@ -5630,8 +5633,9 @@ TEST_F(QuicTransportTest, SetMaxPacingRateWithAndWithoutPacing) {
   EXPECT_TRUE(res1.hasError());
   EXPECT_EQ(LocalErrorCode::PACER_NOT_AVAILABLE, res1.error());
   settings.pacingEnabled = true;
-  transport_->setPacingTimer(std::make_shared<HighResQuicTimer>(
-      &evb_, settings.pacingTimerResolution));
+  transport_->setPacingTimer(
+      std::make_shared<HighResQuicTimer>(
+          &evb_, settings.pacingTimerResolution));
   transport_->setTransportSettings(settings);
   auto res2 = transport_->setMaxPacingRate(125000);
   EXPECT_FALSE(res2.hasError());

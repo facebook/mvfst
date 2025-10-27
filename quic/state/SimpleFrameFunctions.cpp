@@ -346,8 +346,8 @@ quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
               ackState.ackFrequencySequenceNumber.value()) {
         ackState.ackFrequencySequenceNumber = ackFrequencyFrame->sequenceNumber;
         ackState.tolerance = ackFrequencyFrame->packetTolerance;
-        conn.ackStates.maxAckDelay =
-            std::chrono::microseconds(std::max<uint64_t>(
+        conn.ackStates.maxAckDelay = std::chrono::microseconds(
+            std::max<uint64_t>(
                 conn.transportSettings.minAckDelay->count(),
                 ackFrequencyFrame->updateMaxAckDelay));
         ackState.reorderThreshold = ackFrequencyFrame->reorderThreshold;

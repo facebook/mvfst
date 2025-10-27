@@ -1438,7 +1438,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
     sockaddr* rawAddr{nullptr};
 
-    struct sockaddr_storage addrStorage {};
+    struct sockaddr_storage addrStorage{};
 
     if (!server) {
       rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
@@ -1456,7 +1456,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
     int flags = 0;
     QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
 
-    struct msghdr msg {};
+    struct msghdr msg{};
 
     msg.msg_name = rawAddr;
     msg.msg_namelen = rawAddr ? kAddrLen : 0;

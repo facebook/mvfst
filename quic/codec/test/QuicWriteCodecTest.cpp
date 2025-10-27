@@ -101,8 +101,9 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
           })));
 
   EXPECT_CALL(pktBuilder, appendFrame(_))
-      .WillRepeatedly(WithArgs<0>(
-          Invoke([&](auto frame) { pktBuilder.frames_.push_back(frame); })));
+      .WillRepeatedly(WithArgs<0>(Invoke([&](auto frame) {
+        pktBuilder.frames_.push_back(frame);
+      })));
 
   EXPECT_CALL(pktBuilder, appendPaddingFrame()).WillRepeatedly(Invoke([&]() {
     if (!pktBuilder.frames_.empty() &&
@@ -130,27 +131,29 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
       })));
 
   EXPECT_CALL(pktBuilder, _insertRch(_, _))
-      .WillRepeatedly(WithArgs<0, 1>(
-          Invoke([&](const ChainedByteRangeHead& rch, size_t limit) {
-            auto curr = rch.getHead();
-            while (limit > 0 && curr) {
-              size_t amount = std::min(curr->length(), limit);
-              pktBuilder.remaining_ -= amount;
-              pktBuilder.appender_.push(curr->getRange().begin(), amount);
-              curr = curr->getNext();
-              limit -= amount;
-            }
-          })));
+      .WillRepeatedly(
+          WithArgs<0, 1>(
+              Invoke([&](const ChainedByteRangeHead& rch, size_t limit) {
+                auto curr = rch.getHead();
+                while (limit > 0 && curr) {
+                  size_t amount = std::min(curr->length(), limit);
+                  pktBuilder.remaining_ -= amount;
+                  pktBuilder.appender_.push(curr->getRange().begin(), amount);
+                  curr = curr->getNext();
+                  limit -= amount;
+                }
+              })));
 
   EXPECT_CALL(pktBuilder, insert(_, _))
-      .WillRepeatedly(WithArgs<0, 1>(Invoke([&](const BufQueue& buf,
-                                                size_t limit) {
-        pktBuilder.remaining_ -= limit;
-        BufPtr cloneBuf = BufHelpers::create(buf.front()->length());
-        ContiguousReadCursor cursor(buf.front()->data(), buf.front()->length());
-        cursor.tryPull(cloneBuf->writableData(), buf.front()->length());
-        pktBuilder.appender_.insert(std::move(cloneBuf));
-      })));
+      .WillRepeatedly(
+          WithArgs<0, 1>(Invoke([&](const BufQueue& buf, size_t limit) {
+            pktBuilder.remaining_ -= limit;
+            BufPtr cloneBuf = BufHelpers::create(buf.front()->length());
+            ContiguousReadCursor cursor(
+                buf.front()->data(), buf.front()->length());
+            cursor.tryPull(cloneBuf->writableData(), buf.front()->length());
+            pktBuilder.appender_.insert(std::move(cloneBuf));
+          })));
 
   EXPECT_CALL(pktBuilder, push(_, _))
       .WillRepeatedly(

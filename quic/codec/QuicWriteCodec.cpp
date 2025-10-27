@@ -1157,9 +1157,10 @@ quic::Expected<size_t, QuicError> writeFrame(
     }
     case QuicWriteFrame::Type::RstStreamFrame: {
       RstStreamFrame& rstStreamFrame = *frame.asRstStreamFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(
-          rstStreamFrame.reliableSize ? FrameType::RST_STREAM_AT
-                                      : FrameType::RST_STREAM));
+      QuicInteger intFrameType(
+          static_cast<uint8_t>(
+              rstStreamFrame.reliableSize ? FrameType::RST_STREAM_AT
+                                          : FrameType::RST_STREAM));
       QuicInteger streamId(rstStreamFrame.streamId);
       QuicInteger finalSize(rstStreamFrame.finalSize);
       QuicInteger errorCode(static_cast<uint64_t>(rstStreamFrame.errorCode));
@@ -1338,9 +1339,10 @@ quic::Expected<size_t, QuicError> writeFrame(
       const ApplicationErrorCode* isApplicationErrorCode =
           connectionCloseFrame.errorCode.asApplicationErrorCode();
 
-      QuicInteger intFrameType(static_cast<uint8_t>(
-          isTransportErrorCode ? FrameType::CONNECTION_CLOSE
-                               : FrameType::CONNECTION_CLOSE_APP_ERR));
+      QuicInteger intFrameType(
+          static_cast<uint8_t>(
+              isTransportErrorCode ? FrameType::CONNECTION_CLOSE
+                                   : FrameType::CONNECTION_CLOSE_APP_ERR));
 
       QuicInteger reasonLength(connectionCloseFrame.reasonPhrase.size());
       Optional<QuicInteger> closingFrameType;

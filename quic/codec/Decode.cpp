@@ -23,8 +23,9 @@ quic::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketGap(
   // we can just add to gap.
   uint64_t adjustedGap = gap + 2;
   if (packetNum < adjustedGap) {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad gap"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad gap"));
   }
   return packetNum - adjustedGap;
 }
@@ -34,8 +35,9 @@ quic::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketLen(
     uint64_t ackBlockLen) noexcept {
   // Going to allow 0 as a valid value.
   if (packetNum < ackBlockLen) {
-    return quic::make_unexpected(quic::QuicError(
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad block len"));
+    return quic::make_unexpected(
+        quic::QuicError(
+            quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad block len"));
   }
   return packetNum - ackBlockLen;
 }

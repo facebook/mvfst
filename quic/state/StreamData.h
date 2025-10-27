@@ -290,8 +290,9 @@ struct QuicStreamLike {
           lossBuffer.erase(lossItr);
         }
         if (!splitBuf.empty()) {
-          insertIntoLossBuffer(std::make_unique<WriteStreamBuffer>(
-              std::move(splitBuf), lossStartOffset, false));
+          insertIntoLossBuffer(
+              std::make_unique<WriteStreamBuffer>(
+                  std::move(splitBuf), lossStartOffset, false));
         }
         return;
       }

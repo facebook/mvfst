@@ -332,8 +332,12 @@ BufPtr QuicAddrValidationToken::getPlaintextToken() const {
 }
 
 BufPtr RetryToken::genAeadAssocData() const {
-  return BufHelpers::copyBuffer(fmt::format(
-      "{}{}{}", toString(tokenType), originalDstConnId.hex(), clientIp.str()));
+  return BufHelpers::copyBuffer(
+      fmt::format(
+          "{}{}{}",
+          toString(tokenType),
+          originalDstConnId.hex(),
+          clientIp.str()));
 }
 
 BufPtr NewToken::genAeadAssocData() const {

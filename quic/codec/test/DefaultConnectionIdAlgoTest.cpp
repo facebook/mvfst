@@ -25,8 +25,9 @@ TEST(DefaultConnectionIdAlgoTest, canParse) {
   EXPECT_TRUE(al.canParse(
       ConnectionId::createAndMaybeCrash({0x80, 0x01, 0x02, 0x03, 0x04, 0x05})));
   // version 3
-  EXPECT_TRUE(al.canParse(ConnectionId::createAndMaybeCrash(
-      {0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06})));
+  EXPECT_TRUE(al.canParse(
+      ConnectionId::createAndMaybeCrash(
+          {0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06})));
   // version 1, too small size
   EXPECT_FALSE(
       al.canParse(ConnectionId::createAndMaybeCrash({0x40, 0x01, 0x02})));
@@ -60,13 +61,12 @@ TEST(DefaultConnectionIdAlgoTest, decodeV1) {
 
 TEST(DefaultConnectionIdAlgoTest, decodeV2) {
   DefaultConnectionIdAlgo al;
-  ConnectionId cid1 = ConnectionId::createAndMaybeCrash(
-      {/*version*/ 0x80,
-       /*host*/ 0xAA,
-       0xBB,
-       0xCC,
-       /*worker*/ 0xFF,
-       /*process*/ 0x80});
+  ConnectionId cid1 = ConnectionId::createAndMaybeCrash({/*version*/ 0x80,
+                                                         /*host*/ 0xAA,
+                                                         0xBB,
+                                                         0xCC,
+                                                         /*worker*/ 0xFF,
+                                                         /*process*/ 0x80});
   EXPECT_TRUE(al.canParse(cid1));
   auto params1 = al.parseConnectionId(cid1);
   EXPECT_EQ(params1->version, ConnectionIdVersion::V2);
@@ -77,14 +77,13 @@ TEST(DefaultConnectionIdAlgoTest, decodeV2) {
 
 TEST(DefaultConnectionIdAlgoTest, decodeV3) {
   DefaultConnectionIdAlgo al;
-  ConnectionId cid1 = ConnectionId::createAndMaybeCrash(
-      {/*version*/ 0xc0,
-       /*host*/ 0xAA,
-       0xBB,
-       0xCC,
-       0xDD,
-       /*worker*/ 0xFF,
-       /*process*/ 0x80});
+  ConnectionId cid1 = ConnectionId::createAndMaybeCrash({/*version*/ 0xc0,
+                                                         /*host*/ 0xAA,
+                                                         0xBB,
+                                                         0xCC,
+                                                         0xDD,
+                                                         /*worker*/ 0xFF,
+                                                         /*process*/ 0x80});
   EXPECT_TRUE(al.canParse(cid1));
   auto params1 = al.parseConnectionId(cid1);
   EXPECT_EQ(params1->version, ConnectionIdVersion::V3);

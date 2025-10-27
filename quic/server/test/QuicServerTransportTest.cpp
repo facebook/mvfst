@@ -857,8 +857,9 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   ASSERT_FALSE(
       writeDataToQuicStream(*stream, IOBuf::copyBuffer(words.at(3)), false)
           .hasError());
@@ -948,8 +949,9 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -997,8 +999,9 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1048,8 +1051,9 @@ TEST_F(QuicServerTransportTest, RecvInvalidMaxStreamData) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1094,8 +1098,9 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1183,8 +1188,9 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream1->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream1->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream1->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream1->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1198,8 +1204,9 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream2->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-          ChainedByteRangeHead(wordsBuf2), 0, false)));
+      std::forward_as_tuple(
+          std::make_unique<WriteStreamBuffer>(
+              ChainedByteRangeHead(wordsBuf2), 0, false)));
   stream2->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream2->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream2->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -3859,8 +3866,9 @@ class QuicServerTransportHandshakeTest
               EXPECT_THAT(
                   appToken.sourceAddresses, ContainerEq(expectedSourceToken_));
 
-              EXPECT_TRUE(folly::IOBufEqualTo()(
-                  appToken.appParams, folly::IOBuf::copyBuffer(appParams)));
+              EXPECT_TRUE(
+                  folly::IOBufEqualTo()(
+                      appToken.appParams, folly::IOBuf::copyBuffer(appParams)));
               return {};
             }));
   }

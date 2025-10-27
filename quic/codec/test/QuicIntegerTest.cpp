@@ -38,9 +38,10 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
 
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
     auto wrappedEncoded = IOBuf::copyBuffer(encodedBytes);
-    wrappedEncoded->trimEnd(std::min(
-        (unsigned long)(wrappedEncoded->computeChainDataLength()),
-        (unsigned long)(GetParam().encodedLength - atMost)));
+    wrappedEncoded->trimEnd(
+        std::min(
+            (unsigned long)(wrappedEncoded->computeChainDataLength()),
+            (unsigned long)(GetParam().encodedLength - atMost)));
     ContiguousReadCursor cursor(
         wrappedEncoded->data(), wrappedEncoded->length());
     auto originalLength = cursor.remaining();

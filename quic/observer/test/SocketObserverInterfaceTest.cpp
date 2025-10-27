@@ -523,11 +523,13 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(&InvokedOutstandingPacketFields::packetNum, 1))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum, 1))));
   }
 
   // first packet for initial, handshake, app data, separate writes, reversed
@@ -590,11 +592,13 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(&InvokedOutstandingPacketFields::packetNum, 1))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum, 1))));
   }
 
   // retransmit initial
@@ -667,11 +671,13 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::Initial),
-            ::testing::Field(&InvokedOutstandingPacketFields::packetNum, 2))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::Initial),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum, 2))));
   }
 
   // retransmit all three
@@ -825,11 +831,13 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(&InvokedOutstandingPacketFields::packetNum, 13))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum, 13))));
   }
 
   // just app data, single new packet, non-ack eliciting written
@@ -872,11 +880,13 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(&InvokedOutstandingPacketFields::packetNum, 13))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum, 13))));
   }
 
   // just app data, multiple new packets
@@ -1154,11 +1164,13 @@ TEST_F(SocketObserverInterfaceTest, InvokeForEachNewOutstandingPacketOrdered) {
         });
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(&InvokedOutstandingPacketFields::packetNum, 13))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum, 13))));
   }
 }
 

@@ -321,8 +321,9 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
 
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder&&
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
-    setPacketSoftwareRxTimestamp(const std::chrono::system_clock::time_point
-                                     packetSoftwareRxTimestampIn) {
+    setPacketSoftwareRxTimestamp(
+        const std::chrono::system_clock::time_point
+            packetSoftwareRxTimestampIn) {
   maybePacketSoftwareRxTimestamp = packetSoftwareRxTimestampIn;
   return std::move(*this);
 }
@@ -348,8 +349,9 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::Builder::
 }
 
 SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
-    ReceivedUdpPacket(SocketObserverInterface::PacketsReceivedEvent::
-                          ReceivedUdpPacket::BuilderFields&& builderFields)
+    ReceivedUdpPacket(
+        SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
+            BuilderFields&& builderFields)
     : packetReceiveTime([&]() {
         CHECK(builderFields.maybePacketReceiveTime.has_value());
         return builderFields.maybePacketReceiveTime.value();

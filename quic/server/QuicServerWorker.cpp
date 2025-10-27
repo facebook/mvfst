@@ -1612,7 +1612,7 @@ size_t QuicServerWorker::SourceIdentityHash::operator()(
   // Zero initialization is intentional here.
   std::array<unsigned char, kKeySize> key{};
 
-  struct sockaddr_storage storage {};
+  struct sockaddr_storage storage{};
 
   const auto& sockaddr = sid.first;
   sockaddr.getAddress(&storage);

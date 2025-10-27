@@ -231,13 +231,14 @@ quic::Expected<std::unique_ptr<Aead>, QuicError> FizzClientHandshake::buildAead(
     fizz::KeyScheduler& keyScheduler =
         isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
 
-    auto aead = FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
-        *state_.context()->getFactory(),
-        keyScheduler,
-        cipher,
-        secret,
-        kQuicKeyLabel,
-        kQuicIVLabel));
+    auto aead = FizzAead::wrap(
+        fizz::Protocol::deriveRecordAeadWithLabel(
+            *state_.context()->getFactory(),
+            keyScheduler,
+            cipher,
+            secret,
+            kQuicKeyLabel,
+            kQuicIVLabel));
 
     return aead;
   } catch (const std::exception& ex) {

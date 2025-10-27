@@ -150,13 +150,14 @@ class QuicServerTransportTestBase : public virtual testing::Test {
             qEvb_);
     socket = sock.get();
     EXPECT_CALL(*sock, write(testing::_, testing::_, testing::_))
-        .WillRepeatedly(testing::Invoke([&](const folly::SocketAddress&,
-                                            const struct iovec* vec,
-                                            size_t iovec_len) {
-          serverWrites.push_back(
-              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
-          return getTotalIovecLen(vec, iovec_len);
-        }));
+        .WillRepeatedly(
+            testing::Invoke([&](const folly::SocketAddress&,
+                                const struct iovec* vec,
+                                size_t iovec_len) {
+              serverWrites.push_back(
+                  copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+              return getTotalIovecLen(vec, iovec_len);
+            }));
     ON_CALL(*sock, address()).WillByDefault(testing::Return(serverAddr));
     ON_CALL(*sock, setAdditionalCmsgsFunc(testing::_))
         .WillByDefault(testing::Return(quic::Expected<void, QuicError>{}));
@@ -633,8 +634,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   }
 
   FakeServerHandshake* getFakeHandshakeLayer() {
-    return CHECK_NOTNULL(dynamic_cast<FakeServerHandshake*>(
-        server->getNonConstConn().handshakeLayer.get()));
+    return CHECK_NOTNULL(
+        dynamic_cast<FakeServerHandshake*>(
+            server->getNonConstConn().handshakeLayer.get()));
   }
 
   void checkTransportStateUpdate(

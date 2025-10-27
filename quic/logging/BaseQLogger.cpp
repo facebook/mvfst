@@ -15,8 +15,9 @@ void addQuicSimpleFrameToEvent(
   switch (simpleFrame.type()) {
     case quic::QuicSimpleFrame::Type::StopSendingFrame: {
       const quic::StopSendingFrame& frame = *simpleFrame.asStopSendingFrame();
-      event->frames.push_back(std::make_unique<quic::StopSendingFrameLog>(
-          frame.streamId, frame.errorCode));
+      event->frames.push_back(
+          std::make_unique<quic::StopSendingFrameLog>(
+              frame.streamId, frame.errorCode));
       break;
     }
     case quic::QuicSimpleFrame::Type::PathChallengeFrame: {
@@ -35,14 +36,16 @@ void addQuicSimpleFrameToEvent(
     case quic::QuicSimpleFrame::Type::NewConnectionIdFrame: {
       const quic::NewConnectionIdFrame& frame =
           *simpleFrame.asNewConnectionIdFrame();
-      event->frames.push_back(std::make_unique<quic::NewConnectionIdFrameLog>(
-          frame.sequenceNumber, frame.token));
+      event->frames.push_back(
+          std::make_unique<quic::NewConnectionIdFrameLog>(
+              frame.sequenceNumber, frame.token));
       break;
     }
     case quic::QuicSimpleFrame::Type::MaxStreamsFrame: {
       const quic::MaxStreamsFrame& frame = *simpleFrame.asMaxStreamsFrame();
-      event->frames.push_back(std::make_unique<quic::MaxStreamsFrameLog>(
-          frame.maxStreams, frame.isForBidirectional));
+      event->frames.push_back(
+          std::make_unique<quic::MaxStreamsFrameLog>(
+              frame.maxStreams, frame.isForBidirectional));
       break;
     }
     case quic::QuicSimpleFrame::Type::RetireConnectionIdFrame: {
@@ -59,17 +62,19 @@ void addQuicSimpleFrameToEvent(
     }
     case quic::QuicSimpleFrame::Type::KnobFrame: {
       const quic::KnobFrame& frame = *simpleFrame.asKnobFrame();
-      event->frames.push_back(std::make_unique<quic::KnobFrameLog>(
-          frame.knobSpace, frame.id, frame.blob->length()));
+      event->frames.push_back(
+          std::make_unique<quic::KnobFrameLog>(
+              frame.knobSpace, frame.id, frame.blob->length()));
       break;
     }
     case quic::QuicSimpleFrame::Type::AckFrequencyFrame: {
       const quic::AckFrequencyFrame& frame = *simpleFrame.asAckFrequencyFrame();
-      event->frames.push_back(std::make_unique<quic::AckFrequencyFrameLog>(
-          frame.sequenceNumber,
-          frame.packetTolerance,
-          frame.updateMaxAckDelay,
-          frame.reorderThreshold));
+      event->frames.push_back(
+          std::make_unique<quic::AckFrequencyFrameLog>(
+              frame.sequenceNumber,
+              frame.packetTolerance,
+              frame.updateMaxAckDelay,
+              frame.reorderThreshold));
       break;
     }
     case quic::QuicSimpleFrame::Type::NewTokenFrame: {
@@ -115,14 +120,16 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       }
       case QuicFrame::Type::RstStreamFrame: {
         const auto& frame = *quicFrame.asRstStreamFrame();
-        event->frames.push_back(std::make_unique<RstStreamFrameLog>(
-            frame.streamId, frame.errorCode, frame.finalSize));
+        event->frames.push_back(
+            std::make_unique<RstStreamFrameLog>(
+                frame.streamId, frame.errorCode, frame.finalSize));
         break;
       }
       case QuicFrame::Type::ConnectionCloseFrame: {
         const auto& frame = *quicFrame.asConnectionCloseFrame();
-        event->frames.push_back(std::make_unique<ConnectionCloseFrameLog>(
-            frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
+        event->frames.push_back(
+            std::make_unique<ConnectionCloseFrameLog>(
+                frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
         break;
       }
       case QuicFrame::Type::MaxDataFrame: {
@@ -133,8 +140,9 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       }
       case QuicFrame::Type::MaxStreamDataFrame: {
         const auto& frame = *quicFrame.asMaxStreamDataFrame();
-        event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
-            frame.streamId, frame.maximumData));
+        event->frames.push_back(
+            std::make_unique<MaxStreamDataFrameLog>(
+                frame.streamId, frame.maximumData));
         break;
       }
       case QuicFrame::Type::DataBlockedFrame: {
@@ -145,40 +153,45 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       }
       case QuicFrame::Type::StreamDataBlockedFrame: {
         const auto& frame = *quicFrame.asStreamDataBlockedFrame();
-        event->frames.push_back(std::make_unique<StreamDataBlockedFrameLog>(
-            frame.streamId, frame.dataLimit));
+        event->frames.push_back(
+            std::make_unique<StreamDataBlockedFrameLog>(
+                frame.streamId, frame.dataLimit));
         break;
       }
       case QuicFrame::Type::StreamsBlockedFrame: {
         const auto& frame = *quicFrame.asStreamsBlockedFrame();
-        event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
-            frame.streamLimit, frame.isForBidirectional));
+        event->frames.push_back(
+            std::make_unique<StreamsBlockedFrameLog>(
+                frame.streamLimit, frame.isForBidirectional));
         break;
       }
       case QuicFrame::Type::ReadAckFrame: {
         const auto& frame = *quicFrame.asReadAckFrame();
-        event->frames.push_back(std::make_unique<ReadAckFrameLog>(
-            frame.ackBlocks,
-            frame.ackDelay,
-            frame.frameType,
-            frame.maybeLatestRecvdPacketTime,
-            frame.maybeLatestRecvdPacketNum,
-            frame.recvdPacketsTimestampRanges,
-            frame.ecnECT0Count,
-            frame.ecnECT1Count,
-            frame.ecnCECount));
+        event->frames.push_back(
+            std::make_unique<ReadAckFrameLog>(
+                frame.ackBlocks,
+                frame.ackDelay,
+                frame.frameType,
+                frame.maybeLatestRecvdPacketTime,
+                frame.maybeLatestRecvdPacketNum,
+                frame.recvdPacketsTimestampRanges,
+                frame.ecnECT0Count,
+                frame.ecnECT1Count,
+                frame.ecnCECount));
         break;
       }
       case QuicFrame::Type::ReadStreamFrame: {
         const auto& frame = *quicFrame.asReadStreamFrame();
-        event->frames.push_back(std::make_unique<StreamFrameLog>(
-            frame.streamId, frame.offset, frame.data->length(), frame.fin));
+        event->frames.push_back(
+            std::make_unique<StreamFrameLog>(
+                frame.streamId, frame.offset, frame.data->length(), frame.fin));
         break;
       }
       case QuicFrame::Type::ReadCryptoFrame: {
         const auto& frame = *quicFrame.asReadCryptoFrame();
-        event->frames.push_back(std::make_unique<CryptoFrameLog>(
-            frame.offset, frame.data->length()));
+        event->frames.push_back(
+            std::make_unique<CryptoFrameLog>(
+                frame.offset, frame.data->length()));
         break;
       }
       case QuicFrame::Type::ReadNewTokenFrame: {
@@ -242,14 +255,16 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         break;
       case QuicWriteFrame::Type::RstStreamFrame: {
         const RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
-        event->frames.push_back(std::make_unique<RstStreamFrameLog>(
-            frame.streamId, frame.errorCode, frame.finalSize));
+        event->frames.push_back(
+            std::make_unique<RstStreamFrameLog>(
+                frame.streamId, frame.errorCode, frame.finalSize));
         break;
       }
       case QuicWriteFrame::Type::ConnectionCloseFrame: {
         const ConnectionCloseFrame& frame = *quicFrame.asConnectionCloseFrame();
-        event->frames.push_back(std::make_unique<ConnectionCloseFrameLog>(
-            frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
+        event->frames.push_back(
+            std::make_unique<ConnectionCloseFrameLog>(
+                frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
         break;
       }
       case QuicWriteFrame::Type::MaxDataFrame: {
@@ -260,14 +275,16 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       }
       case QuicWriteFrame::Type::MaxStreamDataFrame: {
         const MaxStreamDataFrame& frame = *quicFrame.asMaxStreamDataFrame();
-        event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
-            frame.streamId, frame.maximumData));
+        event->frames.push_back(
+            std::make_unique<MaxStreamDataFrameLog>(
+                frame.streamId, frame.maximumData));
         break;
       }
       case QuicWriteFrame::Type::StreamsBlockedFrame: {
         const StreamsBlockedFrame& frame = *quicFrame.asStreamsBlockedFrame();
-        event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
-            frame.streamLimit, frame.isForBidirectional));
+        event->frames.push_back(
+            std::make_unique<StreamsBlockedFrameLog>(
+                frame.streamLimit, frame.isForBidirectional));
         break;
       }
       case QuicWriteFrame::Type::DataBlockedFrame: {
@@ -279,28 +296,31 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       case QuicWriteFrame::Type::StreamDataBlockedFrame: {
         const StreamDataBlockedFrame& frame =
             *quicFrame.asStreamDataBlockedFrame();
-        event->frames.push_back(std::make_unique<StreamDataBlockedFrameLog>(
-            frame.streamId, frame.dataLimit));
+        event->frames.push_back(
+            std::make_unique<StreamDataBlockedFrameLog>(
+                frame.streamId, frame.dataLimit));
         break;
       }
       case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& frame = *quicFrame.asWriteAckFrame();
-        event->frames.push_back(std::make_unique<WriteAckFrameLog>(
-            frame.ackBlocks,
-            frame.ackDelay,
-            frame.frameType,
-            frame.maybeLatestRecvdPacketTime,
-            frame.maybeLatestRecvdPacketNum,
-            frame.recvdPacketsTimestampRanges,
-            frame.ecnECT0Count,
-            frame.ecnECT1Count,
-            frame.ecnCECount));
+        event->frames.push_back(
+            std::make_unique<WriteAckFrameLog>(
+                frame.ackBlocks,
+                frame.ackDelay,
+                frame.frameType,
+                frame.maybeLatestRecvdPacketTime,
+                frame.maybeLatestRecvdPacketNum,
+                frame.recvdPacketsTimestampRanges,
+                frame.ecnECT0Count,
+                frame.ecnECT1Count,
+                frame.ecnCECount));
         break;
       }
       case QuicWriteFrame::Type::WriteStreamFrame: {
         const WriteStreamFrame& frame = *quicFrame.asWriteStreamFrame();
-        event->frames.push_back(std::make_unique<StreamFrameLog>(
-            frame.streamId, frame.offset, frame.len, frame.fin));
+        event->frames.push_back(
+            std::make_unique<StreamFrameLog>(
+                frame.streamId, frame.offset, frame.len, frame.fin));
         break;
       }
       case QuicWriteFrame::Type::WriteCryptoFrame: {

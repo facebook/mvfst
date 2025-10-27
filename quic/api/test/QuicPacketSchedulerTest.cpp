@@ -965,12 +965,13 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
       FizzServerQuicHandshakeContext::Builder().build());
   conn.version = QuicVersion::MVFST_EXPERIMENTAL2;
 
-  FrameScheduler noopScheduler = std::move(FrameScheduler::Builder(
-                                               conn,
-                                               EncryptionLevel::Handshake,
-                                               PacketNumberSpace::Handshake,
-                                               "testScheduler")
-                                               .ackFrames())
+  FrameScheduler noopScheduler = std::move(
+                                     FrameScheduler::Builder(
+                                         conn,
+                                         EncryptionLevel::Handshake,
+                                         PacketNumberSpace::Handshake,
+                                         "testScheduler")
+                                         .ackFrames())
                                      .build();
   addHandshakeOutstandingPacket(conn);
 
@@ -1139,11 +1140,14 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
       result->packet->packet.frames.front().asMaxDataFrame();
   ASSERT_NE(maxDataFrame, nullptr);
   EXPECT_EQ(2832, maxDataFrame->maximumData);
-  EXPECT_TRUE(folly::IOBufEqualTo{}(
-      *folly::IOBuf::copyBuffer("if you are the dealer"),
-      result->packet->header));
-  EXPECT_TRUE(folly::IOBufEqualTo{}(
-      *folly::IOBuf::copyBuffer("I'm out of the game"), result->packet->body));
+  EXPECT_TRUE(
+      folly::IOBufEqualTo{}(
+          *folly::IOBuf::copyBuffer("if you are the dealer"),
+          result->packet->header));
+  EXPECT_TRUE(
+      folly::IOBufEqualTo{}(
+          *folly::IOBuf::copyBuffer("I'm out of the game"),
+          result->packet->body));
 }
 
 TEST_P(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
@@ -1292,12 +1296,13 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   auto writeResult = writeDataToQuicStream(*stream, inBuf->clone(), false);
   ASSERT_FALSE(writeResult.hasError());
 
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
   auto packetNum = getNextPacketNum(conn, PacketNumberSpace::AppData);
   ShortHeader header(
@@ -1374,12 +1379,13 @@ TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   auto inputData = buildRandomInputData(conn.udpSendPacketLen * 10);
   auto writeResult = writeDataToQuicStream(*stream, inputData->clone(), false);
   ASSERT_FALSE(writeResult.hasError());
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
   auto cipherOverhead = 16;
   PacketNum packetNum = 0;
@@ -1667,8 +1673,9 @@ TEST_P(
   dsrStream->ackedIntervals.insert(0, dsrStream->writeBuffer.chainLength() - 1);
   dsrStream->currentWriteOffset = dsrStream->writeBuffer.chainLength();
   dsrStream->writeBuffer.move();
-  ChainedByteRangeHead(std::move(
-      dsrStream->pendingWrites)); // Move and destruct the pending writes
+  ChainedByteRangeHead(
+      std::move(
+          dsrStream->pendingWrites)); // Move and destruct the pending writes
   conn.streamManager->updateWritableStreams(*dsrStream);
 
   // Write a normal size packet from stream1
@@ -2539,12 +2546,13 @@ TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   auto inputData1 = buildRandomInputData(inputDataLength1);
   auto inputData2 = buildRandomInputData(inputDataLength2);
 
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
 
   ShortHeader shortHeader1(
@@ -2620,12 +2628,13 @@ TEST_P(QuicPacketSchedulerTest, ShortHeaderFixedPaddingAtStart) {
       writeDataToQuicStream(*stream, std::move(data), false).hasError());
 
   // Set up scheduler and builder
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
 
   ShortHeader header(
@@ -2662,12 +2671,13 @@ TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
   size_t inputDataLength = conn.udpSendPacketLen - 20;
   auto inputData = buildRandomInputData(inputDataLength);
 
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
 
   ShortHeader shortHeader(
@@ -2711,12 +2721,13 @@ TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
   size_t paddingModulo = 50;
   conn.transportSettings.paddingModulo = paddingModulo;
 
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
 
   ShortHeader shortHeader(
@@ -2850,13 +2861,14 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   conn.pendingEvents.resets.emplace(
       stream->id, RstStreamFrame(stream->id, 0, bufLen, bufLen));
 
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames()
-                                           .resetFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames()
+                                     .resetFrames())
                                  .build();
   auto cipherOverhead = 16;
   PacketNum packetNum1 = 0;
@@ -3002,12 +3014,13 @@ TEST_P(QuicPacketSchedulerTest, FixedShortHeaderPadding) {
   conn.streamManager->updateWritableStreams(*stream);
 
   // Set up scheduler and builder
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "streamScheduler")
-                                           .streamFrames())
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "streamScheduler")
+                                     .streamFrames())
                                  .build();
 
   ShortHeader header(
@@ -3654,12 +3667,13 @@ TEST_P(QuicPacketSchedulerTest, PathValidationCausesPaddingToFullPacket) {
       std::move(shortHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
 
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           conn,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "PathValidationScheduler")
-                                           .pathValidationFrames(pathId))
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "PathValidationScheduler")
+                                     .pathValidationFrames(pathId))
                                  .build();
 
   auto result = scheduler.scheduleFramesForPacket(

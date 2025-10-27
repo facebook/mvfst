@@ -130,8 +130,9 @@ void expectAppTokenEqual(
 
   EXPECT_NE(decodedAppToken->appParams, nullptr);
   if (appToken.appParams) {
-    EXPECT_TRUE(folly::IOBufEqualTo()(
-        *decodedAppToken->appParams, *appToken.appParams));
+    EXPECT_TRUE(
+        folly::IOBufEqualTo()(
+            *decodedAppToken->appParams, *appToken.appParams));
   } else {
     EXPECT_EQ(decodedAppToken->appParams->computeChainDataLength(), 0);
   }

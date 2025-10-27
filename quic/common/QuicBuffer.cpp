@@ -13,7 +13,7 @@
 namespace quic {
 
 QuicBuffer::QuicBuffer(std::size_t capacity)
-    : sharedBuffer_(new(std::nothrow) uint8_t[capacity]),
+    : sharedBuffer_(new (std::nothrow) uint8_t[capacity]),
       data_(sharedBuffer_.get()),
       buf_(data_),
       next_(this),

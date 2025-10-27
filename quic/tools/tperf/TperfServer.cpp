@@ -395,9 +395,10 @@ class TperfStaticCwndCongestionControllerFactory
       pacerIntervalSource_ =
           StaticCwndCongestionController::PacerIntervalSource::LatestRtt;
     } else if (pacerIntervalSource != "std::nullopt") {
-      throw std::runtime_error(fmt::format(
-          "Invalid pacer interval source: {}. Valid values are mrtt, srtt, lrtt, std::nullopt for min rtt, smoothed rtt, latest rtt, and no pacing respectively.",
-          pacerIntervalSource));
+      throw std::runtime_error(
+          fmt::format(
+              "Invalid pacer interval source: {}. Valid values are mrtt, srtt, lrtt, std::nullopt for min rtt, smoothed rtt, latest rtt, and no pacing respectively.",
+              pacerIntervalSource));
     }
   }
 
@@ -405,9 +406,10 @@ class TperfStaticCwndCongestionControllerFactory
       QuicConnectionStateBase& conn,
       CongestionControlType type) override {
     if (type != CongestionControlType::StaticCwnd) {
-      throw std::runtime_error(fmt::format(
-          "TperfStaticCwndCongestionControllerFactory cannot construct a congestion controller of type {}",
-          congestionControlTypeToString(type)));
+      throw std::runtime_error(
+          fmt::format(
+              "TperfStaticCwndCongestionControllerFactory cannot construct a congestion controller of type {}",
+              congestionControlTypeToString(type)));
     }
     return std::make_unique<StaticCwndCongestionController>(
         conn, cwndInBytes_, pacerIntervalSource_);
@@ -489,8 +491,9 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       transport->addObserver(
           std::make_shared<FixedBucketPacingObserver>(qlogger, 300ms));
     } else if (pacingObserverType == "rtt") {
-      transport->addObserver(std::make_shared<RttBucketPacingObserver>(
-          qlogger, *transport->getState()));
+      transport->addObserver(
+          std::make_shared<RttBucketPacingObserver>(
+              qlogger, *transport->getState()));
     } else if (pacingObserverType == "ack") {
       transport->addObserver(
           std::make_shared<PerUpdatePacingObserver>(qlogger));
@@ -543,10 +546,11 @@ TPerfServer::TPerfServer(
     StaticCwndConfig staticCwndConfig)
     : host_(host),
       port_(port),
-      acceptObserver_(std::make_unique<TPerfAcceptObserver>(
-          logAppRateLimited,
-          logLoss,
-          logRttSample)),
+      acceptObserver_(
+          std::make_unique<TPerfAcceptObserver>(
+              logAppRateLimited,
+              logLoss,
+              logRttSample)),
       latencyFactor_(latencyFactor),
       useAckReceiveTimestamps_(useAckReceiveTimestamps),
       maxAckReceiveTimestampsToSend_(maxAckReceiveTimestampsToSend),

@@ -141,8 +141,9 @@ TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
   auto firstCid = getTestConnectionId(0);
   EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
       .WillOnce(Return(firstCid))
-      .WillOnce(Return(quic::make_unexpected(
-          QuicError(quic::TransportErrorCode::INTERNAL_ERROR, "Tumbledown"))));
+      .WillOnce(Return(
+          quic::make_unexpected(QuicError(
+              quic::TransportErrorCode::INTERNAL_ERROR, "Tumbledown"))));
   EXPECT_CALL(mockRejector, rejectConnectionIdNonConst(_))
       .WillOnce(Invoke([&](const ConnectionId& inputCid) {
         EXPECT_EQ(inputCid, firstCid);
@@ -293,9 +294,10 @@ TEST(ServerStateMachineTest, TestEncodeMinAckDelayParamNotSet) {
   auto customTransportParams = getSupportedExtTransportParams(serverConn);
   EXPECT_THAT(
       customTransportParams,
-      Not(Contains(testing::Field(
-          &TransportParameter::parameter,
-          testing::Eq(TransportParameterId::min_ack_delay)))));
+      Not(Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::min_ack_delay)))));
 }
 
 TEST(ServerStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
@@ -348,9 +350,10 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
   auto customTransportParams = getSupportedExtTransportParams(serverConn);
   EXPECT_THAT(
       customTransportParams,
-      Not(Contains(testing::Field(
-          &TransportParameter::parameter,
-          testing::Eq(TransportParameterId::knob_frames_supported)))));
+      Not(Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::knob_frames_supported)))));
 }
 
 TEST(ServerStateMachineTest, TestProcessExtendedAckSupportParam) {
@@ -431,9 +434,10 @@ TEST(
   auto customTransportParams = getSupportedExtTransportParams(serverConn);
   EXPECT_THAT(
       customTransportParams,
-      Contains(testing::Field(
-          &TransportParameter::parameter,
-          testing::Eq(TransportParameterId::reliable_stream_reset))));
+      Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::reliable_stream_reset))));
   auto it = findParameter(
       customTransportParams, TransportParameterId::reliable_stream_reset);
   EXPECT_TRUE(it->value->empty());
@@ -448,9 +452,10 @@ TEST(
   auto customTransportParams = getSupportedExtTransportParams(serverConn);
   EXPECT_THAT(
       customTransportParams,
-      Not(Contains(testing::Field(
-          &TransportParameter::parameter,
-          testing::Eq(TransportParameterId::reliable_stream_reset)))));
+      Not(Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::reliable_stream_reset)))));
 }
 
 TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitNotSet) {

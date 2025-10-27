@@ -211,8 +211,9 @@ TEST_F(QuicStreamAsyncTransportTest, ReadWrite) {
   auto [promise, future] = folly::makePromiseContract<std::string>();
   EXPECT_CALL(clientStream->readCb, readDataAvailable_(_))
       .WillOnce(Invoke([&clientStream, &p = promise](auto len) mutable {
-        p.setValue(std::string(
-            reinterpret_cast<char*>(clientStream->buf.data()), len));
+        p.setValue(
+            std::string(
+                reinterpret_cast<char*>(clientStream->buf.data()), len));
       }));
 
   std::string msg = "yo yo!";
@@ -241,8 +242,9 @@ TEST_F(QuicStreamAsyncTransportTest, TwoClients) {
         .WillOnce(Invoke(
             [clientStream = clientStream.get(),
              p = folly::MoveWrapper(std::move(promise))](auto len) mutable {
-              p->setValue(std::string(
-                  reinterpret_cast<char*>(clientStream->buf.data()), len));
+              p->setValue(
+                  std::string(
+                      reinterpret_cast<char*>(clientStream->buf.data()), len));
             }));
 
     EXPECT_CALL(clientStream->writeCb, writeSuccess_()).WillOnce(Return());
@@ -262,8 +264,9 @@ TEST_F(QuicStreamAsyncTransportTest, DelayedSetReadCB) {
   auto [promise, future] = folly::makePromiseContract<std::string>();
   EXPECT_CALL(clientStream->readCb, readDataAvailable_(_))
       .WillOnce(Invoke([&clientStream, &p = promise](auto len) mutable {
-        p.setValue(std::string(
-            reinterpret_cast<char*>(clientStream->buf.data()), len));
+        p.setValue(
+            std::string(
+                reinterpret_cast<char*>(clientStream->buf.data()), len));
       }));
 
   std::string msg = "yo yo!";
@@ -309,8 +312,9 @@ TEST_F(QuicStreamAsyncTransportTest, SetReadCbNullptr) {
         // invoke readDataAvailable()
         EXPECT_CALL(clientStream->readCb, readDataAvailable_(_))
             .WillOnce(Invoke([&clientStream, &p](auto len) mutable {
-              p.setValue(std::string(
-                  reinterpret_cast<char*>(clientStream->buf.data()), len));
+              p.setValue(
+                  std::string(
+                      reinterpret_cast<char*>(clientStream->buf.data()), len));
             }));
         EXPECT_CALL(clientStream->readCb, readEOF_()).WillOnce(Return());
         clientStream->transport->setReadCB(&clientStream->readCb);

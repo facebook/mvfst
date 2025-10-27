@@ -1884,40 +1884,47 @@ struct AckEventMatcherBuilder {
     if constexpr (std::is_base_of_v<T, QuicClientTransportTestBase>) {
       return testing::Property(
           &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
-          testing::ElementsAre(testing::AllOf(
-              // ack time, adjusted ack time, RTT not supported for client now
-              testing::Field(&quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
-              testing::Field(
-                  &quic::AckEvent::largestAckedPacket,
-                  testing::Eq(largestAckedPacket)),
-              testing::Field(
-                  &quic::AckEvent::largestNewlyAckedPacket,
-                  testing::Eq(largestNewlyAckedPacket)),
-              testing::Field(
-                  &quic::AckEvent::ackedPackets,
-                  testing::SizeIs(expectedNumAckedPackets)))));
+          testing::ElementsAre(
+              testing::AllOf(
+                  // ack time, adjusted ack time, RTT not supported for client
+                  // now
+                  testing::Field(
+                      &quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
+                  testing::Field(
+                      &quic::AckEvent::largestAckedPacket,
+                      testing::Eq(largestAckedPacket)),
+                  testing::Field(
+                      &quic::AckEvent::largestNewlyAckedPacket,
+                      testing::Eq(largestNewlyAckedPacket)),
+                  testing::Field(
+                      &quic::AckEvent::ackedPackets,
+                      testing::SizeIs(expectedNumAckedPackets)))));
     } else if constexpr (std::is_base_of_v<T, QuicServerTransportTestBase>) {
       return testing::Property(
           &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
-          testing::ElementsAre(testing::AllOf(
-              testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
-              testing::Field(
-                  &quic::AckEvent::adjustedAckTime,
-                  testing::Eq(ackTime - ackDelay)),
-              testing::Field(&quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
-              testing::Field(
-                  &quic::AckEvent::largestAckedPacket,
-                  testing::Eq(largestAckedPacket)),
-              testing::Field(
-                  &quic::AckEvent::largestNewlyAckedPacket,
-                  testing::Eq(largestNewlyAckedPacket)),
-              testing::Field(
-                  &quic::AckEvent::ackedPackets,
-                  testing::SizeIs(expectedNumAckedPackets)),
-              testing::Field(&quic::AckEvent::rttSample, testing::Eq(maybeRtt)),
-              testing::Field(
-                  &quic::AckEvent::rttSampleNoAckDelay,
-                  testing::Eq(maybeRttNoAckDelay)))));
+          testing::ElementsAre(
+              testing::AllOf(
+                  testing::Field(
+                      &quic::AckEvent::ackTime, testing::Eq(ackTime)),
+                  testing::Field(
+                      &quic::AckEvent::adjustedAckTime,
+                      testing::Eq(ackTime - ackDelay)),
+                  testing::Field(
+                      &quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
+                  testing::Field(
+                      &quic::AckEvent::largestAckedPacket,
+                      testing::Eq(largestAckedPacket)),
+                  testing::Field(
+                      &quic::AckEvent::largestNewlyAckedPacket,
+                      testing::Eq(largestNewlyAckedPacket)),
+                  testing::Field(
+                      &quic::AckEvent::ackedPackets,
+                      testing::SizeIs(expectedNumAckedPackets)),
+                  testing::Field(
+                      &quic::AckEvent::rttSample, testing::Eq(maybeRtt)),
+                  testing::Field(
+                      &quic::AckEvent::rttSampleNoAckDelay,
+                      testing::Eq(maybeRttNoAckDelay)))));
     } else {
       FAIL(); // unhandled typed test
     }
@@ -3119,8 +3126,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(writtenPackets1.end)
             .setLargestNewlyAckedPacket(writtenPackets1.end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -3160,8 +3168,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(writtenPackets3.end)
             .setLargestNewlyAckedPacket(writtenPackets3.end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -3427,12 +3436,14 @@ TYPED_TEST(
 
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::packetNum, firstPacketNum))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    firstPacketNum))));
   }
 
   // second write of a single packet worth of data
@@ -3466,12 +3477,14 @@ TYPED_TEST(
 
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::packetNum, firstPacketNum))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    firstPacketNum))));
   }
 
   this->destroyTransport();
@@ -3579,12 +3592,14 @@ TYPED_TEST(
 
     EXPECT_THAT(
         outstandingPacketsDuringInvoke,
-        ::testing::ElementsAre(::testing::AllOf(
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::pnSpace,
-                PacketNumberSpace::AppData),
-            ::testing::Field(
-                &InvokedOutstandingPacketFields::packetNum, firstPacketNum))));
+        ::testing::ElementsAre(
+            ::testing::AllOf(
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::pnSpace,
+                    PacketNumberSpace::AppData),
+                ::testing::Field(
+                    &InvokedOutstandingPacketFields::packetNum,
+                    firstPacketNum))));
   }
 
   // third write of three packets worth of data
@@ -4203,8 +4218,9 @@ TYPED_TEST(
           .setAckDelay(ackDelay)
           .setLargestAckedPacket(maybeWrittenPackets->end)
           .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-              ackRecvTime - sentTime))
+          .setRtt(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime))
           .setRttNoAckDelay(
               std::chrono::duration_cast<std::chrono::microseconds>(
                   ackRecvTime - sentTime - ackDelay))
@@ -4277,8 +4293,9 @@ TYPED_TEST(
           .setAckDelay(ackDelay)
           .setLargestAckedPacket(maybeWrittenPackets->end)
           .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-              ackRecvTime - sentTime))
+          .setRtt(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime))
           .setRttNoAckDelay(
               std::chrono::duration_cast<std::chrono::microseconds>(
                   ackRecvTime - sentTime - ackDelay))
@@ -4352,8 +4369,9 @@ TYPED_TEST(
               std::chrono::duration_cast<std::chrono::microseconds>(ackDelay))
           .setLargestAckedPacket(maybeWrittenPackets->end)
           .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-              ackRecvTime - sentTime))
+          .setRtt(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime))
           .setRttNoAckDelay(0us)
           .build();
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
@@ -4366,10 +4384,13 @@ TYPED_TEST(
               testing::Property(
                   &quic::SocketObserverInterface::AcksProcessedEvent::
                       getAckEvents,
-                  testing::ElementsAre(testing::AllOf(testing::Field(
-                      &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::AnyOf(
-                          testing::Eq(0ms), testing::Eq(std::nullopt)))))))));
+                  testing::ElementsAre(
+                      testing::AllOf(
+                          testing::Field(
+                              &quic::AckEvent::rttSampleNoAckDelay,
+                              testing::AnyOf(
+                                  testing::Eq(0ms),
+                                  testing::Eq(std::nullopt)))))))));
   EXPECT_CALL(
       *observerWithAcks2,
       acksProcessed(
@@ -4379,10 +4400,13 @@ TYPED_TEST(
               testing::Property(
                   &quic::SocketObserverInterface::AcksProcessedEvent::
                       getAckEvents,
-                  testing::ElementsAre(testing::AllOf(testing::Field(
-                      &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::AnyOf(
-                          testing::Eq(0ms), testing::Eq(std::nullopt)))))))));
+                  testing::ElementsAre(
+                      testing::AllOf(
+                          testing::Field(
+                              &quic::AckEvent::rttSampleNoAckDelay,
+                              testing::AnyOf(
+                                  testing::Eq(0ms),
+                                  testing::Eq(std::nullopt)))))))));
 
   const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
   auto buf = quic::test::packetToBuf(
@@ -4450,8 +4474,9 @@ TYPED_TEST(
               std::chrono::duration_cast<std::chrono::microseconds>(ackDelay))
           .setLargestAckedPacket(maybeWrittenPackets->end)
           .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-              ackRecvTime - sentTime))
+          .setRtt(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime))
           .setNoRttWithNoAckDelay()
           .build();
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
@@ -4464,9 +4489,11 @@ TYPED_TEST(
               testing::Property(
                   &quic::SocketObserverInterface::AcksProcessedEvent::
                       getAckEvents,
-                  testing::ElementsAre(testing::AllOf(testing::Field(
-                      &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::Eq(std::nullopt))))))));
+                  testing::ElementsAre(
+                      testing::AllOf(
+                          testing::Field(
+                              &quic::AckEvent::rttSampleNoAckDelay,
+                              testing::Eq(std::nullopt))))))));
   EXPECT_CALL(
       *observerWithAcks2,
       acksProcessed(
@@ -4476,9 +4503,11 @@ TYPED_TEST(
               testing::Property(
                   &quic::SocketObserverInterface::AcksProcessedEvent::
                       getAckEvents,
-                  testing::ElementsAre(testing::AllOf(testing::Field(
-                      &quic::AckEvent::rttSampleNoAckDelay,
-                      testing::Eq(std::nullopt))))))));
+                  testing::ElementsAre(
+                      testing::AllOf(
+                          testing::Field(
+                              &quic::AckEvent::rttSampleNoAckDelay,
+                              testing::Eq(std::nullopt))))))));
 
   const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
   auto buf = quic::test::packetToBuf(
@@ -4560,8 +4589,9 @@ TYPED_TEST(
           .setAckDelay(ackDelay)
           .setLargestAckedPacket(maybeWrittenPackets3->end)
           .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
-          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-              ackRecvTime - sentTime))
+          .setRtt(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime))
           .setRttNoAckDelay(
               std::chrono::duration_cast<std::chrono::microseconds>(
                   ackRecvTime - sentTime - ackDelay))
@@ -4629,8 +4659,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -4670,8 +4701,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -4712,8 +4744,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -4802,8 +4835,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets1->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets1->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -4839,8 +4873,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets2->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets2->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -4876,8 +4911,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets3->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -4973,8 +5009,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets1->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets1->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -5010,8 +5047,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets3->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -5142,8 +5180,9 @@ TYPED_TEST(
             .setAckDelay(ackDelay)
             .setLargestAckedPacket(maybeWrittenPackets3->end)
             .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
-            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
-                ackRecvTime - sentTime))
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
             .setRttNoAckDelay(
                 std::chrono::duration_cast<std::chrono::microseconds>(
                     ackRecvTime - sentTime - ackDelay))
@@ -5254,11 +5293,12 @@ TYPED_TEST(
         testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
         testing::Field(
             &Event::receivedPackets,
-            testing::ElementsAre(ReceivedUdpPacketMatcherBuilder<TypeParam>()
-                                     .setExpectedPacketReceiveTime(pkt1RecvTime)
-                                     .setExpectedPacketNumBytes(pkt1NumBytes)
-                                     .setExpectedTosValue(packetTosValue)
-                                     .build())));
+            testing::ElementsAre(
+                ReceivedUdpPacketMatcherBuilder<TypeParam>()
+                    .setExpectedPacketReceiveTime(pkt1RecvTime)
+                    .setExpectedPacketNumBytes(pkt1NumBytes)
+                    .setExpectedTosValue(packetTosValue)
+                    .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
@@ -5281,11 +5321,12 @@ TYPED_TEST(
         testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
         testing::Field(
             &Event::receivedPackets,
-            testing::ElementsAre(ReceivedUdpPacketMatcherBuilder<TypeParam>()
-                                     .setExpectedPacketReceiveTime(pkt2RecvTime)
-                                     .setExpectedPacketNumBytes(pkt2NumBytes)
-                                     .setExpectedTosValue(packetTosValue)
-                                     .build())));
+            testing::ElementsAre(
+                ReceivedUdpPacketMatcherBuilder<TypeParam>()
+                    .setExpectedPacketReceiveTime(pkt2RecvTime)
+                    .setExpectedPacketNumBytes(pkt2NumBytes)
+                    .setExpectedTosValue(packetTosValue)
+                    .build())));
 
     EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
     EXPECT_CALL(*obs2, packetsReceived(transport, matcher));

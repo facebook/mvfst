@@ -330,14 +330,14 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
       quic::PacketNumberSpace pnSpace,
       quic::AckBlocks acks,
       std::chrono::microseconds ackDelay = 0us) {
-    auto buf =
-        quic::test::packetToBuf(AckPacketBuilder()
-                                    .setDstConn(&getNonConstConn())
-                                    .setPacketNumberSpace(pnSpace)
-                                    .setAckPacketNumStore(&peerPacketNumStore)
-                                    .setAckBlocks(acks)
-                                    .setAckDelay(ackDelay)
-                                    .build());
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&getNonConstConn())
+            .setPacketNumberSpace(pnSpace)
+            .setAckPacketNumStore(&peerPacketNumStore)
+            .setAckBlocks(acks)
+            .setAckDelay(ackDelay)
+            .build());
     buf->coalesce();
     return buf;
   }

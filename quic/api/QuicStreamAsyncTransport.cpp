@@ -534,9 +534,10 @@ void QuicStreamAsyncTransport::onStreamWriteError(
     StreamId /*id*/,
     QuicError error) noexcept {
   if (writeEOF_ != EOFState::DELIVERED) {
-    closeNowImpl(folly::AsyncSocketException(
-        folly::AsyncSocketException::UNKNOWN,
-        fmt::format("Quic write error: {}", toString(error))));
+    closeNowImpl(
+        folly::AsyncSocketException(
+            folly::AsyncSocketException::UNKNOWN,
+            fmt::format("Quic write error: {}", toString(error))));
   }
 }
 

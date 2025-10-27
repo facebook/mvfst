@@ -511,8 +511,9 @@ void handleNewStreamDataWritten(
             .emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(originalOffset),
-                std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-                    std::move(bufWritten), originalOffset, frameFin)))
+                std::forward_as_tuple(
+                    std::make_unique<WriteStreamBuffer>(
+                        std::move(bufWritten), originalOffset, frameFin)))
             .second);
 }
 
@@ -553,8 +554,9 @@ void handleRetransmissionWritten(
               .emplace(
                   std::piecewise_construct,
                   std::forward_as_tuple(frameOffset),
-                  std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-                      std::move(bufWritten), frameOffset, frameFin)))
+                  std::forward_as_tuple(
+                      std::make_unique<WriteStreamBuffer>(
+                          std::move(bufWritten), frameOffset, frameFin)))
               .second);
   } else {
     lossBufferIter->offset += frameLen;
@@ -563,8 +565,9 @@ void handleRetransmissionWritten(
               .emplace(
                   std::piecewise_construct,
                   std::forward_as_tuple(frameOffset),
-                  std::forward_as_tuple(std::make_unique<WriteStreamBuffer>(
-                      std::move(bufWritten), frameOffset, frameFin)))
+                  std::forward_as_tuple(
+                      std::make_unique<WriteStreamBuffer>(
+                          std::move(bufWritten), frameOffset, frameFin)))
               .second);
   }
 }
@@ -586,11 +589,12 @@ void handleRetransmissionBufMetaWritten(
             .emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(frameOffset),
-                std::forward_as_tuple(WriteBufferMeta::Builder()
-                                          .setOffset(frameOffset)
-                                          .setLength(frameLen)
-                                          .setEOF(frameFin)
-                                          .build()))
+                std::forward_as_tuple(
+                    WriteBufferMeta::Builder()
+                        .setOffset(frameOffset)
+                        .setLength(frameLen)
+                        .setEOF(frameFin)
+                        .build()))
             .second);
 }
 
@@ -1183,13 +1187,14 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
   auto encryptionLevel = protectionTypeToEncryptionLevel(
       longHeaderTypeToProtectionType(packetType));
   FrameScheduler scheduler =
-      std::move(FrameScheduler::Builder(
-                    connection,
-                    encryptionLevel,
-                    LongHeader::typeToPacketNumberSpace(packetType),
-                    "CryptoAndAcksScheduler")
-                    .ackFrames()
-                    .cryptoFrames())
+      std::move(
+          FrameScheduler::Builder(
+              connection,
+              encryptionLevel,
+              LongHeader::typeToPacketNumberSpace(packetType),
+              "CryptoAndAcksScheduler")
+              .ackFrames()
+              .cryptoFrames())
           .build();
   auto builder = LongHeaderBuilder(packetType);
   WriteQuicDataResult result;
@@ -1346,18 +1351,18 @@ quic::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
   auto builder = LongHeaderBuilder(type);
   // Probe is not useful for zero rtt because we will always have handshake
   // packets outstanding when sending zero rtt data.
-  FrameScheduler scheduler =
-      std::move(FrameScheduler::Builder(
-                    connection,
-                    encryptionLevel,
-                    LongHeader::typeToPacketNumberSpace(type),
-                    "ZeroRttScheduler")
-                    .streamFrames()
-                    .resetFrames()
-                    .windowUpdateFrames()
-                    .blockedFrames()
-                    .simpleFrames())
-          .build();
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     connection,
+                                     encryptionLevel,
+                                     LongHeader::typeToPacketNumberSpace(type),
+                                     "ZeroRttScheduler")
+                                     .streamFrames()
+                                     .resetFrames()
+                                     .windowUpdateFrames()
+                                     .blockedFrames()
+                                     .simpleFrames())
+                                 .build();
   auto writeResult = writeConnectionDataToSocket(
       socket,
       connection,

@@ -25,8 +25,9 @@ ServerCongestionControllerFactory::makeCongestionController(
     QuicConnectionStateBase& conn,
     CongestionControlType type) {
   auto setupBBR = [&conn](BbrCongestionController* bbr) {
-    bbr->setRttSampler(std::make_unique<BbrRttSampler>(
-        std::chrono::seconds(kDefaultRttSamplerExpiration)));
+    bbr->setRttSampler(
+        std::make_unique<BbrRttSampler>(
+            std::chrono::seconds(kDefaultRttSamplerExpiration)));
     bbr->setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));
   };
   std::unique_ptr<CongestionController> congestionController;
