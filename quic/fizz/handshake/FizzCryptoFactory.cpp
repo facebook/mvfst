@@ -24,7 +24,7 @@ quic::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
   folly::StringPiece salt = getQuicVersionSalt(version);
   auto initialSecret = deriver->hkdfExtract(salt, connIdRange);
   auto trafficSecret = deriver->expandLabel(
-      folly::range(initialSecret),
+      ByteRange(initialSecret.data(), initialSecret.size()),
       label,
       BufHelpers::create(0),
       fizz::Sha256::HashLen);

@@ -217,7 +217,9 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
       currentPacketData->writableData() + packetNumberOffset,
       kMaxPacketNumEncodingSize);
   auto decryptResult = headerCipher->decryptLongHeader(
-      folly::range(sample), initialByteRange, packetNumberByteRange);
+      ByteRange(sample.data(), sample.size()),
+      initialByteRange,
+      packetNumberByteRange);
   if (decryptResult.hasError()) {
     VLOG(4) << "Failed to decrypt long header " << connIdToHex();
     return quic::make_unexpected(decryptResult.error());

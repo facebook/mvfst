@@ -21,7 +21,8 @@ StatelessResetGenerator::StatelessResetGenerator(
     const std::string& addressStr)
     : addressStr_(std::move(addressStr)),
       hkdf_(fizz::openssl::createHkdf<fizz::Sha256>()) {
-  extractedSecret_ = hkdf_.extract(kSalt, folly::range(secret));
+  extractedSecret_ =
+      hkdf_.extract(kSalt, ByteRange(secret.data(), secret.size()));
 }
 
 StatelessResetToken StatelessResetGenerator::generateToken(
@@ -30,7 +31,10 @@ StatelessResetToken StatelessResetGenerator::generateToken(
   auto info = toData(connId);
   info.appendToChain(
       BufHelpers::wrapBuffer(addressStr_.data(), addressStr_.size()));
-  auto out = hkdf_.expand(folly::range(extractedSecret_), info, token.size());
+  auto out = hkdf_.expand(
+      ByteRange(extractedSecret_.data(), extractedSecret_.size()),
+      info,
+      token.size());
   out->coalesce();
   memcpy(token.data(), out->data(), out->length());
   return token;
