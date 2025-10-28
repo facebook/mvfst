@@ -444,7 +444,9 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
           case fizz::EarlySecrets::ClientEarlyTraffic:
             server_.computeCiphers(
                 CipherKind::ZeroRttRead,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           default:
             break;
@@ -455,12 +457,16 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
             server_.computeCiphers(
                 CipherKind::HandshakeRead,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           case fizz::HandshakeSecrets::ServerHandshakeTraffic:
             server_.computeCiphers(
                 CipherKind::HandshakeWrite,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           case fizz::HandshakeSecrets::ECHAcceptConfirmation:
             break;
@@ -471,12 +477,16 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
           case fizz::AppTrafficSecrets::ClientAppTraffic:
             server_.computeCiphers(
                 CipherKind::OneRttRead,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           case fizz::AppTrafficSecrets::ServerAppTraffic:
             server_.computeCiphers(
                 CipherKind::OneRttWrite,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
         }
         break;

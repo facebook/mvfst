@@ -400,7 +400,9 @@ class FizzClientHandshake::ActionMoveVisitor {
           case fizz::EarlySecrets::ClientEarlyTraffic:
             client_.computeCiphers(
                 CipherKind::ZeroRttWrite,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           default:
             break;
@@ -411,12 +413,16 @@ class FizzClientHandshake::ActionMoveVisitor {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
             client_.computeCiphers(
                 CipherKind::HandshakeWrite,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           case fizz::HandshakeSecrets::ServerHandshakeTraffic:
             client_.computeCiphers(
                 CipherKind::HandshakeRead,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           case fizz::HandshakeSecrets::ECHAcceptConfirmation:
             break;
@@ -427,12 +433,16 @@ class FizzClientHandshake::ActionMoveVisitor {
           case fizz::AppTrafficSecrets::ClientAppTraffic:
             client_.computeCiphers(
                 CipherKind::OneRttWrite,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
           case fizz::AppTrafficSecrets::ServerAppTraffic:
             client_.computeCiphers(
                 CipherKind::OneRttRead,
-                folly::range(secretAvailable.secret.secret));
+                ByteRange(
+                    secretAvailable.secret.secret.data(),
+                    secretAvailable.secret.secret.size()));
             break;
         }
         break;
