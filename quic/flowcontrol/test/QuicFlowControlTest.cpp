@@ -528,7 +528,7 @@ TEST_F(QuicFlowControlTest, TestStreamFlowControlAutotuneEnabled) {
   stream.currentReadOffset = 300;
   stream.flowControlState.windowSize = 500;
   stream.flowControlState.advertisedMaxOffset = 400;
-  stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
+  stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now() - 1ms;
   stream.conn.lossState.srtt = 10ms;
 
   stream.conn.transportSettings.autotuneReceiveStreamFlowControl = true;
