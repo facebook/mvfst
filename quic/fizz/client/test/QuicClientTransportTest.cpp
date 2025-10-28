@@ -511,6 +511,18 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
         return true;
       },
       []() -> BufPtr { return nullptr; });
+
+  // Set the onTransportReadyCallback before starting the client to guarantee
+  // the callback is set by the time the handshake is started
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    eventbase_.terminateLoopSoon();
+    ASSERT_EQ(client->getAppProtocol(), "h3");
+    ASSERT_EQ(
+        client->getZeroRttState(),
+        QuicClientTransport::ZeroRttAttemptState::NotAttempted);
+    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  }));
+
   client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
@@ -527,11 +539,6 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamFlowControlWindow);
-  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h3");
-    CHECK(client->getConn().zeroRttWriteCipher);
-    eventbase_.terminateLoopSoon();
-  }));
   eventbase_.loopForever();
 
   EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
@@ -546,6 +553,10 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
+  EXPECT_EQ(
+      client->getZeroRttState(),
+      QuicClientTransport::ZeroRttAttemptState::Accepted);
+  ;
 }
 
 TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
@@ -731,6 +742,11 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
         return true;
       },
       []() -> BufPtr { return nullptr; });
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    ASSERT_EQ(client->getAppProtocol(), "h3");
+    CHECK(client->getConn().zeroRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
   client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
@@ -748,12 +764,6 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamFlowControlWindow);
   client->serverInitialParamsSet() = false;
-
-  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h3");
-    CHECK(client->getConn().zeroRttWriteCipher);
-    eventbase_.terminateLoopSoon();
-  }));
   eventbase_.loopForever();
 
   EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
