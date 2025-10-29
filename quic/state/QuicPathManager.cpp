@@ -230,13 +230,15 @@ void QuicPathManager::onPathChallengeSent(
 
 const PathInfo* QuicPathManager::onPathResponseReceived(
     const PathResponseFrame& pathResponse,
-    PathIdType incomingPathId) {
+    PathIdType /*incomingPathId*/) {
   auto maybePath = getPathByChallengeDataImpl(pathResponse.pathData);
-  if (!maybePath || maybePath->id != incomingPathId) {
+  if (!maybePath) {
     // We can ignore this path response. This is either:
     // - a duplicate response
     // - a response from a path that was has timed out and failed validation.
-    // - a response that was received on the wrong path
+    // Note that it's ok to receive a path response on a path other than the one
+    // we sent the challenge on. See
+    // https://www.rfc-editor.org/rfc/rfc9000.html#section-8.2.2
     return nullptr;
   }
   auto& path = *maybePath;

@@ -692,18 +692,13 @@ TEST_P(
       makePacketWithPathResponseFrame(outstandingChallenge->pathData);
   deliverData(packetToBuf(pathResponsePkt), false, &newPeer2);
 
-  // The response should not impact the state of the newPath
+  // The response should be accepted. The spec says that the peer initiating the
+  // path validation MUST NOT enforce that the response come on the same path.
+  // https://www.rfc-editor.org/rfc/rfc9000.html#section-8.2.2
   EXPECT_EQ(conn.currentPathId, newPath->id);
-  EXPECT_EQ(newPath->status, PathStatus::Validating);
-  EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
-  EXPECT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
-
-  // This should be considered a new path probe for the new peer address
-  auto newPath2 =
-      conn.pathManager->getPath(server->getLocalAddress(), newPeer2);
-  ASSERT_TRUE(newPath2);
-  EXPECT_NE(newPath2->id, newPath->id);
-  EXPECT_EQ(newPath2->status, PathStatus::NotValid);
+  EXPECT_EQ(newPath->status, PathStatus::Validated);
+  EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
+  EXPECT_FALSE(server->pathValidationTimeout().isTimerCallbackScheduled());
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, RetiringConnIdIssuesNewIds) {
