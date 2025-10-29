@@ -354,8 +354,6 @@ void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(
 TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
   expectTransportCallbacks();
   expectStatsCallbacks();
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     EXPECT_EQ(client->getConn().peerConnectionIds.size(), 1);
@@ -364,6 +362,7 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
         client->getConn().peerConnectionIds[0].connId);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -375,12 +374,11 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
 
 TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
   expectTransportCallbacks();
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -456,12 +454,11 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   TransportSettings settings;
   settings.connectUDP = true;
   client->setTransportSettings(settings);
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -478,12 +475,11 @@ TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
   TransportSettings settings;
   settings.connectUDP = true;
   client->setTransportSettings(settings);
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -515,12 +511,18 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   // Set the onTransportReadyCallback before starting the client to guarantee
   // the callback is set by the time the handshake is started
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    eventbase_.terminateLoopSoon();
     ASSERT_EQ(client->getAppProtocol(), "h3");
-    ASSERT_EQ(
+    ASSERT_NE(
         client->getZeroRttState(),
-        QuicClientTransport::ZeroRttAttemptState::NotAttempted);
-    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+        QuicClientTransport::ZeroRttAttemptState::Rejected);
+    // The ZeroRTT onTransportReady() is scheduled on the event base. So if the
+    // handshake completed quickly, the callback could happen after ZerRTT has
+    // already been accepted. We only check the zeroRTTCipher if the callback is
+    // early.
+    if (client->getZeroRttState() ==
+        QuicClientTransport::ZeroRttAttemptState::NotAttempted) {
+      EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+    }
   }));
 
   client->start(&clientConnSetupCallback, &clientConnCallback);
@@ -539,17 +541,28 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamFlowControlWindow);
-  eventbase_.loopForever();
+  eventbase_.loopOnce();
 
-  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  if (client->getZeroRttState() ==
+      QuicClientTransport::ZeroRttAttemptState::NotAttempted) {
+    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+    EXPECT_FALSE(client->replaySafe());
+    EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
+  } else if (
+      client->getZeroRttState() ==
+      QuicClientTransport::ZeroRttAttemptState::Accepted) {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+    EXPECT_TRUE(client->replaySafe());
+  } else {
+    FAIL() << "Zero RTT rejected";
+  }
+
   EXPECT_TRUE(client->good());
-  EXPECT_FALSE(client->replaySafe());
 
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
   expected->appendToChain(data->clone());
-  EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
@@ -602,6 +615,10 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
         return true;
       },
       []() -> BufPtr { return nullptr; });
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    ASSERT_EQ(client->getAppProtocol(), "h3");
+    CHECK(client->getConn().zeroRttWriteCipher);
+  }));
   client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
@@ -618,12 +635,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamFlowControlWindow);
-  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h3");
-    CHECK(client->getConn().zeroRttWriteCipher);
-    eventbase_.terminateLoopSoon();
-  }));
-  eventbase_.loopForever();
+  eventbase_.loopOnce();
 
   EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->good());
@@ -654,12 +666,11 @@ TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
   client->setNewTokenCallback([newToken = newToken](std::string token) {
     *newToken = std::move(token);
   });
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -676,12 +687,11 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
   client->setNewTokenCallback([newToken = newToken](std::string token) {
     *newToken = std::move(token);
   });
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -715,12 +725,11 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
     retryServer = nullptr;
   };
 
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   EXPECT_FALSE(client->getConn().retryToken.empty());
@@ -744,8 +753,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       []() -> BufPtr { return nullptr; });
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
-    CHECK(client->getConn().zeroRttWriteCipher);
-    eventbase_.terminateLoopSoon();
+    ASSERT_NE(
+        client->getZeroRttState(),
+        QuicClientTransport::ZeroRttAttemptState::Accepted);
+    // The ZeroRTT onTransportReady() is scheduled on the event base. So if the
+    // handshake completed quickly, the callback could happen after ZerRTT has
+    // already been rejected. We only check the zeroRTTCipher if the callback is
+    // early.
+    if (client->getZeroRttState() ==
+        QuicClientTransport::ZeroRttAttemptState::NotAttempted) {
+      EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+    }
   }));
   client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
@@ -764,11 +782,21 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamFlowControlWindow);
   client->serverInitialParamsSet() = false;
-  eventbase_.loopForever();
+  eventbase_.loopOnce();
 
-  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  if (client->getZeroRttState() ==
+      QuicClientTransport::ZeroRttAttemptState::NotAttempted) {
+    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+    EXPECT_FALSE(client->replaySafe());
+  } else if (
+      client->getZeroRttState() ==
+      QuicClientTransport::ZeroRttAttemptState::Rejected) {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+    EXPECT_TRUE(client->replaySafe());
+  } else {
+    FAIL() << "Zero RTT accpted";
+  }
   EXPECT_TRUE(client->good());
-  EXPECT_FALSE(client->replaySafe());
 
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
@@ -808,13 +836,12 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
         return true;
       },
       []() -> BufPtr { return nullptr; });
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -850,14 +877,13 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
         return false;
       },
       []() -> BufPtr { return nullptr; });
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-  EXPECT_TRUE(performedValidation);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+  EXPECT_TRUE(performedValidation);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -886,12 +912,11 @@ TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
   std::shared_ptr<FollyQuicEventBase> newQEvb =
       std::make_shared<FollyQuicEventBase>(newEvb.getEventBase());
   expectTransportCallbacks();
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -926,12 +951,11 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
     server2 = nullptr;
   };
 
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -976,12 +1000,11 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
     server2 = nullptr;
   };
 
-  client->start(&clientConnSetupCallback, &clientConnCallback);
-
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     token1 = client->getConn().statelessResetToken;
     eventbase_.terminateLoopSoon();
   }));
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
@@ -1103,10 +1126,10 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
   client->addNewPeerAddress(serverAddr);
   EXPECT_CALL(*sock, write(_, _, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
   client->start(&clientConnSetupCallback, &clientConnCallback);
 
   EXPECT_FALSE(client->isClosed());
-  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
   eventbase_->loopOnce();
   EXPECT_TRUE(client->isClosed());
 }
