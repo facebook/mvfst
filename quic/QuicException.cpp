@@ -128,9 +128,9 @@ folly::StringPiece toString(LocalErrorCode code) {
       return "Path manager error";
     case LocalErrorCode::NO_AVAILABLE_CID:
       return "No available connection ids";
+    case quic::LocalErrorCode::MIGRATION_FAILED:
+      return "Migration failed";
   }
-  LOG(WARNING) << "toString has unhandled ErrorCode";
-  return "Unknown error";
 }
 
 std::string toString(TransportErrorCode code) {

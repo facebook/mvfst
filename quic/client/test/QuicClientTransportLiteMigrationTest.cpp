@@ -50,12 +50,22 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
 class TestPathValidationCallback
     : public QuicPathManager::PathValidationCallback {
  public:
+  TestPathValidationCallback(
+      QuicClientTransportLite* client = nullptr,
+      bool shouldMigrate = false)
+      : client(client), shouldMigrate(shouldMigrate) {}
+
   void onPathValidationResult(const PathInfo& info) override {
     called = true;
     lastId = info.id;
     lastStatus = info.status;
+    if (shouldMigrate) {
+      client->migrateConnection(info.id);
+    }
   }
 
+  QuicClientTransportLite* client;
+  bool shouldMigrate;
   bool called{false};
   PathIdType lastId{0};
   PathStatus lastStatus{PathStatus::NotValid};
@@ -162,7 +172,9 @@ class QuicClientTransportLiteMigrationTest : public Test {
   folly::SocketAddress localAddr_{"::", 54321};
 };
 
-TEST_F(QuicClientTransportLiteMigrationTest, StartPathProbeSuccess) {
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    StartPathProbeSuccessWithoutMigrating) {
   folly::SocketAddress localAddr("::", 12345);
   auto probeSock = createProbeSocketMock(localAddr);
 
@@ -185,6 +197,63 @@ TEST_F(QuicClientTransportLiteMigrationTest, StartPathProbeSuccess) {
   EXPECT_TRUE(callback.called);
   EXPECT_EQ(callback.lastId, pathId);
   EXPECT_EQ(callback.lastStatus, PathStatus::Validated);
+
+  // The path still exists. It wasn't removed in the callback.
+  EXPECT_NE(quicClient_->getConn()->pathManager->getPath(pathId), nullptr);
+
+  // Loop once to allow evb callbacks from the path result callback to execute
+  qEvb_->loopOnce();
+
+  // Since we didn't migrate in the callback, the probe path should be removed
+  EXPECT_EQ(quicClient_->getConn()->pathManager->getPath(pathId), nullptr);
+}
+
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    StartPathProbeSuccessWithMigrating) {
+  folly::SocketAddress localAddr("::", 12345);
+  auto initialPathId = quicClient_->getConn()->currentPathId;
+  auto probeSock = createProbeSocketMock(localAddr);
+
+  auto probeSockPtr = probeSock.get();
+  // Starting a path probe should initialize the socket:
+  EXPECT_CALL(*probeSockPtr, setTosOrTrafficClass(_)).Times(1);
+  EXPECT_CALL(*probeSockPtr, setDFAndTurnOffPMTU()).Times(1);
+  EXPECT_CALL(*probeSockPtr, setAdditionalCmsgsFunc(_)).Times(1);
+
+  TestPathValidationCallback callback(quicClient_.get(), true);
+  auto res = quicClient_->startPathProbe(std::move(probeSock), &callback);
+  ASSERT_TRUE(res.has_value()) << "startPathProbe failed: " << res.error();
+  auto pathId = res.value();
+
+  // Validate a path challenge was scheduled
+  EXPECT_GE(quicClient_->getConn()->pendingEvents.pathChallenges.size(), 1);
+
+  // Validate the path via PathResponse and ensure callback is invoked
+  validatePath(pathId);
+  EXPECT_TRUE(callback.called);
+  EXPECT_EQ(callback.lastId, pathId);
+  EXPECT_EQ(callback.lastStatus, PathStatus::Validated);
+
+  // The probed path and the initial path still exist. Neither was removed in
+  // the callback.
+  EXPECT_NE(quicClient_->getConn()->pathManager->getPath(pathId), nullptr);
+  EXPECT_NE(
+      quicClient_->getConn()->pathManager->getPath(initialPathId), nullptr);
+
+  // We migrated.
+  ASSERT_EQ(quicClient_->getConn()->currentPathId, pathId);
+  // This has to be updated manually in the test.
+  sockPtr_ = probeSockPtr;
+
+  // Loop once to allow evb callbacks from the path result callback to execute
+  qEvb_->loopOnce();
+
+  // Since we migrated the connection, the probed path should still be there.
+  EXPECT_NE(quicClient_->getConn()->pathManager->getPath(pathId), nullptr);
+  // The initial path id should be removed
+  EXPECT_EQ(
+      quicClient_->getConn()->pathManager->getPath(initialPathId), nullptr);
 }
 
 TEST_F(
@@ -192,6 +261,7 @@ TEST_F(
     MigrateConnectionSwitchesCurrentPath) {
   folly::SocketAddress localAddr("::", 22334);
   auto probeSock = createProbeSocketMock(localAddr);
+  auto probeSockPtr = probeSock.get();
 
   auto startRes = quicClient_->startPathProbe(std::move(probeSock), nullptr);
   ASSERT_TRUE(startRes.has_value());
@@ -203,6 +273,12 @@ TEST_F(
   auto migRes = quicClient_->migrateConnection(pathId);
   ASSERT_TRUE(migRes.has_value()) << "migrateConnection failed";
   EXPECT_EQ(quicClient_->getConn()->currentPathId, pathId);
+
+  // This has to be updated manually in the test state since we've migrated
+  sockPtr_ = probeSockPtr;
+
+  // Loop once to allow evb callbacks from the path result callback to execute
+  qEvb_->loopOnce();
 }
 
 TEST_F(QuicClientTransportLiteMigrationTest, PathProbeTimeout) {
@@ -244,6 +320,12 @@ TEST_F(QuicClientTransportLiteMigrationTest, PathProbeTimeout) {
   pathInfo = quicClient_->getConn()->pathManager->getPath(pathId);
   ASSERT_NE(pathInfo, nullptr);
   EXPECT_EQ(pathInfo->status, PathStatus::NotValid);
+
+  // Loop once to allow evb callbacks from the path result callback to execute
+  qEvb_->loopOnce();
+
+  // The path should no longer exist since it's not valid.
+  EXPECT_EQ(quicClient_->getConn()->pathManager->getPath(pathId), nullptr);
 }
 
 TEST_F(

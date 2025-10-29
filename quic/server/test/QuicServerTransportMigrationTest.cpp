@@ -50,6 +50,12 @@ class QuicServerTransportAllowMigrationTest
         ConnectionId::createAndMaybeCrash({9, 10, 11, 12}), 2);
   }
 
+  void TearDown() override {
+    if (server) {
+      server->closeNow(std::nullopt);
+    }
+  }
+
   bool getDisableMigration() override {
     return false;
   }
@@ -187,7 +193,7 @@ TEST_P(
 
 TEST_P(
     QuicServerTransportAllowMigrationTest,
-    ReceiveProbeFromNewPeerAddressWithoutMigrating) {
+    ReceiveProbeFromNewPeerAddressWithoutMigratingLongGracePeriod) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   auto& conn = server->getNonConstConn();
   conn.qLogger = qLogger;
@@ -230,6 +236,11 @@ TEST_P(
 
   // Step 2: Deliver a path response to validate the new peer
   {
+    // Set a very high srtt to ensure that the new path is not immediately
+    // deleted. The grace period for the client to migrate is
+    // kProbedPathGracePeriodInSRTT * SRTT
+    conn.lossState.srtt = 10s;
+
     auto packet =
         makePacketWithPathResponseFrame(outstandingChallenge->pathData);
     auto packetData = packetToBuf(packet);
@@ -238,6 +249,65 @@ TEST_P(
   EXPECT_NE(conn.currentPathId, newPath->id);
   EXPECT_EQ(newPath->status, PathStatus::Validated);
   EXPECT_TRUE(newPath->pathValidationTime.has_value());
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    ReceiveProbeFromNewPeerAddressWithoutMigratingShortGracePeriod) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  auto& conn = server->getNonConstConn();
+  conn.qLogger = qLogger;
+  conn.transportSettings.disableMigration = false;
+
+  // onPeerAddressChanged should be called once for each packet on the
+  // non-primary path
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(2);
+  // Add additional peer id so PathResponse completes.
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  // Deliver a path challenge from a new peer address
+  auto incomingPathChallengeData = 123;
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
+    auto packetData = packetToBuf(packet);
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  // Step 1: New path is created and is validating
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  auto newPathId = newPath->id;
+  ASSERT_TRUE(newPath);
+  EXPECT_NE(conn.currentPathId, newPath->id);
+  EXPECT_EQ(newPath->status, PathStatus::Validating);
+
+  // A path response and a new path challege should be outstanding for the path
+  auto outstandingResponse = getFirstOutstandingPathResponse();
+  ASSERT_TRUE(outstandingResponse);
+  EXPECT_EQ(outstandingResponse->pathData, incomingPathChallengeData);
+
+  auto outstandingChallenge = getFirstOutstandingPathChallenge();
+  ASSERT_TRUE(outstandingChallenge);
+  // The outstanding challenge data can be used to retrieve the path
+  auto sameNewpath =
+      conn.pathManager->getPathByChallengeData(outstandingChallenge->pathData);
+  ASSERT_TRUE(sameNewpath);
+  EXPECT_EQ(sameNewpath->id, newPath->id);
+
+  // Step 2: Deliver a path response to validate the new peer
+  {
+    // Set no grace period for the client to migrate. This should immediately
+    // delete the validated non primary path.
+    conn.lossState.srtt = 0s;
+
+    auto packet =
+        makePacketWithPathResponseFrame(outstandingChallenge->pathData);
+    auto packetData = packetToBuf(packet);
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+  // The client didn't migrate before the grace period so the path was deleted.
+  EXPECT_FALSE(conn.pathManager->getPath(newPathId));
 }
 
 TEST_P(
@@ -438,8 +508,11 @@ TEST_P(
   EXPECT_FALSE(server->pathValidationTimeout().isTimerCallbackScheduled());
   ASSERT_FALSE(conn.fallbackPathId.has_value());
 
+  // The first path should be removed because we are now on a validated path
+  EXPECT_FALSE(conn.pathManager->getPath(firstPathId));
+
   // receiving data from the original peer address would trigger another
-  // migration back to the original path without sending
+  // migration and a new path validation since the path was deleted.
   EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   auto nextPacketData = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -451,18 +524,11 @@ TEST_P(
       0 /* largestAcked */));
 
   deliverData(std::move(nextPacketData), false);
-  ASSERT_EQ(conn.currentPathId, firstPathId);
+  ASSERT_NE(conn.currentPathId, firstPathId);
+  ASSERT_NE(conn.currentPathId, newPathId);
 
-  // First path is already validated
-  EXPECT_FALSE(conn.pendingEvents.pathChallenges.contains(firstPathId));
-  EXPECT_EQ(firstPath->status, PathStatus::Validated);
-
-  // Its cached state is restored
-  EXPECT_EQ(conn.congestionController.get(), firstCongestionController);
-  EXPECT_EQ(conn.lossState.srtt, firstSrtt);
-  EXPECT_EQ(conn.lossState.lrtt, firstLrtt);
-  EXPECT_EQ(conn.lossState.rttvar, firstRttvar);
-  EXPECT_EQ(conn.lossState.mrtt, firstMrtt);
+  // Path will need revalidation
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(conn.currentPathId));
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
@@ -541,11 +607,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   EXPECT_NE(conn.lossState.srtt, 0us);
   EXPECT_NE(conn.lossState.lrtt, 0us);
   EXPECT_NE(conn.lossState.rttvar, 0us);
-
-  // Cached values should not be affected.
-  EXPECT_EQ(firstPath->cachedCCAndRttState->srtt, srtt);
-  EXPECT_EQ(firstPath->cachedCCAndRttState->lrtt, lrtt);
-  EXPECT_EQ(firstPath->cachedCCAndRttState->rttvar, rttvar);
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
@@ -1155,6 +1216,7 @@ TEST_P(
   // Step 1: New path is created and is validating
   auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
   ASSERT_TRUE(newPath);
+  auto newPathId = newPath->id;
   EXPECT_NE(conn.currentPathId, newPath->id);
   EXPECT_EQ(newPath->status, PathStatus::Validating);
   EXPECT_TRUE(newPath->outstandingChallengeData);
@@ -1177,6 +1239,11 @@ TEST_P(
   EXPECT_FALSE(newPath->outstandingChallengeData);
   EXPECT_FALSE(newPath->firstChallengeSentTimestamp);
   EXPECT_FALSE(newPath->lastChallengeSentTimestamp);
+
+  // This is a probe path that failed validation. It will be removed at the end
+  // of the event loop.
+  evb.loopOnce();
+  EXPECT_FALSE(conn.pathManager->getPath(newPathId));
 }
 
 TEST_P(
@@ -1369,7 +1436,7 @@ TEST_P(
   ASSERT_EQ(server.get(), nullptr);
 }
 
-TEST_P(QuicServerTransportAllowMigrationTest, ReapUnusedValidatedPaths) {
+TEST_P(QuicServerTransportAllowMigrationTest, ReapOldValidatedPaths) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   auto& conn = server->getNonConstConn();
   conn.qLogger = qLogger;
@@ -1381,7 +1448,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ReapUnusedValidatedPaths) {
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
   // Path was validated but is old
   path.status = PathStatus::Validated;
-  path.pathValidationTime = Clock::now() - kTimeToRetainUnusedPaths * 2;
+  path.pathValidationTime = Clock::now() - kTimeToRetainOldPaths * 2;
 
   // Deliver any data to the socket. This should trigger the reaping logic.
   {

@@ -390,6 +390,7 @@ enum class LocalErrorCode : uint64_t {
   PATH_NOT_EXISTS = 0x4000001F,
   PATH_MANAGER_ERROR = 0x40000020,
   NO_AVAILABLE_CID = 0x40000021,
+  MIGRATION_FAILED = 0x40000022,
 };
 
 enum class QuicNodeType : bool {
@@ -659,8 +660,21 @@ constexpr std::chrono::seconds kTimeToRetainZeroRttKeys = 20s;
 
 constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState = 60s;
 
-constexpr std::chrono::seconds kTimeToRetainUnusedPaths =
+// Amount of time for the server to keep previously used paths in the path
+// manager before dropping them. This allows the server to restore the path
+// state if the client migrates back to it.
+constexpr std::chrono::seconds kTimeToRetainOldPaths =
     kTimeToRetainLastCongestionAndRttState;
+
+// The number of SRTTs the server transport will maintain the state of a
+// validated probed path waiting for the client to migrate to that path. Once
+// the grace period expires, the transport will drop the probed path state if
+// it's not the current path.
+constexpr uint16_t kProbedPathGracePeriodInSRTT = 3;
+
+// The number of SRTTs the client will continue reading from the old socket
+// after migration.
+constexpr uint16_t kClientTimeToKeepOldPathAfterMigration = 2;
 
 constexpr auto kMinimumNumOfParamsInTheTicket = 8;
 

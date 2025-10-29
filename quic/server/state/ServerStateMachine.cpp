@@ -798,6 +798,15 @@ quic::Expected<void, QuicError> onConnectionMigration(
               conn, prevPathCCType);
     }
   }
+
+  // Try to make room for more migrations if needed.
+  bool allCidsInUse = !std::any_of(
+      conn.peerConnectionIds.begin(),
+      conn.peerConnectionIds.end(),
+      [](const auto& cidData) { return !cidData.inUse; });
+  if (allCidsInUse) {
+    conn.pathManager->maybeReapUnusedPaths(/*force=*/true);
+  }
   return {};
 }
 

@@ -2255,6 +2255,24 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
     conn_->qLogger->addConnectionMigrationUpdate(true);
   }
 
+  // Keep the old path for some time so we can read any packets that might
+  // already be inflight
+  auto removePathLambda = [conn = shared_from_this(), oldPathId]() {
+    auto removePathRes = conn->clientConn_->pathManager->removePath(oldPathId);
+    if (removePathRes.hasError()) {
+      LOG(WARNING) << "Failed to remove old path after migration. "
+                   << removePathRes.error();
+    }
+  };
+  auto delay = kClientTimeToKeepOldPathAfterMigration *
+      std::chrono::ceil<std::chrono::milliseconds>(conn_->lossState.srtt)
+          .count();
+  evb_->runAfterDelay(removePathLambda, delay);
+
+  // Write something to trigger the migration.
+  conn_->pendingEvents.sendPing = true;
+  updateWriteLooper(true);
+
   return {};
 }
 
@@ -2454,6 +2472,29 @@ void QuicClientTransportLite::onPathValidationResult(const PathInfo& pathInfo) {
   if (auto it = pathValidationCallbacks_.find(pathInfo.id);
       it != pathValidationCallbacks_.end() && it->second) {
     it->second->onPathValidationResult(pathInfo);
+    // Remove the callback
+    pathValidationCallbacks_.erase(pathInfo.id);
+  }
+
+  if (pathInfo.id != conn_->currentPathId) {
+    // The upper layer should decide to migrate or not in the callback. After
+    // the callback, if this path is not the current one, remove it to avoid
+    // dangling paths/sockets.
+    evb_->runInLoop(
+        [&, pathId = pathInfo.id]() {
+          auto removeRes = conn_->pathManager->removePath(pathId);
+          if (removeRes.hasError()) {
+            LOG(WARNING) << "Failed to remove path " << pathId
+                         << " after validation: " << removeRes.error();
+          }
+        },
+        /*thisIteration=*/true);
+  } else if (pathInfo.status != PathStatus::Validated) {
+    // This is the current path and it has failed validation, we need to close
+    // the connection.
+    asyncClose(QuicError(
+        QuicErrorCode(LocalErrorCode::MIGRATION_FAILED),
+        "Path validation failed for current path"));
   }
 }
 

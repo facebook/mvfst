@@ -505,7 +505,7 @@ void QuicPathManager::maybeReapUnusedPaths(bool force) {
     }
     if (!force && it.second.pathValidationTime &&
         (Clock::now() - it.second.pathValidationTime.value()) <
-            kTimeToRetainUnusedPaths) {
+            kTimeToRetainOldPaths) {
       continue;
     }
     if (it.first < minPathId) {

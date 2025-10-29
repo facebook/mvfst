@@ -204,6 +204,9 @@ class QuicClientTransportLite
       std::unique_ptr<QuicAsyncUDPSocket> probeSocket,
       QuicPathManager::PathValidationCallback* probeResultCallback = nullptr);
 
+  // Migrate to the path with the given id. This will schedule the current path
+  // to be removed after srtt * kClientTimeToKeepOldPathAfterMigration. The
+  // delay allows the transport to read any inflight packets on the old path.
   quic::Expected<void, QuicError> migrateConnection(PathIdType pathId);
 
   quic::Expected<void, QuicError> removePath(PathIdType pathId);

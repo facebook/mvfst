@@ -1592,8 +1592,70 @@ void QuicServerTransport::setCongestionControl(CongestionControlType type) {
 }
 
 void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
-  if (pathInfo.id == conn_->currentPathId) {
-    if (pathInfo.status == PathStatus::NotValid) {
+  // NOLINTBEGIN
+  /*
+   * There are four cases to handle in the result of path validation:
+   *
+   *                    Path Validation Result
+   *                              |
+   *              +---------------+---------------+
+   *              |                               |
+   *         Path Valid                    Path NotValid
+   *              |                               |
+   *    +---------+---------+           +---------+--------+
+   *    |                   |           |                  |
+   *   (1)                 (2)         (3)                (4)
+   * Current Path      Probing Path   Current Path   Probing Path
+   *    |                   |           |                  |
+   *    v                   v           v                  |
+   * Remove            Remove after   Switch to            |
+   * fallback          grace period   fallback             |
+   * path              if client      path OR              |
+   *                   doesn't        close conn           |
+   *                   switch              |               |
+   *                                       +-------+-------+
+   *                                               |
+   *                                               v
+   *                                          Remove path
+   */
+  // NOLINTEND
+
+  if (pathInfo.status == PathStatus::Validated) {
+    if (pathInfo.id == conn_->currentPathId) {
+      // Case (1): Validated Current Path
+      // remove the fallback path if it exists
+      if (conn_->fallbackPathId) {
+        auto removePathRes =
+            conn_->pathManager->removePath(conn_->fallbackPathId.value());
+        if (removePathRes.hasError()) {
+          LOG(WARNING) << "Failed to remove fallback path: "
+                       << removePathRes.error();
+        }
+        conn_->fallbackPathId.reset();
+      }
+    } else {
+      // Case (2): Validated Probe Path
+      // remove it after the grace period if the client hasn't
+      // migrated to it.
+      auto removeIfNotCurrentFunc = [conn = shared_from_this(),
+                                     pathId = pathInfo.id]() {
+        if (conn->conn_->currentPathId == pathId) {
+          return;
+        }
+        auto removePathRes = conn->conn_->pathManager->removePath(pathId);
+        if (removePathRes.hasError()) {
+          LOG(WARNING) << "Failed to remove probing path: "
+                       << removePathRes.error();
+        }
+      };
+      auto gracePeriod = kProbedPathGracePeriodInSRTT *
+          std::chrono::ceil<std::chrono::milliseconds>(conn_->lossState.srtt)
+              .count();
+      evb_->runAfterDelay(removeIfNotCurrentFunc, gracePeriod);
+    }
+  } else {
+    if (pathInfo.id == conn_->currentPathId) {
+      // Case (3): Invalid Current Path
       // We should fallback to the previously validated path or close the
       // connection if we don't have one.
 
@@ -1603,32 +1665,47 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
       auto migrationReverted = false;
       if (conn_->fallbackPathId) {
         auto fallbackPath = conn_->pathManager->getPath(*conn_->fallbackPathId);
+        conn_->fallbackPathId.reset();
         if (fallbackPath) {
-          conn_->currentPathId = fallbackPath->id;
-          conn_->peerAddress = fallbackPath->peerAddress;
-          auto ccaRestored =
-              conn_->pathManager
-                  ->maybeRestoreCongestionControlAndRttStateForCurrentPath();
-          if (!ccaRestored) {
-            conn_->congestionController =
-                conn_->congestionControllerFactory->makeCongestionController(
-                    *conn_,
-                    conn_->transportSettings.defaultCongestionController);
+          auto switchPathRes =
+              conn_->pathManager->switchCurrentPath(fallbackPath->id);
+          if (switchPathRes.hasError()) {
+            LOG(WARNING) << "Failed to switch to fallback path: "
+                         << switchPathRes.error();
+          } else {
+            auto ccaRestored =
+                conn_->pathManager
+                    ->maybeRestoreCongestionControlAndRttStateForCurrentPath();
+            if (!ccaRestored) {
+              conn_->congestionController =
+                  conn_->congestionControllerFactory->makeCongestionController(
+                      *conn_,
+                      conn_->transportSettings.defaultCongestionController);
+            }
+            conn_->fallbackPathId.reset();
+            migrationReverted = true;
           }
-          conn_->fallbackPathId.reset();
-          migrationReverted = true;
         }
       }
-
       if (!migrationReverted) {
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
             std::string(
                 "Path validation timed out. No fallback path available")));
       }
-    } else if (pathInfo.status == PathStatus::Validated) {
-      // We're on a validated path. We don't need a fallback anymore.
-      conn_->fallbackPathId.reset();
+    }
+
+    // Remove path for cases (3) and (4)
+    if (closeState_ == CloseState::OPEN) {
+      auto removePathFunc = [conn = shared_from_this(),
+                             pathId = pathInfo.id]() {
+        auto removePathRes = conn->conn_->pathManager->removePath(pathId);
+        if (removePathRes.hasError()) {
+          LOG(WARNING) << "Failed to remove probing path: "
+                       << removePathRes.error();
+        }
+      };
+      evb_->runInLoop(removePathFunc, /*thisIteration=*/true);
     }
   }
 }
