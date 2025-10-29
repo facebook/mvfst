@@ -227,6 +227,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     server->getNonConstConn().transportSettings.disableMigration =
         getDisableMigration();
     server->getNonConstConn().transportSettings.enableKeepalive = true;
+    server->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber =
+        getSkipOneInNPacketSequenceNumber();
     server->setConnectionIdAlgo(connIdAlgo_.get());
     server->setClientConnectionId(*clientConnectionId);
     server->setClientChosenDestConnectionId(*initialDestinationConnectionId);
@@ -301,6 +303,10 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
   virtual bool getCanIgnorePathMTU() {
     return true;
+  }
+
+  virtual uint16_t getSkipOneInNPacketSequenceNumber() {
+    return kSkipOneInNPacketSequenceNumber;
   }
 
   std::unique_ptr<Aead> getInitialCipher(

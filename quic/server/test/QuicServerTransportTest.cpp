@@ -66,6 +66,12 @@ class QuicServerTransportTest : public QuicServerTransportAfterStartTestBase {
   auto getTxMatcher(StreamId id, uint64_t offset) {
     return MockByteEventCallback::getTxMatcher(id, offset);
   }
+
+  uint16_t getSkipOneInNPacketSequenceNumber() override {
+    // Disable packet number skipping to make it easier to ack ranges in this
+    // test class.
+    return 0;
+  }
 };
 
 TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
