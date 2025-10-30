@@ -20,7 +20,8 @@ quic::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
     QuicVersion version) const {
   auto deriver =
       fizzFactory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto connIdRange = folly::range(clientDestinationConnId);
+  auto connIdRange = quic::ByteRange(
+      clientDestinationConnId.data(), clientDestinationConnId.size());
   folly::StringPiece salt = getQuicVersionSalt(version);
   auto initialSecret = deriver->hkdfExtract(salt, connIdRange);
   auto trafficSecret = deriver->expandLabel(
