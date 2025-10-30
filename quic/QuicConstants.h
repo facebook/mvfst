@@ -42,6 +42,10 @@ using SystemClock = folly::chrono::SystemClock;
 
 } // namespace quic::chrono
 
+namespace folly {
+class SocketAddress;
+} // namespace folly
+
 namespace quic {
 
 using ByteRange = folly::ByteRange;
@@ -50,6 +54,7 @@ using BufHelpers = folly::IOBuf; // For stuff like BufHelpers::create, etc.
 using Buf = folly::IOBuf; // Used when we're not wrapping the buffer in an
                           // std::unique_ptr
 using BufPtr = std::unique_ptr<Buf>;
+using AddressRange = folly::Range<folly::SocketAddress const*>;
 using BufEq = folly::IOBufEqualTo;
 using Cursor = folly::io::Cursor;
 using Clock = std::chrono::steady_clock;

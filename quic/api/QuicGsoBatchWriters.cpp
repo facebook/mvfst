@@ -293,7 +293,7 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
   }
 
   int ret = sock.writemGSO(
-      folly::range(addrs_.data(), addrs_.data() + addrs_.size()),
+      AddressRange(addrs_.data(), addrs_.size()),
       bufs_.data(),
       bufs_.size(),
       options_.data());
@@ -420,8 +420,7 @@ ssize_t SendmmsgGSOInplacePacketBatchWriter::write(
     }
 
     ret = sock.writemGSO(
-        folly::range(
-            indexToAddr_.data(), indexToAddr_.data() + indexToAddr_.size()),
+        AddressRange(indexToAddr_.data(), indexToAddr_.size()),
         &iovecs[0],
         &messageSizes[0],
         buffers_.size(),
