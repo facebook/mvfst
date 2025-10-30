@@ -254,7 +254,6 @@ mvfst_cpp_library(
     ],
     deps = [
         ":state_functions",
-        ":stream_functions",
         "//quic:constants",
         "//quic/state/stream:stream",
     ],

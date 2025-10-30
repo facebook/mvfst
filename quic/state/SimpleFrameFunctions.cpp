@@ -7,7 +7,6 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/state/QuicStateFunctions.h>
-#include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
