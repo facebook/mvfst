@@ -21,6 +21,14 @@ struct Range {
 
   Range() : begin_(nullptr), end_(nullptr) {}
 
+  // Conversion constructor for safe conversions (e.g., mutable to const)
+  template <class OtherIter>
+  Range(
+      const Range<OtherIter>& other,
+      typename std::enable_if<
+          std::is_convertible<OtherIter, Iter>::value>::type* = nullptr)
+      : begin_(other.begin_), end_(other.end_) {}
+
   size_t size() const {
     return end_ - begin_;
   }
