@@ -98,8 +98,8 @@ TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
        0xe1, 0x28, 0x89, 0x35, 0x1c, 0xd7, 0x3a, 0x55, 0x0f, 0xb6, 0x2c,
        0x4b, 0xb0, 0x87, 0xe9, 0x15, 0xcc, 0xe9, 0x6c, 0xe3, 0xa0});
   auto expectedHex = "cd253a36ff93937c469384a823af6c56";
-  auto packetCipher =
-      cryptoFactory.makePacketNumberCipher(folly::range(clientKey));
+  auto packetCipher = cryptoFactory.makePacketNumberCipher(
+      quic::ByteRange(clientKey.data(), clientKey.size()));
   auto secretHex =
       quic::hexlify(std::string(packetCipherKey_.value()->coalesce()));
   EXPECT_EQ(secretHex, expectedHex);
@@ -113,8 +113,8 @@ TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
 
   auto expectedKey2 = "2579d8696f85eda68d3502b65596586b";
 
-  auto packetCipher2 =
-      cryptoFactory.makePacketNumberCipher(folly::range(serverKey));
+  auto packetCipher2 = cryptoFactory.makePacketNumberCipher(
+      quic::ByteRange(serverKey.data(), serverKey.size()));
   auto secretHex2 =
       quic::hexlify(std::string(packetCipherKey_.value()->coalesce()));
   EXPECT_EQ(secretHex2, expectedKey2);

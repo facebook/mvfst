@@ -70,7 +70,8 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
   CHECK(keyOpt.has_value()) << "Failed to unhexlify key: " << GetParam().key;
   auto key = keyOpt.value();
   EXPECT_EQ(cipher->keyLength(), key.size());
-  auto setKeyResult = cipher->setKey(folly::range(key));
+  auto setKeyResult =
+      cipher->setKey(quic::ByteRange((const uint8_t*)key.data(), key.size()));
   ASSERT_FALSE(setKeyResult.hasError());
   EXPECT_TRUE(!memcmp(cipher->getKey()->data(), key.c_str(), key.size()));
   CipherBytes cipherBytes(
@@ -79,8 +80,10 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
       GetParam().decryptedPacketNumberBytes);
   auto encryptResult = cipher->encryptLongHeader(
       cipherBytes.sample,
-      folly::range(cipherBytes.initial),
-      folly::range(cipherBytes.packetNumber));
+      quic::MutableByteRange(
+          cipherBytes.initial.data(), cipherBytes.initial.size()),
+      quic::MutableByteRange(
+          cipherBytes.packetNumber.data(), cipherBytes.packetNumber.size()));
   ASSERT_FALSE(encryptResult.hasError());
   EXPECT_EQ(
       quic::hexlify(
@@ -96,8 +99,10 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
       GetParam().packetNumberBytes);
   auto decryptResult = cipher->decryptLongHeader(
       cipherBytes.sample,
-      folly::range(cipherBytes.initial),
-      folly::range(cipherBytes.packetNumber));
+      quic::MutableByteRange(
+          cipherBytes.initial.data(), cipherBytes.initial.size()),
+      quic::MutableByteRange(
+          cipherBytes.packetNumber.data(), cipherBytes.packetNumber.size()));
   ASSERT_FALSE(decryptResult.hasError());
   EXPECT_EQ(
       quic::hexlify(
