@@ -433,9 +433,7 @@ CodecResult QuicReadCodec::parsePacket(
   // Missing 1-rtt header cipher is the only case we wouldn't consider reset
   if (!currentOneRttReadCipher_ || !oneRttHeaderCipher_) {
     VLOG(4) << nodeToString(nodeType_) << " cannot read key phase zero packet";
-    VLOG(20) << "cannot read data="
-             << quic::hexlify(
-                    std::string(queue.front()->clone()->moveToFbString()))
+    VLOG(20) << "cannot read data=" << quic::hexlify(queue.front()->toString())
              << " " << connIdToHex();
     return CodecResult(
         CipherUnavailable(queue.move(), ProtectionType::KeyPhaseZero));
