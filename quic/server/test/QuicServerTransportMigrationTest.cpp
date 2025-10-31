@@ -508,6 +508,8 @@ TEST_P(
   EXPECT_FALSE(server->pathValidationTimeout().isTimerCallbackScheduled());
   ASSERT_FALSE(conn.fallbackPathId.has_value());
 
+  // Loop once to allow any paths to be removed (this happens in the eventbase)
+  evb.loopOnce();
   // The first path should be removed because we are now on a validated path
   EXPECT_FALSE(conn.pathManager->getPath(firstPathId));
 
@@ -529,6 +531,101 @@ TEST_P(
 
   // Path will need revalidation
   EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(conn.currentPathId));
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    MigrateToNewPeerRespondOnFallbackPath) {
+  auto data = IOBuf::copyBuffer("migration data");
+  auto packetData = packetToBuf(createStreamPacket(
+      *clientConnectionId,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++,
+      2,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  auto& conn = server->getConn();
+
+  ASSERT_FALSE(conn.fallbackPathId.has_value());
+
+  auto peerAddress = conn.peerAddress;
+  auto firstPathId = conn.currentPathId;
+  auto firstCongestionController = conn.congestionController.get();
+  auto firstSrtt = conn.lossState.srtt;
+  auto firstLrtt = conn.lossState.lrtt;
+  auto firstRttvar = conn.lossState.rttvar;
+  auto firstMrtt = conn.lossState.mrtt;
+
+  // Step 1: Client migrates to new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
+  deliverData(std::move(packetData), false, &newPeer);
+
+  auto newPathId = conn.currentPathId;
+  ASSERT_NE(firstPathId, newPathId);
+  auto newPath = conn.pathManager->getPath(newPathId);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(newPath->status, PathStatus::NotValid);
+
+  ASSERT_TRUE(conn.fallbackPathId.has_value());
+  EXPECT_EQ(conn.fallbackPathId.value(), firstPathId);
+
+  ASSERT_TRUE(conn.pendingEvents.pathChallenges.contains(newPathId));
+  auto pathChallengeData =
+      conn.pendingEvents.pathChallenges.at(newPathId).pathData;
+  EXPECT_EQ(conn.peerAddress, newPeer);
+  EXPECT_EQ(conn.lossState.srtt, 0us);
+  EXPECT_EQ(conn.lossState.lrtt, 0us);
+  EXPECT_EQ(conn.lossState.rttvar, 0us);
+  EXPECT_EQ(conn.lossState.mrtt, kDefaultMinRtt);
+  EXPECT_TRUE(conn.congestionController);
+  EXPECT_NE(conn.congestionController.get(), firstCongestionController);
+
+  auto firstPath = conn.pathManager->getPath(firstPathId);
+  ASSERT_TRUE(firstPath);
+  EXPECT_EQ(firstPath->status, PathStatus::Validated);
+  EXPECT_EQ(firstPath->peerAddress, clientAddr);
+  EXPECT_EQ(
+      firstPath->cachedCCAndRttState->congestionController.get(),
+      firstCongestionController);
+  EXPECT_EQ(firstPath->cachedCCAndRttState->srtt, firstSrtt);
+  EXPECT_EQ(firstPath->cachedCCAndRttState->lrtt, firstLrtt);
+  EXPECT_EQ(firstPath->cachedCCAndRttState->rttvar, firstRttvar);
+  EXPECT_EQ(firstPath->cachedCCAndRttState->mrtt, firstMrtt);
+
+  // Step 2: Server sends path challenge
+  loopForWrites();
+  EXPECT_FALSE(conn.pendingEvents.pathChallenges.contains(newPathId));
+  EXPECT_EQ(newPath->status, PathStatus::Validating);
+  EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
+  EXPECT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+
+  EXPECT_NE(newPath->writableBytes, 0);
+
+  // Step 3: Client responds with path response on the fallback (initial) path
+  packetData = packetToBuf(makePacketWithPathResponseFrame(pathChallengeData));
+  // Deliver the path response on the fallback (original) path, not the new path
+  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
+  deliverData(std::move(packetData), false, &clientAddr);
+
+  // Allow any path removal to execute (it is scheduled on the eventbase)
+  evb.loopOnce();
+
+  // The new path should be validated even though the response came on a
+  // different path
+  EXPECT_EQ(newPath->status, PathStatus::Validated);
+  EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
+  EXPECT_FALSE(server->pathValidationTimeout().isTimerCallbackScheduled());
+
+  // The current path should still be the new path
+  EXPECT_EQ(conn.currentPathId, newPathId);
+  EXPECT_EQ(conn.peerAddress, newPeer);
+
+  // The fallback path should be removed since the current path is validated.
+  EXPECT_FALSE(conn.fallbackPathId.has_value());
+  EXPECT_FALSE(conn.pathManager->getPath(firstPathId));
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {

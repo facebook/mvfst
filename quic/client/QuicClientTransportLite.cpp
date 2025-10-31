@@ -2482,6 +2482,9 @@ void QuicClientTransportLite::onPathValidationResult(const PathInfo& pathInfo) {
     // dangling paths/sockets.
     evb_->runInLoop(
         [&, pathId = pathInfo.id]() {
+          if (conn_->currentPathId == pathId) {
+            return;
+          }
           auto removeRes = conn_->pathManager->removePath(pathId);
           if (removeRes.hasError()) {
             LOG(WARNING) << "Failed to remove path " << pathId

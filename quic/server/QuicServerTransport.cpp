@@ -1620,38 +1620,41 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
    */
   // NOLINTEND
 
+  auto removeIfNotCurrentFunc = [conn = shared_from_this()](
+                                    PathIdType pathToRemove,
+                                    const std::string& pathType) {
+    if (conn->conn_->currentPathId == pathToRemove) {
+      return;
+    }
+    auto removePathRes = conn->conn_->pathManager->removePath(pathToRemove);
+    if (removePathRes.hasError()) {
+      LOG(WARNING) << "Failed to remove " + pathType + " path: "
+                   << removePathRes.error();
+    }
+  };
+
   if (pathInfo.status == PathStatus::Validated) {
     if (pathInfo.id == conn_->currentPathId) {
       // Case (1): Validated Current Path
       // remove the fallback path if it exists
       if (conn_->fallbackPathId) {
-        auto removePathRes =
-            conn_->pathManager->removePath(conn_->fallbackPathId.value());
-        if (removePathRes.hasError()) {
-          LOG(WARNING) << "Failed to remove fallback path: "
-                       << removePathRes.error();
-        }
+        runOnEvbAsync([pathId = conn_->fallbackPathId.value(),
+                       removeFunc = std::move(removeIfNotCurrentFunc),
+                       type = "fallback"](auto) { removeFunc(pathId, type); });
         conn_->fallbackPathId.reset();
       }
     } else {
       // Case (2): Validated Probe Path
       // remove it after the grace period if the client hasn't
       // migrated to it.
-      auto removeIfNotCurrentFunc = [conn = shared_from_this(),
-                                     pathId = pathInfo.id]() {
-        if (conn->conn_->currentPathId == pathId) {
-          return;
-        }
-        auto removePathRes = conn->conn_->pathManager->removePath(pathId);
-        if (removePathRes.hasError()) {
-          LOG(WARNING) << "Failed to remove probing path: "
-                       << removePathRes.error();
-        }
-      };
       auto gracePeriod = kProbedPathGracePeriodInSRTT *
           std::chrono::ceil<std::chrono::milliseconds>(conn_->lossState.srtt)
               .count();
-      evb_->runAfterDelay(removeIfNotCurrentFunc, gracePeriod);
+      evb_->runAfterDelay(
+          [pathId = pathInfo.id,
+           removeFunc = std::move(removeIfNotCurrentFunc),
+           type = "unused validated probe"]() { removeFunc(pathId, type); },
+          gracePeriod);
     }
   } else {
     if (pathInfo.id == conn_->currentPathId) {
@@ -1697,15 +1700,10 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
 
     // Remove path for cases (3) and (4)
     if (closeState_ == CloseState::OPEN) {
-      auto removePathFunc = [conn = shared_from_this(),
-                             pathId = pathInfo.id]() {
-        auto removePathRes = conn->conn_->pathManager->removePath(pathId);
-        if (removePathRes.hasError()) {
-          LOG(WARNING) << "Failed to remove probing path: "
-                       << removePathRes.error();
-        }
-      };
-      evb_->runInLoop(removePathFunc, /*thisIteration=*/true);
+      runOnEvbAsync(
+          [pathId = pathInfo.id,
+           removeFunc = std::move(removeIfNotCurrentFunc),
+           type = "failed probe"](auto) { removeFunc(pathId, type); });
     }
   }
 }
