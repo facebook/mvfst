@@ -34,7 +34,6 @@
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 
-#include <folly/io/IOBuf.h>
 #include <folly/io/async/DelayedDestruction.h>
 #include <quic/common/Optional.h>
 
@@ -553,7 +552,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   ConnectionFlowControlState flowControlState;
 
   struct PendingWriteBatch {
-    std::unique_ptr<folly::IOBuf> buf;
+    BufPtr buf;
     // More fields will be needed here for other batch writer types.
   };
 
@@ -752,7 +751,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   uint16_t uniqueInitialCryptoFramesReceived{0};
 
   // In priming mode data is written here instead of on the network
-  std::vector<std::unique_ptr<folly::IOBuf>> primingData;
+  std::vector<BufPtr> primingData;
 
   // Is the stream buffer low after the next write
   bool imminentStreamCompletion{false};
