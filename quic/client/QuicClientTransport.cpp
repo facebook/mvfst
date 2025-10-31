@@ -34,8 +34,10 @@ void QuicClientTransport::onNotifyDataAvailable(
     QuicAsyncUDPSocket& sock) noexcept {
   auto self = this->shared_from_this();
   CHECK(conn_) << "trying to receive packets without a connection";
-  auto readBufferSize =
-      conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
+  auto readBufferSize = std::max(
+                            conn_->transportSettings.maxRecvPacketSize,
+                            uint64_t(kDefaultUDPReadBufferSize)) *
+      numGROBuffers_;
   const uint16_t numPackets = conn_->transportSettings.maxRecvBatchSize;
 
   const size_t readAllocSize =
