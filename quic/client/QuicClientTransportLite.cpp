@@ -657,7 +657,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
       }
       case QuicFrame::Type::ReadNewTokenFrame: {
         ReadNewTokenFrame& newTokenFrame = *quicFrame.asReadNewTokenFrame();
-        std::string tokenStr = newTokenFrame.token->to<std::string>();
+        std::string tokenStr = newTokenFrame.token->toString();
         VLOG(10) << "client received new token token="
                  << quic::hexlify(tokenStr);
         if (newTokenCallback_) {
