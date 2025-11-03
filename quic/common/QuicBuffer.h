@@ -24,6 +24,8 @@ class QuicBuffer {
     CREATE = 0,
   };
 
+  QuicBuffer() : next_(this), prev_(this) {}
+
   explicit QuicBuffer(std::size_t capacity);
 
   // Same as the previous constructor, just added the CreateOp
