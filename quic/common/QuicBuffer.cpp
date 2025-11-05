@@ -114,6 +114,21 @@ std::unique_ptr<QuicBuffer> QuicBuffer::takeOwnership(
       std::move(shared)));
 }
 
+std::unique_ptr<QuicBuffer> QuicBuffer::wrapIov(
+    const iovec* vec,
+    size_t count) {
+  QuicBuffer result;
+  for (size_t i = 0; i < count; ++i) {
+    size_t len = vec[i].iov_len;
+    void* data = vec[i].iov_base;
+    if (len > 0) {
+      auto buf = wrapBuffer(data, len);
+      result.appendToChain(std::move(buf));
+    }
+  }
+  return result.isChained() ? result.pop() : create(0);
+}
+
 std::unique_ptr<QuicBuffer> QuicBuffer::fromString(
     std::unique_ptr<std::string> ptr) {
   // Take ownership of the string's underlying buffer and ensure the
@@ -258,7 +273,7 @@ ByteRange QuicBuffer::coalesce() {
     const std::size_t newTailroom = prev()->tailroom();
     coalesceAndReallocate(newHeadroom, computeChainDataLength(), newTailroom);
   }
-  return ByteRange(data_, length_);
+  return {data_, length_};
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::pop() {

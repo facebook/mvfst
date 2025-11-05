@@ -87,6 +87,12 @@ class QuicBuffer {
       FreeFunction freeFn = nullptr,
       void* userData = nullptr);
 
+  // Convert an iovec array into a QuicBuffer chain.
+  // Wraps a number of iovecs into a QuicBuffer chain. If count == 0 or all
+  // iovecs have zero length, returns a zero-length buffer. This function never
+  // returns nullptr.
+  static std::unique_ptr<QuicBuffer> wrapIov(const iovec* vec, size_t count);
+
   static QuicBuffer wrapBufferAsValue(
       const void* buf,
       std::size_t capacity) noexcept;

@@ -994,4 +994,140 @@ TEST(QuicBufferTest, TestToStringAllEmpty) {
   EXPECT_EQ(b1->computeChainDataLength(), 0);
 }
 
+TEST(QuicBufferTest, TestWrapIovEmpty) {
+  // Test with empty iovec array (count = 0)
+  struct iovec vec[1];
+  auto buf = QuicBuffer::wrapIov(vec, 0);
+
+  ASSERT_NE(buf, nullptr);
+  EXPECT_EQ(buf->length(), 0);
+  EXPECT_FALSE(buf->isChained());
+}
+
+TEST(QuicBufferTest, TestWrapIovSingle) {
+  // Test with a single iovec containing data
+  const char* data = "hello world";
+  struct iovec vec[1];
+  vec[0].iov_base = (void*)data;
+  vec[0].iov_len = 11;
+
+  auto buf = QuicBuffer::wrapIov(vec, 1);
+
+  ASSERT_NE(buf, nullptr);
+  EXPECT_EQ(buf->length(), 11);
+  EXPECT_FALSE(buf->isChained());
+  EXPECT_EQ(memcmp(buf->data(), data, 11), 0);
+}
+
+TEST(QuicBufferTest, TestWrapIovMultiple) {
+  // Test with multiple iovecs containing data
+  const char* data1 = "hello";
+  const char* data2 = " ";
+  const char* data3 = "world";
+
+  struct iovec vec[3];
+  vec[0].iov_base = (void*)data1;
+  vec[0].iov_len = 5;
+  vec[1].iov_base = (void*)data2;
+  vec[1].iov_len = 1;
+  vec[2].iov_base = (void*)data3;
+  vec[2].iov_len = 5;
+
+  auto buf = QuicBuffer::wrapIov(vec, 3);
+
+  ASSERT_NE(buf, nullptr);
+  EXPECT_TRUE(buf->isChained());
+  EXPECT_EQ(buf->countChainElements(), 3);
+  EXPECT_EQ(buf->computeChainDataLength(), 11);
+
+  // Verify each buffer in the chain
+  EXPECT_EQ(buf->length(), 5);
+  EXPECT_EQ(memcmp(buf->data(), "hello", 5), 0);
+
+  EXPECT_EQ(buf->next()->length(), 1);
+  EXPECT_EQ(memcmp(buf->next()->data(), " ", 1), 0);
+
+  EXPECT_EQ(buf->next()->next()->length(), 5);
+  EXPECT_EQ(memcmp(buf->next()->next()->data(), "world", 5), 0);
+}
+
+TEST(QuicBufferTest, TestWrapIovWithZeroLengthIovecs) {
+  // Test with iovecs that have zero length (should be skipped)
+  const char* data1 = "hello";
+  const char* data2 = "world";
+
+  struct iovec vec[4];
+  vec[0].iov_base = (void*)data1;
+  vec[0].iov_len = 5;
+  vec[1].iov_base = nullptr;
+  vec[1].iov_len = 0; // zero length, should be skipped
+  vec[2].iov_base = (void*)data2;
+  vec[2].iov_len = 5;
+  vec[3].iov_base = nullptr;
+  vec[3].iov_len = 0; // zero length, should be skipped
+
+  auto buf = QuicBuffer::wrapIov(vec, 4);
+
+  ASSERT_NE(buf, nullptr);
+  EXPECT_TRUE(buf->isChained());
+  // Should only have 2 elements since zero-length iovecs are skipped
+  EXPECT_EQ(buf->countChainElements(), 2);
+  EXPECT_EQ(buf->computeChainDataLength(), 10);
+
+  EXPECT_EQ(buf->length(), 5);
+  EXPECT_EQ(memcmp(buf->data(), "hello", 5), 0);
+
+  EXPECT_EQ(buf->next()->length(), 5);
+  EXPECT_EQ(memcmp(buf->next()->data(), "world", 5), 0);
+}
+
+TEST(QuicBufferTest, TestWrapIovAllZeroLength) {
+  // Test with all iovecs having zero length
+  struct iovec vec[3];
+  vec[0].iov_base = nullptr;
+  vec[0].iov_len = 0;
+  vec[1].iov_base = nullptr;
+  vec[1].iov_len = 0;
+  vec[2].iov_base = nullptr;
+  vec[2].iov_len = 0;
+
+  auto buf = QuicBuffer::wrapIov(vec, 3);
+
+  // Should return a zero-length buffer, not nullptr
+  ASSERT_NE(buf, nullptr);
+  EXPECT_EQ(buf->length(), 0);
+  EXPECT_FALSE(buf->isChained());
+}
+
+TEST(QuicBufferTest, TestWrapIovChainIntegrity) {
+  // Test that the chain is properly formed with correct next/prev pointers
+  const char* data1 = "A";
+  const char* data2 = "B";
+  const char* data3 = "C";
+
+  struct iovec vec[3];
+  vec[0].iov_base = (void*)data1;
+  vec[0].iov_len = 1;
+  vec[1].iov_base = (void*)data2;
+  vec[1].iov_len = 1;
+  vec[2].iov_base = (void*)data3;
+  vec[2].iov_len = 1;
+
+  auto buf = QuicBuffer::wrapIov(vec, 3);
+
+  ASSERT_NE(buf, nullptr);
+
+  QuicBuffer* first = buf.get();
+  QuicBuffer* second = first->next();
+  QuicBuffer* third = second->next();
+
+  // Verify forward chain
+  EXPECT_EQ(third->next(), first);
+
+  // Verify backward chain
+  EXPECT_EQ(first->prev(), third);
+  EXPECT_EQ(second->prev(), first);
+  EXPECT_EQ(third->prev(), second);
+}
+
 } // namespace quic
