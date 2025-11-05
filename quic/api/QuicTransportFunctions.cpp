@@ -1617,13 +1617,17 @@ quic::Expected<void, QuicError> encryptPacketHeader(
       header + headerLen - packetNumberLength, packetNumberLength);
   if (headerForm == HeaderForm::Short) {
     auto result = headerCipher.encryptShortHeader(
-        sample, initialByteRange, packetNumByteRange);
+        ByteRange(sample.data(), sample.size()),
+        initialByteRange,
+        packetNumByteRange);
     if (!result.has_value()) {
       return quic::make_unexpected(result.error());
     }
   } else {
     auto result = headerCipher.encryptLongHeader(
-        sample, initialByteRange, packetNumByteRange);
+        ByteRange(sample.data(), sample.size()),
+        initialByteRange,
+        packetNumByteRange);
     if (!result.has_value()) {
       return quic::make_unexpected(result.error());
     }
