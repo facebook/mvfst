@@ -1130,4 +1130,116 @@ TEST(QuicBufferTest, TestWrapIovChainIntegrity) {
   EXPECT_EQ(third->prev(), second);
 }
 
+TEST(QuicBufferTest, TestPrepend) {
+  // Create a buffer with headroom
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 5, 10, 0);
+
+  EXPECT_EQ(quicBuffer->length(), 5);
+  EXPECT_EQ(quicBuffer->headroom(), 10);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "hello", 5), 0);
+
+  const uint8_t* originalData = quicBuffer->data();
+
+  // Prepend 3 bytes
+  quicBuffer->prepend(3);
+
+  // After prepend:
+  // - data pointer should move backward by 3
+  // - length should increase by 3
+  // - original data should still be accessible at offset 3
+  EXPECT_EQ(quicBuffer->data(), originalData - 3);
+  EXPECT_EQ(quicBuffer->length(), 8);
+  EXPECT_EQ(quicBuffer->headroom(), 7);
+  EXPECT_EQ(memcmp(quicBuffer->data() + 3, "hello", 5), 0);
+}
+
+TEST(QuicBufferTest, TestPrependWithDataPopulation) {
+  // Create a buffer with headroom
+  const uint8_t* data = (const uint8_t*)"world";
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 5, 6, 0);
+
+  EXPECT_EQ(quicBuffer->length(), 5);
+  EXPECT_EQ(quicBuffer->headroom(), 6);
+
+  // Prepend 6 bytes and populate with "hello "
+  quicBuffer->prepend(6);
+
+  // Write data into the prepended space
+  memcpy(quicBuffer->writableData(), "hello ", 6);
+
+  // Now the buffer should contain "hello world"
+  EXPECT_EQ(quicBuffer->length(), 11);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "hello world", 11), 0);
+}
+
+TEST(QuicBufferTest, TestPrependZeroBytes) {
+  // Create a buffer with headroom
+  const uint8_t* data = (const uint8_t*)"test";
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 4, 5, 0);
+
+  const uint8_t* originalData = quicBuffer->data();
+  std::size_t originalLength = quicBuffer->length();
+  std::size_t originalHeadroom = quicBuffer->headroom();
+
+  // Prepend 0 bytes should not change anything
+  quicBuffer->prepend(0);
+
+  EXPECT_EQ(quicBuffer->data(), originalData);
+  EXPECT_EQ(quicBuffer->length(), originalLength);
+  EXPECT_EQ(quicBuffer->headroom(), originalHeadroom);
+  EXPECT_EQ(memcmp(quicBuffer->data(), "test", 4), 0);
+}
+
+TEST(QuicBufferTest, TestPrependInsufficientHeadroom) {
+  // Create a buffer with limited headroom
+  const uint8_t* data = (const uint8_t*)"hello";
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 5, 3, 0);
+
+  EXPECT_EQ(quicBuffer->headroom(), 3);
+
+  // Attempting to prepend more than available headroom should fail
+  EXPECT_DEATH(quicBuffer->prepend(5), "");
+}
+
+TEST(QuicBufferTest, TestPrependMultipleTimes) {
+  // Create a buffer with ample headroom
+  const uint8_t* data = (const uint8_t*)"end";
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 3, 10, 0);
+
+  const uint8_t* originalData = quicBuffer->data();
+
+  // First prepend
+  quicBuffer->prepend(5);
+  memcpy(quicBuffer->writableData(), "start", 5);
+  EXPECT_EQ(quicBuffer->length(), 8);
+  EXPECT_EQ(quicBuffer->data(), originalData - 5);
+
+  // Second prepend
+  quicBuffer->prepend(2);
+  memcpy(quicBuffer->writableData(), ">>", 2);
+  EXPECT_EQ(quicBuffer->length(), 10);
+  EXPECT_EQ(quicBuffer->data(), originalData - 7);
+
+  // Verify final content: ">>startend"
+  EXPECT_EQ(memcmp(quicBuffer->data(), ">>startend", 10), 0);
+}
+
+TEST(QuicBufferTest, TestPrependExhaustHeadroom) {
+  // Create a buffer with specific headroom
+  const uint8_t* data = (const uint8_t*)"data";
+  auto quicBuffer = QuicBuffer::copyBuffer(data, 4, 8, 0);
+
+  EXPECT_EQ(quicBuffer->headroom(), 8);
+
+  // Prepend exactly all available headroom
+  quicBuffer->prepend(8);
+
+  EXPECT_EQ(quicBuffer->length(), 12);
+  EXPECT_EQ(quicBuffer->headroom(), 0);
+
+  // Verify original data is still intact at the end
+  EXPECT_EQ(memcmp(quicBuffer->data() + 8, "data", 4), 0);
+}
+
 } // namespace quic

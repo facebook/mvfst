@@ -116,6 +116,8 @@ class QuicBuffer {
     length_ += amount;
   }
 
+  void prepend(std::size_t amount) noexcept;
+
   [[nodiscard]] std::size_t length() const noexcept {
     return length_;
   }

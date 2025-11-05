@@ -210,6 +210,13 @@ void QuicBuffer::retreat(std::size_t amount) noexcept {
   data_ -= amount;
 }
 
+void QuicBuffer::prepend(std::size_t amount) noexcept {
+  CHECK_LE(amount, headroom())
+      << "Not enough room to prepend data in QuicBuffer";
+  data_ -= amount;
+  length_ += amount;
+}
+
 bool QuicBuffer::isSharedOne() const noexcept {
   return !sharedBuffer_ || (sharedBuffer_.use_count() > 1);
 }
