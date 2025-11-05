@@ -8,8 +8,7 @@
 #include <gtest/gtest.h>
 #include <quic/common/QuicRange.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 TEST(QuicRangeConversionTest, MutableToConstConversion) {
   // Test basic conversion from MutableByteRange to ByteRange
@@ -48,5 +47,4 @@ TEST(QuicRangeConversionTest, CopyConstruction) {
   EXPECT_EQ(constRange[2], 30);
 }
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test
