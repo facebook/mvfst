@@ -91,7 +91,7 @@ TEST_P(QuicIntegerEncodeTest, Encode) {
     return;
   }
   auto written = encodeQuicInteger(GetParam().decoded, appendOp);
-  auto encodedValue = quic::hexlify(queue->to<std::string>());
+  auto encodedValue = quic::hexlify(queue->toString());
   LOG(INFO) << "encoded=" << encodedValue;
   LOG(INFO) << "expected=" << GetParam().hexEncoded;
 
@@ -117,7 +117,7 @@ TEST_F(QuicIntegerEncodeTest, ForceFourBytes) {
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
   EXPECT_EQ(4, *encodeQuicInteger(37, appendOp, 4));
-  auto encodedValue = quic::hexlify(queue->to<std::string>());
+  auto encodedValue = quic::hexlify(queue->toString());
   EXPECT_EQ("80000025", encodedValue);
 }
 
@@ -126,7 +126,7 @@ TEST_F(QuicIntegerEncodeTest, ForceEightBytes) {
   BufAppender appender(queue.get(), 10);
   auto appendOp = [&](auto val) { appender.writeBE(val); };
   EXPECT_EQ(8, *encodeQuicInteger(37, appendOp, 8));
-  auto encodedValue = quic::hexlify(queue->to<std::string>());
+  auto encodedValue = quic::hexlify(queue->toString());
   EXPECT_EQ("c000000000000025", encodedValue);
 }
 

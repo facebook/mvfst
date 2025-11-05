@@ -1140,7 +1140,7 @@ void QuicServerWorker::sendRetryPacket(
   auto encryptedToken = generator.encryptToken(retryToken);
 
   CHECK(encryptedToken.has_value());
-  std::string encryptedTokenStr = encryptedToken.value()->to<std::string>();
+  std::string encryptedTokenStr = encryptedToken.value()->toString();
 
   // Create the integrity tag
   // For the tag to be correctly validated by the client, the initalByte

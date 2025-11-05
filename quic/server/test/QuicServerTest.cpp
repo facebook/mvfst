@@ -1636,7 +1636,7 @@ TEST_F(QuicServerWorkerRetryTest, TestNewTokenStatsCallback) {
   auto encryptedToken = generator.encryptToken(newToken);
 
   CHECK(encryptedToken.has_value());
-  std::string encryptedTokenStr = encryptedToken.value()->to<std::string>();
+  std::string encryptedTokenStr = encryptedToken.value()->toString();
 
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
@@ -2949,7 +2949,7 @@ TEST_F(QuicServerTest, NetworkTestHealthCheck) {
   };
   reader->getSocket().write(serverAddr, IOBuf::copyBuffer(healthCheckToken));
   auto serverData = reader->readOne().get();
-  EXPECT_EQ(serverData->to<std::string>(), std::string("OK"));
+  EXPECT_EQ(serverData->toString(), std::string("OK"));
 
   reader->getSocket().write(serverAddr, IOBuf::copyBuffer(notHealthCheckToken));
   EXPECT_THROW(reader->readOne().get(200ms), folly::FutureTimeout);

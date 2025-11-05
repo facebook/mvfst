@@ -3395,9 +3395,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
 
   auto clientReadNewTokenFrame = clientParsedFrame->asReadNewTokenFrame();
 
-  auto serverToken =
-      serverWriteNewTokenFrame.second[0]->token->to<std::string>();
-  auto clientToken = clientReadNewTokenFrame->token->to<std::string>();
+  auto serverToken = serverWriteNewTokenFrame.second[0]->token->toString();
+  auto clientToken = clientReadNewTokenFrame->token->toString();
 
   EXPECT_EQ(clientToken, serverToken);
   loopForWrites();

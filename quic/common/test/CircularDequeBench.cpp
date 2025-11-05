@@ -61,9 +61,9 @@ void prepareDeque(Container& d, size_t count) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   while (counter++ < count) {
     if constexpr (std::is_same_v<typename Container::value_type, std::string>) {
-      d.emplace_back(buffer->clone()->to<std::string>());
+      d.emplace_back(buffer->clone()->toString());
     } else {
-      d.emplace_back(NoexceptString(buffer->clone()->to<std::string>()));
+      d.emplace_back(NoexceptString(buffer->clone()->toString()));
     }
   }
 }
@@ -76,7 +76,7 @@ BENCHMARK(deque_push_front, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_front(buffer->clone()->to<std::string>());
+    d.push_front(buffer->clone()->toString());
   }
 }
 
@@ -87,7 +87,7 @@ BENCHMARK(circular_deque_push_front, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_front(NoexceptString(buffer->clone()->to<std::string>()));
+    d.push_front(NoexceptString(buffer->clone()->toString()));
   }
 }
 
@@ -98,7 +98,7 @@ BENCHMARK(deque_push_back, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_back(buffer->clone()->to<std::string>());
+    d.push_back(buffer->clone()->toString());
   }
 }
 
@@ -109,7 +109,7 @@ BENCHMARK(circular_deque_push_back, iters) {
   auto buffer = quic::test::buildRandomInputData(kLen);
   suspender.dismiss();
   while (iters--) {
-    d.push_back(NoexceptString(buffer->clone()->to<std::string>()));
+    d.push_back(NoexceptString(buffer->clone()->toString()));
   }
 }
 

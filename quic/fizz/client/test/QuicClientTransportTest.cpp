@@ -312,7 +312,7 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
                      auto) mutable {
             auto readData = c->read(id, 1000);
             auto copy = readData->first->clone();
-            LOG(INFO) << "Client received data=" << copy->to<std::string>()
+            LOG(INFO) << "Client received data=" << copy->toString()
                       << " on stream=" << id
                       << " read=" << readData->first->computeChainDataLength()
                       << " sent=" << dataCopy->computeChainDataLength();
@@ -2410,7 +2410,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->to<std::string>()
+    LOG(INFO) << "Client received data=" << copy->toString()
               << " on stream=" << streamId;
     EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
     dataDelivered = true;
@@ -2517,9 +2517,9 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->clone()->to<std::string>()
+    LOG(INFO) << "Client received data=" << copy->clone()->toString()
               << " on stream=" << streamId;
-    EXPECT_EQ(copy->to<std::string>(), expected->clone()->to<std::string>());
+    EXPECT_EQ(copy->toString(), expected->clone()->toString());
     dataDelivered = true;
     eventbase_->terminateLoopSoon();
   }));
@@ -2587,7 +2587,7 @@ TEST_F(
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->to<std::string>()
+    LOG(INFO) << "Client received data=" << copy->toString()
               << " on stream=" << streamId;
     EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
     dataDelivered = true;
@@ -2861,7 +2861,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->to<std::string>()
+    LOG(INFO) << "Client received data=" << copy->toString()
               << " on stream=" << streamId;
     EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
     dataDelivered = true;

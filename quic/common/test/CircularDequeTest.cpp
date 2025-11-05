@@ -635,7 +635,7 @@ TEST(CircularDequeTest, MiddleOpsNoCrashNoLeak) {
   auto obuffer = quic::test::buildRandomInputData(500);
   while (counter++ < 10000 / 2) {
     auto buffer = obuffer->clone();
-    cd.push_front(NoexceptString(buffer->to<std::string>()));
+    cd.push_front(NoexceptString(buffer->toString()));
   }
   EXPECT_EQ(5000, cd.size());
   counter = 0;

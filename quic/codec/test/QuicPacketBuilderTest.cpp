@@ -731,7 +731,7 @@ TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   cursor.tryPull(retryTokenObtained->writableData(), retryTokenLen);
   retryTokenObtained->append(retryTokenLen);
 
-  std::string retryTokenObtainedString = retryTokenObtained->to<std::string>();
+  std::string retryTokenObtainedString = retryTokenObtained->toString();
   EXPECT_EQ(retryTokenObtainedString, retryToken);
 
   // integrity tag

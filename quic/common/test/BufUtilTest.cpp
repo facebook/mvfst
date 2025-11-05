@@ -84,31 +84,31 @@ TEST(BufQueue, Split) {
   checkConsistency(queue);
   EXPECT_EQ(1, prefix->computeChainDataLength());
   EXPECT_EQ(11, queue.front()->computeChainDataLength());
-  EXPECT_EQ(prefix->to<std::string>(), "H");
+  EXPECT_EQ(prefix->toString(), "H");
 
   prefix = queue.splitAtMost(2);
   checkConsistency(queue);
   EXPECT_EQ(2, prefix->computeChainDataLength());
   EXPECT_EQ(9, queue.front()->computeChainDataLength());
-  EXPECT_EQ(prefix->to<std::string>(), "el");
+  EXPECT_EQ(prefix->toString(), "el");
 
   prefix = queue.splitAtMost(3);
   checkConsistency(queue);
   EXPECT_EQ(3, prefix->computeChainDataLength());
   EXPECT_EQ(6, queue.front()->computeChainDataLength());
-  EXPECT_EQ(prefix->to<std::string>(), "lo,");
+  EXPECT_EQ(prefix->toString(), "lo,");
 
   prefix = queue.splitAtMost(1);
   checkConsistency(queue);
   EXPECT_EQ(1, prefix->computeChainDataLength());
   EXPECT_EQ(5, queue.front()->computeChainDataLength());
-  EXPECT_EQ(prefix->to<std::string>(), " ");
+  EXPECT_EQ(prefix->toString(), " ");
 
   prefix = queue.splitAtMost(5);
   checkConsistency(queue);
   EXPECT_EQ(5, prefix->computeChainDataLength());
   EXPECT_EQ((IOBuf*)nullptr, queue.front());
-  EXPECT_EQ(prefix->to<std::string>(), "World");
+  EXPECT_EQ(prefix->toString(), "World");
 
   queue.append(IOBuf::copyBuffer(SCL("Hello,")));
   checkConsistency(queue);
@@ -116,14 +116,14 @@ TEST(BufQueue, Split) {
   checkConsistency(queue);
   EXPECT_EQ(3, prefix->computeChainDataLength());
   EXPECT_EQ(3, queue.chainLength());
-  EXPECT_EQ(prefix->to<std::string>(), "Hel");
+  EXPECT_EQ(prefix->toString(), "Hel");
 
   queue.append(IOBuf::copyBuffer(SCL(" World")));
   checkConsistency(queue);
   prefix = queue.splitAtMost(13);
   EXPECT_EQ(9, prefix->computeChainDataLength());
   EXPECT_EQ(0, queue.chainLength());
-  EXPECT_EQ(prefix->to<std::string>(), "lo, World");
+  EXPECT_EQ(prefix->toString(), "lo, World");
   checkConsistency(queue);
 }
 
@@ -243,7 +243,7 @@ TEST(BufAppender, TestPushAlreadyFits) {
   appender.push((uint8_t*)str.data(), str.size());
   EXPECT_EQ(data->computeChainDataLength(), str.size());
   EXPECT_EQ(data->countChainElements(), 1);
-  EXPECT_EQ(data->to<std::string>(), str);
+  EXPECT_EQ(data->toString(), str);
 }
 
 TEST(BufAppender, TestPushLargerThanAppendLen) {
@@ -252,7 +252,7 @@ TEST(BufAppender, TestPushLargerThanAppendLen) {
   std::string str = "12456134134134134134134";
   appender.push((uint8_t*)str.data(), str.size());
   EXPECT_EQ(data->computeChainDataLength(), str.size());
-  EXPECT_EQ(data->to<std::string>(), str);
+  EXPECT_EQ(data->toString(), str);
 }
 
 TEST(BufAppender, TestPushExpands) {
@@ -269,7 +269,7 @@ TEST(BufAppender, TestPushExpands) {
   EXPECT_EQ(data->computeChainDataLength(), str.size() * 5);
 
   std::string expected = str + str + str + str + str;
-  EXPECT_EQ(data->to<std::string>(), expected);
+  EXPECT_EQ(data->toString(), expected);
 }
 
 TEST(BufAppender, TestInsertIOBuf) {
@@ -289,11 +289,11 @@ TEST(BufAppender, TestInsertIOBuf) {
   EXPECT_EQ(
       data->computeChainDataLength(), str.size() * 3 + hello->length() * 2);
 
-  auto helloStr = hello->clone()->to<std::string>();
+  auto helloStr = hello->clone()->toString();
   std::string expected = str + str + helloStr + str + helloStr;
-  EXPECT_EQ(data->to<std::string>(), expected);
+  EXPECT_EQ(data->toString(), expected);
   hello->append(4);
-  EXPECT_EQ(hello->to<std::string>(), "helloworld");
+  EXPECT_EQ(hello->toString(), "helloworld");
 }
 
 TEST(BufAppender, TestInsertIOBufMoved) {
@@ -317,9 +317,9 @@ TEST(BufAppender, TestInsertIOBufMoved) {
 
   // test that the bufAppender uses the tailroom that is available in the hello
   // buffer.
-  auto helloStr = helloPtr->cloneOne()->to<std::string>();
+  auto helloStr = helloPtr->cloneOne()->toString();
   std::string expected = str + str + "hello" + str;
-  EXPECT_EQ(data->to<std::string>(), expected);
+  EXPECT_EQ(data->toString(), expected);
   EXPECT_EQ(helloStr, "hello12456");
 }
 
