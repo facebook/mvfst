@@ -1043,15 +1043,8 @@ CloningScheduler::scheduleFramesForPacket(
   // The writableBytes in this function shouldn't be limited by cwnd, since
   // we only use CloningScheduler for the cases that we want to bypass cwnd for
   // now.
-  bool hasData = frameScheduler_.hasData();
-  if (conn_.version.has_value() &&
-      conn_.version.value() != QuicVersion::QUIC_V1) {
-    hasData = frameScheduler_.hasImmediateData();
-  }
-  if (hasData) {
-    // Note that there is a possibility that we end up writing nothing here. But
-    // if frameScheduler_ hasData() to write, we shouldn't invoke the cloning
-    // path if the write fails.
+  if (frameScheduler_.hasImmediateData()) {
+    // If we have new ack-eliciting data to write, write that first.
     return frameScheduler_.scheduleFramesForPacket(
         std::move(builder), writableBytes);
   }
