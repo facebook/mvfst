@@ -122,6 +122,9 @@ class PriorityQueue {
    public:
     Priority() : storage_{kUninitialized} {}
 
+    Priority(const Priority&) = default;
+    Priority& operator=(const Priority&) = default;
+
     ~Priority() = default;
 
     [[nodiscard]] bool isInitialized() const {
