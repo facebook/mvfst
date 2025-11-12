@@ -1584,6 +1584,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
           remaining = 0;
           networkData.addPacket(
               ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+          // This is the last packet. Break here to silence the linter's warning
+          // about a use-after-move in the next iteration of the loop
+          break;
         }
       }
     } else {
@@ -1774,6 +1777,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
           remaining = 0;
           networkData.addPacket(
               ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+          // This is the last packet. Break here to silence the linter's warning
+          // about a use-after-move in the next iteration of the loop
+          break;
         }
       }
     } else {
