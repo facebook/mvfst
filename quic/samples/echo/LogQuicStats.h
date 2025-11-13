@@ -118,7 +118,19 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << __func__;
   }
 
-  void onPeerAddressChanged() override {
+  void onConnectionMigration() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
+  void onPathAdded() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
+  void onPathValidationSuccess() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
+  void onPathValidationFailure() override {
     VLOG(2) << prefix_ << __func__;
   }
 

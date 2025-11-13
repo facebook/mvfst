@@ -107,7 +107,13 @@ class QuicTransportStatsCallback {
 
   virtual void onConnectionCloseZeroBytesWritten() = 0;
 
-  virtual void onPeerAddressChanged() = 0;
+  virtual void onConnectionMigration() = 0;
+
+  virtual void onPathAdded() = 0;
+
+  virtual void onPathValidationSuccess() = 0;
+
+  virtual void onPathValidationFailure() = 0;
 
   // stream level metrics
   virtual void onNewQuicStream() = 0;

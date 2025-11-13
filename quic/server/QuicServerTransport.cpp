@@ -1634,6 +1634,7 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
   };
 
   if (pathInfo.status == PathStatus::Validated) {
+    QUIC_STATS(conn_->statsCallback, onPathValidationSuccess);
     if (pathInfo.id == conn_->currentPathId) {
       // Case (1): Validated Current Path
       // remove the fallback path if it exists
@@ -1663,6 +1664,7 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
           gracePeriod);
     }
   } else {
+    QUIC_STATS(conn_->statsCallback, onPathValidationFailure);
     if (pathInfo.id == conn_->currentPathId) {
       // Case (3): Invalid Current Path
       // We should fallback to the previously validated path or close the

@@ -199,9 +199,11 @@ TEST_P(
   conn.qLogger = qLogger;
   conn.transportSettings.disableMigration = false;
 
-  // onPeerAddressChanged should be called once for each packet on the
-  // non-primary path
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(2);
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(0);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   // Add additional peer id so PathResponse completes.
   conn.peerConnectionIds.emplace_back(
       ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
@@ -259,9 +261,11 @@ TEST_P(
   conn.qLogger = qLogger;
   conn.transportSettings.disableMigration = false;
 
-  // onPeerAddressChanged should be called once for each packet on the
-  // non-primary path
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(2);
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(0);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   // Add additional peer id so PathResponse completes.
   conn.peerConnectionIds.emplace_back(
       ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
@@ -318,9 +322,11 @@ TEST_P(
   conn.qLogger = qLogger;
   conn.transportSettings.disableMigration = false;
 
-  // onPeerAddressChanged should be called once for each packet on the
-  // non-primary path before migration
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(2);
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   // Add additional peer id so PathResponse completes.
   conn.peerConnectionIds.emplace_back(
       ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
@@ -405,6 +411,9 @@ TEST_P(
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(0);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+
   // Receive second packet first
   deliverData(std::move(secondPacket));
   EXPECT_EQ(conn.currentPathId, initialPathId);
@@ -413,7 +422,6 @@ TEST_P(
 
   // Receive first packet later from a different address
   folly::SocketAddress newPeer("100.101.102.103", 23456);
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(firstPacket), true, &newPeer);
 
   // No migration for reordered packet
@@ -446,8 +454,11 @@ TEST_P(
   auto firstRttvar = conn.lossState.rttvar;
   auto firstMrtt = conn.lossState.mrtt;
 
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(2);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(2);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+
   folly::SocketAddress newPeer("100.101.102.103", 23456);
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPathId = conn.currentPathId;
@@ -516,7 +527,6 @@ TEST_P(
 
   // receiving data from the original peer address would trigger another
   // migration and a new path validation since the path was deleted.
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   auto nextPacketData = packetToBuf(createStreamPacket(
       *clientConnectionId,
       *conn.serverConnectionId,
@@ -551,6 +561,11 @@ TEST_P(
 
   ASSERT_FALSE(conn.fallbackPathId.has_value());
 
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   auto peerAddress = conn.peerAddress;
   auto firstPathId = conn.currentPathId;
   auto firstCongestionController = conn.congestionController.get();
@@ -561,7 +576,6 @@ TEST_P(
 
   // Step 1: Client migrates to new peer address
   folly::SocketAddress newPeer("100.101.102.103", 23456);
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPathId = conn.currentPathId;
@@ -608,7 +622,6 @@ TEST_P(
   // Step 3: Client responds with path response on the fallback (initial) path
   packetData = packetToBuf(makePacketWithPathResponseFrame(pathChallengeData));
   // Deliver the path response on the fallback (original) path, not the new path
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &clientAddr);
 
   // Allow any path removal to execute (it is scheduled on the eventbase)
@@ -650,8 +663,12 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   auto firstPath = conn.pathManager->getPath(conn.currentPathId);
   ASSERT_TRUE(firstPath);
 
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   folly::SocketAddress newPeer("100.101.102.103", 23456);
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPath = conn.pathManager->getPath(conn.currentPathId);
@@ -725,7 +742,11 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   ASSERT_FALSE(conn.pathManager->getPath(server->getLocalAddress(), newPeer));
 
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(1);
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(0);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
@@ -768,8 +789,12 @@ TEST_P(
 
   auto peerAddress = server->getConn().peerAddress;
 
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(2);
+  EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
+  EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
+
   folly::SocketAddress newPeer("100.101.102.103", 23456);
-  EXPECT_CALL(*quicStats_, onPeerAddressChanged).Times(2);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);

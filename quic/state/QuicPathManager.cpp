@@ -52,6 +52,8 @@ quic::Expected<PathIdType, QuicError> QuicPathManager::addPath(
           std::move(socket),
           PathStatus::NotValid));
 
+  QUIC_STATS(conn_.statsCallback, onPathAdded);
+
   return id;
 }
 

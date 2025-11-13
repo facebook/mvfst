@@ -37,7 +37,10 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onNewConnection, ());
   MOCK_METHOD(void, onConnectionClose, (Optional<QuicErrorCode>));
   MOCK_METHOD(void, onConnectionCloseZeroBytesWritten, ());
-  MOCK_METHOD(void, onPeerAddressChanged, ());
+  MOCK_METHOD(void, onConnectionMigration, ());
+  MOCK_METHOD(void, onPathAdded, ());
+  MOCK_METHOD(void, onPathValidationSuccess, ());
+  MOCK_METHOD(void, onPathValidationFailure, ());
   MOCK_METHOD(void, onNewQuicStream, ());
   MOCK_METHOD(void, onQuicStreamClosed, ());
   MOCK_METHOD(void, onQuicStreamReset, (QuicErrorCode));

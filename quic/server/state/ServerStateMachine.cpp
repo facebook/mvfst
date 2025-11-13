@@ -786,6 +786,8 @@ quic::Expected<void, QuicError> onConnectionMigration(
     return quic::make_unexpected(switchPathRes.error());
   }
 
+  QUIC_STATS(conn.statsCallback, onConnectionMigration);
+
   if (!isNATRebinding) {
     auto ccaRestored =
         conn.pathManager
@@ -1212,9 +1214,6 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     }
 
     if (conn.peerAddress != readData.peerAddress) {
-      // TODO: JBESHAY MIGRATION - this counter will count all packets received
-      // on non-primary paths. Revisit all connection migration counters.
-      QUIC_STATS(conn.statsCallback, onPeerAddressChanged);
       auto migrationDenied = (encryptionLevel != EncryptionLevel::AppData) ||
           conn.transportSettings.disableMigration;
       if (migrationDenied) {

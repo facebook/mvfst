@@ -2263,6 +2263,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
     conn_->qLogger->addConnectionMigrationUpdate(true);
   }
 
+  QUIC_STATS(conn_->statsCallback, onConnectionMigration);
+
   // Keep the old path for some time so we can read any packets that might
   // already be inflight
   auto removePathLambda = [conn = shared_from_this(), oldPathId]() {
@@ -2482,6 +2484,12 @@ void QuicClientTransportLite::onPathValidationResult(const PathInfo& pathInfo) {
     it->second->onPathValidationResult(pathInfo);
     // Remove the callback
     pathValidationCallbacks_.erase(pathInfo.id);
+  }
+
+  if (pathInfo.status == PathStatus::Validated) {
+    QUIC_STATS(conn_->statsCallback, onPathValidationSuccess);
+  } else {
+    QUIC_STATS(conn_->statsCallback, onPathValidationFailure);
   }
 
   if (pathInfo.id != conn_->currentPathId) {
