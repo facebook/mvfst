@@ -1638,10 +1638,16 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
       // Case (1): Validated Current Path
       // remove the fallback path if it exists
       if (conn_->fallbackPathId) {
-        runOnEvbAsync([pathId = conn_->fallbackPathId.value(),
+        runOnEvbAsync([conn = shared_from_this(),
+                       pathId = conn_->fallbackPathId.value(),
                        removeFunc = std::move(removeIfNotCurrentFunc),
-                       type = "fallback"](auto) { removeFunc(pathId, type); });
-        conn_->fallbackPathId.reset();
+                       type = "fallback"](auto) {
+          removeFunc(pathId, type);
+          if (conn->conn_->fallbackPathId.has_value() &&
+              conn->conn_->fallbackPathId.value() == pathId) {
+            conn->conn_->fallbackPathId.reset();
+          }
+        });
       }
     } else {
       // Case (2): Validated Probe Path

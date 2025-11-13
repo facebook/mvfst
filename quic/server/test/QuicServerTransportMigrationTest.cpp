@@ -506,10 +506,11 @@ TEST_P(
   EXPECT_EQ(newPath->status, PathStatus::Validated);
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(server->pathValidationTimeout().isTimerCallbackScheduled());
-  ASSERT_FALSE(conn.fallbackPathId.has_value());
 
   // Loop once to allow any paths to be removed (this happens in the eventbase)
   evb.loopOnce();
+  ASSERT_FALSE(conn.fallbackPathId.has_value());
+
   // The first path should be removed because we are now on a validated path
   EXPECT_FALSE(conn.pathManager->getPath(firstPathId));
 
