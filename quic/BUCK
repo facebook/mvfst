@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
 
 oncall("traffic_protocols")
 
@@ -94,4 +95,11 @@ mvfst_cpp_library(
     exported_deps = [
         ":constants",
     ],
+)
+
+fb_native.export_file(
+    name = "src-tree",
+    src = ".",
+    mode = "reference",
+    visibility = ["PUBLIC"],
 )
