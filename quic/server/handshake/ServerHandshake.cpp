@@ -359,7 +359,7 @@ Handshake::TLSSummary ServerHandshake::getTLSSummary() const {
   return summary;
 }
 
-class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
+class ServerHandshake::ActionMoveVisitor {
  public:
   explicit ActionMoveVisitor(ServerHandshake& server) : server_(server) {}
 

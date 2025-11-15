@@ -34,7 +34,7 @@ using namespace testing;
 
 namespace quic::test {
 
-class ClientHandshakeTest : public Test, public boost::static_visitor<> {
+class ClientHandshakeTest : public Test {
  public:
   ~ClientHandshakeTest() override = default;
 
