@@ -320,6 +320,11 @@ class QuicPathManager {
 
   // The path validation callback
   PathValidationCallback* pathValidationCallback_{nullptr};
+
+  // The latest retrieved path is cached here. This is an optimization to reduce
+  // looking up the path by source,destination tuple or by id in the maps for
+  // every read and write.
+  mutable const PathInfo* cachedPath_{nullptr};
 };
 
 } // namespace quic

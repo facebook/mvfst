@@ -61,6 +61,10 @@ quic::Expected<std::reference_wrapper<const PathInfo>, QuicError>
 QuicPathManager::getOrAddPath(
     const folly::SocketAddress& localAddress,
     const folly::SocketAddress& peerAddress) {
+  if (cachedPath_ && cachedPath_->localAddress == localAddress &&
+      cachedPath_->peerAddress == peerAddress) {
+    return std::cref(*cachedPath_);
+  }
   auto it = pathTupleToId_.find({localAddress, peerAddress});
   if (it != pathTupleToId_.end()) {
     return std::cref(*CHECK_NOTNULL(getPath(it->second)));
@@ -69,8 +73,9 @@ QuicPathManager::getOrAddPath(
   if (idRes.hasError()) {
     return quic::make_unexpected(idRes.error());
   }
+  cachedPath_ = &pathIdToInfo_.at(idRes.value());
 
-  return std::cref(pathIdToInfo_.at(idRes.value()));
+  return std::cref(*cachedPath_);
 }
 
 quic::Expected<PathIdType, QuicError> QuicPathManager::addValidatedPath(
@@ -97,6 +102,10 @@ quic::Expected<void, QuicError> QuicPathManager::removePath(PathIdType pathId) {
   if (it == pathIdToInfo_.end()) {
     return quic::make_unexpected(
         QuicError(LocalErrorCode::PATH_MANAGER_ERROR, "Path not found"));
+  }
+
+  if (cachedPath_ && cachedPath_->id == pathId) {
+    cachedPath_ = nullptr;
   }
 
   if (it->second.socket) {
@@ -126,16 +135,24 @@ quic::Expected<void, QuicError> QuicPathManager::removePath(PathIdType pathId) {
 }
 
 const PathInfo* QuicPathManager::getPath(PathIdType pathId) const {
+  if (cachedPath_ && cachedPath_->id == pathId) {
+    return cachedPath_;
+  }
   auto it = pathIdToInfo_.find(pathId);
   if (it == pathIdToInfo_.end()) {
     return nullptr;
   }
+  cachedPath_ = &it->second;
   return &it->second;
 }
 
 const PathInfo* QuicPathManager::getPath(
     const folly::SocketAddress& localAddress,
     const folly::SocketAddress& peerAddress) {
+  if (cachedPath_ && cachedPath_->localAddress == localAddress &&
+      cachedPath_->peerAddress == peerAddress) {
+    return cachedPath_;
+  }
   auto it = pathTupleToId_.find({localAddress, peerAddress});
   if (it == pathTupleToId_.end()) {
     return nullptr;
