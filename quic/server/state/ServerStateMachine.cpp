@@ -978,7 +978,6 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
 
     auto customTransportParams = getSupportedExtTransportParams(conn);
 
-    QUIC_STATS(conn.statsCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
             version,
