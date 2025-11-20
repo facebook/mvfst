@@ -759,6 +759,20 @@ quic::Expected<void, QuicError> onConnectionMigration(
     conn.fallbackPathId.reset();
   }
 
+  if (readPath->status != PathStatus::Validated &&
+      readPath->outstandingChallengeData.has_value() &&
+      !conn.pendingEvents.pathChallenges.contains(readPathId)) {
+    // We're migrating to a path with an outstanding path challenge that we
+    // haven't received a response for yet. We resend it here to give the path
+    // validation a better chance at succeeding.
+    // This helps work around a bug in some QUIC implementations that do
+    // not properly handle a path challenge when it's sent in the same packet as
+    // a path response responding to a path probe.
+    conn.pendingEvents.pathChallenges.emplace(
+        readPath->id,
+        PathChallengeFrame(readPath->outstandingChallengeData.value()));
+  }
+
   // If this is NAT rebinding, keep congestion state unchanged
   bool isNATRebinding =
       maybeNATRebinding(readPath->peerAddress, connPath->peerAddress);
