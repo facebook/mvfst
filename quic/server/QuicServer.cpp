@@ -139,7 +139,9 @@ bool QuicServer::isInitialized() const noexcept {
 void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   checkRunningInThread(mainThreadId_);
   CHECK(ctx_) << "Must set a TLS context for the Quic server";
-  CHECK_LE(maxWorkers, std::numeric_limits<uint8_t>::max());
+  CHECK_LE(maxWorkers, std::numeric_limits<uint8_t>::max())
+      << "Quic server doesn't support more than "
+      << (int)std::numeric_limits<uint8_t>::max() << " workers";
   size_t numCpu = std::thread::hardware_concurrency();
   if (maxWorkers == 0) {
     maxWorkers = numCpu;
