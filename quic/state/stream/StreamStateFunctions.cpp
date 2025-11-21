@@ -25,9 +25,6 @@ quic::Expected<void, QuicError> resetQuicStream(
     stream.removeFromWriteBufStartingAtOffset(*reliableSize);
     stream.removeFromPendingWritesStartingAtOffset(*reliableSize);
     stream.removeFromLossBufStartingAtOffset(*reliableSize);
-    stream.removeFromRetransmissionBufMetasStartingAtOffset(*reliableSize);
-    stream.removeFromWriteBufMetaStartingAtOffset(*reliableSize);
-    stream.removeFromLossBufMetasStartingAtOffset(*reliableSize);
     stream.streamWriteError = error;
   } else {
     stream.reliableSizeToPeer = std::nullopt;
@@ -36,13 +33,6 @@ quic::Expected<void, QuicError> resetQuicStream(
     ChainedByteRangeHead(std::move(stream.pendingWrites)); // Will be destructed
     stream.lossBuffer.clear();
     stream.streamWriteError = error;
-    stream.writeBufMeta.length = 0;
-    stream.retransmissionBufMetas.clear();
-    stream.lossBufMetas.clear();
-    if (stream.dsrSender) {
-      stream.dsrSender->release();
-      stream.dsrSender.reset();
-    }
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);

@@ -1519,7 +1519,6 @@ void QuicTransportBaseLite::closeImpl(
          uint64_t(conn_->transportSettings.timeReorderingThreshDividend),
          conn_->usedZeroRtt,
          conn_->version.value_or(QuicVersion::MVFST_INVALID),
-         conn_->dsrPacketCount,
          conn_->initialPacketsReceived,
          conn_->uniqueInitialCryptoFramesReceived,
          timeUntilLastInitialCryptoFrameReceived,

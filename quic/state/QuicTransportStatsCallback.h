@@ -69,8 +69,6 @@ class QuicTransportStatsCallback {
     }
   }
 
-  virtual void onDSRPacketSent(size_t pktSize) = 0;
-
   virtual void onPacketRetransmission() = 0;
 
   virtual void onPacketLoss() = 0;

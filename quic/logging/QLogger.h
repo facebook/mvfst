@@ -63,7 +63,6 @@ class QLogger {
     uint64_t finalPacketLossTimeReorderingThreshDividend{};
     bool usedZeroRtt{};
     QuicVersion quicVersion{QuicVersion::MVFST_INVALID};
-    uint64_t dsrPacketCount{};
     uint16_t initialPacketsReceived{};
     uint16_t uniqueInitialCryptoFramesReceived{};
     std::chrono::milliseconds timeUntilLastInitialCryptoFrameReceived;

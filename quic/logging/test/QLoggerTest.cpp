@@ -116,7 +116,6 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
        .finalPacketLossTimeReorderingThreshDividend = 47,
        .usedZeroRtt = false,
        .quicVersion = QuicVersion::MVFST,
-       .dsrPacketCount = 37,
        /* numQuicInitialPacketReceived = */ .initialPacketsReceived = 1,
        /* numUniqueInitialCryptoFrameReceived = */
        .uniqueInitialCryptoFramesReceived = 1,
@@ -146,7 +145,6 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
   EXPECT_EQ(gotEvent->finalPacketLossReorderingThreshold, 46);
   EXPECT_EQ(gotEvent->finalPacketLossTimeReorderingThreshDividend, 47);
   EXPECT_EQ(gotEvent->usedZeroRtt, false);
-  EXPECT_EQ(gotEvent->dsrPacketCount, 37);
   EXPECT_EQ(gotEvent->initialPacketsReceived, 1);
   EXPECT_EQ(gotEvent->uniqueInitialCryptoFramesReceived, 1);
   EXPECT_EQ(gotEvent->timeUntilLastInitialCryptoFrameReceived.count(), 1);
@@ -872,7 +870,6 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        "final_packet_loss_time_reordering_threshold_dividend": 15,
        "used_zero_rtt": true,
        "quic_version": 4207849474,
-       "dsr_packet_count": 37,
        "initial_packets_received": 1,
        "unique_initial_crypto_frames_received": 1,
        "time_until_last_initial_crypto_frame_received": 1,
@@ -903,7 +900,6 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        .finalPacketLossTimeReorderingThreshDividend = 15,
        .usedZeroRtt = true,
        .quicVersion = QuicVersion::MVFST,
-       .dsrPacketCount = 37,
        /* numQuicInitialPacketReceived = */ .initialPacketsReceived = 1,
        /* numUniqueInitialCryptoFrameReceived = */
        .uniqueInitialCryptoFramesReceived = 1,

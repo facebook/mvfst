@@ -10,7 +10,6 @@
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 namespace quic {
@@ -48,20 +47,6 @@ class TestQuicTransport
         false /* drainConnection */);
     // closeImpl may have been called earlier with drain = true, so force close.
     closeUdpSocket();
-  }
-
-  WriteResult writeBufMeta(
-      StreamId /* id */,
-      const BufferMeta& /* data */,
-      bool /* eof */,
-      ByteEventCallback* /* cb */) override {
-    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-
-  WriteResult setDSRPacketizationRequestSender(
-      StreamId /* id */,
-      std::unique_ptr<DSRPacketizationRequestSender> /* sender */) override {
-    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
 
   Optional<std::vector<TransportParameter>> getPeerTransportParams()
@@ -111,14 +96,6 @@ class TestQuicTransport
     if (result.hasError()) {
       return quic::make_unexpected(result.error());
     }
-    [[maybe_unused]] auto writePacketization = writePacketizationRequest(
-        *dynamic_cast<QuicServerConnectionState*>(conn_.get()),
-        *conn_->clientConnectionId,
-        (isConnectionPaced(*conn_)
-             ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
-             : conn_->transportSettings.writeConnectionDataPacketsLimit),
-        *aead,
-        Clock::now());
     auto pathValidationResult = writePathValidationDataForAlternatePaths(
         *socket_,
         *conn_,

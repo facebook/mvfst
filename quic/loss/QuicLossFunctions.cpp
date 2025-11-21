@@ -175,36 +175,19 @@ quic::Expected<void, QuicError> markPacketLoss(
           break;
         }
 
-        if (!frame.fromBufMeta) {
-          auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
-          if (bufferItr == stream->retransmissionBuffer.end()) {
-            break;
-          }
-          if (!streamRetransmissionDisabled(conn, *stream)) {
-            stream->insertIntoLossBuffer(std::move(bufferItr->second));
-          }
-          if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
-              streamsWithAddedStreamLossForPacket.end()) {
-            stream->streamLossCount++;
-            streamsWithAddedStreamLossForPacket.insert(frame.streamId);
-          }
-          stream->retransmissionBuffer.erase(bufferItr);
-        } else {
-          auto retxBufMetaItr =
-              stream->retransmissionBufMetas.find(frame.offset);
-          if (retxBufMetaItr == stream->retransmissionBufMetas.end()) {
-            break;
-          }
-          if (!streamRetransmissionDisabled(conn, *stream)) {
-            stream->insertIntoLossBufMeta(retxBufMetaItr->second);
-          }
-          if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
-              streamsWithAddedStreamLossForPacket.end()) {
-            stream->streamLossCount++;
-            streamsWithAddedStreamLossForPacket.insert(frame.streamId);
-          }
-          stream->retransmissionBufMetas.erase(retxBufMetaItr);
+        auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
+        if (bufferItr == stream->retransmissionBuffer.end()) {
+          break;
         }
+        if (!streamRetransmissionDisabled(conn, *stream)) {
+          stream->insertIntoLossBuffer(std::move(bufferItr->second));
+        }
+        if (streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
+            streamsWithAddedStreamLossForPacket.end()) {
+          stream->streamLossCount++;
+          streamsWithAddedStreamLossForPacket.insert(frame.streamId);
+        }
+        stream->retransmissionBuffer.erase(bufferItr);
         conn.streamManager->updateWritableStreams(*stream);
         break;
       }
@@ -287,8 +270,6 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
-    const InlineMap<StreamId, PacketNum, 20>& largestDsrAckedSequenceNumber,
-    const Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
     const TimePoint& lossTime,
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
@@ -305,7 +286,6 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
 
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
-    Optional<uint64_t> maybeCurrentStreamPacketIdx;
     if (currentPacketNum >= largestAcked) {
       break;
     }
@@ -314,42 +294,8 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
       iter++;
       continue;
     }
-    // We now have to determine the largest ACKed packet number we should use
-    // for the reordering threshold loss determination.
-    auto maybeStreamFrame = pkt.packet.frames.empty()
-        ? nullptr
-        : pkt.packet.frames.front().asWriteStreamFrame();
 
-    // Use the translated virtual number for the current packet if it's a DSR
-    // packet, or the non DSR sequence number otherwise.
-    if (maybeCurrentStreamPacketIdx.has_value()) {
-      currentPacketNum = *maybeCurrentStreamPacketIdx;
-    } else if (pkt.nonDsrPacketSequenceNumber.has_value()) {
-      currentPacketNum = pkt.nonDsrPacketSequenceNumber.value();
-    }
-
-    // For DSR we use the stream packet index (monotonic index of packets
-    // within a stream) to determine reordering loss. This effectively puts
-    // DSR packets on their own packet number timeline.
-    auto largestAckedForComparison = [&]() -> PacketNum {
-      if (maybeStreamFrame && maybeStreamFrame->fromBufMeta) {
-        maybeCurrentStreamPacketIdx = maybeStreamFrame->streamPacketIdx;
-        // If the packet being considered is a DSR packet, we use the
-        // largest ACKed for that stream. The default value here covers the
-        // case where no DSR packets were ACKed, in which case we should
-        // not declare reorder loss.
-        CHECK(pkt.isDSRPacket);
-        return folly::get_default(
-            largestDsrAckedSequenceNumber,
-            maybeStreamFrame->streamId,
-            *maybeCurrentStreamPacketIdx);
-      } else {
-        // If the packet being considered is a non-DSR packet, use the largest
-        // non-DSR ACKed sequence number. If there were no non-DSR ACKed, we
-        // shouldn't declare reorder loss.
-        return largestNonDsrAckedSequenceNumber.value_or(currentPacketNum);
-      }
-    }();
+    auto largestAckedForComparison = largestAcked;
 
     // The max ensures that we don't overflow on the subtraction if the largest
     // ACKed is smaller.
@@ -382,10 +328,6 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
       continue;
     }
 
-    if (pkt.isDSRPacket) {
-      CHECK_GT(conn.outstandings.dsrCount, 0);
-      --conn.outstandings.dsrCount;
-    }
     if (pkt.maybeClonedPacketIdentifier) {
       CHECK(conn.outstandings.clonedPacketCount[pnSpace]);
       --conn.outstandings.clonedPacketCount[pnSpace];
@@ -450,8 +392,7 @@ detectLossPackets(
     const AckState& ackState,
     const LossVisitor& lossVisitor,
     const TimePoint lossTime,
-    const PacketNumberSpace pnSpace,
-    const CongestionController::AckEvent* ackEvent) {
+    const PacketNumberSpace pnSpace) {
   getLossTime(conn, pnSpace).reset();
   std::chrono::microseconds rttSample =
       std::max(conn.lossState.srtt, conn.lossState.lrtt);
@@ -475,52 +416,12 @@ detectLossPackets(
 
   // Note that time based loss detection is also within the same PNSpace.
 
-  // Loop over all ACKed packets and collect the largest ACKed packet per DSR
-  // stream. This facilitates only considering the reordering threshold per DSR
-  // sender, which avoids the problem of "natural" reordering caused by
-  // multiple DSR senders. Similarly track the largest non-DSR ACKed, for the
-  // reason but when DSR packets are reordered "before" non-DSR packets.
-  // These two variables hold DSR and non-DSR sequence numbers not actual packet
-  // numbers  InlineMap<StreamId, PacketNum, 20> largestDsrAckedSeqNo;
-  InlineMap<StreamId, PacketNum, 20> largestDsrAckedSeqNo;
-  Optional<PacketNum> largestNonDsrAckedSeqNo;
-  if (ackEvent) {
-    for (const auto& ackPacket : ackEvent->ackedPackets) {
-      for (auto& [stream, details] : ackPacket.detailsPerStream) {
-        if (details.streamPacketIdx) {
-          largestDsrAckedSeqNo[stream] = std::max(
-              folly::get_default(
-                  largestDsrAckedSeqNo, stream, *details.streamPacketIdx),
-              *details.streamPacketIdx);
-        } else {
-          largestNonDsrAckedSeqNo = std::max(
-              largestNonDsrAckedSeqNo.value_or(0),
-              ackPacket.nonDsrPacketSequenceNumber);
-        }
-      }
-      // If there are no streams, then it's not a DSR packet.
-      if (ackPacket.detailsPerStream.empty()) {
-        largestNonDsrAckedSeqNo = std::max(
-            largestNonDsrAckedSeqNo.value_or(0),
-            ackPacket.nonDsrPacketSequenceNumber);
-      }
-    }
-  }
-  // This covers the case where there's no ackedPackets.
-  if (largestDsrAckedSeqNo.empty() &&
-      ackState.largestNonDsrSequenceNumberAckedByPeer.has_value()) {
-    largestNonDsrAckedSeqNo = largestNonDsrAckedSeqNo.value_or(
-        ackState.largestNonDsrSequenceNumberAckedByPeer.value());
-  }
-
   bool shouldSetTimer = false;
   if (ackState.largestAckedByPeer.has_value()) {
     auto processResult = processOutstandingsForLoss(
         conn,
         *ackState.largestAckedByPeer,
         pnSpace,
-        largestDsrAckedSeqNo,
-        largestNonDsrAckedSeqNo,
         lossTime,
         rttSample,
         lossVisitor, // Pass the visitor (which returns Expected)
@@ -600,19 +501,9 @@ handleAckForLoss(
     ackState.largestAckedByPeer = std::max<PacketNum>(
         ackState.largestAckedByPeer.value_or(*ack.largestNewlyAckedPacket),
         *ack.largestNewlyAckedPacket);
-
-    // Update the largest non-DSR acked sequence number
-    auto largestNewlyAckedPacket = ack.getLargestNewlyAckedPacket();
-    if (largestNewlyAckedPacket &&
-        largestNewlyAckedPacket->nonDsrPacketSequenceNumber) {
-      ackState.largestNonDsrSequenceNumberAckedByPeer = std::max<uint64_t>(
-          ackState.largestNonDsrSequenceNumberAckedByPeer.value_or(
-              largestNewlyAckedPacket->nonDsrPacketSequenceNumber),
-          largestNewlyAckedPacket->nonDsrPacketSequenceNumber);
-    }
   }
-  auto lossEventResult = detectLossPackets(
-      conn, ackState, lossVisitor, ack.ackTime, pnSpace, &ack);
+  auto lossEventResult =
+      detectLossPackets(conn, ackState, lossVisitor, ack.ackTime, pnSpace);
 
   if (!lossEventResult.has_value()) {
     return quic::make_unexpected(lossEventResult.error());

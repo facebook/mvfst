@@ -35,7 +35,6 @@ mvfst_cpp_library(
     ],
     deps = [
         ":pacing_observer",
-        ":tperf_dsr_sender",
         "//fizz/crypto:utils",
         "//folly/stats:histogram",
         "//quic/common/test:test_utils",
@@ -65,27 +64,6 @@ mvfst_cpp_binary(
     }),
     external_deps = [
         "glog",
-    ],
-)
-
-mvfst_cpp_library(
-    name = "tperf_dsr_sender",
-    srcs = [
-        "TperfDSRSender.cpp",
-    ],
-    headers = [
-        "TperfDSRSender.h",
-    ],
-    deps = [
-        "//quic/dsr/backend/test:test_utils",
-    ],
-    exported_deps = [
-        "//folly:network_address",
-        "//quic/common/udpsocket:quic_async_udp_socket",
-        "//quic/dsr:dsr_packetization_request_sender",
-        "//quic/dsr:types",
-        "//quic/dsr/backend:dsr_packetizer",
-        "//quic/server:server",
     ],
 )
 

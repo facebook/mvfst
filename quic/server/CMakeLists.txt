@@ -34,7 +34,6 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_state_ack_handler
@@ -81,7 +80,6 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_server_state
@@ -122,7 +120,6 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_state_ack_handler
@@ -137,7 +134,6 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_state_ack_handler
@@ -154,7 +150,6 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_server_state
@@ -175,7 +170,6 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_server_state

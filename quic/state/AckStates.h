@@ -28,15 +28,11 @@ struct AckState : WriteAckFrameState {
   Optional<PacketNum> largestAckedByPeer;
   // Largest received packet number at the time we sent our last close message.
   Optional<PacketNum> largestReceivedAtLastCloseSent;
-  // Packet sequence number for largest non-dsr packet acked by peer.
-  Optional<uint64_t> largestNonDsrSequenceNumberAckedByPeer;
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
   // If set, then this packet number was recently skipped and should not be
   // acked by the peer.
   Optional<PacketNum> skippedPacketNum;
-  // Incremented for each non-DSR packet.
-  uint64_t nonDsrPacketSequenceNumber{0};
   uint64_t reorderThreshold{0};
   Optional<uint64_t> tolerance;
   Optional<uint64_t> ackFrequencySequenceNumber;

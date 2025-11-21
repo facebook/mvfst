@@ -159,16 +159,6 @@ class QuicServerTransport
   std::shared_ptr<QuicTransportBaseLite> sharedGuard() override;
   QuicConnectionStats getConnectionsStats() const override;
 
-  WriteResult writeBufMeta(
-      StreamId /* id */,
-      const BufferMeta& /* data */,
-      bool /* eof */,
-      ByteEventCallback* cb = nullptr) override;
-
-  WriteResult setDSRPacketizationRequestSender(
-      StreamId /* id */,
-      std::unique_ptr<DSRPacketizationRequestSender> /* sender */) override;
-
   const fizz::server::FizzServerContext& getCtx() {
     return *ctx_;
   }

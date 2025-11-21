@@ -81,8 +81,6 @@ auto emplacePackets(
         0,
         OutstandingPacketMetadata::DetailsPerStream());
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, pnSpace).nonDsrPacketSequenceNumber++;
     packetNum++;
   }
 }
@@ -199,8 +197,6 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 101;
@@ -280,8 +276,6 @@ TEST_P(AckHandlersTest, TestAckWithECN) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   // To enable accounting of sent marked packets
   conn.ecnState = ECNState::ValidatedL4S;
@@ -364,8 +358,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
       0,
       OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(std::move(sentPacket));
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -379,10 +371,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
 
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
   ASSERT_FALSE(
       detectLossPackets(
@@ -456,8 +446,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
       0,
       OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(std::move(sentPacket));
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -471,10 +459,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
 
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
   ASSERT_FALSE(
       detectLossPackets(
@@ -554,8 +540,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
       0,
       OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(std::move(sentPacket));
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -569,10 +553,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
 
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
   ASSERT_FALSE(
       detectLossPackets(
@@ -648,8 +630,6 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
       0,
       OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(std::move(sentPacket));
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -663,10 +643,8 @@ TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
 
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
   ASSERT_FALSE(
       detectLossPackets(
@@ -741,8 +719,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
         packetDestroyFn);
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 3);
 
@@ -825,16 +801,12 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
         packetDestroyFn);
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 3);
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 3;
   ackState.largestAckedByPeer = 3;
   ASSERT_FALSE(detectLossPackets(
                    conn,
@@ -896,8 +868,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
         packetDestroyFn);
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
 
   // Send ACK for #4, which should clear # 1 as well.
@@ -978,8 +948,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
         packetDestroyFn);
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 1000);
 
@@ -1097,8 +1065,6 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 101;
@@ -1269,8 +1235,6 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
 
   ReadAckFrame ackFrame;
@@ -1395,8 +1359,6 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
 
   for (PacketNum packetNum = 20; packetNum < 40; packetNum += 3) {
@@ -1417,8 +1379,6 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
 
   ReadAckFrame ackFrame;
@@ -1520,8 +1480,6 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   auto secondPacket = createNewPacket(101 /* packetNum */, GetParam().pnSpace);
   WriteAckFrame secondAckFrame;
@@ -1542,8 +1500,6 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   ReadAckFrame firstReceivedAck;
   firstReceivedAck.largestAcked = 100;
@@ -1633,8 +1589,6 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 5;
@@ -1703,8 +1657,6 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   PacketNum packetNum2 = 10;
   auto regularPacket2 = createNewPacket(packetNum2, GetParam().pnSpace);
@@ -1720,8 +1672,6 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   // Ack a packet one higher than the packet so that we don't trigger
   // reordering threshold.
@@ -1769,8 +1719,6 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
 
   ReadAckFrame ackFrame;
@@ -1985,8 +1933,6 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 0;
@@ -2125,8 +2071,6 @@ TEST_P(AckHandlersTest, MultiplePacketProcessors) {
         LossState(),
         0,
         OutstandingPacketMetadata::DetailsPerStream());
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
   }
 
   ReadAckFrame ackFrame;
@@ -2356,8 +2300,6 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   ReadAckFrame ackFrame;
   // ackDelay has no effect on mrtt
@@ -2494,8 +2436,6 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   conn.lossState.totalBytesSent += 111;
   conn.lossState.totalBodyBytesSent += 100;
@@ -2569,8 +2509,6 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -2699,8 +2637,6 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -2830,8 +2766,6 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -3592,8 +3526,6 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -3700,8 +3632,6 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -3815,8 +3745,6 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -4059,8 +3987,6 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = false;
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -4208,8 +4134,6 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -4314,8 +4238,6 @@ TEST_P(AckHandlersTest, ObserverRttSample) {
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = false;
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
     packetNum++;
   }
@@ -4443,10 +4365,8 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
       .Times(1);
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 4;
   ackState.largestAckedByPeer = 4;
   ASSERT_FALSE(detectLossPackets(
                    conn,
@@ -4545,10 +4465,8 @@ TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
 
   // Update the ackState
   // Both largestAckedByPeer (packet num) and
-  // largestNonDsrSequenceNumberAckedByPeer (sequence num) need to be updated to
   // exercise loss by reorder path
   auto& ackState = getAckState(conn, GetParam().pnSpace);
-  ackState.largestNonDsrSequenceNumberAckedByPeer = 10;
   ackState.largestAckedByPeer = 10;
   ASSERT_FALSE(detectLossPackets(
                    conn,
@@ -4620,8 +4538,6 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-      getAckState(conn, GetParam().pnSpace).nonDsrPacketSequenceNumber++;
 
   ReadAckFrame ackFrame;
   auto ackReceiveTime = packetSendTime + 400ns;
@@ -4785,8 +4701,7 @@ class AckEventForAppDataTest : public Test {
                packet.packet,
                timepoint,
                getEncodedSize(packet),
-               getEncodedBodySize(packet),
-               false /* isDSRPacket */)
+               getEncodedBodySize(packet))
                .hasError());
   }
 
@@ -7886,8 +7801,6 @@ TEST_P(AckHandlersTest, InflightBytesDecrementOnAckIncludesLostBytes) {
         OutstandingPacketMetadata::DetailsPerStream());
 
     conn.outstandings.packets.emplace_back(std::move(sentPacket));
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, pnSpace).nonDsrPacketSequenceNumber++;
 
     inflightAtSend += kPktSize;
   }

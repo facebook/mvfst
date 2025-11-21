@@ -139,7 +139,6 @@ mvfst_cpp_library(
         "//quic/congestion_control:congestion_controller",
         "//quic/congestion_control:packet_processor",
         "//quic/congestion_control:throttling_signal_provider",
-        "//quic/dsr:dsr_packetization_request_sender",
         "//quic/handshake:handshake",
         "//quic/logging:qlogger",
         "//quic/observer:socket_observer_types",

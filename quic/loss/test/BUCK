@@ -19,8 +19,6 @@ mvfst_cpp_test(
         "//quic/common/events:folly_eventbase",
         "//quic/common/test:test_utils",
         "//quic/common/testutil:mock_async_udp_socket",
-        "//quic/dsr:types",
-        "//quic/dsr/test:mocks",
         "//quic/fizz/client/handshake:fizz_client_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/logging/test:mocks",

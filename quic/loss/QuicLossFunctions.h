@@ -183,8 +183,6 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const PacketNumberSpace& pnSpace,
-    const InlineMap<StreamId, PacketNum, 20>& largestDsrAckedSequenceNumber,
-    const Optional<PacketNum>& largestNonDsrAckedSequenceNumber,
     const TimePoint& lossTime,
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor, // Visitor now returns Expected
@@ -204,8 +202,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
         const AckState& ackState,
         const LossVisitor& lossVisitor,
         const TimePoint lossTime,
-        const PacketNumberSpace pnSpace,
-        const CongestionController::AckEvent* ackEvent = nullptr);
+        const PacketNumberSpace pnSpace);
 
 /*
  * Function invoked when PTO alarm fires. Handles errors internally.

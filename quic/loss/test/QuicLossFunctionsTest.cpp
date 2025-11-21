@@ -19,7 +19,6 @@
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
-#include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
@@ -104,11 +103,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->ackStates.initialAckState->nextPacketNum = 1;
-    conn->ackStates.initialAckState->nonDsrPacketSequenceNumber = 1;
     conn->ackStates.handshakeAckState->nextPacketNum = 1;
-    conn->ackStates.handshakeAckState->nonDsrPacketSequenceNumber = 1;
     conn->ackStates.appDataAckState.nextPacketNum = 1;
-    conn->ackStates.appDataAckState.nonDsrPacketSequenceNumber = 1;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamFlowControlWindow;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
@@ -313,11 +309,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   }
   conn.outstandings.packets.emplace_back(std::move(outstandingPacket));
   conn.lossState.largestSent = getNextPacketNum(conn, packetNumberSpace);
-  increaseNextPacketNum(conn, packetNumberSpace, isDsr);
-  conn.outstandings.packets.back().isDSRPacket = isDsr;
+  increaseNextPacketNum(conn, packetNumberSpace);
   if (!isDsr) {
-    conn.outstandings.packets.back().nonDsrPacketSequenceNumber =
-        getAckState(conn, packetNumberSpace).nonDsrPacketSequenceNumber - 1;
   }
   conn.pendingEvents.setLossDetectionAlarm = true;
   return conn.lossState.largestSent.value();
@@ -387,8 +380,7 @@ TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {
     return {};
   };
   auto& ackState = getAckState(*conn, PacketNumberSpace::Initial);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = secondPacketNum;
+  ackState.largestAckedByPeer = secondPacketNum;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -845,8 +837,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
       firstHandshakeOpIter + 2, firstHandshakeOpIter + 5);
   // Ack for packet 9 arrives
   auto& ackState = getAckState(*conn, PacketNumberSpace::Handshake);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 9;
+  ackState.largestAckedByPeer = 9;
   auto lossResult = detectLossPackets(
       *conn,
       ackState,
@@ -908,8 +899,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThresholdWithSkippedPacket) {
   EXPECT_EQ(7, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   // Ack for packet 8 arrives
   auto& ackState = getAckState(*conn, PacketNumberSpace::Handshake);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 8;
+  ackState.largestAckedByPeer = 8;
   auto lossResult = detectLossPackets(
       *conn,
       ackState,
@@ -1130,8 +1120,7 @@ TEST_F(QuicLossFunctionsTest, ReorderingThresholdChecksSamePacketNumberSpace) {
   }
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = latestSent + 1;
+  ackState.largestAckedByPeer = latestSent;
 
   ASSERT_FALSE(detectLossPackets(
                    *conn,
@@ -1204,8 +1193,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent;
+  ackState.largestAckedByPeer = largestSent;
   auto lossEventResult = detectLossPackets(
       *conn,
       ackState,
@@ -1249,8 +1237,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   auto lossTime = sendTime + 50ms;
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::Handshake);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = second;
+  ackState.largestAckedByPeer = second;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1567,8 +1554,7 @@ TEST_F(QuicLossFunctionsTest, NoSkipLossVisitor) {
   }
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = lastSent;
+  ackState.largestAckedByPeer = lastSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1605,8 +1591,7 @@ TEST_F(QuicLossFunctionsTest, SkipLossVisitor) {
   }
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = lastSent;
+  ackState.largestAckedByPeer = lastSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1654,8 +1639,7 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
   // Ack the last sent packet. Despite three losses, lossVisitor only visit one
   // packet
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = lastSent;
+  ackState.largestAckedByPeer = lastSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1681,14 +1665,13 @@ TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
   sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
-  auto ackedPacket =
-      sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   auto noopLossMarker = [](auto&, auto /* pathId */, auto&, bool)
       -> quic::Expected<void, quic::QuicError> { return {}; };
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
   ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = ackedPacket;
+      conn->ackStates.appDataAckState.nextPacketNum + 4;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1815,8 +1798,7 @@ TEST_F(QuicLossFunctionsTest, TotalLossCount) {
   conn->lossState.rtxCount = 135;
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1943,7 +1925,7 @@ TEST_F(QuicLossFunctionsTest, TimeThreshold) {
   auto referenceTime = Clock::now();
   auto packet1 =
       sendPacket(*conn, referenceTime - 10ms, std::nullopt, PacketType::OneRtt);
-  auto packet2 = sendPacket(
+  sendPacket(
       *conn,
       referenceTime + conn->lossState.srtt / 2,
       std::nullopt,
@@ -1957,8 +1939,7 @@ TEST_F(QuicLossFunctionsTest, TimeThreshold) {
   };
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = packet2;
+  ackState.largestAckedByPeer = packet1 + 1;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -1987,8 +1968,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingInitialCounting) {
   };
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::Initial);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2018,8 +1998,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
     return {};
   };
   auto& ackState = getAckState(*conn, PacketNumberSpace::Handshake);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2031,7 +2010,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
   EXPECT_EQ(4, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 }
 
-TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
+TEST_F(QuicLossFunctionsTest, CappedShiftNoCrash) {
   auto conn = createConn();
   conn->outstandings.reset();
   conn->lossState.ptoCount =
@@ -2112,7 +2091,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
-          .setNonDsrPacketSequenceNumber(1)
           .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
@@ -2147,7 +2125,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
-          .setNonDsrPacketSequenceNumber(1)
           .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
@@ -2181,7 +2158,6 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(1)
-          .setNonDsrPacketSequenceNumber(1)
           .setOutstandingPacketMetadata(opm)
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
@@ -2220,7 +2196,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
   TimePoint checkTime = TimePoint(200ms);
 
   // Out of 1, 2, 3, 4, 5, 6, 7 -- we deleted (acked) 3,4,5.
-  // 1, 2 and 6 are "lost" due to reodering. None lost due to timeout
+  // With reorderingThreshold=1 and largestAckedByPeer=7, packets < (7-1) are
+  // lost. So 1, 2 are "lost" due to reordering. None lost due to timeout.
   EXPECT_CALL(
       *obs1,
       packetLossDetected(
@@ -2235,16 +2212,11 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
                   getLossPacketMatcher(
                       2 /* packetNum */,
                       true /* lossByReorder */,
-                      false /* lossByTimeout */),
-                  getLossPacketMatcher(
-                      6 /* packetNum */,
-                      true /* lossByReorder */,
                       false /* lossByTimeout */)))))
       .Times(1);
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2266,7 +2238,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
               false /* lossByTimeout */),
           getOutstandingPacketMatcher(
               6 /* packetNum */,
-              true /* lossByReorder */,
+              false /* lossByReorder */,
               false /* lossByTimeout */),
           getOutstandingPacketMatcher(
               7 /* packetNum */,
@@ -2301,7 +2273,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
   conn->transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = TimePoint(500ms);
 
-  // expect all packets to be lost due to timeout
+  // expect packets 1-6 to be lost due to timeout
+  // (packet 7 is largestAckedByPeer so it's not checked for loss)
   EXPECT_CALL(
       *obs1,
       packetLossDetected(
@@ -2332,15 +2305,10 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
                   getLossPacketMatcher(
                       6 /* packetNum */,
                       false /* lossByReorder */,
-                      true /* lossByTimeout */),
-                  getLossPacketMatcher(
-                      7 /* packetNum */,
-                      false /* lossByReorder */,
                       true /* lossByTimeout */)))))
       .Times(1);
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2379,7 +2347,7 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
           getOutstandingPacketMatcher(
               7 /* packetNum */,
               false /* lossByReorder */,
-              true /* lossByTimeout */)));
+              false /* lossByTimeout */)));
 
   CHECK_NOTNULL(conn->getSocketObserverContainer())->removeObserver(obs1.get());
 }
@@ -2416,8 +2384,10 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
   TimePoint checkTime = TimePoint(500ms);
 
   // Out of 1, 2, 3, 4, 5, 6, 7 -- we deleted (acked) 3,4,5.
-  // 1, 2, 6 are lost due to reodering and timeout.
-  // 7 just timed out
+  // With reorderingThreshold=1 and largestAckedByPeer=7, packets < 6 are lost
+  // by reorder. All packets also timed out. So: 1, 2 lost by both reorder and
+  // timeout; 6 lost by timeout only. Packet 7 is not checked for loss (it's
+  // largestAckedByPeer).
   EXPECT_CALL(
       *obs1,
       packetLossDetected(
@@ -2435,16 +2405,11 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
                       true /* lossByTimeout */),
                   getLossPacketMatcher(
                       6 /* packetNum */,
-                      true /* lossByReorder */,
-                      true /* lossByTimeout */),
-                  getLossPacketMatcher(
-                      7 /* packetNum */,
                       false /* lossByReorder */,
                       true /* lossByTimeout */)))))
       .Times(1);
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2466,12 +2431,12 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
               true /* lossByTimeout */),
           getOutstandingPacketMatcher(
               6 /* packetNum */,
-              true /* lossByReorder */,
+              false /* lossByReorder */,
               true /* lossByTimeout */),
           getOutstandingPacketMatcher(
               7 /* packetNum */,
               false /* lossByReorder */,
-              true /* lossByTimeout */)));
+              false /* lossByTimeout */)));
 
   CHECK_NOTNULL(conn->getSocketObserverContainer())->removeObserver(obs1.get());
 }
@@ -2506,8 +2471,7 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {
   TimePoint checkTime = TimePoint(200ms);
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2516,12 +2480,13 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {
                    PacketNumberSpace::AppData)
                    .hasError());
 
-  // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
-  // 0, 1, and 5 should be marked lost due to reordering, std::nullopt due to
-  // timeout 6 is outstanding / on the wire still (no determination made)
-  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLost);
+  // Sent 7 packets (1-7), deleted (acked) 3,4,5
+  // With reorderingThreshold=1 and largestAckedByPeer=7, packets < 6 are lost.
+  // So packets 1, 2 should be marked lost due to reordering (not packet 6).
+  // Packet 7 is not checked for loss.
+  EXPECT_EQ(2, conn->lossState.totalPacketsMarkedLost);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByTimeout);
-  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
+  EXPECT_EQ(2, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
 TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeout) {
@@ -2549,8 +2514,7 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeout) {
   TimePoint checkTime = TimePoint(500ms);
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2559,9 +2523,10 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeout) {
                    PacketNumberSpace::AppData)
                    .hasError());
 
-  // All 7 packets should be marked as lost by PTO
-  EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLostByTimeout);
+  // Packets 1-6 should be marked as lost by PTO
+  // (packet 7 is largestAckedByPeer so it's not checked for loss)
+  EXPECT_EQ(6, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(6, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
@@ -2595,8 +2560,7 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutPartial) {
   TimePoint checkTime = TimePoint(500ms);
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2605,11 +2569,12 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutPartial) {
                    PacketNumberSpace::AppData)
                    .hasError());
 
-  // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
-  // 0, 1, 5, and 6 should be marked lost due to timeout, std::nullopt due to
-  // reordering
-  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByTimeout);
+  // Sent 7 packets (1-7), deleted (acked) 3,4,5
+  // Remaining: 1, 2, 6, 7
+  // Packet 7 is largestAckedByPeer so it's not checked for loss
+  // Packets 1, 2, 6 should be marked lost due to timeout
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByTimeout);
   EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
@@ -2644,8 +2609,7 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutAndReordering) {
   TimePoint checkTime = TimePoint(500ms);
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = largestSent + 1;
+  ackState.largestAckedByPeer = largestSent;
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2654,912 +2618,16 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByTimeoutAndReordering) {
                    PacketNumberSpace::AppData)
                    .hasError());
 
-  // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
-  // 0, 1, and 5 should be marked lost due to reordering AND timeout
-  // 6 should be marked as lost due to timeout only
-  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
-  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByTimeout);
-  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
+  // Sent 7 packets (1-7), deleted (acked) 3,4,5
+  // Remaining: 1, 2, 6, 7
+  // With reorderingThreshold=1 and largestAckedByPeer=7, packets < 6 are lost
+  // by reorder. All packets also timed out. Packet 7 is not checked for loss.
+  // So: packets 1, 2 lost by both reorder and timeout; packet 6 lost by timeout
+  // only.
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByTimeout);
+  EXPECT_EQ(2, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
-
-TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
-  auto conn = createConn();
-  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
-  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  ASSERT_FALSE(
-      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("grape"), false)
-          .hasError());
-  ASSERT_FALSE(
-      writeBufMetaToQuicStream(*stream, BufferMeta(1000), true).hasError());
-  auto bufMetaStartingOffset = stream->writeBufMeta.offset;
-  ASSERT_EQ(1000, stream->writeBufMeta.length);
-  ASSERT_TRUE(stream->writeBufMeta.eof);
-  ASSERT_EQ(bufMetaStartingOffset + 1000, *stream->finalWriteOffset);
-  // Send real data
-  ASSERT_FALSE(handleStreamWritten(
-                   *conn,
-                   *stream,
-                   0,
-                   bufMetaStartingOffset,
-                   false,
-                   0 /* PacketNum */,
-                   PacketNumberSpace::AppData)
-                   .hasError());
-  ASSERT_EQ(0, stream->pendingWrites.chainLength());
-  auto retxIter = stream->retransmissionBuffer.find(0);
-  ASSERT_NE(stream->retransmissionBuffer.end(), retxIter);
-  ASSERT_EQ(0, retxIter->second->offset);
-  ASSERT_FALSE(retxIter->second->eof);
-  auto expectedBuf = folly::IOBuf::copyBuffer("grape");
-  ASSERT_EQ(
-      ByteRange(expectedBuf->buffer(), expectedBuf->length()),
-      retxIter->second->data.getHead()->getRange());
-  ASSERT_EQ(stream->currentWriteOffset, bufMetaStartingOffset);
-
-  // Send BufMeta in 3 chunks:
-  handleStreamBufMetaWritten(
-      *conn,
-      *stream,
-      bufMetaStartingOffset,
-      200,
-      false,
-      1 /* PacketNum */,
-      PacketNumberSpace::AppData);
-  ASSERT_EQ(800, stream->writeBufMeta.length);
-  ASSERT_TRUE(stream->writeBufMeta.eof);
-  ASSERT_EQ(bufMetaStartingOffset + 200, stream->writeBufMeta.offset);
-  auto retxBufMetaIter =
-      stream->retransmissionBufMetas.find(bufMetaStartingOffset);
-  ASSERT_NE(stream->retransmissionBufMetas.end(), retxBufMetaIter);
-  ASSERT_EQ(bufMetaStartingOffset, retxBufMetaIter->second.offset);
-  ASSERT_EQ(200, retxBufMetaIter->second.length);
-  ASSERT_FALSE(retxBufMetaIter->second.eof);
-  conn->streamManager->updateWritableStreams(*stream);
-  EXPECT_FALSE(conn->streamManager->hasLoss());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
-
-  handleStreamBufMetaWritten(
-      *conn,
-      *stream,
-      bufMetaStartingOffset + 200,
-      400,
-      false,
-      2 /* PacketNum */,
-      PacketNumberSpace::AppData);
-  ASSERT_EQ(400, stream->writeBufMeta.length);
-  ASSERT_TRUE(stream->writeBufMeta.eof);
-  ASSERT_EQ(bufMetaStartingOffset + 600, stream->writeBufMeta.offset);
-  retxBufMetaIter =
-      stream->retransmissionBufMetas.find(bufMetaStartingOffset + 200);
-  ASSERT_NE(stream->retransmissionBufMetas.end(), retxBufMetaIter);
-  ASSERT_EQ(bufMetaStartingOffset + 200, retxBufMetaIter->second.offset);
-  ASSERT_EQ(400, retxBufMetaIter->second.length);
-  ASSERT_FALSE(retxBufMetaIter->second.eof);
-  conn->streamManager->updateWritableStreams(*stream);
-  EXPECT_FALSE(conn->streamManager->hasLoss());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
-
-  handleStreamBufMetaWritten(
-      *conn,
-      *stream,
-      bufMetaStartingOffset + 600,
-      400,
-      true,
-      3 /* PacketNum */,
-      PacketNumberSpace::AppData);
-  ASSERT_EQ(0, stream->writeBufMeta.length);
-  ASSERT_TRUE(stream->writeBufMeta.eof);
-  ASSERT_EQ(bufMetaStartingOffset + 1000 + 1, stream->writeBufMeta.offset);
-  retxBufMetaIter =
-      stream->retransmissionBufMetas.find(bufMetaStartingOffset + 600);
-  ASSERT_NE(stream->retransmissionBufMetas.end(), retxBufMetaIter);
-  ASSERT_EQ(bufMetaStartingOffset + 600, retxBufMetaIter->second.offset);
-  ASSERT_EQ(400, retxBufMetaIter->second.length);
-  ASSERT_TRUE(retxBufMetaIter->second.eof);
-  conn->streamManager->updateWritableStreams(*stream);
-  EXPECT_FALSE(conn->streamManager->hasLoss());
-  EXPECT_TRUE(conn->streamManager->writableDSRStreams().empty());
-
-  // Lose the 1st dsr packet:
-  RegularQuicWritePacket packet1(PacketHeader(ShortHeader(
-      ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 1)));
-  WriteStreamFrame frame1(stream->id, bufMetaStartingOffset, 200, false);
-  frame1.fromBufMeta = true;
-  packet1.frames.push_back(frame1);
-  ASSERT_FALSE(
-      markPacketLoss(*conn, conn->currentPathId, packet1, false /* processed */)
-          .hasError());
-  EXPECT_EQ(1, stream->lossBufMetas.size());
-  const auto& lostBufMeta1 = stream->lossBufMetas.front();
-  EXPECT_EQ(bufMetaStartingOffset, lostBufMeta1.offset);
-  EXPECT_EQ(200, lostBufMeta1.length);
-  EXPECT_FALSE(lostBufMeta1.eof);
-  EXPECT_EQ(2, stream->retransmissionBufMetas.size());
-  EXPECT_TRUE(conn->streamManager->hasLoss());
-  ASSERT_EQ(stream->streamLossCount, 1);
-  EXPECT_FALSE(stream->hasWritableBufMeta());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
-  EXPECT_TRUE(writeQueueContains(*conn, stream->id));
-
-  // Lose the 3rd dsr packet:
-  RegularQuicWritePacket packet3(PacketHeader(ShortHeader(
-      ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 3)));
-  WriteStreamFrame frame3(stream->id, bufMetaStartingOffset + 600, 400, true);
-  frame3.fromBufMeta = true;
-  packet3.frames.push_back(frame3);
-  ASSERT_FALSE(
-      markPacketLoss(*conn, conn->currentPathId, packet3, false /* processed */)
-          .hasError());
-  EXPECT_EQ(2, stream->lossBufMetas.size());
-  const auto& lostBufMeta2 = stream->lossBufMetas.back();
-  EXPECT_EQ(bufMetaStartingOffset + 600, lostBufMeta2.offset);
-  EXPECT_EQ(400, lostBufMeta2.length);
-  EXPECT_TRUE(lostBufMeta2.eof);
-  EXPECT_EQ(1, stream->retransmissionBufMetas.size());
-  ASSERT_EQ(stream->streamLossCount, 2);
-  EXPECT_TRUE(conn->streamManager->hasLoss());
-  EXPECT_FALSE(stream->hasWritableBufMeta());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
-  EXPECT_TRUE(writeQueueContains(*conn, stream->id));
-
-  // Lose the 3rd dsr packet, it should be merged together with the first
-  // element in the lossBufMetas:
-  RegularQuicWritePacket packet2(PacketHeader(ShortHeader(
-      ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 2)));
-  WriteStreamFrame frame2(stream->id, bufMetaStartingOffset + 200, 400, false);
-  frame2.fromBufMeta = true;
-  packet2.frames.push_back(frame2);
-  ASSERT_FALSE(
-      markPacketLoss(*conn, conn->currentPathId, packet2, false /* processed */)
-          .hasError());
-  EXPECT_EQ(2, stream->lossBufMetas.size());
-  const auto& lostBufMeta3 = stream->lossBufMetas.front();
-  EXPECT_EQ(bufMetaStartingOffset, lostBufMeta3.offset);
-  EXPECT_EQ(600, lostBufMeta3.length);
-  EXPECT_FALSE(lostBufMeta3.eof);
-  EXPECT_EQ(0, stream->retransmissionBufMetas.size());
-  ASSERT_EQ(stream->streamLossCount, 3);
-  EXPECT_TRUE(conn->streamManager->hasLoss());
-  EXPECT_FALSE(stream->hasWritableBufMeta());
-  EXPECT_FALSE(conn->streamManager->writableDSRStreams().contains(stream->id));
-  EXPECT_TRUE(writeQueueContains(*conn, stream->id));
-}
-
-TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormal) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId */, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 6; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        true);
-  }
-  // Add some DSR frames
-  for (auto& op : conn->outstandings.packets) {
-    // This matches the stream packet index to the one used by the packet.
-    op.packet.frames.emplace_back(
-        WriteStreamFrame{
-            0,
-            10,
-            100,
-            false,
-            true,
-            std::nullopt,
-            op.packet.header.getPacketSequenceNum()});
-    op.isDSRPacket = true;
-    conn->outstandings.dsrCount++;
-  }
-  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // Assume some packets are already acked
-  for (auto iter =
-           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
-       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
-       iter++) {
-    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-  }
-  auto firstAppDataOpIter =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  conn->outstandings.packets.erase(
-      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
-  // Ack for packet 9 arrives
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{0, 10, 100, false, true, std::nullopt, 9});
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(9)
-          .setNonDsrPacketSequenceNumber(0)
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .build());
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 9;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  ASSERT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  ASSERT_TRUE(lossEvent->largestLostPacketNum.has_value());
-  EXPECT_EQ(2, lossEvent->largestLostPacketNum.value());
-  EXPECT_EQ(TimePoint(90ms), lossEvent->lossTime);
-  // Packet 1,2 should be marked as loss
-  EXPECT_EQ(lostPacket.size(), 2);
-  EXPECT_EQ(lostPacket.front(), 1);
-  EXPECT_EQ(lostPacket.back(), 2);
-
-  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-
-  // Packet 6 should remain in packet as the delta is less than threshold
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  EXPECT_EQ(conn->outstandings.packets.size(), 1 + numDeclaredLost);
-  auto first = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  auto packetNum = first->packet.header.getPacketSequenceNum();
-  EXPECT_EQ(packetNum, 6);
-}
-
-TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRNormalOverflow) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId*/, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 6; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        true);
-  }
-  // Add some DSR frames
-  for (auto& op : conn->outstandings.packets) {
-    op.packet.frames.emplace_back(WriteStreamFrame{0, 10, 100, false, true});
-    op.isDSRPacket = true;
-    conn->outstandings.dsrCount++;
-  }
-  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // Assume some packets are already acked
-  for (auto iter =
-           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
-       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
-       iter++) {
-    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-  }
-  auto firstAppDataOpIter =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  conn->outstandings.packets.erase(
-      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
-  // Ack for packet 9 arrives
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{0, 10, 100, false, true});
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(0)
-          .setNonDsrPacketSequenceNumber(0)
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .build());
-
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 9;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  EXPECT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  EXPECT_FALSE(lossEvent.has_value());
-
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  EXPECT_EQ(numDeclaredLost, 0);
-}
-
-TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorder) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId*/, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 6; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        true);
-  }
-  // Add some DSR frames
-  for (auto& op : conn->outstandings.packets) {
-    op.packet.frames.emplace_back(
-        WriteStreamFrame{
-            0,
-            10,
-            100,
-            false,
-            true,
-            std::nullopt,
-            op.packet.header.getPacketSequenceNum()});
-    op.isDSRPacket = true;
-    conn->outstandings.dsrCount++;
-  }
-  // Add another non-DSR after
-  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
-  EXPECT_EQ(7, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // Assume some packets are already acked
-  for (auto iter =
-           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
-       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
-       iter++) {
-    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-  }
-  auto firstAppDataOpIter =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  conn->outstandings.packets.erase(
-      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
-  // Ack for packet 20 arrives
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(20)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  // Ack a different stream.
-  detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{4, 10, 100, false, true});
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(20)
-          .setNonDsrPacketSequenceNumber(0)
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .build());
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(19)
-          .setNonDsrPacketSequenceNumber(19 - 6)
-          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .build());
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 20;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  EXPECT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  ASSERT_TRUE(lossEvent.has_value());
-
-  EXPECT_EQ(3, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  // We should declare the non DSR packet lost.
-  EXPECT_EQ(1, numDeclaredLost);
-}
-
-TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorder) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId*/, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
-  }
-  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // Assume some packets are already acked
-  for (auto iter =
-           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
-       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
-       iter++) {
-    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-  }
-  auto firstAppDataOpIter =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  conn->outstandings.packets.erase(
-      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
-  // Ack for packet 9 arrives
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  // Ack a different stream.
-  detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{4, 10, 100, false, true});
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(9)
-          .setNonDsrPacketSequenceNumber(9)
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .build());
-
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 9;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  EXPECT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  EXPECT_FALSE(lossEvent.has_value());
-
-  EXPECT_EQ(3, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  EXPECT_EQ(0, numDeclaredLost);
-  EXPECT_EQ(conn->outstandings.packets.size(), 3);
-}
-
-TEST_F(
-    QuicLossFunctionsTest,
-    TestReorderingThresholdNonDSRIgnoreReorderOverflow) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId*/, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 6; ++i) {
-    sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
-  }
-  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // Assume some packets are already acked
-  for (auto iter =
-           getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2;
-       iter < getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5;
-       iter++) {
-    conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-  }
-  auto firstAppDataOpIter =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  conn->outstandings.packets.erase(
-      firstAppDataOpIter + 2, firstAppDataOpIter + 5);
-  // Ack for packet 0 arrives
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(
-      WriteStreamFrame{4, 10, 100, false, true});
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(9)
-          .setNonDsrPacketSequenceNumber(9)
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .build());
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(0)
-          .setNonDsrPacketSequenceNumber(0)
-          .setOutstandingPacketMetadata(
-              getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                  ->metadata)
-          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
-          .build());
-
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 9;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  EXPECT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  EXPECT_FALSE(lossEvent.has_value());
-
-  EXPECT_EQ(3, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  EXPECT_EQ(0, numDeclaredLost);
-  EXPECT_EQ(conn->outstandings.packets.size(), 3);
-}
-
-TEST_F(QuicLossFunctionsTest, TestReorderingThresholdDSRIgnoreReorderBurst) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId*/, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 4; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        true);
-  }
-  // Add some DSR frames and build the ACK
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  for (auto& op : conn->outstandings.packets) {
-    WriteStreamFrame f{
-        0,
-        10,
-        100,
-        false,
-        true,
-        std::nullopt,
-        op.packet.header.getPacketSequenceNum()};
-    AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-    if (op.packet.header.getPacketSequenceNum() != 4) {
-      detailsPerStream.recordFrameDelivered(f);
-      ack.ackedPackets.emplace_back(
-          CongestionController::AckEvent::AckPacket::Builder()
-              .setPacketNum(op.packet.header.getPacketSequenceNum())
-              .setNonDsrPacketSequenceNumber(0)
-              .setDetailsPerStream(std::move(detailsPerStream))
-              .setOutstandingPacketMetadata(op.metadata)
-              .build());
-    }
-    op.packet.frames.emplace_back(f);
-    op.isDSRPacket = true;
-    conn->outstandings.dsrCount++;
-  }
-  // Add another non-DSR burst and ACK all of them
-  for (int i = 0; i < 4; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        false);
-    auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
-    ack.ackedPackets.emplace_back(
-        CongestionController::AckEvent::AckPacket::Builder()
-            .setPacketNum(op.packet.header.getPacketSequenceNum())
-            .setNonDsrPacketSequenceNumber(
-                op.nonDsrPacketSequenceNumber.value())
-            .setDetailsPerStream({})
-            .setOutstandingPacketMetadata(op.metadata)
-            .build());
-  }
-  // Add one more DSR packet from the same stream, ACKed
-  sendPacket(
-      *conn,
-      Clock::now(),
-      std::nullopt,
-      PacketType::OneRtt,
-      std::nullopt,
-      true);
-  auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  WriteStreamFrame f{0, 10, 100, false, true, std::nullopt, 5};
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(f);
-  op.packet.frames.emplace_back(f);
-  op.isDSRPacket = true;
-  conn->outstandings.dsrCount++;
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(op.packet.header.getPacketSequenceNum())
-          .setNonDsrPacketSequenceNumber(0)
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(op.metadata)
-          .build());
-
-  ASSERT_EQ(9, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // ACK everything that isn't packet 4.
-  auto itr = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  while (itr != conn->outstandings.packets.end()) {
-    if (itr->packet.header.getPacketSequenceNum() != 4) {
-      itr = conn->outstandings.packets.erase(itr);
-      conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-    } else {
-      itr++;
-    }
-  }
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 10;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  EXPECT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  EXPECT_FALSE(lossEvent.has_value());
-  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  // The DSR packet before the burst shouldn't be lost.
-  EXPECT_EQ(0, numDeclaredLost);
-}
-
-TEST_F(QuicLossFunctionsTest, TestReorderingThresholdNonDSRIgnoreReorderBurst) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  auto testingLossMarkFunc =
-      [&lostPacket](auto& /*conn*/, auto /*pathId*/, auto& packet, bool)
-      -> quic::Expected<void, quic::QuicError> {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPacket.push_back(packetNum);
-    return {};
-  };
-  for (int i = 0; i < 4; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        false);
-  }
-  // Add some non-DSR frames and build the ACK
-  auto ack = AckEvent::Builder()
-                 .setPacketNumberSpace(PacketNumberSpace::AppData)
-                 .setLargestAckedPacket(9)
-                 .setIsImplicitAck(false)
-                 .setAckTime(Clock::now())
-                 .setAdjustedAckTime(Clock::now())
-                 .setAckDelay(0us)
-                 .build();
-  for (auto& op : conn->outstandings.packets) {
-    WriteStreamFrame f{0, 10, 100, false, false, std::nullopt, 0};
-    AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-    if (op.packet.header.getPacketSequenceNum() != 4) {
-      detailsPerStream.recordFrameDelivered(f);
-      ack.ackedPackets.emplace_back(
-          CongestionController::AckEvent::AckPacket::Builder()
-              .setPacketNum(op.packet.header.getPacketSequenceNum())
-              .setNonDsrPacketSequenceNumber(
-                  op.nonDsrPacketSequenceNumber.value())
-              .setDetailsPerStream(std::move(detailsPerStream))
-              .setOutstandingPacketMetadata(op.metadata)
-              .build());
-    }
-    op.packet.frames.emplace_back(f);
-  }
-  // Add a DSR burst and ACK all of them
-  for (int i = 0; i < 4; ++i) {
-    sendPacket(
-        *conn,
-        Clock::now(),
-        std::nullopt,
-        PacketType::OneRtt,
-        std::nullopt,
-        true);
-    auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
-    WriteStreamFrame f{
-        4, 10, 100, false, true, std::nullopt, conn->outstandings.dsrCount++};
-    AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-    detailsPerStream.recordFrameDelivered(f);
-    ack.ackedPackets.emplace_back(
-        CongestionController::AckEvent::AckPacket::Builder()
-            .setPacketNum(op.packet.header.getPacketSequenceNum())
-            .setNonDsrPacketSequenceNumber(0)
-            .setDetailsPerStream(std::move(detailsPerStream))
-            .setOutstandingPacketMetadata(op.metadata)
-            .build());
-    op.packet.frames.emplace_back(f);
-    op.isDSRPacket = true;
-  }
-  // Add one more non-DSR packet from the same stream, ACKed
-  sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
-  auto& op = *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  WriteStreamFrame f{0, 10, 100, false, false, std::nullopt, 0};
-  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
-  detailsPerStream.recordFrameDelivered(f);
-  op.packet.frames.emplace_back(f);
-  ack.ackedPackets.emplace_back(
-      CongestionController::AckEvent::AckPacket::Builder()
-          .setPacketNum(op.packet.header.getPacketSequenceNum())
-          .setNonDsrPacketSequenceNumber(op.nonDsrPacketSequenceNumber.value())
-          .setDetailsPerStream(std::move(detailsPerStream))
-          .setOutstandingPacketMetadata(op.metadata)
-          .build());
-
-  ASSERT_EQ(9, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  // ACK everything that isn't packet 4.
-  auto itr = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  while (itr != conn->outstandings.packets.end()) {
-    if (itr->packet.header.getPacketSequenceNum() != 4) {
-      itr = conn->outstandings.packets.erase(itr);
-      conn->outstandings.packetCount[PacketNumberSpace::AppData]--;
-    } else {
-      itr++;
-    }
-  }
-  auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
-  ackState.largestAckedByPeer =
-      ackState.largestNonDsrSequenceNumberAckedByPeer = 10;
-  auto lossEventResult = detectLossPackets(
-      *conn,
-      ackState,
-      testingLossMarkFunc,
-      TimePoint(90ms),
-      PacketNumberSpace::AppData,
-      &ack);
-  EXPECT_FALSE(lossEventResult.hasError());
-  auto& lossEvent = lossEventResult.value();
-  EXPECT_FALSE(lossEvent.has_value());
-  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
-  auto numDeclaredLost = std::count_if(
-      conn->outstandings.packets.begin(),
-      conn->outstandings.packets.end(),
-      [](auto& op) { return op.declaredLost; });
-  // The non-DSR packet before the burst shouldn't be lost.
-  EXPECT_EQ(0, numDeclaredLost);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    QuicLossFunctionsTests,
-    QuicLossFunctionsTest,
-    Values(
-        PacketNumberSpace::Initial,
-        PacketNumberSpace::Handshake,
-        PacketNumberSpace::AppData));
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionDisabled) {
   folly::EventBase evb;

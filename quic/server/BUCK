@@ -70,7 +70,6 @@ mvfst_cpp_library(
         "//quic/common:socket_util",
         "//quic/congestion_control:bbr",
         "//quic/congestion_control:copa",
-        "//quic/dsr/frontend:write_functions",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/priority:http_priority_queue",

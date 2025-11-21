@@ -728,31 +728,6 @@ TEST_P(QuicStreamManagerTest, TestUnidirectionalStreamsSeparateSetTwoStreams) {
   EXPECT_EQ(manager.readableUnidirectionalStreams().size(), 1);
 }
 
-TEST_P(QuicStreamManagerTest, WriteBufferMeta) {
-  auto& manager = *conn.streamManager;
-  auto streamResult = manager.createNextUnidirectionalStream();
-  ASSERT_TRUE(streamResult.has_value());
-  auto* stream = streamResult.value();
-
-  // Add some real data into write buffer
-  ASSERT_FALSE(
-      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("prefix"), false)
-          .hasError());
-  // Artificially remove the stream from writable queue, so that any further
-  // writable query is about the DSR state.
-  manager.removeWritable(*stream);
-
-  BufferMeta bufferMeta(200);
-  ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
-  EXPECT_TRUE(stream->hasWritableBufMeta());
-  EXPECT_TRUE(manager.hasWritable()); // Checks combined queues
-
-  stream->sendState = StreamSendState::Closed;
-  stream->recvState = StreamRecvState::Closed;
-  ASSERT_FALSE(manager.removeClosedStream(stream->id).hasError());
-  EXPECT_TRUE(manager.writableDSRStreams().empty());
-}
-
 TEST_P(QuicStreamManagerTest, RemoveResetsUponClosure) {
   auto& manager = *conn.streamManager;
   auto streamResult = manager.createNextBidirectionalStream();

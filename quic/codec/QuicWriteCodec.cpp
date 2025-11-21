@@ -164,12 +164,7 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   }
   if (appendFrame) {
     builder.appendFrame(WriteStreamFrame(
-        id,
-        offset,
-        dataLen,
-        streamType.hasFin(),
-        false /* fromBufMetaIn */,
-        streamGroupId));
+        id, offset, dataLen, streamType.hasFin(), streamGroupId));
   } else {
     builder.markNonEmpty();
   }

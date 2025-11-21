@@ -422,7 +422,6 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
     uint64_t finalPacketLossTimeReorderingThreshDividend,
     bool usedZeroRttIn,
     QuicVersion quicVersionIn,
-    uint64_t dsrPacketCountIn,
     uint16_t initialPacketsReceivedIn,
     uint16_t uniqueInitialCryptoFramesReceivedIn,
     std::chrono::milliseconds timeUntilLastInitialCryptoFrameReceivedIn,
@@ -449,7 +448,6 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
           finalPacketLossTimeReorderingThreshDividend},
       usedZeroRtt{usedZeroRttIn},
       quicVersion{quicVersionIn},
-      dsrPacketCount{dsrPacketCountIn},
       initialPacketsReceived{initialPacketsReceivedIn},
       uniqueInitialCryptoFramesReceived{uniqueInitialCryptoFramesReceivedIn},
       timeUntilLastInitialCryptoFrameReceived{
@@ -491,7 +489,6 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
   data["quic_version"] =
       static_cast<std::underlying_type<decltype(quicVersion)>::type>(
           quicVersion);
-  data["dsr_packet_count"] = dsrPacketCount;
   data["initial_packets_received"] = initialPacketsReceived;
   data["unique_initial_crypto_frames_received"] =
       uniqueInitialCryptoFramesReceived;

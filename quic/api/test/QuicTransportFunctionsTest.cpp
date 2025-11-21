@@ -241,8 +241,7 @@ TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
       packet.packet,
       Clock::now(),
       50,
-      0,
-      false /* isDSRPacket */);
+      0);
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
@@ -294,8 +293,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       packet.packet,
       TimePoint{},
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   EXPECT_EQ(
@@ -360,8 +358,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       packet2.packet,
       TimePoint(),
       getEncodedSize(packet2),
-      getEncodedBodySize(packet2),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet2));
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
@@ -493,8 +490,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       packet1.packet,
       TimePoint{},
       getEncodedSize(packet1),
-      getEncodedBodySize(packet1),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet1));
   ASSERT_FALSE(result.hasError());
 
   // appData packet number should increase
@@ -559,8 +555,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
       packet2.packet,
       TimePoint(),
       getEncodedSize(packet2),
-      getEncodedBodySize(packet2),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet2));
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
@@ -668,8 +663,7 @@ TEST_F(
                    packet1.packet,
                    TimePoint{},
                    getEncodedSize(packet1),
-                   getEncodedBodySize(packet1),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet1))
                    .hasError());
 
   // appData packet number should increase
@@ -759,8 +753,7 @@ TEST_F(
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
-                   getEncodedBodySize(packet2),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet2))
                    .hasError());
   EXPECT_EQ(
       conn->ackStates.initialAckState->nextPacketNum,
@@ -830,8 +823,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    handshakePacket.packet,
                    TimePoint{},
                    getEncodedSize(handshakePacket),
-                   getEncodedBodySize(handshakePacket),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(handshakePacket))
                    .hasError());
   ASSERT_FALSE(updateConnection(
                    *conn,
@@ -840,8 +832,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    initialPacket.packet,
                    TimePoint{},
                    getEncodedSize(initialPacket),
-                   getEncodedBodySize(initialPacket),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(initialPacket))
                    .hasError());
   ASSERT_FALSE(updateConnection(
                    *conn,
@@ -850,8 +841,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
                    appDataPacket.packet,
                    TimePoint{},
                    getEncodedSize(appDataPacket),
-                   getEncodedBodySize(appDataPacket),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(appDataPacket))
                    .hasError());
   // verify qLogger added correct logs
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -904,8 +894,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
 
   // verify QLogger contains correct packet information
@@ -957,8 +946,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
 
   // verify QLogger contains correct packet information
@@ -1007,8 +995,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet information
@@ -1048,8 +1035,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result2.hasError());
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
@@ -1070,8 +1056,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       packet2.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result4.hasError());
 
   //  verify QLogger contains correct packet and frame information
@@ -1105,8 +1090,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet and frames information
@@ -1145,8 +1129,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
@@ -1169,8 +1152,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
@@ -1203,8 +1185,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result3.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
@@ -1223,8 +1204,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result4.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
@@ -1284,8 +1264,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result1.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
@@ -1312,8 +1291,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
@@ -1351,8 +1329,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result2.hasError());
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
@@ -1376,8 +1353,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       nonHandshake.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result4.hasError());
 
   // verify QLogger contains correct packet information
@@ -1432,8 +1408,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
 
   EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
@@ -1452,8 +1427,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
                    nonHandshake.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
 
   // verify QLogger contains correct packet information
@@ -1518,8 +1492,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   EXPECT_EQ(1, conn->lossState.totalPacketsSent);
   EXPECT_EQ(0, conn->lossState.totalAckElicitingPacketsSent);
@@ -1572,8 +1545,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
                    packet.packet,
                    TimePoint(),
                    555,
-                   500,
-                   false /* isDSRPacket */)
+                   500)
                    .hasError());
   EXPECT_EQ(21, conn->lossState.totalPacketsSent);
   EXPECT_EQ(16, conn->lossState.totalAckElicitingPacketsSent);
@@ -1663,8 +1635,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithAppLimitedStats) {
                    packet.packet,
                    TimePoint(),
                    555,
-                   500,
-                   false /* isDSRPacket */)
+                   500)
                    .hasError());
 
   // should have the current app limited time recorded in metadata
@@ -1725,8 +1696,7 @@ TEST_F(
                    packet.packet,
                    TimePoint(),
                    555,
-                   500,
-                   false /* isDSRPacket */)
+                   500)
                    .hasError());
 
   // should have the current app limited time recorded in metadata
@@ -1767,8 +1737,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
       std::move(writePacket),
       MockClock::now(),
       1500,
-      1400,
-      false /* isDSRPacket */);
+      1400);
   ASSERT_FALSE(result.hasError());
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1821,8 +1790,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet information
@@ -1859,8 +1827,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   // verify QLogger contains correct packet information
@@ -1900,8 +1867,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   ASSERT_FALSE(conn->ackStates.appDataAckState.skippedPacketNum.has_value());
 
@@ -1921,8 +1887,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionSkipAPacketNumber) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
 
   ASSERT_TRUE(conn->ackStates.appDataAckState.skippedPacketNum.has_value());
@@ -1943,8 +1908,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
   // Since there is no ACK eliciting frame in this packet,
   // it is not included as an outstanding packet, and there's no StreamDetails
@@ -1965,8 +1929,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
   // If we have only control frames sent, there should be no stream data in the
   // outstanding packet.
@@ -1988,8 +1951,7 @@ TEST_F(QuicTransportFunctionsTest, TestPingFrameCounter) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
   ASSERT_EQ(1, conn->numPingFramesSent);
 }
@@ -2014,8 +1976,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   const auto streamMatcher = testing::Pair(
@@ -2061,8 +2022,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   const auto streamMatcher = testing::Pair(
@@ -2105,8 +2065,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(1, conn->outstandings.packets.size());
@@ -2146,8 +2105,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(2, conn->outstandings.packets.size());
@@ -2194,8 +2152,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(3, conn->outstandings.packets.size());
@@ -2237,8 +2194,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
       packet.packet,
       TimePoint(),
       getEncodedSize(packet),
-      getEncodedBodySize(packet),
-      false /* isDSRPacket */);
+      getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
   ASSERT_EQ(4, conn->outstandings.packets.size());
@@ -2291,8 +2247,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
-                   getEncodedBodySize(packet1),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet1))
                    .hasError());
 
   ASSERT_FALSE(writeDataToQuicStream(
@@ -2309,8 +2264,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
-                   getEncodedBodySize(packet2),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet2))
                    .hasError());
 
   // Should be two packets at this point, each with 1 frame of data
@@ -2364,8 +2318,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
                    packet3.packet,
                    TimePoint(),
                    getEncodedSize(packet3),
-                   getEncodedBodySize(packet3),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet3))
                    .hasError());
 
   // Should be three packets at this point
@@ -2421,8 +2374,7 @@ TEST_F(
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
-                   getEncodedBodySize(packet1),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet1))
                    .hasError());
 
   ASSERT_FALSE(writeDataToQuicStream(
@@ -2439,8 +2391,7 @@ TEST_F(
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
-                   getEncodedBodySize(packet2),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet2))
                    .hasError());
 
   ASSERT_FALSE(writeDataToQuicStream(
@@ -2457,8 +2408,7 @@ TEST_F(
                    packet3.packet,
                    TimePoint(),
                    getEncodedSize(packet3),
-                   getEncodedBodySize(packet3),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet3))
                    .hasError());
 
   // Should be three packets at this point, each with 1 frame of data
@@ -2522,8 +2472,7 @@ TEST_F(
                    packet4.packet,
                    TimePoint(),
                    getEncodedSize(packet4),
-                   getEncodedBodySize(packet4),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet4))
                    .hasError());
 
   // Should be four packets at this point
@@ -2579,8 +2528,7 @@ TEST_F(
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
-                   getEncodedBodySize(packet1),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet1))
                    .hasError());
 
   ASSERT_FALSE(writeDataToQuicStream(
@@ -2598,8 +2546,7 @@ TEST_F(
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet2),
-                   getEncodedBodySize(packet2),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet2))
                    .hasError());
 
   ASSERT_FALSE(writeDataToQuicStream(
@@ -2617,8 +2564,7 @@ TEST_F(
                    packet3.packet,
                    TimePoint(),
                    getEncodedSize(packet3),
-                   getEncodedBodySize(packet3),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet3))
                    .hasError());
 
   // Should be three packets at this point, each with 1 frame of data
@@ -2682,8 +2628,7 @@ TEST_F(
                    packet4.packet,
                    TimePoint(),
                    getEncodedSize(packet4),
-                   getEncodedBodySize(packet4),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet4))
                    .hasError());
 
   // Should be four packets at this point
@@ -2762,8 +2707,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                    packet1.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
-                   getEncodedBodySize(packet1),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet1))
                    .hasError());
 
   // check stream details for the sent packet
@@ -2838,8 +2782,7 @@ TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
                    packet2.packet,
                    TimePoint(),
                    getEncodedSize(packet1),
-                   getEncodedBodySize(packet1),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet1))
                    .hasError());
 
   // check stream details for the retransmitted packet
@@ -4356,8 +4299,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterAppData) {
                    packet.packet,
                    TimePoint(),
                    123,
-                   100,
-                   false /* isDSRPacket */)
+                   100)
                    .hasError());
   EXPECT_EQ(
       0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
@@ -4386,8 +4328,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterHandshake) {
                    packet.packet,
                    TimePoint(),
                    123,
-                   123,
-                   false /* isDSRPacket */)
+                   123)
                    .hasError());
   EXPECT_EQ(
       0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
@@ -4416,8 +4357,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterInitial) {
                    packet.packet,
                    TimePoint(),
                    123,
-                   123,
-                   false /* isDSRPacket */)
+                   123)
                    .hasError());
   EXPECT_EQ(
       1, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
@@ -4441,8 +4381,7 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   EXPECT_FALSE(conn->streamManager->hasBlocked());
   EXPECT_FALSE(conn->outstandings.packets.empty());
@@ -4467,8 +4406,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(
@@ -4491,8 +4429,7 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
           packet.packet,
           TimePoint(),
           getEncodedSize(packet),
-          getEncodedBodySize(packet),
-          false /* isDSRPacket */),
+          getEncodedBodySize(packet)),
       ".*Send more than one connection window update.*");
 }
 
@@ -4514,8 +4451,7 @@ TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   EXPECT_FALSE(conn->outstandings.packets.empty());
 }
@@ -4535,8 +4471,7 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   EXPECT_TRUE(conn->pendingEvents.resets.empty());
   EXPECT_FALSE(conn->outstandings.packets.empty());
@@ -4562,8 +4497,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
                    packet.packet,
                    TimePoint(),
                    getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   false /* isDSRPacket */)
+                   getEncodedBodySize(packet))
                    .hasError());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(1, conn->outstandings.numClonedPackets());
@@ -4581,8 +4515,7 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
                    packet.packet,
                    TimePoint{},
                    4321,
-                   4000,
-                   false /* isDSRPacket */)
+                   4000)
                    .hasError());
   EXPECT_EQ(5555, conn->lossState.totalBytesSent);
   EXPECT_EQ(5000, conn->lossState.totalBodyBytesSent);
@@ -4600,8 +4533,7 @@ TEST_F(QuicTransportFunctionsTest, TotalPacketsSentUpdate) {
                    packet.packet,
                    TimePoint{},
                    4321,
-                   0,
-                   false /* isDSRPacket */)
+                   0)
                    .hasError());
   EXPECT_EQ(startTotalPacketsSent + 1, conn->lossState.totalPacketsSent);
 }
@@ -4624,8 +4556,7 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
                    packet.packet,
                    TimePoint(),
                    0,
-                   0,
-                   false /* isDSRPacket */)
+                   0)
                    .hasError());
   EXPECT_EQ(247, conn->lossState.timeoutBasedRtxCount);
 }
@@ -5184,81 +5115,6 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   EXPECT_EQ(conn->outstandings.packets.size(), outstandingPacketsCount + 3);
 }
 
-TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
-  auto conn = createConn();
-  // Builds a fake packet to test with.
-  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-
-  auto streamId =
-      conn->streamManager->createNextBidirectionalStream().value()->id;
-  auto stream = conn->streamManager->findStream(streamId);
-  EXPECT_TRUE(stream->retransmissionBufMetas.empty());
-  ASSERT_FALSE(writeDataToQuicStream(
-                   *stream,
-                   IOBuf::copyBuffer("Wear a face mask please!"),
-                   false /* eof */)
-                   .hasError());
-  BufferMeta bufMeta(2000);
-  ASSERT_FALSE(
-      writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */).hasError());
-  EXPECT_TRUE(stream->writeBufMeta.eof);
-  EXPECT_EQ(2000, stream->writeBufMeta.length);
-  auto bufMetaStartingOffset = stream->writeBufMeta.offset;
-  WriteStreamFrame writeStreamFrame(
-      streamId, bufMetaStartingOffset, 1000, false /* fin */);
-  writeStreamFrame.fromBufMeta = true;
-  packet.packet.frames.push_back(writeStreamFrame);
-
-  ASSERT_FALSE(updateConnection(
-                   *conn,
-                   *currentPathInfo_,
-                   std::nullopt,
-                   packet.packet,
-                   TimePoint(),
-                   getEncodedSize(packet),
-                   getEncodedBodySize(packet),
-                   true /* dsr */)
-                   .hasError());
-  EXPECT_EQ(1000 + bufMetaStartingOffset, stream->writeBufMeta.offset);
-  EXPECT_EQ(1000, stream->writeBufMeta.length);
-  EXPECT_FALSE(stream->retransmissionBufMetas.empty());
-  auto retxBufMetaIter =
-      stream->retransmissionBufMetas.find(bufMetaStartingOffset);
-  EXPECT_NE(retxBufMetaIter, stream->retransmissionBufMetas.end());
-  EXPECT_EQ(bufMetaStartingOffset, retxBufMetaIter->second.offset);
-  EXPECT_EQ(1000, retxBufMetaIter->second.length);
-  EXPECT_FALSE(retxBufMetaIter->second.eof);
-  EXPECT_TRUE(conn->outstandings.packets.back().isDSRPacket);
-
-  // Manually lose this packet:
-  stream->lossBufMetas.push_back(retxBufMetaIter->second);
-  stream->retransmissionBufMetas.erase(retxBufMetaIter);
-  ASSERT_FALSE(stream->lossBufMetas.empty());
-  ASSERT_TRUE(stream->retransmissionBufMetas.empty());
-
-  // Retransmit it:
-  auto retxPacket = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  // Retx of the stream looks exactly the same
-  retxPacket.packet.frames.push_back(writeStreamFrame);
-  ASSERT_FALSE(updateConnection(
-                   *conn,
-                   *currentPathInfo_,
-                   std::nullopt,
-                   retxPacket.packet,
-                   TimePoint(),
-                   getEncodedSize(retxPacket),
-                   getEncodedBodySize(packet),
-                   true /* dsr */)
-                   .hasError());
-  EXPECT_TRUE(stream->lossBufMetas.empty());
-  retxBufMetaIter = stream->retransmissionBufMetas.find(bufMetaStartingOffset);
-  EXPECT_NE(retxBufMetaIter, stream->retransmissionBufMetas.end());
-  EXPECT_EQ(bufMetaStartingOffset, retxBufMetaIter->second.offset);
-  EXPECT_EQ(1000, retxBufMetaIter->second.length);
-  EXPECT_FALSE(retxBufMetaIter->second.eof);
-  EXPECT_TRUE(conn->outstandings.packets.back().isDSRPacket);
-}
-
 TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -5279,8 +5135,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
                      packet.packet,
                      TimePoint(),
                      getEncodedSize(packet),
-                     getEncodedBodySize(packet),
-                     false /* isDSRPacket */)
+                     getEncodedBodySize(packet))
                      .hasError());
   }
 
@@ -5297,8 +5152,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
                     packet.packet,
                     TimePoint(),
                     getEncodedSize(packet),
-                    getEncodedBodySize(packet),
-                    false /* isDSRPacket */)
+                    getEncodedBodySize(packet))
                     .hasError());
   }
 }
@@ -5324,8 +5178,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
                      packet.packet,
                      TimePoint(),
                      getEncodedSize(packet),
-                     getEncodedBodySize(packet),
-                     false /* isDSRPacket */)
+                     getEncodedBodySize(packet))
                      .hasError());
   }
 
@@ -5347,8 +5200,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
                     packet.packet,
                     TimePoint(),
                     getEncodedSize(packet),
-                    getEncodedBodySize(packet),
-                    false /* isDSRPacket */)
+                    getEncodedBodySize(packet))
                     .hasError());
   }
 }
@@ -5374,8 +5226,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
                      packet.packet,
                      TimePoint(),
                      getEncodedSize(packet),
-                     getEncodedBodySize(packet),
-                     false /* isDSRPacket */)
+                     getEncodedBodySize(packet))
                      .hasError());
   }
 
@@ -5392,8 +5243,7 @@ TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
                     packet.packet,
                     TimePoint(),
                     getEncodedSize(packet),
-                    getEncodedBodySize(packet),
-                    false /* isDSRPacket */)
+                    getEncodedBodySize(packet))
                     .hasError());
   }
 }

@@ -226,8 +226,7 @@ bool handleStreamBufMetaWritten(
     RegularQuicWritePacket packet,
     TimePoint time,
     uint32_t encodedSize,
-    uint32_t encodedBodySize,
-    bool isDSRPacket);
+    uint32_t encodedBodySize);
 
 /**
  * Returns the number of writable bytes available for constructing a PTO packet.

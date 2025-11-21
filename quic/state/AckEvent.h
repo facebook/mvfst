@@ -152,14 +152,11 @@ struct AckEvent {
   struct AckPacket {
     // Sequence number of previously outstanding (now acked) packet
     quic::PacketNum packetNum;
-    uint64_t nonDsrPacketSequenceNumber{0};
 
     // Metadata of the previously outstanding (now acked) packet
     OutstandingPacketMetadata outstandingPacketMetadata;
 
     struct StreamDetails {
-      Optional<uint64_t> streamPacketIdx;
-
       // definition for DupAckedStreamIntervalSet
       // we expect this to be rare, any thus only allocate a single position
       template <class T>
@@ -255,8 +252,6 @@ struct AckEvent {
 
     struct Builder {
       Builder&& setPacketNum(quic::PacketNum packetNumIn);
-      Builder&& setNonDsrPacketSequenceNumber(
-          uint64_t nonDsrPacketSequenceNumberIn);
       Builder&& setOutstandingPacketMetadata(
           OutstandingPacketMetadata& outstandingPacketMetadataIn);
       Builder&& setDetailsPerStream(DetailsPerStream&& detailsPerStreamIn);
@@ -271,7 +266,6 @@ struct AckEvent {
 
      private:
       Optional<quic::PacketNum> packetNum;
-      Optional<uint64_t> nonDsrPacketSequenceNumber;
       OutstandingPacketMetadata* outstandingPacketMetadata{nullptr};
       Optional<DetailsPerStream> detailsPerStream;
       OutstandingPacketWrapper::LastAckedPacketInfo* lastAckedPacketInfo{
@@ -286,7 +280,6 @@ struct AckEvent {
     // into the back of a vector.
     explicit AckPacket(
         quic::PacketNum packetNumIn,
-        uint64_t nonDsrPacketSequenceNumberIn,
         const OutstandingPacketMetadata& outstandingPacketMetadataIn, // NOLINT
         const DetailsPerStream& detailsPerStreamIn, // NOLINT
         Optional<OutstandingPacketWrapper::LastAckedPacketInfo>

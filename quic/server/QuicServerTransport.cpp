@@ -7,7 +7,6 @@
 
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
-#include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/QuicServerTransport.h>
@@ -342,24 +341,6 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
       }
       return result.value();
     };
-    auto dsrPath =
-        [&](auto limit) -> quic::Expected<WriteQuicDataResult, QuicError> {
-      auto bytesBefore = conn_->lossState.totalBytesSent;
-      // The DSR path can't write probes.
-      // This is packetsWritte, probesWritten, bytesWritten.
-      auto dsrResult = writePacketizationRequest(
-          *serverConn_,
-          destConnId,
-          limit,
-          *conn_->oneRttWriteCipher,
-          writeLoopBeginTime);
-      if (dsrResult.hasError()) {
-        return quic::make_unexpected(dsrResult.error());
-      }
-      auto result = WriteQuicDataResult{
-          dsrResult.value(), 0, conn_->lossState.totalBytesSent - bytesBefore};
-      return result;
-    };
     auto pathValidationWrites =
         [&](auto limit) -> quic::Expected<WriteQuicDataResult, QuicError> {
       auto result = writePathValidationDataForAlternatePaths(
@@ -377,30 +358,16 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
       }
       return result.value();
     };
-    // We need a while loop because both paths write streams from the same
-    // queue, which can result in empty writes.
+    // We need a while loop because we might get empty writes.
     while (packetLimit) {
       auto totalSentBefore = conn_->lossState.totalBytesSent;
-      // Give the non-DSR path a chance first for things like ACKs and flow
-      // control.
       auto written = nonDsrPath(packetLimit);
       if (written.hasError()) {
         return quic::make_unexpected(written.error());
       }
-      // For both paths we only consider full packets against the packet
-      // limit. While this is slightly more aggressive than the intended
-      // packet limit it also helps ensure that small packets don't cause
-      // us to underutilize the link when mixing between DSR and non-DSR.
       packetLimit -= written->bytesWritten / conn_->udpSendPacketLen;
-      if (packetLimit && congestionControlWritableBytes(*serverConn_)) {
-        auto dsrWritten = dsrPath(packetLimit);
-        if (dsrWritten.hasError()) {
-          return quic::make_unexpected(dsrWritten.error());
-        }
-        packetLimit -= dsrWritten->bytesWritten / conn_->udpSendPacketLen;
-      }
       if (totalSentBefore == conn_->lossState.totalBytesSent) {
-        // We haven't written anything with either path, so we're done.
+        // We haven't written anything, so we're done.
         break;
       }
     }
@@ -1349,173 +1316,6 @@ QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
     connStats.localAddress = serverConn_->serverAddr;
   }
   return connStats;
-}
-
-QuicSocket::WriteResult QuicServerTransport::writeBufMeta(
-    StreamId id,
-    const BufferMeta& data,
-    bool eof,
-    ByteEventCallback* cb) {
-  if (isReceivingStream(conn_->nodeType, id)) {
-    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  [[maybe_unused]] auto self = sharedGuard();
-  try {
-    // Check whether stream exists before calling getStream to avoid
-    // creating a peer stream if it does not exist yet.
-    if (!conn_->streamManager->streamExists(id)) {
-      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-    }
-    auto stream =
-        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
-    if (!stream->writable()) {
-      return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
-    }
-    if (!stream->dsrSender) {
-      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-    }
-    if (stream->currentWriteOffset == 0 && stream->pendingWrites.empty()) {
-      // If nothing has been written ever, meta writing isn't allowed.
-      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-    }
-    // Register DeliveryCallback for the data + eof offset.
-    if (cb) {
-      auto dataLength = data.length + (eof ? 1 : 0);
-      if (dataLength) {
-        auto currentLargestWriteOffset = getLargestWriteOffsetSeen(*stream);
-        auto deliveryResult = registerDeliveryCallback(
-            id, currentLargestWriteOffset + dataLength - 1, cb);
-        if (!deliveryResult.has_value()) {
-          VLOG(4) << "Failed to register delivery callback: "
-                  << toString(deliveryResult.error());
-          exceptionCloseWhat_ = "Failed to register delivery callback";
-          closeImpl(QuicError(
-              deliveryResult.error(),
-              std::string("registerDeliveryCallback() error")));
-          return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-        }
-      }
-    }
-    bool wasAppLimitedOrIdle = false;
-    if (conn_->congestionController) {
-      wasAppLimitedOrIdle = conn_->congestionController->isAppLimited();
-      wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
-    }
-    auto writeResult = writeBufMetaToQuicStream(*stream, data, eof);
-    if (!writeResult.has_value()) {
-      VLOG(4) << __func__ << " streamId=" << id << " "
-              << writeResult.error().message << " " << *this;
-      exceptionCloseWhat_ = writeResult.error().message;
-      closeImpl(QuicError(
-          QuicErrorCode(*writeResult.error().code.asTransportErrorCode()),
-          std::string("writeChain() error")));
-      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-    }
-    // If we were previously app limited restart pacing with the current rate.
-    if (wasAppLimitedOrIdle && conn_->pacer) {
-      conn_->pacer->reset();
-    }
-    updateWriteLooper(true);
-  } catch (const QuicTransportException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return quic::make_unexpected(ex.errorCode());
-  } catch (const std::exception& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("writeChain() error")));
-    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
-  }
-  return {};
-}
-
-QuicSocket::WriteResult QuicServerTransport::setDSRPacketizationRequestSender(
-    StreamId id,
-    std::unique_ptr<DSRPacketizationRequestSender> sender) {
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (isReceivingStream(conn_->nodeType, id)) {
-    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  [[maybe_unused]] auto self = sharedGuard();
-  try {
-    // Check whether stream exists before calling getStream to avoid
-    // creating a peer stream if it does not exist yet.
-    if (!conn_->streamManager->streamExists(id)) {
-      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-    }
-    auto stream =
-        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
-    // Only allow resetting it back to nullptr once set.
-    if (stream->dsrSender && sender != nullptr) {
-      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-    }
-    if (stream->dsrSender != nullptr) {
-      // If any of these aren't true then we are abandoning stream data.
-      CHECK_EQ(stream->writeBufMeta.length, 0) << stream;
-      CHECK_EQ(stream->lossBufMetas.size(), 0) << stream;
-      CHECK_EQ(stream->retransmissionBufMetas.size(), 0) << stream;
-      stream->dsrSender->release();
-      stream->dsrSender = nullptr;
-      return {};
-    }
-    if (!stream->writable()) {
-      return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
-    }
-    stream->dsrSender = std::move(sender);
-    // Default to disabling opportunistic ACKing for DSR since it causes extra
-    // writes and spurious losses.
-    conn_->transportSettings.opportunisticAcking = false;
-    // Also turn on the default of 5 nexts per stream which has empirically
-    // shown good results.
-    if (conn_->transportSettings.priorityQueueWritesPerStream == 1) {
-      conn_->transportSettings.priorityQueueWritesPerStream = 5;
-      conn_->streamManager->setWriteQueueMaxNextsPerStream(5);
-    }
-
-    // Fow now, no appLimited or appIdle update here since we are not writing
-    // either BufferMetas yet. The first BufferMeta write will update it.
-  } catch (const QuicTransportException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return quic::make_unexpected(ex.errorCode());
-  } catch (const std::exception& ex) {
-    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-            << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("writeChain() error")));
-    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
-  }
-  return {};
 }
 
 CipherInfo QuicServerTransport::getOneRttCipherInfo() const {

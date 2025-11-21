@@ -11,7 +11,6 @@
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/tools/tperf/PacingObserver.h>
-#include <quic/tools/tperf/TperfDSRSender.h>
 #include <quic/tools/tperf/TperfServer.h>
 
 namespace quic::tperf {
@@ -29,7 +28,6 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
       folly::AsyncUDPSocket& sock,
-      bool dsrEnabled,
       uint32_t burstDeadlineMs,
       uint64_t maxPacingRate,
       TPerfServer::DoneCallback* doneCallback)
@@ -38,7 +36,6 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
         blockSize_(blockSize),
         numStreams_(numStreams),
         maxBytesPerStream_(maxBytesPerStream),
-        dsrEnabled_(dsrEnabled),
         burstDeadlineMs_(burstDeadlineMs),
         maxPacingRate_(maxPacingRate),
         doneCallback_(doneCallback) {
@@ -189,11 +186,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
         eof = true;
       }
     }
-    if (dsrEnabled_ && (((id - 3) / 4) % 2) == 0) {
-      dsrSend(id, toSend, eof);
-    } else {
-      regularSend(id, toSend, eof);
-    }
+    regularSend(id, toSend, eof);
     if (!eof) {
       notifyDataForStream(id);
     } else {
@@ -213,33 +206,6 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
  private:
-  void dsrSend(quic::StreamId id, uint64_t toSend, bool eof) {
-    if (streamsHavingDSRSender_.find(id) == streamsHavingDSRSender_.end()) {
-      auto dsrSender =
-          std::make_unique<TperfDSRSender>(buf_->clone(), udpSock_);
-      auto serverTransport = dynamic_cast<QuicServerTransport*>(sock_.get());
-      dsrSender->setCipherInfo(serverTransport->getOneRttCipherInfo());
-      auto res =
-          sock_->setDSRPacketizationRequestSender(id, std::move(dsrSender));
-      if (res.hasError()) {
-        LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
-      }
-      // OK I don't know when to erase it...
-      streamsHavingDSRSender_.insert(id);
-      // Some real data has to be written before BufMeta is written, and we
-      // can only do it once:
-      res = sock_->writeChain(id, folly::IOBuf::copyBuffer("Lame"), false);
-      if (res.hasError()) {
-        LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
-      }
-    }
-    BufferMeta bufferMeta(toSend);
-    auto res = sock_->writeBufMeta(id, bufferMeta, eof, nullptr);
-    if (res.hasError()) {
-      LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
-    }
-  }
-
   void regularSend(quic::StreamId id, uint64_t toSend, bool eof) {
     auto sendBuffer = buf_->clone();
     sendBuffer->append(toSend);
@@ -343,8 +309,6 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   uint32_t numStreams_;
   uint64_t maxBytesPerStream_;
   std::unordered_map<quic::StreamId, uint64_t> bytesPerStream_;
-  std::set<quic::StreamId> streamsHavingDSRSender_;
-  bool dsrEnabled_;
   uint32_t burstDeadlineMs_;
   uint64_t maxPacingRate_;
 
@@ -428,7 +392,6 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       uint64_t blockSize,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
-      bool dsrEnabled,
       uint32_t burstDeadlineMs,
       uint64_t maxPacingRate,
       std::string qloggerPath,
@@ -437,7 +400,6 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       : blockSize_(blockSize),
         numStreams_(numStreams),
         maxBytesPerStream_(maxBytesPerStream),
-        dsrEnabled_(dsrEnabled),
         burstDeadlineMs_(burstDeadlineMs),
         maxPacingRate_(maxPacingRate),
         qloggerPath_(qloggerPath),
@@ -458,7 +420,6 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         numStreams_,
         maxBytesPerStream_,
         *sock,
-        dsrEnabled_,
         burstDeadlineMs_,
         maxPacingRate_,
         doneCallback_);
@@ -504,7 +465,6 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
   uint64_t blockSize_;
   uint32_t numStreams_;
   uint64_t maxBytesPerStream_;
-  bool dsrEnabled_;
   uint32_t burstDeadlineMs_;
   uint64_t maxPacingRate_;
   std::string qloggerPath_;
@@ -526,7 +486,6 @@ TPerfServer::TPerfServer(
     uint64_t maxBytesPerStream,
     uint32_t maxReceivePacketSize,
     bool useInplaceWrite,
-    bool dsrEnabled,
     bool overridePacketSize,
     double latencyFactor,
     bool useAckReceiveTimestamps,
@@ -610,7 +569,6 @@ TPerfServer::TPerfServer(
           blockSize,
           numStreams,
           maxBytesPerStream,
-          dsrEnabled,
           burstDeadlineMs_,
           maxPacingRate_,
           qloggerPath,

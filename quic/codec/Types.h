@@ -466,33 +466,21 @@ struct WriteStreamFrame {
   uint64_t len;
   bool fin;
 
-  // Whether this WriteStreamFrame is created from a BufMeta, instead of real
-  // write buffer data.
-  bool fromBufMeta{false};
-
-  uint64_t streamPacketIdx{0};
-
   WriteStreamFrame(
       StreamId streamIdIn,
       uint64_t offsetIn,
       uint64_t lenIn,
       bool finIn,
-      bool fromBufMetaIn = false,
-      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt,
-      uint64_t streamPacketIdxIn = 0)
+      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
       : streamId(streamIdIn),
         streamGroupId(streamGroupIdIn),
         offset(offsetIn),
         len(lenIn),
-        fin(finIn),
-        fromBufMeta(fromBufMetaIn),
-        streamPacketIdx(streamPacketIdxIn) {}
+        fin(finIn) {}
 
   bool operator==(const WriteStreamFrame& rhs) const {
     return streamId == rhs.streamId && offset == rhs.offset && len == rhs.len &&
-        fin == rhs.fin && fromBufMeta == rhs.fromBufMeta &&
-        streamGroupId == rhs.streamGroupId &&
-        streamPacketIdx == rhs.streamPacketIdx;
+        fin == rhs.fin && streamGroupId == rhs.streamGroupId;
   }
 };
 

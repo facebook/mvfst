@@ -7,10 +7,10 @@
 
 #pragma once
 
+#include <folly/io/async/EventBase.h>
 #include <folly/portability/GMock.h>
 
 #include <quic/api/QuicSocket.h>
-#include <quic/dsr/Types.h>
 
 namespace quic {
 
@@ -261,14 +261,6 @@ class MockQuicSocket : public QuicSocket {
       WriteResult,
       writeChain,
       (StreamId, SharedBuf, bool, ByteEventCallback*));
-  MOCK_METHOD(
-      WriteResult,
-      writeBufMeta,
-      (StreamId, const BufferMeta&, bool, ByteEventCallback*));
-  MOCK_METHOD(
-      WriteResult,
-      setDSRPacketizationRequestSender,
-      (StreamId, std::unique_ptr<DSRPacketizationRequestSender>));
   MOCK_METHOD(
       (quic::Expected<void, LocalErrorCode>),
       registerDeliveryCallback,

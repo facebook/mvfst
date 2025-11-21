@@ -1073,21 +1073,6 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
   return {};
 }
 
-QuicSocketLite::WriteResult QuicClientTransportLite::writeBufMeta(
-    StreamId /* id */,
-    const BufferMeta& /* data */,
-    bool /* eof */,
-    ByteEventCallback* /* cb */) {
-  return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-}
-
-QuicSocketLite::WriteResult
-QuicClientTransportLite::setDSRPacketizationRequestSender(
-    StreamId /* id */,
-    std::unique_ptr<DSRPacketizationRequestSender> /* sender */) {
-  return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-}
-
 quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;

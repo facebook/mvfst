@@ -101,8 +101,8 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
     auto packet = makeTestingWritePacket(
         pn, packetSize, totalSent += packetSize, testStart_ + 10ms);
     quic::test::onPacketsSentWrapper(conn_.get(), &bbr2, packet);
-    packet.nonDsrPacketSequenceNumber = pn++;
     conn_->outstandings.packets.emplace_back(std::move(packet));
+    pn++;
     ASSERT_EQ(conn_->lossState.inflightBytes, totalSent);
   }
 
@@ -127,8 +127,6 @@ TEST_F(Bbr2Test, StartupCwndGrowthBasic) {
     auto ackPkt =
         CongestionController::AckEvent::AckPacket::Builder()
             .setPacketNum(pkt.getPacketSequenceNum())
-            .setNonDsrPacketSequenceNumber(
-                pkt.nonDsrPacketSequenceNumber.value())
             .setOutstandingPacketMetadata(pkt.metadata)
             .setLastAckedPacketInfo(
                 pkt.lastAckedPacketInfo ? &*pkt.lastAckedPacketInfo : nullptr)

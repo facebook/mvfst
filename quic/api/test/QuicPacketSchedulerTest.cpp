@@ -14,8 +14,6 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/dsr/Types.h>
-#include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/priority/HTTPPriorityQueue.h>
@@ -628,33 +626,6 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   conn.streamManager->queueWindowUpdate(nonExistentStream);
   ASSERT_FALSE(scheduler.writeWindowUpdates(builder).hasError());
   EXPECT_EQ(builder.remainingSpaceInPkt(), originalSpace);
-}
-
-TEST_P(QuicPacketSchedulerTest, NoCloningForDSR) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame", conn);
-  ASSERT_FALSE(noopScheduler.hasData());
-  CloningScheduler cloningScheduler(noopScheduler, conn, "Juice WRLD", 0);
-  EXPECT_FALSE(cloningScheduler.hasData());
-  addOutstandingPacket(conn);
-  EXPECT_TRUE(cloningScheduler.hasData());
-  conn.outstandings.packets.back().isDSRPacket = true;
-  conn.outstandings.dsrCount++;
-  EXPECT_FALSE(cloningScheduler.hasData());
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
-      conn.clientConnectionId.value_or(getTestConnectionId()),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  auto result = cloningScheduler.scheduleFramesForPacket(
-      std::move(builder), kDefaultUDPSendPacketLen);
-  ASSERT_FALSE(result.hasError());
-  EXPECT_FALSE(result->clonedPacketIdentifier.has_value());
-  EXPECT_FALSE(result->packet.has_value());
 }
 
 TEST_P(QuicPacketSchedulerTest, CloningSchedulerTest) {
@@ -1328,8 +1299,7 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       result->packet->packet,
       Clock::now(),
       bufferLength,
-      0,
-      false /* isDSRPacket */);
+      0);
   ASSERT_FALSE(updateResult.hasError());
   buf = bufAccessor.obtain();
   ASSERT_EQ(conn.udpSendPacketLen, buf->length());
@@ -1410,8 +1380,7 @@ TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
       packetResult->packet->packet,
       Clock::now(),
       encodedSize,
-      0,
-      false /* isDSRPacket */);
+      0);
   ASSERT_FALSE(updateResult.hasError());
 
   // make packetNum too larger to be encoded into the same size:
@@ -1635,68 +1604,6 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   verifyStreamFrames(*builder2, {f3});
   ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
   verifyStreamFrames(*builder2, {f1});
-}
-
-TEST_P(
-    QuicPacketSchedulerTest,
-    StreamFrameSchedulerRoundRobinStreamPerPacketHitsDsr) {
-  auto connPtr = createConn(10, 100000, 100000, GetParam());
-  auto& conn = *connPtr;
-  conn.transportSettings.streamFramePerPacket = true;
-  StreamFrameScheduler scheduler(conn);
-
-  auto stream1 = createStream(conn);
-  auto stream2 = createStream(conn);
-  auto stream3 = createStream(conn);
-  auto stream4 = createStream(conn);
-
-  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
-  writeDataToStream(conn, stream1, std::move(largeBuf));
-  auto f2 = writeDataToStream(conn, stream2, "some data");
-  auto f3 = writeDataToStream(conn, stream3, "some data");
-
-  // Set up DSR
-  auto sender = std::make_unique<MockDSRPacketizationRequestSender>();
-  ON_CALL(*sender, addSendInstruction(testing::_))
-      .WillByDefault(testing::Return(true));
-  ON_CALL(*sender, flush()).WillByDefault(testing::Return(true));
-  auto dsrStream = conn.streamManager->findStream(stream4);
-  dsrStream->dsrSender = std::move(sender);
-
-  BufferMeta bufMeta(20);
-  writeDataToStream(conn, stream4, "some data");
-  ASSERT_FALSE(writeBufMetaToQuicStream(
-                   *conn.streamManager->findStream(stream4), bufMeta, true)
-                   .hasError());
-
-  // Pretend we sent the non DSR data
-  dsrStream->ackedIntervals.insert(0, dsrStream->writeBuffer.chainLength() - 1);
-  dsrStream->currentWriteOffset = dsrStream->writeBuffer.chainLength();
-  dsrStream->writeBuffer.move();
-  ChainedByteRangeHead(
-      std::move(
-          dsrStream->pendingWrites)); // Move and destruct the pending writes
-  conn.streamManager->updateWritableStreams(*dsrStream);
-
-  // Write a normal size packet from stream1
-  auto builder1 = createPacketBuilder(conn);
-  auto result = scheduler.writeStreams(builder1);
-  ASSERT_FALSE(result.hasError());
-
-  EXPECT_EQ(nextScheduledStreamID(conn), stream2);
-
-  // Should write frames for stream2, stream3, followed by an empty write.
-  auto builder2 = setupMockPacketBuilder();
-  ASSERT_TRUE(scheduler.hasPendingData());
-  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
-  ASSERT_EQ(builder2->frames_.size(), 1);
-  ASSERT_TRUE(scheduler.hasPendingData());
-  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
-  ASSERT_EQ(builder2->frames_.size(), 2);
-  EXPECT_FALSE(scheduler.hasPendingData());
-  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
-
-  verifyStreamFrames(*builder2, {f2, f3});
 }
 
 TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerSequential) {
@@ -1994,8 +1901,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
           packet1,
           Clock::now(),
           1000,
-          0,
-          false /* isDSR */)
+          0)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2031,8 +1937,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
           packet2,
           Clock::now(),
           1000,
-          0,
-          false /* isDSR */)
+          0)
           .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
@@ -2041,64 +1946,6 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   EXPECT_TRUE(stream->lossBuffer.empty());
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
   EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
-}
-
-TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlIgnoreDSR) {
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  ASSERT_FALSE(
-      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
-  conn.flowControlState.peerAdvertisedMaxOffset = 1000;
-  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
-  initializePathManagerState(conn);
-
-  auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
-  auto dsrStream = conn.streamManager->createNextBidirectionalStream().value();
-  auto stream = conn.streamManager->findStream(streamId);
-  auto data = buildRandomInputData(1000);
-  ASSERT_FALSE(
-      writeDataToQuicStream(*stream, std::move(data), true).hasError());
-  WriteBufferMeta bufMeta{};
-  bufMeta.offset = 0;
-  bufMeta.length = 100;
-  bufMeta.eof = false;
-  dsrStream->insertIntoLossBufMeta(bufMeta);
-  conn.streamManager->updateWritableStreams(*stream);
-  conn.streamManager->updateWritableStreams(*dsrStream);
-
-  StreamFrameScheduler scheduler(conn);
-  EXPECT_TRUE(scheduler.hasPendingData());
-  ShortHeader shortHeader1(
-      ProtectionType::KeyPhaseZero,
-      getTestConnectionId(),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
-      conn.udpSendPacketLen,
-      std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  ASSERT_FALSE(builder1.encodePacketHeader().hasError());
-  ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
-  auto packet1 = std::move(builder1).buildPacket().packet;
-  ASSERT_FALSE(
-      updateConnection(
-          conn,
-          *CHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
-          std::nullopt,
-          packet1,
-          Clock::now(),
-          1000,
-          0,
-          false /* isDSR */)
-          .hasError());
-  EXPECT_EQ(1, packet1.frames.size());
-  auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
-  EXPECT_EQ(streamId, writeStreamFrame1.streamId);
-  EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
-  EXPECT_EQ(0, stream->pendingWrites.chainLength());
-  EXPECT_EQ(1, stream->retransmissionBuffer.size());
-  EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
-
-  EXPECT_FALSE(scheduler.hasPendingData());
 }
 
 TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
@@ -2140,8 +1987,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
           packet1,
           Clock::now(),
           1000,
-          0,
-          false /* isDSR */)
+          0)
           .hasError());
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2177,8 +2023,7 @@ TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
           packet2,
           Clock::now(),
           1000,
-          0,
-          false /* isDSR */)
+          0)
           .hasError());
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
@@ -2234,8 +2079,7 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
       packet1,
       Clock::now(),
       1200,
-      0,
-      false /* isDSR */));
+      0));
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(highPriStreamId, writeStreamFrame1.streamId);
@@ -2276,8 +2120,7 @@ TEST_P(QuicPacketSchedulerTest, MultipleStreamsRunOutOfFlowControl) {
       packet2,
       Clock::now(),
       1000,
-      0,
-      false /* isDSR */));
+      0));
   ASSERT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame3 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(highPriStreamId, writeStreamFrame3.streamId);
@@ -2332,8 +2175,7 @@ TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
           packet1,
           Clock::now(),
           1200,
-          0,
-          false /* isDSR */)
+          0)
           .hasError());
   ASSERT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
@@ -2349,98 +2191,6 @@ TEST_P(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   EXPECT_TRUE(stream2->lossBuffer.empty());
   EXPECT_EQ(1, stream2->retransmissionBuffer.size());
   EXPECT_EQ(200, stream2->retransmissionBuffer[0]->data.chainLength());
-}
-
-TEST_P(QuicPacketSchedulerTest, WritingFINFromBufWithBufMetaFirst) {
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  ASSERT_FALSE(
-      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  auto* stream = *(conn.streamManager->createNextBidirectionalStream());
-  stream->flowControlState.peerAdvertisedMaxOffset = 100000;
-  initializePathManagerState(conn);
-
-  ASSERT_FALSE(
-      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false)
-          .hasError());
-  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  BufferMeta bufferMeta(5000);
-  ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
-  EXPECT_TRUE(stream->finalWriteOffset.has_value());
-
-  stream->writeBufMeta.split(5000);
-  ASSERT_EQ(0, stream->writeBufMeta.length);
-  ASSERT_GT(stream->writeBufMeta.offset, 0);
-  conn.streamManager->updateWritableStreams(*stream);
-
-  PacketNum packetNum = 0;
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
-      conn.clientConnectionId.value_or(getTestConnectionId()),
-      packetNum);
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  ASSERT_FALSE(builder.encodePacketHeader().hasError());
-  StreamFrameScheduler scheduler(conn);
-  ASSERT_FALSE(scheduler.writeStreams(builder).hasError());
-  auto packet = std::move(builder).buildPacket().packet;
-  ASSERT_EQ(1, packet.frames.size());
-  auto streamFrame = *packet.frames[0].asWriteStreamFrame();
-  EXPECT_EQ(streamFrame.len, 6);
-  EXPECT_EQ(streamFrame.offset, 0);
-  EXPECT_FALSE(streamFrame.fin);
-  handleNewStreamDataWritten(*stream, streamFrame.len, streamFrame.fin);
-  EXPECT_EQ(stream->currentWriteOffset, 6);
-}
-
-TEST_P(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  ASSERT_FALSE(
-      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
-  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
-  auto* stream = *(conn.streamManager->createNextBidirectionalStream());
-  stream->flowControlState.peerAdvertisedMaxOffset = 100000;
-  initializePathManagerState(conn);
-
-  ASSERT_FALSE(
-      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false)
-          .hasError());
-  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  BufferMeta bufferMeta(5000);
-  ASSERT_FALSE(writeBufMetaToQuicStream(*stream, bufferMeta, true).hasError());
-  EXPECT_TRUE(stream->finalWriteOffset.has_value());
-  PacketNum packetNum = 0;
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
-      conn.clientConnectionId.value_or(getTestConnectionId()),
-      packetNum);
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  ASSERT_FALSE(builder.encodePacketHeader().hasError());
-  StreamFrameScheduler scheduler(conn);
-  ASSERT_FALSE(scheduler.writeStreams(builder).hasError());
-  auto packet = std::move(builder).buildPacket().packet;
-  EXPECT_EQ(1, packet.frames.size());
-  auto streamFrame = *packet.frames[0].asWriteStreamFrame();
-  EXPECT_EQ(streamFrame.len, 6);
-  EXPECT_EQ(streamFrame.offset, 0);
-  EXPECT_FALSE(streamFrame.fin);
-  handleNewStreamDataWritten(*stream, streamFrame.len, streamFrame.fin);
-
-  // Pretent all the bufMetas were sent, without FIN bit
-  stream->writeBufMeta.split(5000);
-  stream->writeBufMeta.offset++;
-  ASSERT_EQ(0, stream->writeBufMeta.length);
-  ASSERT_GT(stream->writeBufMeta.offset, 0);
-  conn.streamManager->updateWritableStreams(*stream);
-  StreamFrameScheduler scheduler2(conn);
-  EXPECT_FALSE(scheduler2.hasPendingData());
 }
 
 TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
@@ -2895,8 +2645,7 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
           packetResult1.value().packet->packet,
           Clock::now(),
           encodedSize1,
-          0,
-          false /* isDSRPacket */)
+          0)
           .hasError());
 
   // We shouldn't send the reliable reset just yet, because we haven't yet
@@ -2927,8 +2676,7 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
           packetResult2.value().packet->packet,
           Clock::now(),
           encodedSize2,
-          0,
-          false /* isDSRPacket */)
+          0)
           .hasError());
 
   // Now we should have egressed all the stream data upto the reliable offset,

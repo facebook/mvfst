@@ -257,7 +257,6 @@ void FileQLogger::addTransportSummary(const TransportSummaryArgs& args) {
           args.finalPacketLossTimeReorderingThreshDividend,
           args.usedZeroRtt,
           args.quicVersion,
-          args.dsrPacketCount,
           args.initialPacketsReceived,
           args.uniqueInitialCryptoFramesReceived,
           args.timeUntilLastInitialCryptoFrameReceived,

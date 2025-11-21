@@ -137,7 +137,6 @@ class StreamFrameScheduler {
       uint64_t& connWritableBytes);
 
   QuicConnectionStateBase& conn_;
-  bool nextStreamDsr_{false};
 };
 
 class RstStreamScheduler {

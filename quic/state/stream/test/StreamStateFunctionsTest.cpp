@@ -9,8 +9,6 @@
 
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/dsr/Types.h>
-#include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -258,39 +256,6 @@ TEST_F(StreamStateFunctionsTests, SendReset) {
       resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN).hasError());
   EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow);
   EXPECT_TRUE(stream.writeBuffer.empty());
-}
-
-TEST_F(StreamStateFunctionsTests, SendResetDSRStream) {
-  QuicServerConnectionState conn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  conn.flowControlState.peerAdvertisedMaxOffset = 5000;
-  StreamId id = 1;
-  QuicStreamState stream(id, conn);
-  auto initialConnWindow = getSendConnFlowControlBytesAPI(conn);
-  ASSERT_FALSE(
-      writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("aloha"), false)
-          .hasError());
-  auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
-  EXPECT_CALL(*mockDSRSender, release()).Times(1);
-  stream.flowControlState.peerAdvertisedMaxOffset =
-      std::numeric_limits<uint64_t>::max();
-  stream.dsrSender = std::move(mockDSRSender);
-  BufferMeta bufMeta(2000);
-  ASSERT_FALSE(writeBufMetaToQuicStream(stream, bufMeta, true).hasError());
-  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 5 + 2000);
-  EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow - 5 - 2000);
-  ASSERT_FALSE(appendDataToReadBuffer(
-                   stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0))
-                   .hasError());
-  EXPECT_FALSE(stream.writeBuffer.empty());
-  EXPECT_FALSE(stream.readBuffer.empty());
-  ASSERT_FALSE(
-      resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN).hasError());
-  EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow);
-  EXPECT_TRUE(stream.streamWriteError.has_value());
-  EXPECT_TRUE(stream.writeBuffer.empty());
-  EXPECT_EQ(0, stream.writeBufMeta.length);
-  EXPECT_TRUE(stream.lossBufMetas.empty());
 }
 
 TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {

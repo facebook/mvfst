@@ -63,10 +63,6 @@ struct OutstandingsInfo {
   // Number of packets currently declared lost.
   uint64_t declaredLostCount{0};
 
-  // Number of outstanding inflight DSR packet. That is, when a DSR packet is
-  // declared lost, this counter will be decreased.
-  uint64_t dsrCount{0};
-
   // We just use this to get the correct number of outstanding packets. We
   // subtract the number of packets declared lost and scheduled for destruction
   // from the number of packets in the outstanding packets list.
@@ -92,7 +88,6 @@ struct OutstandingsInfo {
     clonedPacketCount = {};
     declaredLostCount = 0;
     scheduledForDestructionCount = 0;
-    dsrCount = 0;
   }
 };
 
@@ -671,9 +666,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // identify specific outstanding packets (based on writeCount and packetNum)
   // in the Observers, to construct Write Blocks
   uint64_t writeCount{0};
-
-  // Number of DSR packets sent by this connection.
-  uint64_t dsrPacketCount{0};
 
   // Whether we successfully used 0-RTT keys in this connection.
   bool usedZeroRtt{false};

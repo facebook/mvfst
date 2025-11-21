@@ -505,7 +505,6 @@ class QLogTransportSummaryEvent : public QLogEvent {
       uint64_t finalPacketLossTimeReorderingThreshDividend,
       bool usedZeroRtt,
       QuicVersion version,
-      uint64_t dsrPacketCount,
       uint16_t initialPacketsReceived,
       uint16_t uniqueInitialCryptoFramesReceived,
       std::chrono::milliseconds timeUntilLastInitialCryptoFrameReceived,
@@ -532,7 +531,6 @@ class QLogTransportSummaryEvent : public QLogEvent {
   uint64_t finalPacketLossTimeReorderingThreshDividend;
   bool usedZeroRtt;
   QuicVersion quicVersion;
-  uint64_t dsrPacketCount;
   uint16_t initialPacketsReceived;
   uint16_t uniqueInitialCryptoFramesReceived;
   std::chrono::milliseconds timeUntilLastInitialCryptoFrameReceived;

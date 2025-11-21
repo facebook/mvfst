@@ -10,7 +10,6 @@ endif()
 add_executable(
   tperf
   tperf.cpp
-  TperfDSRSender.cpp
   TperfClient.cpp
   TperfServer.cpp
 )
@@ -31,7 +30,6 @@ target_link_libraries(
   Folly::folly
   fizz::fizz
   mvfst_test_utils
-  mvfst_dsr_backend
   ${GFLAGS_LIBRARIES}
   ${LIBGMOCK_LIBRARIES}
 )

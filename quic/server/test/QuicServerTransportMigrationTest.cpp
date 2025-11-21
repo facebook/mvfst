@@ -10,8 +10,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/QuicPacketBuilder.h>
 
-#include <quic/dsr/Types.h>
-
 #include <quic/logging/FileQLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 

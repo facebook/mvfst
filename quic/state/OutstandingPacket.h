@@ -186,12 +186,6 @@ struct OutstandingPacket {
   // will be a std::nullopt if the packet isn't a clone and hasn't been cloned.
   Optional<ClonedPacketIdentifier> maybeClonedPacketIdentifier;
 
-  OptionalIntegral<uint64_t> nonDsrPacketSequenceNumber;
-
-  // Whether this is a DSR packet. A DSR packet's stream data isn't written
-  // by transport directly.
-  bool isDSRPacket : 1;
-
   /**
    * Whether the packet is sent when congestion controller is in app-limited
    * state.
@@ -232,7 +226,6 @@ struct OutstandingPacket {
             std::move(detailsPerStream),
             totalAppLimitedTimeUsecs)) {
     // TODO remove when C++20 everywhere.
-    isDSRPacket = false;
     isAppLimited = false;
     declaredLost = false;
   }

@@ -17,14 +17,10 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameDelivered(
   if (!frame.len) { // may be FIN only
     return;
   }
-  auto [it, inserted] = emplace(
+  emplace(
       std::piecewise_construct,
       std::make_tuple(frame.streamId),
       std::make_tuple());
-  auto& outstandingPacketStreamDetails = it->second;
-  if (frame.fromBufMeta) {
-    outstandingPacketStreamDetails.streamPacketIdx = frame.streamPacketIdx;
-  }
 }
 
 void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
@@ -36,18 +32,15 @@ void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
       std::piecewise_construct,
       std::make_tuple(frame.streamId),
       std::make_tuple());
+  (void)inserted; // Unused after DSR removal
 
   auto& outstandingPacketStreamDetails = it->second;
   outstandingPacketStreamDetails.dupAckedStreamIntervals.insert(
       frame.offset, frame.offset + frame.len - 1);
-  if (frame.fromBufMeta) {
-    outstandingPacketStreamDetails.streamPacketIdx = frame.streamPacketIdx;
-  }
 }
 
 AckEvent::AckPacket::AckPacket(
     quic::PacketNum packetNumIn,
-    uint64_t nonDsrPacketSequenceNumberIn,
     const OutstandingPacketMetadata& outstandingPacketMetadataIn, // NOLINT
     const DetailsPerStream& detailsPerStreamIn, // NOLINT
     Optional<OutstandingPacketWrapper::LastAckedPacketInfo>
@@ -55,7 +48,6 @@ AckEvent::AckPacket::AckPacket(
     bool isAppLimitedIn,
     OptionalMicros&& receiveRelativeTimeStampUsec)
     : packetNum(packetNumIn),
-      nonDsrPacketSequenceNumber(nonDsrPacketSequenceNumberIn),
       outstandingPacketMetadata(outstandingPacketMetadataIn), // NOLINT
       detailsPerStream(detailsPerStreamIn), // NOLINT
       lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
@@ -65,13 +57,6 @@ AckEvent::AckPacket::AckPacket(
 AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setPacketNum(
     quic::PacketNum packetNumIn) {
   packetNum = packetNumIn;
-  return std::move(*this);
-}
-
-AckEvent::AckPacket::Builder&&
-AckEvent::AckPacket::Builder::setNonDsrPacketSequenceNumber(
-    uint64_t nonDsrPacketSequenceNumberIn) {
-  nonDsrPacketSequenceNumber = nonDsrPacketSequenceNumberIn;
   return std::move(*this);
 }
 
@@ -115,7 +100,6 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
   CHECK(detailsPerStream.has_value());
   return AckEvent::AckPacket(
       packetNum.value(),
-      nonDsrPacketSequenceNumber.value(),
       *outstandingPacketMetadata,
       detailsPerStream.value(),
       lastAckedPacketInfo ? Optional<OutstandingPacket::LastAckedPacketInfo>(
@@ -132,7 +116,6 @@ void AckEvent::AckPacket::Builder::buildInto(
   CHECK(detailsPerStream.has_value());
   ackedPacketsVec.emplace_back(
       packetNum.value(),
-      nonDsrPacketSequenceNumber.value(),
       *outstandingPacketMetadata,
       detailsPerStream.value(),
       lastAckedPacketInfo ? Optional<OutstandingPacket::LastAckedPacketInfo>(

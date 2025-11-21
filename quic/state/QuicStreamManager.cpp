@@ -890,7 +890,6 @@ void QuicStreamManager::updateWritableStreams(
   // Check for terminal write errors first
   if (stream.streamWriteError.has_value() && !stream.reliableSizeToPeer) {
     CHECK(stream.lossBuffer.empty());
-    CHECK(stream.lossBufMetas.empty());
     removeWritable(stream);
     return;
   }
@@ -904,32 +903,21 @@ void QuicStreamManager::updateWritableStreams(
     return;
   }
 
-  // Update writable/loss sets based on data/meta presence
+  // Update writable/loss sets based on data presence
   if (stream.hasWritableData()) {
     writableStreams_.emplace(stream.id);
   } else {
     writableStreams_.erase(stream.id);
-  }
-  if (stream.hasWritableBufMeta()) {
-    writableDSRStreams_.emplace(stream.id);
-  } else {
-    writableDSRStreams_.erase(stream.id);
   }
   if (!stream.lossBuffer.empty()) {
     lossStreams_.emplace(stream.id);
   } else {
     lossStreams_.erase(stream.id);
   }
-  if (!stream.lossBufMetas.empty()) {
-    lossDSRStreams_.emplace(stream.id);
-  } else {
-    lossDSRStreams_.erase(stream.id);
-  }
 
   // Update the actual scheduling queues (PriorityQueue or control set)
   connFlowControlOpen |= bool(oldWriteQueue_);
-  if (stream.hasSchedulableData(connFlowControlOpen) ||
-      stream.hasSchedulableDsr(connFlowControlOpen)) {
+  if (stream.hasSchedulableData(connFlowControlOpen)) {
     if (stream.isControl) {
       controlWriteQueue_.emplace(stream.id);
     } else {

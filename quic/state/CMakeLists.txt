@@ -36,7 +36,6 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_sender
   mvfst_handshake
 )
 
@@ -49,7 +48,6 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_dsr_sender
   mvfst_handshake
   mvfst_http_priority_queue
 )

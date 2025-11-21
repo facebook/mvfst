@@ -13,76 +13,10 @@
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
 #include <quic/common/IntervalSet.h>
-#include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/mvfst-config.h>
 #include <quic/priority/PriorityQueue.h>
 
 namespace quic {
-
-/**
- * A buffer representation without the actual data. This is part of the public
- * facing interface.
- *
- * This is experimental.
- */
-struct BufferMeta {
-  size_t length;
-
-  explicit BufferMeta(size_t lengthIn) : length(lengthIn) {}
-};
-
-/**
- * A write buffer representation without the actual data. This is used for
- * write buffer management in a stream.
- *
- * This is experimental.
- */
-struct WriteBufferMeta {
-  size_t length{0};
-  size_t offset{0};
-  bool eof{false};
-
-  WriteBufferMeta() = default;
-
-  struct Builder {
-    Builder& setLength(size_t lengthIn) {
-      length_ = lengthIn;
-      return *this;
-    }
-
-    Builder& setOffset(size_t offsetIn) {
-      offset_ = offsetIn;
-      return *this;
-    }
-
-    Builder& setEOF(bool val) {
-      eof_ = val;
-      return *this;
-    }
-
-    WriteBufferMeta build() {
-      return WriteBufferMeta(length_, offset_, eof_);
-    }
-
-   private:
-    size_t length_{0};
-    size_t offset_{0};
-    bool eof_{false};
-  };
-
-  WriteBufferMeta split(size_t splitLen) {
-    CHECK_GE(length, splitLen);
-    auto splitEof = splitLen == length && eof;
-    WriteBufferMeta splitOf(splitLen, offset, splitEof);
-    offset += splitLen;
-    length -= splitLen;
-    return splitOf;
-  }
-
- private:
-  explicit WriteBufferMeta(size_t lengthIn, size_t offsetIn, bool eofIn)
-      : length(lengthIn), offset(offsetIn), eof(eofIn) {}
-};
 
 struct StreamBuffer {
   BufQueue data;
@@ -156,11 +90,8 @@ struct QuicStreamLike {
 
   // Current offset of the start bytes in the pending writes chain.
   // This changes when we pop stuff off the pendingWrites chain.
-  // In a non-DSR stream, when we are finished writing out all the bytes until
-  // FIN, this will be one greater than finalWriteOffset.
-  // When DSR is used, this still points to the starting bytes in the write
-  // buffer. Its value won't change with WriteBufferMetas are appended and sent
-  // for a stream.
+  // When we are finished writing out all the bytes until FIN, this will be
+  // one greater than finalWriteOffset.
   uint64_t currentWriteOffset{0};
 
   // the minimum offset requires retransmit
@@ -439,10 +370,6 @@ struct QuicStreamState : public QuicStreamLike {
     totalHolbTime = other.totalHolbTime;
     holbCount = other.holbCount;
     priority = other.priority;
-    dsrSender = std::move(other.dsrSender);
-    writeBufMeta = other.writeBufMeta;
-    retransmissionBufMetas = std::move(other.retransmissionBufMetas);
-    lossBufMetas = std::move(other.lossBufMetas);
     streamLossCount = other.streamLossCount;
   }
 
@@ -503,9 +430,7 @@ struct QuicStreamState : public QuicStreamLike {
   // Uninitialized = default
   PriorityQueue::Priority priority;
 
-  // This monotonically increases by 1 this stream is written to packets. Note
-  // that this is only used for DSR and facilitates loss detection.
-  uint64_t streamPacketIdx{0};
+  uint64_t streamLossCount{0};
 
   // Returns true if both send and receive state machines are in a terminal
   // state
@@ -528,7 +453,7 @@ struct QuicStreamState : public QuicStreamLike {
     return recvState == StreamRecvState::Open;
   }
 
-  // If the stream has writable data that's not backed by DSR. That is, in a
+  // If the stream has writable data. That is, in a
   // regular stream write, it will be able to write something. So it either
   // needs to have data in the pendingWrites chain, or it has EOF to send.
   bool hasWritableData(bool connFlowControlOpen = true) const {
@@ -538,62 +463,29 @@ struct QuicStreamState : public QuicStreamLike {
           flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
     }
     if (finalWriteOffset) {
-      // We can only write a FIN with a non-DSR stream frame if there's no
-      // DSR data.
-      return writeBufMeta.offset == 0 &&
-          currentWriteOffset <= *finalWriteOffset;
+      return currentWriteOffset <= *finalWriteOffset;
     }
     return false;
   }
 
-  // Whether this stream has non-DSR data in the write buffer or loss buffer.
+  // Whether this stream has data in the write buffer or loss buffer.
   [[nodiscard]] bool hasSchedulableData(bool connFlowControlOpen = true) const {
     return hasWritableData(connFlowControlOpen) || !lossBuffer.empty();
-  }
-
-  [[nodiscard]] bool hasSchedulableDsr(bool connFlowControlOpen = true) const {
-    return hasWritableBufMeta(connFlowControlOpen) || !lossBufMetas.empty();
-  }
-
-  [[nodiscard]] bool hasWritableBufMeta(bool connFlowControlOpen = true) const {
-    if (writeBufMeta.offset == 0) {
-      return false;
-    }
-    if (writeBufMeta.length > 0) {
-      CHECK_GE(flowControlState.peerAdvertisedMaxOffset, writeBufMeta.offset);
-      return connFlowControlOpen &&
-          flowControlState.peerAdvertisedMaxOffset - writeBufMeta.offset > 0;
-    }
-    if (finalWriteOffset) {
-      return writeBufMeta.offset <= *finalWriteOffset;
-    }
-    return false;
   }
 
   [[nodiscard]] bool hasSentFIN() const {
     if (!finalWriteOffset) {
       return false;
     }
-    return currentWriteOffset > *finalWriteOffset ||
-        writeBufMeta.offset > *finalWriteOffset;
+    return currentWriteOffset > *finalWriteOffset;
   }
 
   [[nodiscard]] bool hasLoss() const {
-    return !lossBuffer.empty() || !lossBufMetas.empty();
+    return !lossBuffer.empty();
   }
 
   [[nodiscard]] uint64_t nextOffsetToWrite() const {
-    // The stream has never had WriteBufferMetas. Then currentWriteOffset
-    // always points to the next offset we send. This of course relies on the
-    // current contract of DSR: Real data always comes first. This code (and a
-    // lot other code) breaks when that contract is breached.
-    if (writeBufMeta.offset == 0) {
-      return currentWriteOffset;
-    }
-    if (!pendingWrites.empty()) {
-      return currentWriteOffset;
-    }
-    return writeBufMeta.offset;
+    return currentWriteOffset;
   }
 
   bool hasReadableData() const {
@@ -604,54 +496,6 @@ struct QuicStreamState : public QuicStreamLike {
 
   bool hasPeekableData() const {
     return readBuffer.size() > 0;
-  }
-
-  void removeFromWriteBufMetaStartingAtOffset(uint64_t startingOffset) {
-    if (startingOffset <= writeBufMeta.offset) {
-      writeBufMeta.length = 0;
-      return;
-    }
-
-    if (startingOffset > writeBufMeta.offset &&
-        startingOffset <= writeBufMeta.offset + writeBufMeta.length) {
-      writeBufMeta.length = uint32_t(startingOffset - writeBufMeta.offset);
-    }
-  }
-
-  void removeFromRetransmissionBufMetasStartingAtOffset(
-      uint64_t startingOffset) {
-    UnorderedSet<uint64_t> offsetsToRemove;
-
-    for (auto& [offset, buf] : retransmissionBufMetas) {
-      if (offset >= startingOffset) {
-        offsetsToRemove.insert(offset);
-      } else if (offset + buf.length >= startingOffset) {
-        buf.length = size_t(startingOffset - offset);
-      }
-    }
-
-    for (auto offset : offsetsToRemove) {
-      retransmissionBufMetas.erase(offset);
-    }
-  }
-
-  void removeFromLossBufMetasStartingAtOffset(uint64_t startingOffset) {
-    if (lossBufMetas.empty()) {
-      // Nothing to do.
-      return;
-    }
-
-    while (!lossBufMetas.empty()) {
-      auto& lastElement = lossBufMetas.back();
-      if (lastElement.offset >= startingOffset) {
-        lossBufMetas.pop_back();
-      } else if (lastElement.offset + lastElement.length >= startingOffset) {
-        lastElement.length = uint32_t(startingOffset - lastElement.offset);
-        return;
-      } else {
-        return;
-      }
-    }
   }
 
   void removeFromReadBufferStartingAtOffset(uint64_t startingOffset) {
@@ -668,46 +512,6 @@ struct QuicStreamState : public QuicStreamLike {
       } else {
         return;
       }
-    }
-  }
-
-  std::unique_ptr<DSRPacketizationRequestSender> dsrSender;
-
-  // BufferMeta that has been written to the QUIC layer.
-  // When offset is 0, nothing has been written to it. On first write, its
-  // starting offset will be currentWriteOffset + pendingWrites.chainLength().
-  WriteBufferMeta writeBufMeta;
-
-  // A map to store sent WriteBufferMetas for potential retransmission.
-  UnorderedMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
-
-  // WriteBufferMetas that's already marked lost. They will be retransmitted.
-  CircularDeque<WriteBufferMeta> lossBufMetas;
-
-  uint64_t streamLossCount{0};
-
-  /**
-   * Insert a new WriteBufferMeta into lossBufMetas. If the new WriteBufferMeta
-   * can be append to an existing WriteBufferMeta, it will be appended. Note
-   * it won't be prepended to an existing WriteBufferMeta. And it will also not
-   * merge 3 WriteBufferMetas together if the new one happens to fill up a hole
-   * between 2 existing WriteBufferMetas.
-   */
-  void insertIntoLossBufMeta(WriteBufferMeta bufMeta) {
-    auto lossItr = std::upper_bound(
-        lossBufMetas.begin(),
-        lossBufMetas.end(),
-        bufMeta.offset,
-        [](auto offset, const auto& wBufMeta) {
-          return offset < wBufMeta.offset;
-        });
-    if (!lossBufMetas.empty() && lossItr != lossBufMetas.begin() &&
-        std::prev(lossItr)->offset + std::prev(lossItr)->length ==
-            bufMeta.offset) {
-      std::prev(lossItr)->length += bufMeta.length;
-      std::prev(lossItr)->eof = bufMeta.eof;
-    } else {
-      lossBufMetas.insert(lossItr, bufMeta);
     }
   }
 };

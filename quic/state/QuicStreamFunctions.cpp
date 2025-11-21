@@ -26,17 +26,10 @@ void prependToBuf(quic::BufPtr& buf, quic::BufPtr toAppend) {
 namespace quic {
 quic::Expected<void, QuicError>
 writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof) {
-  auto neverWrittenBufMeta = (0 == stream.writeBufMeta.offset);
   uint64_t len = 0;
   if (data) {
     len = data->computeChainDataLength();
   }
-  // Disallow writing any data or EOF when there's buf meta data already.
-  CHECK(neverWrittenBufMeta);
-  // Also disallow writing an EOF at the end of real data when there's going
-  // to be buf meta data in the future.
-  LOG_IF(FATAL, eof && stream.dsrSender)
-      << "Trying to write eof on normal data for DSR stream: " << &stream;
   if (len > 0) {
     // We call this before updating the writeBuffer because we only want to
     // write a blocked frame first time the stream becomes blocked
@@ -49,38 +42,6 @@ writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof) {
     stream.finalWriteOffset = stream.currentWriteOffset + bufferSize;
   }
   auto result = updateFlowControlOnWriteToStream(stream, len);
-  if (!result.has_value()) {
-    return quic::make_unexpected(result.error());
-  }
-  stream.conn.streamManager->updateWritableStreams(stream);
-  return {};
-}
-
-quic::Expected<void, QuicError> writeBufMetaToQuicStream(
-    QuicStreamState& stream,
-    const BufferMeta& data,
-    bool eof) {
-  if (data.length > 0) {
-    maybeWriteBlockAfterAPIWrite(stream);
-  }
-  auto realDataLength =
-      stream.currentWriteOffset + stream.pendingWrites.chainLength();
-  CHECK_GT(realDataLength, 0)
-      << "Real data has to be written to a stream before any buffer meta is"
-      << "written to it.";
-  if (stream.writeBufMeta.offset == 0) {
-    CHECK(!stream.finalWriteOffset.has_value())
-        << "Buffer meta cannot be appended to a stream after we have seen EOM "
-        << "in real data";
-    stream.writeBufMeta.offset = realDataLength;
-  }
-  stream.writeBufMeta.length += data.length;
-  if (eof) {
-    stream.finalWriteOffset =
-        stream.writeBufMeta.offset + stream.writeBufMeta.length;
-    stream.writeBufMeta.eof = true;
-  }
-  auto result = updateFlowControlOnWriteToStream(stream, data.length);
   if (!result.has_value()) {
     return quic::make_unexpected(result.error());
   }
@@ -472,9 +433,7 @@ bool allBytesTillFinAcked(const QuicStreamState& stream) {
    * 5. We have no bytes that are detected as lost.
    */
   return stream.hasSentFIN() && stream.retransmissionBuffer.empty() &&
-      stream.retransmissionBufMetas.empty() && stream.pendingWrites.empty() &&
-      !stream.hasWritableBufMeta() && stream.lossBuffer.empty() &&
-      stream.lossBufMetas.empty();
+      stream.pendingWrites.empty() && stream.lossBuffer.empty();
 }
 
 void appendPendingStreamReset(
@@ -482,19 +441,6 @@ void appendPendingStreamReset(
     const QuicStreamState& stream,
     ApplicationErrorCode errorCode,
     Optional<uint64_t> reliableSize) {
-  /*
-   * When BufMetas are written to the transport, but before they are written to
-   * the network, writeBufMeta.offset would be assigned a value >
-   * currentWriteOffset. For this reason, we can't simply use
-   * min(max(currentWriteOffset, writeBufMeta.offset), finalWriteOffset) as the
-   * final offset. We have to check if any BufMetas have been written to the
-   * network. If we simply use min(max(currentWriteOffset, writeBufMeta.offset),
-   * we risk using a value > peer's flow control limit.
-   */
-  bool writeBufWritten = stream.writeBufMeta.offset &&
-      (stream.currentWriteOffset + stream.pendingWrites.chainLength() !=
-       stream.writeBufMeta.offset);
-
   /*
    * The spec mandates that with multiple RESET_STREAM_AT or RESET_STREAM
    * frames, we must use the same value of finalSize. Although we don't store
@@ -512,8 +458,7 @@ void appendPendingStreamReset(
    * RESET_STREAM_AT frames by virtue of the fact that it's the maxiumum of the
    * current write offset and the new reliable size.
    */
-  uint64_t finalSize =
-      writeBufWritten ? stream.writeBufMeta.offset : stream.currentWriteOffset;
+  uint64_t finalSize = stream.currentWriteOffset;
   if (reliableSize) {
     // It's possible that we've queued up data at the socket, but haven't yet
     // written it out to the wire, so stream.currentWriteOffset could be
@@ -532,20 +477,16 @@ void appendPendingStreamReset(
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
   return stream.finalWriteOffset.value_or(
-      std::max<uint64_t>(
-          stream.currentWriteOffset + stream.pendingWrites.chainLength(),
-          stream.writeBufMeta.offset + stream.writeBufMeta.length));
+      stream.currentWriteOffset + stream.pendingWrites.chainLength());
 }
 
 Optional<uint64_t> getLargestWriteOffsetTxed(const QuicStreamState& stream) {
   // currentWriteOffset is really nextWriteOffset
   // when 0, it indicates nothing has been written yet
-  if (stream.currentWriteOffset == 0 && stream.writeBufMeta.offset == 0) {
+  if (stream.currentWriteOffset == 0) {
     return std::nullopt;
   }
-  uint64_t currentWriteOffset =
-      std::max<uint64_t>(stream.currentWriteOffset, stream.writeBufMeta.offset);
-  return currentWriteOffset - 1;
+  return stream.currentWriteOffset - 1;
 }
 
 Optional<uint64_t> getLargestDeliverableOffset(const QuicStreamState& stream) {

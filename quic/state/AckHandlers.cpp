@@ -181,7 +181,6 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       ? make_optional(firstOutstandingPacket->getPacketSequenceNum())
       : std::nullopt;
 
-  uint64_t dsrPacketsAcked = 0;
   Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
   Optional<LegacyObserver::SpuriousLossEvent> spuriousLossEvent;
@@ -252,9 +251,6 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
     if (ackedPacketIterator->maybeClonedPacketIdentifier) {
       CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
       --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
-    }
-    if (ackedPacketIterator->isDSRPacket) {
-      ++dsrPacketsAcked;
     }
 
     if (!ack.implicit && currentPacketNum == frame.largestAcked) {
@@ -389,8 +385,6 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         outstandingPacket->packet.header.getPacketSequenceNum());
     CongestionController::AckEvent::AckPacket::Builder()
         .setPacketNum(outstandingPacket->packet.header.getPacketSequenceNum())
-        .setNonDsrPacketSequenceNumber(
-            outstandingPacket->nonDsrPacketSequenceNumber.value_or(0))
         .setOutstandingPacketMetadata(outstandingPacket->metadata)
         .setDetailsPerStream(std::move(detailsPerStream))
         .setLastAckedPacketInfo(
@@ -408,8 +402,6 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
-  CHECK_GE(conn.outstandings.dsrCount, dsrPacketsAcked);
-  conn.outstandings.dsrCount -= dsrPacketsAcked;
   CHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();

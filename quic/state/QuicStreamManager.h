@@ -215,7 +215,6 @@ class QuicStreamManager {
     windowUpdates_ = std::move(other.windowUpdates_);
     flowControlUpdated_ = std::move(other.flowControlUpdated_);
     lossStreams_ = std::move(other.lossStreams_);
-    lossDSRStreams_ = std::move(other.lossDSRStreams_);
     readableStreams_ = std::move(other.readableStreams_);
     unidirectionalReadableStreams_ =
         std::move(other.unidirectionalReadableStreams_);
@@ -224,7 +223,6 @@ class QuicStreamManager {
     writeQueue_ = std::move(other.writeQueue_);
     controlWriteQueue_ = std::move(other.controlWriteQueue_);
     writableStreams_ = std::move(other.writableStreams_);
-    writableDSRStreams_ = std::move(other.writableDSRStreams_);
     txStreams_ = std::move(other.txStreams_);
     deliverableStreams_ = std::move(other.deliverableStreams_);
     closedStreams_ = std::move(other.closedStreams_);
@@ -426,20 +424,11 @@ class QuicStreamManager {
   }
 
   [[nodiscard]] bool hasLoss() const {
-    return !lossStreams_.empty() || !lossDSRStreams_.empty();
-  }
-
-  [[nodiscard]] bool hasNonDSRLoss() const {
     return !lossStreams_.empty();
-  }
-
-  [[nodiscard]] bool hasDSRLoss() const {
-    return !lossDSRStreams_.empty();
   }
 
   void removeLoss(StreamId id) {
     lossStreams_.erase(id);
-    lossDSRStreams_.erase(id);
   }
 
   void addLoss(StreamId id) {
@@ -458,10 +447,6 @@ class QuicStreamManager {
       bool connFlowControlOpen = true,
       const std::shared_ptr<QLogger>& qLogger = nullptr);
 
-  auto& writableDSRStreams() {
-    return writableDSRStreams_;
-  }
-
   auto& controlWriteQueue() {
     return controlWriteQueue_;
   }
@@ -479,14 +464,6 @@ class QuicStreamManager {
         !writeQueue_->empty() || !controlWriteQueue_.empty();
   }
 
-  [[nodiscard]] bool hasDSRWritable() const {
-    return !writableDSRStreams_.empty();
-  }
-
-  bool hasNonDSRWritable() const {
-    return !writableStreams_.empty() || !controlWriteQueue_.empty();
-  }
-
   void removeWritable(const QuicStreamState& stream) {
     if (stream.isControl) {
       controlWriteQueue_.erase(stream.id);
@@ -499,14 +476,11 @@ class QuicStreamManager {
       }
     }
     writableStreams_.erase(stream.id);
-    writableDSRStreams_.erase(stream.id);
     lossStreams_.erase(stream.id);
-    lossDSRStreams_.erase(stream.id);
   }
 
   void clearWritable() {
     writableStreams_.clear();
-    writableDSRStreams_.clear();
     if (oldWriteQueue_) {
       oldWriteQueue()->clear();
     }
@@ -920,7 +894,6 @@ class QuicStreamManager {
 
   // Streams that have bytes in loss buffer
   UnorderedSet<StreamId> lossStreams_;
-  UnorderedSet<StreamId> lossDSRStreams_;
   UnorderedSet<StreamId> readableStreams_;
   UnorderedSet<StreamId> unidirectionalReadableStreams_;
   UnorderedSet<StreamId> peekableStreams_;
@@ -929,7 +902,6 @@ class QuicStreamManager {
   std::unique_ptr<deprecated::PriorityQueue> oldWriteQueue_;
   std::set<StreamId> controlWriteQueue_;
   UnorderedSet<StreamId> writableStreams_;
-  UnorderedSet<StreamId> writableDSRStreams_;
   UnorderedSet<StreamId> txStreams_;
   UnorderedSet<StreamId> deliverableStreams_;
   UnorderedSet<StreamId> closedStreams_;

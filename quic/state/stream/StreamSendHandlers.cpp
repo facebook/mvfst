@@ -134,50 +134,26 @@ quic::Expected<void, QuicError> sendAckSMHandler(
   switch (stream.sendState) {
     case StreamSendState::Open:
     case StreamSendState::ResetSent: {
-      if (!ackedFrame.fromBufMeta) {
-        // Clean up the acked buffers from the retransmissionBuffer.
-        auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
-        if (ackedBuffer != stream.retransmissionBuffer.end()) {
-          CHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
-          CHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
-          CHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
-          VLOG(10) << "Open: acked stream data stream=" << stream.id
-                   << " offset=" << ackedBuffer->second->offset
-                   << " len=" << ackedBuffer->second->data.chainLength()
-                   << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
-          auto updateResult = stream.updateAckedIntervals(
-              ackedBuffer->second->offset,
-              ackedBuffer->second->data.chainLength(),
-              ackedBuffer->second->eof);
-          if (!updateResult.has_value()) {
-            return quic::make_unexpected(QuicError(
-                TransportErrorCode::INTERNAL_ERROR,
-                "Failed to update acked intervals"));
-          }
-          stream.retransmissionBuffer.erase(ackedBuffer);
+      // Clean up the acked buffers from the retransmissionBuffer.
+      auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
+      if (ackedBuffer != stream.retransmissionBuffer.end()) {
+        CHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
+        CHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
+        CHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
+        VLOG(10) << "Open: acked stream data stream=" << stream.id
+                 << " offset=" << ackedBuffer->second->offset
+                 << " len=" << ackedBuffer->second->data.chainLength()
+                 << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
+        auto updateResult = stream.updateAckedIntervals(
+            ackedBuffer->second->offset,
+            ackedBuffer->second->data.chainLength(),
+            ackedBuffer->second->eof);
+        if (!updateResult.has_value()) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              "Failed to update acked intervals"));
         }
-      } else {
-        auto ackedBuffer =
-            stream.retransmissionBufMetas.find(ackedFrame.offset);
-        if (ackedBuffer != stream.retransmissionBufMetas.end()) {
-          CHECK_EQ(ackedFrame.offset, ackedBuffer->second.offset);
-          CHECK_EQ(ackedFrame.len, ackedBuffer->second.length);
-          CHECK_EQ(ackedFrame.fin, ackedBuffer->second.eof);
-          VLOG(10) << "Open: acked stream data bufmeta=" << stream.id
-                   << " offset=" << ackedBuffer->second.offset
-                   << " len=" << ackedBuffer->second.length
-                   << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
-          auto updateResult = stream.updateAckedIntervals(
-              ackedBuffer->second.offset,
-              ackedBuffer->second.length,
-              ackedBuffer->second.eof);
-          if (!updateResult.has_value()) {
-            return quic::make_unexpected(QuicError(
-                TransportErrorCode::INTERNAL_ERROR,
-                "Failed to update acked intervals"));
-          }
-          stream.retransmissionBufMetas.erase(ackedBuffer);
-        }
+        stream.retransmissionBuffer.erase(ackedBuffer);
       }
 
       // This stream may be able to invoke some deliveryCallbacks:

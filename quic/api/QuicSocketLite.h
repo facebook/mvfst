@@ -516,22 +516,6 @@ class QuicSocketLite {
       ByteEventCallback* cb = nullptr) = 0;
 
   /**
-   * Write a data representation in the form of BufferMeta to the given stream.
-   */
-  virtual WriteResult writeBufMeta(
-      StreamId id,
-      const BufferMeta& data,
-      bool eof,
-      ByteEventCallback* cb = nullptr) = 0;
-
-  /**
-   * Set the DSRPacketizationRequestSender for a stream.
-   */
-  virtual WriteResult setDSRPacketizationRequestSender(
-      StreamId id,
-      std::unique_ptr<DSRPacketizationRequestSender> sender) = 0;
-
-  /**
    * Close the stream for writing.  Equivalent to writeChain(id, nullptr, true).
    */
   virtual Optional<LocalErrorCode> shutdownWrite(StreamId id) = 0;

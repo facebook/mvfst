@@ -22,8 +22,6 @@
 
 namespace quic {
 
-class DSRPacketizationRequestSender;
-
 class QuicSocket : virtual public QuicSocketLite {
  public:
   /**

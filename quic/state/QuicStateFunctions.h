@@ -60,8 +60,7 @@ PacketNum getNextPacketNum(
 
 void increaseNextPacketNum(
     QuicConnectionStateBase& conn,
-    PacketNumberSpace pnSpace,
-    bool dsrPacket = false) noexcept;
+    PacketNumberSpace pnSpace) noexcept;
 
 /**
  * Update largestReceivedUdpPacketNum in ackState with packetNum. Return the

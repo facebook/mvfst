@@ -26,8 +26,6 @@ mvfst_cpp_test(
     ],
     deps = [
         "//quic/common/test:test_utils",
-        "//quic/dsr:types",
-        "//quic/dsr/test:mocks",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/logging:file_qlogger",
         "//quic/server/state:server",

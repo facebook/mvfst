@@ -532,10 +532,6 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
     do {
       auto streamId = level.iterator->current();
       auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
-      if (!stream->hasSchedulableData() && stream->hasSchedulableDsr()) {
-        // We hit a DSR stream
-        return {};
-      }
       CHECK(stream) << "streamId=" << streamId
                     << "inc=" << uint64_t(level.incremental);
       auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
@@ -576,10 +572,6 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
     CHECK(id.isStreamID());
     auto streamId = id.asStreamID();
     auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
-    if (!stream->hasSchedulableData() && stream->hasSchedulableDsr()) {
-      // We hit a DSR stream
-      return {};
-    }
     CHECK(stream) << "streamId=" << streamId;
     // TODO: this is counting STREAM frame overhead against the stream itself
     auto lastWriteBytes = builder.remainingSpaceInPkt();
@@ -630,7 +622,6 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreams(
     conn_.schedulingState.nextScheduledControlStream = result.value();
   }
   auto* oldWriteQueue = conn_.streamManager->oldWriteQueue();
-  QuicStreamState* nextStream{nullptr};
   if (oldWriteQueue) {
     if (!oldWriteQueue->empty()) {
       auto result = writeStreamsHelper(
@@ -641,8 +632,6 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreams(
       if (!result.has_value()) {
         return quic::make_unexpected(result.error());
       }
-      auto streamId = oldWriteQueue->getNextScheduledStream();
-      nextStream = conn_.streamManager->findStream(streamId);
     }
   } else {
     auto& writeQueue = conn_.streamManager->writeQueue();
@@ -655,29 +644,15 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreams(
       if (!result.has_value()) {
         return quic::make_unexpected(result.error());
       }
-      if (!writeQueue.empty()) {
-        auto id = writeQueue.peekNextScheduledID();
-        CHECK(id.isStreamID());
-        nextStream = conn_.streamManager->findStream(id.asStreamID());
-      }
     }
-  }
-  // If the next non-control stream is DSR, record that fact in the
-  // scheduler so that we don't try to write a non DSR stream again.
-  // Note that this means that in the presence of many large control
-  // streams and DSR streams, we won't completely prioritize control
-  // streams but they will not be starved.
-  if (nextStream && !nextStream->hasSchedulableData()) {
-    nextStreamDsr_ = true;
   }
   return {};
 }
 
 bool StreamFrameScheduler::hasPendingData() const {
-  return !nextStreamDsr_ &&
-      (conn_.streamManager->hasNonDSRLoss() ||
-       (conn_.streamManager->hasNonDSRWritable() &&
-        getSendConnFlowControlBytesWire(conn_) > 0));
+  return conn_.streamManager->hasLoss() ||
+      (conn_.streamManager->hasWritable() &&
+       getSendConnFlowControlBytesWire(conn_) > 0);
 }
 
 quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
@@ -695,9 +670,8 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
   uint64_t flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(stream), connWritableBytes);
   uint64_t bufferLen = stream.pendingWrites.chainLength();
-  // We should never write a FIN from the non-DSR scheduler for a DSR stream.
-  bool canWriteFin = stream.finalWriteOffset.has_value() &&
-      bufferLen <= flowControlLen && stream.writeBufMeta.offset == 0;
+  bool canWriteFin =
+      stream.finalWriteOffset.has_value() && bufferLen <= flowControlLen;
   auto writeOffset = stream.currentWriteOffset;
   auto res = writeStreamFrameHeader(
       builder,
@@ -741,8 +715,7 @@ quic::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
         conn_.streamManager->getStream(streamId).value_or(nullptr);
     CHECK(streamState) << "Stream " << streamId
                        << " not found when going through resets";
-    if (streamState->pendingWrites.empty() &&
-        streamState->writeBufMeta.length == 0) {
+    if (streamState->pendingWrites.empty()) {
       //    We only write a RESET_STREAM or RESET_STREAM_AT frame for a stream
       //    once we've written out all data that needs to be delivered reliably.
       //    While this is not something that's mandated by the spec, we're doing
@@ -1029,8 +1002,7 @@ CloningScheduler::CloningScheduler(
       cipherOverhead_(cipherOverhead) {}
 
 bool CloningScheduler::hasData() const {
-  return frameScheduler_.hasData() ||
-      conn_.outstandings.numOutstanding() > conn_.outstandings.dsrCount;
+  return frameScheduler_.hasData() || conn_.outstandings.numOutstanding() > 0;
 }
 
 quic::Expected<SchedulingResult, QuicError>
@@ -1053,7 +1025,7 @@ CloningScheduler::scheduleFramesForPacket(
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
   for (auto& outstandingPacket : conn_.outstandings.packets) {
-    if (outstandingPacket.declaredLost || outstandingPacket.isDSRPacket) {
+    if (outstandingPacket.declaredLost) {
       continue;
     }
     auto opPnSpace = outstandingPacket.packet.header.getPacketNumberSpace();

@@ -75,7 +75,6 @@ DEFINE_string(
     transport_knob_params,
     "",
     "JSON-serialized dictionary of transport knob params");
-DEFINE_bool(dsr, false, "if you want to debug perf");
 DEFINE_bool(
     use_ack_receive_timestamps,
     false,
@@ -147,7 +146,6 @@ int main(int argc, char* argv[]) {
         FLAGS_bytes_per_stream,
         FLAGS_max_receive_packet_size,
         FLAGS_use_inplace_write,
-        FLAGS_dsr,
         FLAGS_override_packet_size,
         FLAGS_latency_factor,
         FLAGS_use_ack_receive_timestamps,
