@@ -64,7 +64,7 @@ class QuicBuffer {
       std::size_t minTailroom = 0);
 
   static std::unique_ptr<QuicBuffer> wrapBuffer(
-      void* buf,
+      const void* buf,
       std::size_t capacity);
 
   // Create a QuicBuffer from a std::string without copying the contents.

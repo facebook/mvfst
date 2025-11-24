@@ -77,7 +77,7 @@ std::unique_ptr<QuicBuffer> QuicBuffer::copyBuffer(
 }
 
 std::unique_ptr<QuicBuffer> QuicBuffer::wrapBuffer(
-    void* buf,
+    const void* buf,
     std::size_t capacity) {
   return std::unique_ptr<QuicBuffer>(new (std::nothrow) QuicBuffer(
       capacity, (uint8_t*)buf, (uint8_t*)buf, capacity, nullptr));
