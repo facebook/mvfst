@@ -18,17 +18,14 @@ mvfst_cpp_test(
         "//fizz/protocol/test:mocks",
         "//fizz/server:protocol",
         "//fizz/server/test:mocks",
-        "//folly:fbstring",
         "//folly/io/async:scoped_event_base_thread",
         "//folly/io/async:ssl_context",
-        "//folly/io/async/test:mocks",
         "//quic/client:client_extension",
         "//quic/client:state_and_handshake",
         "//quic/common/test:test_utils",
         "//quic/fizz/client/handshake:fizz_client_handshake",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/state:quic_state_machine",
-        "//quic/state:stream_functions",
     ],
 )
 
@@ -39,8 +36,10 @@ mvfst_cpp_test(
     ],
     deps = [
         "//fizz/protocol/test:test_util",
+        "//quic:constants",
         "//quic/common/test:test_utils",
         "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/folly_utils:folly_utils",
     ],
 )
 

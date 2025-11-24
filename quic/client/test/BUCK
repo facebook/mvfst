@@ -35,7 +35,6 @@ mvfst_cpp_test(
         "//quic/common/events:folly_eventbase",
         "//quic/common/udpsocket:folly_async_udp_socket",
         "//quic/fizz/client/handshake:fizz_client_handshake",
-        "//quic/handshake:handshake",
         "//quic/handshake:transport_parameters",
     ],
 )
@@ -102,9 +101,11 @@ mvfst_cpp_test(
         "QuicClientTransportLiteMigrationTest.cpp",
     ],
     deps = [
+        "//folly:network_address",
         "//quic/api/test:mocks",
-        "//quic/client:client",
+        "//quic/client:client_lite",
         "//quic/client/test:mocks",
+        "//quic/codec:types",
         "//quic/common/events:folly_eventbase",
         "//quic/common/test:test_utils",
         "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",

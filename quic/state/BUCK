@@ -124,7 +124,6 @@ mvfst_cpp_library(
         ":stats_callback",
         ":transport_settings",
         "//folly:network_address",
-        "//folly/io:iobuf",
         "//folly/io/async:delayed_destruction",
         "//quic:config",
         "//quic:constants",

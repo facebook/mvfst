@@ -184,7 +184,6 @@ mvfst_cpp_test(
         "StaticCwndCongestionControllerTest.cpp",
     ],
     deps = [
-        ":mocks",
         ":test_utils",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
@@ -214,7 +213,7 @@ mvfst_cpp_test(
     ],
     deps = [
         ":test_utils",
-        "//quic/api:transport",
+        "//quic/api:transport_helpers",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:bbr",
         "//quic/congestion_control:bbr_bandwidth_sampler",
@@ -230,7 +229,6 @@ mvfst_cpp_test(
         "Bbr2Test.cpp",
     ],
     deps = [
-        ":mocks",
         ":test_utils",
         "//folly/portability:gmock",
         "//folly/portability:gtest",

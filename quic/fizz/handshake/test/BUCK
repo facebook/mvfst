@@ -11,6 +11,7 @@ mvfst_cpp_test(
         "//fizz/record/test:extension_tests_base",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
+        "//quic:constants",
         "//quic/common/test:test_utils",
         "//quic/fizz/handshake:fizz_handshake",
     ],

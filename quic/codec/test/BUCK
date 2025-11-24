@@ -35,7 +35,6 @@ mvfst_cpp_test(
         "QuicReadCodecTest.cpp",
     ],
     deps = [
-        "//folly/io:iobuf",
         "//folly/portability:gtest",
         "//quic:exception",
         "//quic/codec:codec",
@@ -57,7 +56,6 @@ mvfst_cpp_test(
     deps = [
         ":mocks",
         "//folly:random",
-        "//folly/io:iobuf",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic:constants",
@@ -81,7 +79,6 @@ mvfst_cpp_test(
         "//folly/container:array",
         "//folly/io:iobuf",
         "//folly/portability:gtest",
-        "//quic:exception",
         "//quic/codec:decode",
         "//quic/codec:types",
         "//quic/common/test:test_utils",
@@ -138,6 +135,7 @@ mvfst_cpp_test(
     deps = [
         "//folly/portability:gtest",
         "//quic/codec:types",
+        "//quic/common:contiguous_cursor",
         "//quic/common:string_utils",
     ],
 )
@@ -151,14 +149,12 @@ mvfst_cpp_test(
     deps = [
         ":mocks",
         "//folly:random",
-        "//folly/io:iobuf",
         "//folly/portability:gtest",
         "//quic/codec:codec",
         "//quic/codec:pktbuilder",
         "//quic/codec:types",
         "//quic/common/test:test_utils",
         "//quic/fizz/handshake:fizz_handshake",
-        "//quic/handshake:handshake",
     ],
 )
 
@@ -177,8 +173,6 @@ mvfst_cpp_test(
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/server/state:server",
         "//quic/state:quic_state_machine",
-        "//quic/state:state_functions",
-        "//quic/state:stream_functions",
         "//quic/state/stream:stream",
     ],
 )
@@ -190,11 +184,11 @@ mvfst_cpp_test(
     ],
     supports_static_listing = False,
     deps = [
-        "//folly:expected",
         "//folly/io:iobuf",
         "//folly/portability:gtest",
         "//quic:exception",
         "//quic/codec:types",
+        "//quic/common:contiguous_cursor",
         "//quic/common:optional",
         "//quic/common:string_utils",
     ],

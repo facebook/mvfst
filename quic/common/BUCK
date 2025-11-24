@@ -27,8 +27,7 @@ mvfst_cpp_library(
         "QuicBuffer.h",
         "QuicRange.h",
     ],
-    deps = [
-    ],
+    deps = [],
     exported_deps = [
         "//folly/portability:sys_uio",
     ],
@@ -65,8 +64,7 @@ mvfst_cpp_library(
     headers = [
         "Variant.h",
     ],
-    exported_deps = [
-    ],
+    exported_deps = [],
 )
 
 mvfst_cpp_library(

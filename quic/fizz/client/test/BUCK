@@ -31,10 +31,8 @@ mvfst_cpp_test(
     supports_static_listing = False,
     deps = [
         ":quic_client_transport_test_util",
-        "//fizz/crypto/aead/test:mocks",
         "//fizz/protocol/clock/test:mock_clock",
         "//folly/futures:core",
-        "//folly/io:iobuf",
         "//folly/io:socket_option_map",
         "//folly/io/async:scoped_event_base_thread",
         "//folly/portability:gmock",

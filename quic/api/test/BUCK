@@ -9,6 +9,7 @@ mvfst_cpp_library(
         "Mocks.h",
     ],
     exported_deps = [
+        "//folly/io/async:async_base",
         "//folly/portability:gmock",
         "//quic:exception",
         "//quic/api:loop_detector_callback",
@@ -44,7 +45,6 @@ mvfst_cpp_test(
         ":mocks",
         ":test_quic_transport",
         "//folly:random",
-        "//folly/io:iobuf",
         "//quic:constants",
         "//quic/api:transport",
         "//quic/api:transport_helpers",
@@ -144,7 +144,6 @@ mvfst_cpp_test(
         "//quic/common/test:test_utils",
         "//quic/common/udpsocket:folly_async_udp_socket",
         "//quic/fizz/client/handshake:fizz_client_handshake",
-        "//quic/state:quic_state_machine",
     ],
 )
 
@@ -173,6 +172,7 @@ mvfst_cpp_test(
     deps = [
         ":mocks",
         "//folly:move_wrapper",
+        "//folly/container:f14_hash",
         "//folly/futures:core",
         "//folly/io/async/test:mocks",
         "//folly/portability:gmock",

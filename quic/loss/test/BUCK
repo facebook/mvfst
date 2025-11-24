@@ -12,7 +12,7 @@ mvfst_cpp_test(
         "//folly/io/async/test:mocks",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
-        "//quic/api:transport",
+        "//quic/api:transport_helpers",
         "//quic/api/test:mocks",
         "//quic/client:state_and_handshake",
         "//quic/codec:types",
