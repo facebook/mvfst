@@ -2046,13 +2046,6 @@ TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadError) {
 
   EXPECT_FALSE(transport->transportConn->streamManager->streamExists(stream1));
   transport.reset();
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, getClosingStream("1"));
 }
 
 TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadFin) {

@@ -17,6 +17,23 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "qlog_schema",
+    srcs = [
+        "QLogSchema.cpp",
+    ],
+    headers = [
+        "QLogSchema.h",
+    ],
+    deps = [
+        ":qlogger_constants",
+    ],
+    exported_deps = [
+        "//folly/json:dynamic",
+        "//quic:constants",
+    ],
+)
+
+mvfst_cpp_library(
     name = "qlogger",
     srcs = [
         "QLogger.cpp",
@@ -65,6 +82,7 @@ mvfst_cpp_library(
     deps = ["//folly:dynamic"],
     exported_deps = [
         ":base_qlogger",
+        ":qlog_schema",
         ":qlogger_constants",
         "//folly:dynamic",
         "//folly/compression:compression",

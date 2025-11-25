@@ -424,6 +424,13 @@ enum class QLogEventType : uint32_t {
 
 folly::StringPiece toString(QLogEventType type);
 
+/**
+ * Returns IETF qlog spec-compliant event name (category:event format)
+ * e.g., "transport:packet_sent", "recovery:metrics_updated"
+ * See draft-ietf-quic-qlog-quic-events
+ */
+std::string toQlogEventName(QLogEventType type);
+
 class QLogEvent {
  public:
   QLogEvent() = default;
@@ -557,6 +564,21 @@ class QLogCongestionMetricUpdateEvent : public QLogEvent {
   std::string congestionEvent;
   std::string state;
   std::string recoveryState;
+
+  [[nodiscard]] folly::dynamic toDynamic() const override;
+};
+
+class QLogCongestionStateUpdateEvent : public QLogEvent {
+ public:
+  QLogCongestionStateUpdateEvent(
+      Optional<std::string> oldState,
+      std::string newState,
+      Optional<std::string> trigger,
+      std::chrono::microseconds refTimeIn);
+  ~QLogCongestionStateUpdateEvent() override = default;
+  Optional<std::string> oldState;
+  std::string newState;
+  Optional<std::string> trigger;
 
   [[nodiscard]] folly::dynamic toDynamic() const override;
 };
@@ -723,12 +745,26 @@ class QLogMetricUpdateEvent : public QLogEvent {
       std::chrono::microseconds mrtt,
       std::chrono::microseconds srtt,
       std::chrono::microseconds ackDelay,
-      std::chrono::microseconds refTime);
+      std::chrono::microseconds refTime,
+      Optional<std::chrono::microseconds> rttVar = std::nullopt,
+      Optional<uint64_t> congestionWindow = std::nullopt,
+      Optional<uint64_t> bytesInFlight = std::nullopt,
+      Optional<uint64_t> ssthresh = std::nullopt,
+      Optional<uint64_t> packetsInFlight = std::nullopt,
+      Optional<uint64_t> pacingRateBytesPerSec = std::nullopt,
+      Optional<uint32_t> ptoCount = std::nullopt);
   ~QLogMetricUpdateEvent() override = default;
   std::chrono::microseconds latestRtt;
   std::chrono::microseconds mrtt;
   std::chrono::microseconds srtt;
   std::chrono::microseconds ackDelay;
+  Optional<std::chrono::microseconds> rttVar;
+  Optional<uint64_t> congestionWindow;
+  Optional<uint64_t> bytesInFlight;
+  Optional<uint64_t> ssthresh;
+  Optional<uint64_t> packetsInFlight;
+  Optional<uint64_t> pacingRateBytesPerSec;
+  Optional<uint32_t> ptoCount;
   [[nodiscard]] folly::dynamic toDynamic() const override;
 };
 

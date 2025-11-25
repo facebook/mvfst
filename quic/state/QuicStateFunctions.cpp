@@ -87,7 +87,17 @@ void updateRtt(
   // inform qlog
   if (conn.qLogger) {
     conn.qLogger->addMetricUpdate(
-        rttSample, conn.lossState.mrtt, conn.lossState.srtt, ackDelay);
+        rttSample,
+        conn.lossState.mrtt,
+        conn.lossState.srtt,
+        ackDelay,
+        conn.lossState.rttvar,
+        std::nullopt,
+        conn.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn.lossState.ptoCount);
   }
 }
 

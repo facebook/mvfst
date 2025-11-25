@@ -64,12 +64,25 @@ constexpr auto kZeroRttAccepted = "zerortt accepted";
 constexpr auto kZeroRttAttempted = "zerortt attempted";
 constexpr auto kRecalculateTimeToOrigin = "recalculate time to origin";
 constexpr auto kAbort = "abort";
-constexpr auto kQLogVersion = "draft-00";
+
+// IETF qlog schema version and URIs (draft-ietf-quic-qlog-main-schema-latest)
+constexpr auto kQLogVersion = "0.4";
+constexpr auto kQLogFileSchemaURI = "urn:ietf:params:qlog:file:contained";
+constexpr auto kQLogSerializationFormat = "application/qlog+json";
+constexpr auto kQLogEventSchemaURI = "urn:ietf:params:qlog:events:quic";
+constexpr auto kQLogMvfstEventSchemaURI = "urn:ietf:params:qlog:events:mvfst";
+
 constexpr auto kQLogTitle = "mvfst qlog";
 constexpr auto kQLogDescription = "Converted from file";
 constexpr auto kQLogTraceTitle = "mvfst qlog from single connection";
 constexpr auto kQLogTraceDescription = "Generated qlog from connection";
-constexpr auto kQLogTimeUnits = "us";
+
+constexpr auto kQLogTimeUnits = "microseconds";
+constexpr auto kQLogTimeFormatRelativeToEpoch = "relative_to_epoch";
+constexpr auto kQLogTimeFormatRelativeToPrevious = "relative_to_previous_event";
+constexpr auto kQLogClockTypeSystem = "system";
+constexpr auto kQLogClockTypeMonotonic = "monotonic";
+
 constexpr auto kQLogVersionField = "qlog_version";
 constexpr auto kQLogTitleField = "title";
 constexpr auto kQLogDescriptionField = "description";

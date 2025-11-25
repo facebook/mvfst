@@ -310,16 +310,6 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   EXPECT_EQ(stream.currentReadOffset, 100);
   EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 100);
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 2);
-  std::array<int, 2> offsets = {0, 200};
-  for (int i = 0; i < 2; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-    EXPECT_EQ(event->update, getFlowControlEvent(offsets[i]));
-  }
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {

@@ -584,9 +584,6 @@ quic::Expected<void, QuicError>
 QuicServerTransport::maybeWriteNewSessionTicket() {
   if (shouldWriteNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
-    if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kWriteNst);
-    }
     newSessionTicketWrittenTimestamp_ = Clock::now();
     Optional<uint64_t> cwndHint = std::nullopt;
     if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
@@ -705,9 +702,6 @@ void QuicServerTransport::maybeIssueConnectionIds() {
 
 void QuicServerTransport::maybeNotifyTransportReady() {
   if (!transportReadyNotified_ && connSetupCallback_ && hasWriteCipher()) {
-    if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kTransportReady);
-    }
     transportReadyNotified_ = true;
     connSetupCallback_->onTransportReady();
 

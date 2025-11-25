@@ -38,8 +38,18 @@ void Copa::onRemoveBytesFromInflight(uint64_t /* bytes */) {
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        conn_.lossState.inflightBytes, getCongestionWindow(), kRemoveInflight);
+    conn_.qLogger->addMetricUpdate(
+        conn_.lossState.lrtt,
+        conn_.lossState.mrtt,
+        conn_.lossState.srtt,
+        conn_.lossState.maybeLrttAckDelay.value_or(0us),
+        conn_.lossState.rttvar,
+        getCongestionWindow(),
+        conn_.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn_.lossState.ptoCount);
   }
 }
 
@@ -51,10 +61,18 @@ void Copa::onPacketSent(const OutstandingPacketWrapper& packet) {
            << " packetNum=" << packet.packet.header.getPacketSequenceNum()
            << " " << conn_;
   if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        conn_.lossState.inflightBytes,
+    conn_.qLogger->addMetricUpdate(
+        conn_.lossState.lrtt,
+        conn_.lossState.mrtt,
+        conn_.lossState.srtt,
+        conn_.lossState.maybeLrttAckDelay.value_or(0us),
+        conn_.lossState.rttvar,
         getCongestionWindow(),
-        kCongestionPacketSent);
+        conn_.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn_.lossState.ptoCount);
   }
 }
 
@@ -173,10 +191,18 @@ void Copa::onPacketAcked(const AckEvent& ack) {
            << conn_;
 
   if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        conn_.lossState.inflightBytes,
+    conn_.qLogger->addMetricUpdate(
+        conn_.lossState.lrtt,
+        conn_.lossState.mrtt,
+        conn_.lossState.srtt,
+        conn_.lossState.maybeLrttAckDelay.value_or(0us),
+        conn_.lossState.rttvar,
         getCongestionWindow(),
-        kCongestionPacketAck);
+        conn_.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn_.lossState.ptoCount);
   }
 
   if (rttStandingMicroSec < rttMin.count()) {
@@ -292,10 +318,18 @@ void Copa::onPacketLoss(const LossEvent& loss) {
            << " lostPackets=" << loss.lostPackets << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        conn_.lossState.inflightBytes,
+    conn_.qLogger->addMetricUpdate(
+        conn_.lossState.lrtt,
+        conn_.lossState.mrtt,
+        conn_.lossState.srtt,
+        conn_.lossState.maybeLrttAckDelay.value_or(0us),
+        conn_.lossState.rttvar,
         getCongestionWindow(),
-        kCongestionPacketLoss);
+        conn_.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn_.lossState.ptoCount);
   }
   DCHECK(loss.largestLostPacketNum.has_value());
   if (loss.persistentCongestion) {
@@ -304,10 +338,18 @@ void Copa::onPacketLoss(const LossEvent& loss) {
              << " cwnd=" << cwndBytes_
              << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
     if (conn_.qLogger) {
-      conn_.qLogger->addCongestionMetricUpdate(
-          conn_.lossState.inflightBytes,
+      conn_.qLogger->addMetricUpdate(
+          conn_.lossState.lrtt,
+          conn_.lossState.mrtt,
+          conn_.lossState.srtt,
+          conn_.lossState.maybeLrttAckDelay.value_or(0us),
+          conn_.lossState.rttvar,
           getCongestionWindow(),
-          kPersistentCongestion);
+          conn_.lossState.inflightBytes,
+          std::nullopt,
+          std::nullopt,
+          std::nullopt,
+          conn_.lossState.ptoCount);
     }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
     if (conn_.pacer) {

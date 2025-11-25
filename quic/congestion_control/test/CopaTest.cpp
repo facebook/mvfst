@@ -201,13 +201,12 @@ TEST_F(CopaTest, PersistentCongestion) {
   quic::test::onPacketsSentWrapper(&conn, &copa, pkt);
 
   std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, 10);
-  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent);
+  auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(*event->bytesInFlight, 10);
+  EXPECT_EQ(*event->congestionWindow, kDefaultCwnd);
 
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
@@ -239,19 +238,17 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   EXPECT_EQ(copa.getWritableBytes(), originalWritableBytes - ackedSize + 2);
 
   std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 2);
   auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, ackedSize);
-  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent);
+  auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(*event->bytesInFlight, ackedSize);
+  EXPECT_EQ(*event->congestionWindow, kDefaultCwnd);
 
   auto tmp2 = std::move(qLogger->logs[indices[1]]);
-  auto event2 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp2.get());
-  EXPECT_EQ(event2->bytesInFlight, ackedSize - 2);
-  EXPECT_EQ(event2->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event2->congestionEvent, kRemoveInflight);
+  auto event2 = dynamic_cast<QLogMetricUpdateEvent*>(tmp2.get());
+  EXPECT_EQ(*event2->bytesInFlight, ackedSize - 2);
+  EXPECT_EQ(*event2->congestionWindow, kDefaultCwnd);
 }
 
 TEST_F(CopaTest, TestSlowStartAck) {
@@ -303,13 +300,12 @@ TEST_F(CopaTest, TestSlowStartAck) {
   EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
 
   std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 11); // mostly congestionPacketSent logs
   auto tmp = std::move(qLogger->logs[indices[10]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
-  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
+  auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(*event->bytesInFlight, copa.getBytesInFlight());
+  EXPECT_EQ(*event->congestionWindow, kDefaultCwnd);
 
   now += 50ms;
   packetNumToAck++;
@@ -608,13 +604,12 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   quic::test::onPacketAckOrLossWrapper(&conn, &copa, ack, loss);
 
   std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
-  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketLoss);
+  auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(*event->bytesInFlight, copa.getBytesInFlight());
+  EXPECT_EQ(*event->congestionWindow, kDefaultCwnd);
 }
 
 TEST_F(CopaTest, PacketLossInvokesPacer) {

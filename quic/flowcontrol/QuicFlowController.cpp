@@ -147,10 +147,8 @@ bool maybeSendConnWindowUpdate(
   if (newAdvertisedOffset) {
     conn.pendingEvents.connWindowUpdate = true;
     QUIC_STATS(conn.statsCallback, onConnFlowControlUpdate);
-    if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(
-          getFlowControlEvent(newAdvertisedOffset.value()));
-    }
+    // Note: Flow control updates are redundant - MAX_DATA frames already
+    // logged in packet events
     if (conn.transportSettings.autotuneReceiveConnFlowControl) {
       maybeIncreaseConnectionFlowControlWindow(
           flowControlState, updateTime, conn.lossState.srtt);
@@ -296,10 +294,7 @@ quic::Expected<void, QuicError> updateFlowControlOnWriteToSocket(
   stream.conn.flowControlState.sumCurStreamBufferLen -= length;
   if (stream.conn.flowControlState.sumCurWriteOffset ==
       stream.conn.flowControlState.peerAdvertisedMaxOffset) {
-    if (stream.conn.qLogger) {
-      stream.conn.qLogger->addTransportStateUpdate(
-          getFlowControlEvent(stream.conn.flowControlState.sumCurWriteOffset));
-    }
+    // Note: Flow control blocked events are redundant
     QUIC_STATS(stream.conn.statsCallback, onConnFlowControlBlocked);
   }
   return {};
@@ -338,10 +333,7 @@ void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
       stream.pendingWrites.empty()) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
-    if (stream.conn.qLogger) {
-      stream.conn.qLogger->addTransportStateUpdate(
-          getFlowControlEvent(stream.conn.flowControlState.sumCurWriteOffset));
-    }
+    // Note: Flow control blocked events are redundant
     QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlBlocked);
   }
 }
@@ -383,10 +375,7 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
     stream.flowControlState.pendingBlockedFrame = true;
-    if (stream.conn.qLogger) {
-      stream.conn.qLogger->addTransportStateUpdate(
-          getFlowControlEvent(stream.flowControlState.peerAdvertisedMaxOffset));
-    }
+    // Note: Flow control blocked events are redundant
     QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlBlocked);
   }
 }
@@ -394,7 +383,7 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
 void handleStreamWindowUpdate(
     QuicStreamState& stream,
     uint64_t maximumData,
-    PacketNum packetNum) {
+    [[maybe_unused]] PacketNum packetNum) {
   if (stream.sendState == StreamSendState::Closed ||
       stream.sendState == StreamSendState::ResetSent) {
     // Flow control updates are not meaningful.
@@ -409,10 +398,8 @@ void handleStreamWindowUpdate(
     }
     stream.conn.streamManager->updateWritableStreams(
         stream, getSendConnFlowControlBytesWire(stream.conn) > 0);
-    if (stream.conn.qLogger) {
-      stream.conn.qLogger->addTransportStateUpdate(
-          getRxStreamWU(stream.id, packetNum, maximumData));
-    }
+    // Note: Stream window updates are redundant - MAX_STREAM_DATA frames
+    // already logged in packet events
   }
   // Peer sending a smaller max offset than previously advertised is legal but
   // ignored.
@@ -421,14 +408,12 @@ void handleStreamWindowUpdate(
 void handleConnWindowUpdate(
     QuicConnectionStateBase& conn,
     const MaxDataFrame& frame,
-    PacketNum packetNum) {
+    [[maybe_unused]] PacketNum packetNum) {
   if (conn.flowControlState.peerAdvertisedMaxOffset <= frame.maximumData) {
     conn.flowControlState.peerAdvertisedMaxOffset = frame.maximumData;
     conn.streamManager->onMaxData();
-    if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(
-          getRxConnWU(packetNum, frame.maximumData));
-    }
+    // Note: Connection window updates are redundant - MAX_DATA frames already
+    // logged in packet events
   }
   // Peer sending a smaller max offset than previously advertised is legal but
   // ignored.

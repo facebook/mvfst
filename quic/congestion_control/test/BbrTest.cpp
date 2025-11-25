@@ -89,20 +89,12 @@ TEST_F(BbrTest, Recovery) {
   EXPECT_EQ(expectedRecoveryWindow, bbr.getCongestionWindow());
 
   std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, inflightBytes);
-  EXPECT_EQ(event->currentCwnd, expectedRecoveryWindow);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
-  EXPECT_EQ(
-      event->state,
-      bbrStateToString(BbrCongestionController::BbrState::Startup));
-  EXPECT_EQ(
-      event->recoveryState,
-      bbrRecoveryStateToString(
-          BbrCongestionController::RecoveryState::CONSERVATIVE));
+  auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(*event->bytesInFlight, inflightBytes);
+  EXPECT_EQ(*event->congestionWindow, expectedRecoveryWindow);
 
   // Sleep 1ms to make next now() a bit far from previous now().
   std::this_thread::sleep_for(1ms);
@@ -603,20 +595,12 @@ TEST_F(BbrTest, AckAggregation) {
   sendAckGrow(true);
 
   std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, 0);
-  EXPECT_EQ(event->currentCwnd, bbr.getCongestionWindow());
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
-  EXPECT_EQ(
-      event->state,
-      bbrStateToString(BbrCongestionController::BbrState::Startup));
-  EXPECT_EQ(
-      event->recoveryState,
-      bbrRecoveryStateToString(
-          BbrCongestionController::RecoveryState::NOT_RECOVERY));
+  auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(*event->bytesInFlight, 0);
+  EXPECT_EQ(*event->congestionWindow, bbr.getCongestionWindow());
 
   // kStartupSlowGrowRoundLimit consecutive slow growth to leave Startup
   for (int i = 0; i <= kStartupSlowGrowRoundLimit; i++) {

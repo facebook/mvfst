@@ -756,13 +756,6 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReadBasic) {
 
   EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
   EXPECT_EQ(generateMaxStreamDataFrame(stream).maximumData, 400);
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, getFlowControlEvent(700));
 }
 
 // We've received a reliable reset. Now, we're receiving additional data,
@@ -957,13 +950,6 @@ TEST_F(QuicFlowControlTest, HandleStreamWindowUpdate) {
 
   EXPECT_NO_THROW(handleStreamWindowUpdate(stream, 200, 3));
   EXPECT_EQ(stream.flowControlState.peerAdvertisedMaxOffset, 300);
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, getRxStreamWU(id, 2, 300));
 }
 
 TEST_F(QuicFlowControlTest, HandleConnWindowUpdate) {

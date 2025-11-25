@@ -49,10 +49,23 @@ class MockQLogger : public QLogger {
   MOCK_METHOD(
       void,
       addMetricUpdate,
-      (std::chrono::microseconds,
-       std::chrono::microseconds,
-       std::chrono::microseconds,
-       std::chrono::microseconds));
+      (std::chrono::microseconds latestRtt,
+       std::chrono::microseconds mrtt,
+       std::chrono::microseconds srtt,
+       std::chrono::microseconds ackDelay,
+       Optional<std::chrono::microseconds> rttVar,
+       Optional<uint64_t> congestionWindow,
+       Optional<uint64_t> bytesInFlight,
+       Optional<uint64_t> ssthresh,
+       Optional<uint64_t> packetsInFlight,
+       Optional<uint64_t> pacingRateBytesPerSec,
+       Optional<uint32_t> ptoCount));
+  MOCK_METHOD(
+      void,
+      addCongestionStateUpdate,
+      (Optional<std::string> oldState,
+       std::string newState,
+       Optional<std::string> trigger));
   MOCK_METHOD(
       void,
       addStreamStateUpdate,

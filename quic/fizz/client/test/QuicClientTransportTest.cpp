@@ -4718,16 +4718,6 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
       socketWrites,
       *makeHandshakeCodec(),
       QuicFrame::Type::ConnectionCloseFrame));
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(
-      event->update,
-      getPeerClose(
-          "Client closed by peer reason=Stand clear of the closing doors, please"));
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationCloseNoError) {

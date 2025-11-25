@@ -563,8 +563,6 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       serverWrites,
       *makeClientEncryptedCodec(),
       QuicFrame::Type::ConnectionCloseFrame));
-  checkTransportStateUpdate(
-      qLogger, "Server closed by peer reason=Mind the gap");
 }
 
 TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
@@ -1348,13 +1346,6 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
       findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame>());
 
   EXPECT_GT(numStopSendingPackets, 1);
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, kLossTimeoutExpired);
 }
 
 TEST_F(QuicServerTransportTest, TestAckStopSending) {
@@ -1504,7 +1495,6 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
       serverWrites,
       *makeClientEncryptedCodec(),
       QuicFrame::Type::ConnectionCloseFrame));
-  checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
 TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
@@ -1599,7 +1589,6 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
         *makeClientEncryptedCodec(),
         QuicFrame::Type::ConnectionCloseFrame));
     ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), 0);
-    checkTransportStateUpdate(qLogger, std::move(closedMsg));
   }
 }
 
@@ -1641,7 +1630,6 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
       serverWrites,
       *makeClientEncryptedCodec(),
       QuicFrame::Type::ConnectionCloseFrame));
-  checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
 TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
@@ -3065,21 +3053,6 @@ TEST_F(
   recvClientFinished();
   loopForWrites();
   EXPECT_EQ(server->getConn().writableBytesLimit, std::nullopt);
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 5);
-  std::array<::std::string, 5> updateArray = {
-      kDerivedZeroRttReadCipher,
-      kDerivedOneRttWriteCipher,
-      kTransportReady,
-      kDerivedOneRttReadCipher,
-      kWriteNst};
-  for (int i = 0; i < 5; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-    EXPECT_EQ(event->update, updateArray[i]);
-  }
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
@@ -3219,16 +3192,6 @@ TEST_F(
           server->getConn().udpSendPacketLen;
   EXPECT_NE(originalUdpSize, server->getConn().udpSendPacketLen);
   EXPECT_EQ(*server->getNonConstConn().writableBytesLimit, expectedLen);
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 3);
-  std::array<::std::string, 3> updateArray = {
-      kDerivedZeroRttReadCipher, kDerivedOneRttWriteCipher, kTransportReady};
-  for (int i = 0; i < 3; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-    EXPECT_EQ(event->update, updateArray[i]);
-  }
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, MaxReceivePacketSizeTooLarge) {

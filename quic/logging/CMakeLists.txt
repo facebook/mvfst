@@ -10,6 +10,7 @@ add_library(
   QLogger.cpp
   QLoggerConstants.cpp
   QLoggerTypes.cpp
+  QLogSchema.cpp
 )
 
 set_property(TARGET mvfst_qlogger PROPERTY VERSION ${PACKAGE_VERSION})

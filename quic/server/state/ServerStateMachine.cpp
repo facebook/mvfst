@@ -539,9 +539,6 @@ quic::Expected<void, QuicError> updateHandshakeState(
 
   if (zeroRttReadCipher) {
     conn.usedZeroRtt = true;
-    if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(kDerivedZeroRttReadCipher);
-    }
     conn.readCodec->setZeroRttReadCipher(std::move(zeroRttReadCipher));
   }
   if (zeroRttHeaderCipher) {
@@ -555,9 +552,6 @@ quic::Expected<void, QuicError> updateHandshakeState(
   }
 
   if (oneRttWriteCipher) {
-    if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher);
-    }
     if (conn.oneRttWriteCipher) {
       return quic::make_unexpected(QuicError(
           TransportErrorCode::CRYPTO_ERROR, "Duplicate 1-rtt write cipher"));
@@ -582,9 +576,6 @@ quic::Expected<void, QuicError> updateHandshakeState(
     updateNegotiatedAckFeatures(conn);
   }
   if (oneRttReadCipher) {
-    if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(kDerivedOneRttReadCipher);
-    }
     // Clear limit because CFIN is received at this point
     conn.isClientAddrVerified = true;
     conn.writableBytesLimit.reset();
@@ -1567,9 +1558,6 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           VLOG(4) << errMsg << " " << conn;
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
-          if (conn.qLogger) {
-            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-          }
           conn.peerConnectionError =
               QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
           if (getSendConnFlowControlBytesWire(conn) == 0 &&
@@ -1879,9 +1867,6 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
         auto errMsg = fmt::format(
             "Server closed by peer reason={}", connFrame.reasonPhrase);
         VLOG(4) << errMsg << " " << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-        }
         // we want to deliver app callbacks with the peer supplied error,
         // but send a NO_ERROR to the peer.
         conn.peerConnectionError =

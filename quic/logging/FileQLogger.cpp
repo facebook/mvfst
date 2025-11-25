@@ -8,6 +8,7 @@
 #include <quic/logging/FileQLogger.h>
 
 #include <fstream>
+#include <vector>
 
 #include <folly/json/json.h> // @manual=//folly:dynamic
 
@@ -34,6 +35,8 @@ void FileQLogger::setupStream() {
     LOG(ERROR) << "Error: No dcid found";
     return;
   }
+  numEvents_ = 0;
+  startTime_ = std::chrono::microseconds::zero();
   endLine_ = prettyJson_ ? "\n" : "";
   auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
   std::string outputPath =
@@ -109,40 +112,31 @@ void FileQLogger::finishStream() {
   if (!writer_) {
     return;
   }
+
   // finish copying the line that was stopped on
   std::string unfinishedLine(
       &eventLine_[pos_ + token_.size()],
       eventLine_.size() - pos_ - token_.size() - (prettyJson_ ? 0 : 1));
+
   if (!prettyJson_) {
     writeToStream(unfinishedLine);
+
+    writeToStream(folly::StringPiece("}"));
   } else {
-    // copy all the remaining lines but the last one
-    std::string previousLine = eventsPadding_ + unfinishedLine;
+    std::vector<std::string> remainingLines;
+    remainingLines.push_back(eventsPadding_ + unfinishedLine);
+
     while (getline(baseJson_, eventLine_)) {
-      writeToStream(endLine_);
-      writeToStream(previousLine);
-      previousLine = eventLine_;
+      remainingLines.push_back(eventLine_);
+    }
+
+    for (size_t i = 0; i < remainingLines.size(); ++i) {
+      if (i > 0) {
+        writeToStream(endLine_);
+      }
+      writeToStream(remainingLines[i]);
     }
   }
-  writeToStream(folly::StringPiece(","));
-  writeToStream(endLine_);
-
-  // generate and add the summary
-  auto summary = generateSummary(numEvents_, startTime_, endTime_);
-  auto summaryJson =
-      prettyJson_ ? folly::toPrettyJson(summary) : folly::toJson(summary);
-  std::stringstream summaryBuffer;
-  std::string line;
-  writeToStream(
-      prettyJson_ ? (basePadding_ + "\"summary\" : ") : "\"summary\":");
-  summaryBuffer << summaryJson;
-  std::string summaryPadding;
-  // add padding to every line in the summary except the first
-  while (getline(summaryBuffer, line)) {
-    writeToStream(fmt::format("{}{}{}", summaryPadding, line, endLine_));
-    summaryPadding = basePadding_;
-  }
-  writeToStream(folly::StringPiece("}"));
 
   // Finalize compression frame
   if (compress_) {
@@ -177,13 +171,17 @@ void FileQLogger::handleEvent(std::unique_ptr<QLogEvent> event) {
     std::string line;
     eventBuffer << eventJson;
 
-    if (numEvents_ > 1) {
-      writeToStream(folly::StringPiece(","));
-    }
-
-    // add padding to every line in the event
+    bool firstLine = true;
     while (getline(eventBuffer, line)) {
-      writeToStream(endLine_);
+      if (firstLine) {
+        if (numEvents_ > 1) {
+          writeToStream(folly::StringPiece(","));
+        }
+        writeToStream(endLine_);
+        firstLine = false;
+      } else {
+        writeToStream(endLine_);
+      }
       writeToStream(fmt::format("{}{}{}", basePadding_, eventsPadding_, line));
     }
 
@@ -283,6 +281,21 @@ void FileQLogger::addCongestionMetricUpdate(
           std::move(congestionEvent),
           std::move(state),
           std::move(recoveryState),
+          refTime));
+}
+
+void FileQLogger::addCongestionStateUpdate(
+    Optional<std::string> oldState,
+    std::string newState,
+    Optional<std::string> trigger) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now().time_since_epoch());
+
+  handleEvent(
+      std::make_unique<quic::QLogCongestionStateUpdateEvent>(
+          std::move(oldState),
+          std::move(newState),
+          std::move(trigger),
           refTime));
 }
 
@@ -394,6 +407,21 @@ void FileQLogger::addPacketsLost(
 }
 
 void FileQLogger::addTransportStateUpdate(std::string update) {
+  static const std::unordered_set<std::string> validStates = {
+      "attempted",
+      "handshake_started",
+      "handshake_complete",
+      "closed",
+      "peer_validated",
+      "early_write",
+      "handshake_confirmed",
+      "closing",
+      "draining"};
+
+  if (validStates.find(update) == validStates.end()) {
+    return;
+  }
+
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
@@ -417,72 +445,93 @@ void FileQLogger::addMetricUpdate(
     std::chrono::microseconds latestRtt,
     std::chrono::microseconds mrtt,
     std::chrono::microseconds srtt,
-    std::chrono::microseconds ackDelay) {
+    std::chrono::microseconds ackDelay,
+    Optional<std::chrono::microseconds> rttVar,
+    Optional<uint64_t> congestionWindow,
+    Optional<uint64_t> bytesInFlight,
+    Optional<uint64_t> ssthresh,
+    Optional<uint64_t> packetsInFlight,
+    Optional<uint64_t> pacingRateBytesPerSec,
+    Optional<uint32_t> ptoCount) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(
       std::make_unique<quic::QLogMetricUpdateEvent>(
-          latestRtt, mrtt, srtt, ackDelay, refTime));
+          latestRtt,
+          mrtt,
+          srtt,
+          ackDelay,
+          refTime,
+          rttVar,
+          congestionWindow,
+          bytesInFlight,
+          ssthresh,
+          packetsInFlight,
+          pacingRateBytesPerSec,
+          ptoCount));
 }
 
 folly::dynamic FileQLogger::toDynamic() const {
-  folly::dynamic dynamicObj = toDynamicBase();
+  folly::dynamic qlogFile = toDynamicBase();
 
-  dynamicObj["summary"] =
-      generateSummary(logs.size(), logs[0]->refTime, logs.back()->refTime);
-
-  // convert stored logs into folly::Dynamic event array
   auto events = folly::dynamic::array();
   for (auto& event : logs) {
     events.push_back(event->toDynamic());
   }
 
-  dynamicObj["traces"][0]["events"] = events;
+  qlogFile["traces"][0]["events"] = events;
 
-  return dynamicObj;
+  return qlogFile;
 }
 
 folly::dynamic FileQLogger::toDynamicBase() const {
-  folly::dynamic dynamicObj = folly::dynamic::object;
-  dynamicObj[kQLogVersionField] = kQLogVersion;
-  dynamicObj[kQLogTitleField] = kQLogTitle;
-  dynamicObj[kQLogDescriptionField] = kQLogDescription;
+  folly::dynamic qlogFile = folly::dynamic::object();
 
-  dynamicObj["traces"] = folly::dynamic::array();
-  folly::dynamic dynamicTrace = folly::dynamic::object;
+  qlogFile["description"] = kQLogDescription;
+  qlogFile["file_schema"] = kQLogFileSchemaURI;
+  qlogFile["serialization_format"] = kQLogSerializationFormat;
+  qlogFile["title"] = kQLogTitle;
 
-  dynamicTrace["vantage_point"] =
-      folly::dynamic::object("type", vantagePointString(vantagePoint))(
-          "name", vantagePointString(vantagePoint));
-  dynamicTrace["title"] = kQLogTraceTitle;
-  dynamicTrace["description"] = kQLogTraceDescription;
-  dynamicTrace["configuration"] =
-      folly::dynamic::object("time_offset", 0)("time_units", kQLogTimeUnits);
+  folly::dynamic trace = folly::dynamic::object();
+  trace["title"] = kQLogTraceTitle;
+  trace["description"] = kQLogTraceDescription;
 
-  std::string dcidStr = dcid.has_value() ? dcid.value().hex() : "";
-  std::string scidStr = scid.has_value() ? scid.value().hex() : "";
-  folly::dynamic commonFieldsObj = folly::dynamic::object;
-  commonFieldsObj["reference_time"] = "0";
-  commonFieldsObj["dcid"] = dcidStr;
-  commonFieldsObj["scid"] = scidStr;
-  commonFieldsObj["protocol_type"] = protocolType;
-  dynamicTrace["common_fields"] = std::move(commonFieldsObj);
+  auto vpInfo = createVantagePoint(vantagePoint, "");
+  trace["vantage_point"] = vpInfo.toDynamic();
 
-  dynamicTrace["events"] = folly::dynamic::array();
-  dynamicTrace["event_fields"] =
-      folly::dynamic::array("relative_time", "category", "event", "data");
+  trace["event_schemas"] =
+      folly::dynamic::array(kQLogEventSchemaURI, kQLogMvfstEventSchemaURI);
 
-  dynamicObj["traces"].push_back(dynamicTrace);
+  folly::dynamic commonFieldsDyn = folly::dynamic::object();
+  commonFieldsDyn["odcid"] = dcid.has_value() ? dcid.value().hex() : "";
 
-  return dynamicObj;
+  if (!protocolType.empty()) {
+    commonFieldsDyn["protocol_type"] = protocolType;
+  }
+  folly::dynamic refTime = folly::dynamic::object();
+  refTime["clock_type"] = kQLogClockTypeMonotonic;
+  refTime["epoch"] = "unknown";
+  commonFieldsDyn["reference_time"] = std::move(refTime);
+  commonFieldsDyn["time_format"] = kQLogTimeFormatRelativeToEpoch;
+
+  commonFieldsDyn["scid"] = scid.has_value() ? scid.value().hex() : "";
+
+  trace["common_fields"] = std::move(commonFieldsDyn);
+
+  trace["events"] = folly::dynamic::array();
+
+  qlogFile["traces"] = folly::dynamic::array();
+  qlogFile["traces"].push_back(std::move(trace));
+
+  return qlogFile;
 }
 
 folly::dynamic FileQLogger::generateSummary(
     size_t numEvents,
     std::chrono::microseconds startTime,
     std::chrono::microseconds endTime) const {
-  folly::dynamic summaryObj = folly::dynamic::object;
+  folly::dynamic summaryObj = folly::dynamic::object();
   summaryObj[kQLogTraceCountField] =
       1; // hardcoded, we only support 1 trace right now
 
@@ -490,7 +539,7 @@ folly::dynamic FileQLogger::generateSummary(
   // if there is <= 1 event, max_duration is 0
   // otherwise, it is the (time of the last event - time of the  first event)
   summaryObj["max_duration"] =
-      (numEvents == 0) ? 0 : (endTime - startTime).count();
+      (numEvents <= 1) ? 0 : (endTime - startTime).count();
   summaryObj["total_event_count"] = numEvents;
   return summaryObj;
 }

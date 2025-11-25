@@ -14,6 +14,7 @@
 #include <folly/logging/AsyncFileWriter.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/BaseQLogger.h>
+#include <quic/logging/QLogSchema.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerTypes.h>
 
@@ -102,7 +103,18 @@ class FileQLogger : public BaseQLogger {
       std::chrono::microseconds latestRtt,
       std::chrono::microseconds mrtt,
       std::chrono::microseconds srtt,
-      std::chrono::microseconds ackDelay) override;
+      std::chrono::microseconds ackDelay,
+      Optional<std::chrono::microseconds> rttVar = std::nullopt,
+      Optional<uint64_t> congestionWindow = std::nullopt,
+      Optional<uint64_t> bytesInFlight = std::nullopt,
+      Optional<uint64_t> ssthresh = std::nullopt,
+      Optional<uint64_t> packetsInFlight = std::nullopt,
+      Optional<uint64_t> pacingRateBytesPerSec = std::nullopt,
+      Optional<uint32_t> ptoCount = std::nullopt) override;
+  void addCongestionStateUpdate(
+      Optional<std::string> oldState,
+      std::string newState,
+      Optional<std::string> trigger) override;
   void addStreamStateUpdate(
       StreamId id,
       std::string update,

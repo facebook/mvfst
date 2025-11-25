@@ -112,12 +112,18 @@ void BbrCongestionController::onPacketLoss(
   if (loss.persistentCongestion) {
     recoveryWindow_ = conn_.udpSendPacketLen * kMinCwndInMssForBbr;
     if (conn_.qLogger) {
-      conn_.qLogger->addCongestionMetricUpdate(
-          conn_.lossState.inflightBytes,
+      conn_.qLogger->addMetricUpdate(
+          conn_.lossState.lrtt,
+          conn_.lossState.mrtt,
+          conn_.lossState.srtt,
+          conn_.lossState.maybeLrttAckDelay.value_or(0us),
+          conn_.lossState.rttvar,
           getCongestionWindow(),
-          kPersistentCongestion,
-          bbrStateToString(state_),
-          bbrRecoveryStateToString(recoveryState_));
+          conn_.lossState.inflightBytes,
+          std::nullopt,
+          std::nullopt,
+          std::nullopt,
+          conn_.lossState.ptoCount);
     }
   }
 }
@@ -192,12 +198,18 @@ void BbrCongestionController::onPacketAcked(
     bool hasLoss) {
   SCOPE_EXIT {
     if (conn_.qLogger) {
-      conn_.qLogger->addCongestionMetricUpdate(
-          conn_.lossState.inflightBytes,
+      conn_.qLogger->addMetricUpdate(
+          conn_.lossState.lrtt,
+          conn_.lossState.mrtt,
+          conn_.lossState.srtt,
+          conn_.lossState.maybeLrttAckDelay.value_or(0us),
+          conn_.lossState.rttvar,
           getCongestionWindow(),
-          kCongestionPacketAck,
-          bbrStateToString(state_),
-          bbrRecoveryStateToString(recoveryState_));
+          conn_.lossState.inflightBytes,
+          std::nullopt,
+          std::nullopt,
+          std::nullopt,
+          conn_.lossState.ptoCount);
     }
   };
   if (ack.implicit) {

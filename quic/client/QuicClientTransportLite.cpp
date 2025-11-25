@@ -737,9 +737,6 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         VLOG(4) << errMsg << " " << *this;
         // we want to deliver app callbacks with the peer supplied error,
         // but send a NO_ERROR to the peer.
-        if (conn_->qLogger) {
-          conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-        }
         conn_->peerConnectionError =
             QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
         // We don't return an error here, as receiving a close triggers the

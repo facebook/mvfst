@@ -86,41 +86,6 @@ TEST_F(CubicTest, PersistentCongestion) {
       makeAck(2, 3000, Clock::now(), packet3.metadata.time),
       std::nullopt);
 
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 10);
-  std::array<std::string, 10> congestionEventArr = {
-      kCubicInit,
-      kRemoveInflight,
-      kCubicLoss,
-      kPersistentCongestion,
-      kCongestionPacketAck,
-      kResetTimeToOrigin,
-      kResetLastReductionTime,
-      kCubicSteadyCwnd,
-      kCwndNoChange,
-      kCongestionPacketAck};
-
-  std::array<folly::StringPiece, 10> stateArr = {
-      cubicStateToString(CubicStates::Hystart),
-      cubicStateToString(CubicStates::Hystart),
-      cubicStateToString(CubicStates::FastRecovery),
-      cubicStateToString(CubicStates::Hystart),
-      cubicStateToString(CubicStates::Steady),
-      cubicStateToString(CubicStates::Steady),
-      cubicStateToString(CubicStates::Steady),
-      cubicStateToString(CubicStates::Steady),
-      cubicStateToString(CubicStates::Steady),
-      cubicStateToString(CubicStates::Steady)};
-
-  for (int i = 0; i < 10; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-    EXPECT_EQ(event->bytesInFlight, 0);
-    EXPECT_EQ(event->congestionEvent, congestionEventArr[i]);
-    EXPECT_EQ(event->state, stateArr[i]);
-    EXPECT_EQ(event->recoveryState, "");
-  }
   EXPECT_EQ(currentCwnd, cubic.getWritableBytes());
 }
 
@@ -191,13 +156,6 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
       std::nullopt);
   EXPECT_GE(cubic.getWritableBytes(), 2100);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, kRecalculateTimeToOrigin);
 }
 
 TEST_F(CubicTest, AppIdle) {
@@ -329,13 +287,6 @@ TEST_F(CubicTest, PacingGain) {
       makeAck(2, 1500, Clock::now(), packet2.metadata.time),
       std::nullopt);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, kRecalculateTimeToOrigin);
 }
 
 TEST_F(CubicTest, PacetLossInvokesPacer) {

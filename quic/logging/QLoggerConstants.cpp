@@ -35,7 +35,7 @@ folly::StringPiece toQlogString(FrameType frame) {
     case FrameType::STOP_SENDING:
       return "stop_sending";
     case FrameType::CRYPTO_FRAME:
-      return "crypto_frame";
+      return "crypto";
     case FrameType::NEW_TOKEN:
       return "new_token";
     case FrameType::STREAM:
