@@ -431,7 +431,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
           kHTTP3ProtocolType,
           qloggerPath_,
           true /* prettyJson*/,
-          false /* streaming */);
+          true /* streaming */);
       transport->setQLogger(std::move(qlogger));
       setPacingObserver(qlogger, transport.get(), pacingObserver_);
     } else {
