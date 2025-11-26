@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/system/HardwareConcurrency.h>
 #include <quic/server/async_tran/QuicAsyncTransportServer.h>
 
 namespace quic {
@@ -26,7 +27,7 @@ void QuicAsyncTransportServer::start(
     const folly::SocketAddress& address,
     size_t numThreads) {
   if (numThreads == 0) {
-    numThreads = std::thread::hardware_concurrency();
+    numThreads = folly::hardware_concurrency();
   }
   std::vector<folly::EventBase*> evbs;
   for (size_t i = 0; i < numThreads; ++i) {
