@@ -141,6 +141,10 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // Sequence number of the last received MAX_PACING_RATE_KNOB_SEQUENCED.
   Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{std::nullopt};
 
+  // Counter for consecutive migration failures (path validation failures on
+  // current path)
+  uint32_t consecutiveMigrationFailures{0};
+
   Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 
   QuicServerConnectionState(

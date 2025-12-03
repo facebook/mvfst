@@ -1769,4 +1769,392 @@ TEST_P(QuicServerTransportAllowMigrationTest, InitialClientCidMarkedInUse) {
   EXPECT_TRUE(foundInUseCid);
 }
 
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    ConsecutiveMigrationFailuresIncrementsCounter) {
+  auto& conn = server->getNonConstConn();
+
+  // Add additional peer id so migration can occur
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  auto firstPath = conn.pathManager->getPath(conn.currentPathId);
+  ASSERT_TRUE(firstPath);
+
+  // Initial counter should be zero
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+
+  // Migrate to a new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("migration data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+  EXPECT_EQ(newPath->status, PathStatus::Validating);
+
+  // Trigger path validation timeout (migration failure)
+  ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+  server->pathValidationTimeout().cancelTimerCallback();
+  auto& nonConstNewPath =
+      quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath->id);
+  nonConstNewPath.pathResponseDeadline = Clock::now() - 1ms;
+  server->pathValidationTimeout().timeoutExpired();
+
+  // Counter should be incremented
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 1);
+
+  // Should have reverted to fallback path
+  EXPECT_EQ(conn.currentPathId, firstPath->id);
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    ConnectionClosesAfterMaxConsecutiveMigrationFailures) {
+  auto& conn = server->getNonConstConn();
+
+  // Add additional peer ids so migrations can occur
+  for (uint32_t i = 1; i <= 6; ++i) {
+    conn.peerConnectionIds.emplace_back(
+        ConnectionId::createAndMaybeCrash(
+            std::vector<uint8_t>{
+                static_cast<uint8_t>(i),
+                static_cast<uint8_t>(i + 1),
+                static_cast<uint8_t>(i + 2),
+                static_cast<uint8_t>(i + 3)}),
+        i);
+  }
+
+  auto firstPath = conn.pathManager->getPath(conn.currentPathId);
+  ASSERT_TRUE(firstPath);
+
+  // Perform 5 consecutive migration failures
+  for (uint32_t i = 0; i < kMaxConsecutiveMigrationFailures; ++i) {
+    // Create a new peer address for each migration attempt
+    folly::SocketAddress newPeer(
+        "100.101.102." + std::to_string(100 + i), 23456 + i);
+
+    // Migrate to new peer
+    {
+      auto data = IOBuf::copyBuffer("migration data " + std::to_string(i));
+      auto packetData = packetToBuf(createStreamPacket(
+          *clientConnectionId,
+          *server->getConn().serverConnectionId,
+          clientNextAppDataPacketNum++,
+          2,
+          *data,
+          0 /* cipherOverhead */,
+          0 /* largestAcked */));
+      deliverData(std::move(packetData), true, &newPeer);
+    }
+
+    auto newPath =
+        conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+    ASSERT_TRUE(newPath);
+
+    // For the last iteration, connection should close during timeout
+    if (i == kMaxConsecutiveMigrationFailures - 1) {
+      // Counter should be at the limit - 1 before the timeout
+      EXPECT_EQ(
+          conn.consecutiveMigrationFailures,
+          kMaxConsecutiveMigrationFailures - 1);
+
+      // Trigger path validation timeout - this should close the connection
+      ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+      server->pathValidationTimeout().cancelTimerCallback();
+      auto& nonConstNewPath =
+          quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath->id);
+      nonConstNewPath.pathResponseDeadline = Clock::now() - 1ms;
+      server->pathValidationTimeout().timeoutExpired();
+
+      // Connection should be closed
+      EXPECT_TRUE(server->isClosed());
+      break;
+    } else {
+      // Trigger path validation timeout
+      ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+      server->pathValidationTimeout().cancelTimerCallback();
+      auto& nonConstNewPath =
+          quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath->id);
+      nonConstNewPath.pathResponseDeadline = Clock::now() - 1ms;
+      server->pathValidationTimeout().timeoutExpired();
+
+      // Counter should be incremented
+      EXPECT_EQ(conn.consecutiveMigrationFailures, i + 1);
+
+      // Should have reverted to fallback path
+      EXPECT_EQ(conn.currentPathId, firstPath->id);
+    }
+  }
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    MigrationFailureCounterResetsOnPacketReception) {
+  auto& conn = server->getNonConstConn();
+
+  // Add additional peer id so migration can occur
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  auto firstPath = conn.pathManager->getPath(conn.currentPathId);
+  ASSERT_TRUE(firstPath);
+
+  // Initial failure counter should be zero
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+
+  // Migrate to a new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("migration data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+
+  // Trigger path validation timeout (migration failure)
+  ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+  server->pathValidationTimeout().cancelTimerCallback();
+  auto& nonConstNewPath =
+      quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath->id);
+  nonConstNewPath.pathResponseDeadline = Clock::now() - 1ms;
+  server->pathValidationTimeout().timeoutExpired();
+
+  // Counter should be incremented, packet counter reset after revert
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 1);
+
+  // Should have reverted to fallback path
+  EXPECT_EQ(conn.currentPathId, firstPath->id);
+
+  // Send a packet on the current (fallback) path
+  {
+    auto data = IOBuf::copyBuffer("fallback data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), false);
+  }
+
+  // After first packet on current path, failure counter should reset
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    PingScheduledAfterMigrationFailureAndRevert) {
+  auto& conn = server->getNonConstConn();
+
+  // Add additional peer id so migration can occur
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  auto firstPath = conn.pathManager->getPath(conn.currentPathId);
+  ASSERT_TRUE(firstPath);
+
+  // Clear any pending pings
+  conn.pendingEvents.sendPing = false;
+
+  // Migrate to a new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("migration data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+
+  // Trigger path validation timeout (migration failure)
+  ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+  server->pathValidationTimeout().cancelTimerCallback();
+  auto& nonConstNewPath =
+      quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath->id);
+  nonConstNewPath.pathResponseDeadline = Clock::now() - 1ms;
+  server->pathValidationTimeout().timeoutExpired();
+
+  // Should have reverted to fallback path
+  EXPECT_EQ(conn.currentPathId, firstPath->id);
+
+  // Ping should be scheduled to confirm client is on fallback path
+  EXPECT_TRUE(conn.pendingEvents.sendPing);
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    SuccessfulMigrationDoesNotIncrementFailureCounter) {
+  auto& conn = server->getNonConstConn();
+
+  // Add additional peer id so migration can occur
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+
+  // Initial counter should be zero
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+
+  // Migrate to a new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("migration data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+  EXPECT_EQ(newPath->status, PathStatus::Validating);
+
+  // Get the challenge to validate the path
+  auto outstandingChallenge = getFirstOutstandingPathChallenge();
+  ASSERT_TRUE(outstandingChallenge);
+
+  // Send path response to validate the migration
+  {
+    auto packetData = packetToBuf(
+        makePacketWithPathResponseFrame(outstandingChallenge->pathData));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  // Path should be validated
+  EXPECT_EQ(newPath->status, PathStatus::Validated);
+
+  // Counter should still be zero (no failure occurred)
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    MigrationFailureCounterResetsOnMigrationToFallback) {
+  auto& conn = server->getNonConstConn();
+
+  // Add additional peer ids so migrations can occur
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 2);
+
+  auto firstPath = conn.pathManager->getPath(conn.currentPathId);
+  ASSERT_TRUE(firstPath);
+
+  // Initial failure counter should be zero
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+
+  // First migration that will fail
+  folly::SocketAddress newPeer1("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("migration data 1");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer1);
+  }
+
+  auto newPath1 =
+      conn.pathManager->getPath(server->getLocalAddress(), newPeer1);
+  ASSERT_TRUE(newPath1);
+  EXPECT_EQ(conn.currentPathId, newPath1->id);
+
+  // Trigger path validation timeout for first migration
+  ASSERT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+  server->pathValidationTimeout().cancelTimerCallback();
+  auto& nonConstNewPath1 =
+      quic::PathManagerTestAccessor::getNonConstPathInfo(conn, newPath1->id);
+  nonConstNewPath1.pathResponseDeadline = Clock::now() - 1ms;
+  server->pathValidationTimeout().timeoutExpired();
+
+  // Should have incremented counter and reverted to fallback
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 1);
+  EXPECT_EQ(conn.currentPathId, firstPath->id);
+
+  // Second migration to a different peer
+  folly::SocketAddress newPeer2("100.101.102.104", 23457);
+  {
+    auto data = IOBuf::copyBuffer("migration data 2");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer2);
+  }
+
+  auto newPath2 =
+      conn.pathManager->getPath(server->getLocalAddress(), newPeer2);
+  ASSERT_TRUE(newPath2);
+  EXPECT_EQ(conn.currentPathId, newPath2->id);
+
+  // Path validation is in progress, but before it times out,
+  // client sends a packet on the fallback path
+  {
+    auto data = IOBuf::copyBuffer("fallback data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &clientAddr);
+  }
+
+  // Should have migrated back to fallback path
+  EXPECT_EQ(conn.currentPathId, firstPath->id);
+
+  // Since the fallback path is validated, and we just received a packet on it
+  // (which triggered the migration), the failure counter should be reset
+  // immediately
+  EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
+}
+
 } // namespace quic::test

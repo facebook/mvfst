@@ -1464,6 +1464,18 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
       // We should fallback to the previously validated path or close the
       // connection if we don't have one.
 
+      // Increment consecutive migration failure counter
+      ++serverConn_->consecutiveMigrationFailures;
+
+      // Close connection if we've exceeded the limit
+      if (serverConn_->consecutiveMigrationFailures >=
+          kMaxConsecutiveMigrationFailures) {
+        closeImpl(QuicError(
+            QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
+            std::string("Too many consecutive migration failures")));
+        return;
+      }
+
       // This will reverse what ServerStateMachine::onConnectionMigration()
       // did. The reason it's here is that we want to be able to close the
       // connection, which is only possible from the transport.
@@ -1489,6 +1501,8 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
             }
             conn_->fallbackPathId.reset();
             migrationReverted = true;
+            // Schedule ping to confirm client is on fallback path
+            conn_->pendingEvents.sendPing = true;
           }
         }
       }

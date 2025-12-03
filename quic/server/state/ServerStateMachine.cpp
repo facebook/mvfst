@@ -741,13 +741,19 @@ quic::Expected<void, QuicError> onConnectionMigration(
         TransportErrorCode::INTERNAL_ERROR, "Inconsistent path state"));
   }
 
-  if (readPath->status != PathStatus::Validated &&
-      connPath->status == PathStatus::Validated) {
-    // We may need to fallback to the current path if the new path fails
-    // validation
-    conn.fallbackPathId = connPath->id;
-  } else {
+  // If migrating to the fallback path, reset consecutive failures immediately.
+  // The ongoing migration was probably spurious.
+  if (conn.fallbackPathId && *conn.fallbackPathId == readPathId) {
+    conn.consecutiveMigrationFailures = 0;
+  }
+
+  if (readPath->status == PathStatus::Validated) {
+    // We're migrating to a validated path. No fallback needed.
     conn.fallbackPathId.reset();
+  } else if (connPath->status == PathStatus::Validated) {
+    // We may need to fallback to the latest validated path if the new path
+    // fails validation
+    conn.fallbackPathId = connPath->id;
   }
 
   if (readPath->status != PathStatus::Validated &&
@@ -1673,6 +1679,13 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
       }
     } else {
+      // Reset consecutive migration failure counter if we received a packet on
+      // a validated current path
+      if (conn.consecutiveMigrationFailures > 0 &&
+          readPath.status == PathStatus::Validated) {
+        conn.consecutiveMigrationFailures = 0;
+      }
+
       if (auto shortHeader = regularPacket.header.asShort(); shortHeader &&
           shortHeader->getConnectionId() != conn.serverConnectionId) {
         // The client has switched the destination connection id it's using for

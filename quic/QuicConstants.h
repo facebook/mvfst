@@ -681,6 +681,10 @@ constexpr uint16_t kProbedPathGracePeriodInSRTT = 3;
 // after migration.
 constexpr uint16_t kClientTimeToKeepOldPathAfterMigration = 2;
 
+// Maximum number of consecutive migration failures (path validation failures
+// on the current path) before closing the connection.
+constexpr uint32_t kMaxConsecutiveMigrationFailures = 5;
+
 constexpr auto kMinimumNumOfParamsInTheTicket = 8;
 
 constexpr auto kStatelessResetTokenSecretLength = 32;
