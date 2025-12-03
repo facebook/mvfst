@@ -79,7 +79,6 @@ mvfst_cpp_library(
         "//quic/server/handshake:stateless_reset_generator",
         "//quic/server/handshake:token_generator",
         "//quic/server/third-party:siphash",
-        "//quic/state:quic_stream_utilities",
         "//quic/state:transport_settings_functions",
     ] + select({
         "DEFAULT": [
