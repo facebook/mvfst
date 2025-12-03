@@ -1421,8 +1421,9 @@ void QuicServerTransport::onPathValidationResult(const PathInfo& pathInfo) {
     }
     auto removePathRes = conn->conn_->pathManager->removePath(pathToRemove);
     if (removePathRes.hasError()) {
-      LOG(WARNING) << "Failed to remove " + pathType + " path: "
-                   << removePathRes.error();
+      // This is best effort since the path could have already been reaped.
+      VLOG(4) << "Removing " + pathType + " path error: "
+              << removePathRes.error();
     }
   };
 

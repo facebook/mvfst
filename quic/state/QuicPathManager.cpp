@@ -408,13 +408,10 @@ bool QuicPathManager::maybeRestoreCongestionControlAndRttStateForCurrentPath() {
       conn_.lossState.lrtt = rttSample;
       conn_.lossState.rttvar = 0us;
       conn_.lossState.mrtt = rttSample;
-    } else {
-      // We have nothing. Just reset everything.
-      conn_.lossState.srtt = 0us;
-      conn_.lossState.lrtt = 0us;
-      conn_.lossState.rttvar = 0us;
-      conn_.lossState.mrtt = kDefaultMinRtt;
     }
+    // If we don't have a valid RTT sample, leave the current state as-is.
+    // This is required to allow the PTO and path validation timeouts to
+    // function properly during the migration.
   }
 
   // Reset the cached state. If it was there, we either used or it's stale

@@ -554,16 +554,21 @@ TEST_F(QuicPathManagerTest, RestoreCongestionControlAndRttStateReset) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
+  connState_->lossState.srtt = 1ms;
+  connState_->lossState.lrtt = 2ms;
+  connState_->lossState.rttvar = 3ms;
+  connState_->lossState.mrtt = 4ms;
+
   connState_->currentPathId = id;
 
-  // No cached state or RTT sample - should reset to defaults
+  // No cached state or RTT sample - should be left as-is.
   bool ccaRestored =
       manager_->maybeRestoreCongestionControlAndRttStateForCurrentPath();
   EXPECT_FALSE(ccaRestored);
-  EXPECT_EQ(connState_->lossState.srtt, std::chrono::microseconds(0));
-  EXPECT_EQ(connState_->lossState.lrtt, std::chrono::microseconds(0));
-  EXPECT_EQ(connState_->lossState.rttvar, std::chrono::microseconds(0));
-  EXPECT_EQ(connState_->lossState.mrtt, kDefaultMinRtt);
+  EXPECT_EQ(connState_->lossState.srtt, 1ms);
+  EXPECT_EQ(connState_->lossState.lrtt, 2ms);
+  EXPECT_EQ(connState_->lossState.rttvar, 3ms);
+  EXPECT_EQ(connState_->lossState.mrtt, 4ms);
 }
 
 // Writable Bytes Tests

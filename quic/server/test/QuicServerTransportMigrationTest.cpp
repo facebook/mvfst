@@ -1010,10 +1010,10 @@ TEST_P(
   ASSERT_NE(conn.currentPathId, initialPath->id);
   auto newPath = conn.pathManager->getPath(conn.currentPathId);
   ASSERT_TRUE(newPath);
-  // The cached state is empty. The rtt/cca state is reset
-  EXPECT_EQ(conn.lossState.srtt, 0us);
-  EXPECT_EQ(conn.lossState.lrtt, 0us);
-  EXPECT_EQ(conn.lossState.rttvar, 0us);
+  // The cached state is empty. cca is reset. rtt is unchanged.
+  EXPECT_EQ(conn.lossState.srtt, 200ms);
+  EXPECT_EQ(conn.lossState.lrtt, 220ms);
+  EXPECT_EQ(conn.lossState.rttvar, 20ms);
   EXPECT_NE(conn.congestionController.get(), firstCongestionController);
   conn.lossState.srtt = 100ms;
   conn.lossState.lrtt = 110ms;
@@ -1056,12 +1056,13 @@ TEST_P(
       0 /* cipherOverhead */,
       0 /* largestAcked */));
   deliverData(std::move(packetData), true, &newPeer);
-  // The cached state is not used since the path is not validated
+  // The cached state is not used since the path is not validated. cca is reset.
+  // rtt is unchanged.
   ASSERT_EQ(conn.peerAddress, newPeer);
   ASSERT_NE(conn.currentPathId, initialPath->id);
-  EXPECT_EQ(conn.lossState.srtt, 0us);
-  EXPECT_EQ(conn.lossState.lrtt, 0us);
-  EXPECT_EQ(conn.lossState.rttvar, 0us);
+  EXPECT_EQ(conn.lossState.srtt, 200ms);
+  EXPECT_EQ(conn.lossState.lrtt, 220ms);
+  EXPECT_EQ(conn.lossState.rttvar, 20ms);
   EXPECT_NE(conn.congestionController.get(), firstCongestionController);
 }
 
@@ -1301,11 +1302,11 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientAddressChangeOutOfSubnet) {
 
   // State is cached for the first path
   EXPECT_TRUE(firstPath->cachedCCAndRttState);
-  // The cc and rtt state is reset
-  EXPECT_EQ(conn.lossState.srtt, 0us);
-  EXPECT_EQ(conn.lossState.lrtt, 0us);
-  EXPECT_EQ(conn.lossState.rttvar, 0us);
-  EXPECT_EQ(conn.lossState.mrtt, kDefaultMinRtt);
+  // The rtt state is unchanged since we have nothing to restore. cca is reset.
+  EXPECT_EQ(conn.lossState.lrtt, 100ms);
+  EXPECT_EQ(conn.lossState.srtt, 120ms);
+  EXPECT_EQ(conn.lossState.rttvar, 20ms);
+  EXPECT_EQ(conn.lossState.mrtt, 80ms);
   EXPECT_NE(conn.congestionController.get(), congestionController);
 }
 
