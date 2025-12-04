@@ -189,23 +189,24 @@ class MockQuicTransport : public QuicServerTransport {
 
   class RoutingCallback : public QuicServerTransport::RoutingCallback {
    public:
-    virtual ~RoutingCallback() = default;
+    ~RoutingCallback() override = default;
 
     // Called when a connection id is available
-    virtual void onConnectionIdAvailable(
+    void onConnectionIdAvailable(
         QuicServerTransport::Ptr transport,
-        ConnectionId id) noexcept = 0;
+        ConnectionId id) noexcept override = 0;
 
     // Called when a connection id is bound and ip address should not
     // be used any more for routing.
-    virtual void onConnectionIdBound(
-        QuicServerTransport::Ptr transport) noexcept = 0;
+    void onConnectionIdBound(
+        QuicServerTransport::Ptr transport) noexcept override = 0;
 
     // Called when the connection is finished and needs to be Unbound.
-    virtual void onConnectionUnbound(
+    void onConnectionUnbound(
         QuicServerTransport*,
         const QuicServerTransport::SourceIdentity& address,
-        const std::vector<ConnectionIdData>& connectionIdData) noexcept = 0;
+        const std::vector<ConnectionIdData>& connectionIdData) noexcept
+        override = 0;
   };
 
   MockQuicTransport(
@@ -224,7 +225,7 @@ class MockQuicTransport : public QuicServerTransport {
             connCb,
             ctx) {}
 
-  virtual ~MockQuicTransport() {
+  ~MockQuicTransport() override {
     customDestructor();
   }
 

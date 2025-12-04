@@ -302,7 +302,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       transport_->lossTimeoutExpired();
     }
 
-    virtual void callbackCanceled() noexcept override {
+    void callbackCanceled() noexcept override {
       // ignore. this usually means that the eventbase is dying, so we will be
       // canceled anyway
       return;
@@ -363,7 +363,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       transport_->ackTimeoutExpired();
     }
 
-    virtual void callbackCanceled() noexcept override {
+    void callbackCanceled() noexcept override {
       // ignore. this usually means that the eventbase is dying, so we will be
       // canceled anyway
       return;
@@ -384,7 +384,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       transport_->pathValidationTimeoutExpired();
     }
 
-    virtual void callbackCanceled() noexcept override {
+    void callbackCanceled() noexcept override {
       // ignore. this usually means that the eventbase is dying, so we will be
       // canceled anyway
       return;

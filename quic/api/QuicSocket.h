@@ -73,7 +73,7 @@ class QuicSocket : virtual public QuicSocketLite {
           validator,
       std::function<BufPtr()> getter) = 0;
 
-  virtual ~QuicSocket() override = default;
+  ~QuicSocket() override = default;
 
   /**
    * ===== Generic Socket Methods =====

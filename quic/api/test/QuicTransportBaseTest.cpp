@@ -392,7 +392,7 @@ class TestQuicTransport
     pacedWriteDataToSocket();
   }
 
-  bool hasWriteCipher() const {
+  bool hasWriteCipher() const override {
     return conn_->oneRttWriteCipher != nullptr;
   }
 
@@ -404,7 +404,7 @@ class TestQuicTransport
     return *conn_;
   }
 
-  void closeTransport() {
+  void closeTransport() override {
     transportClosed = true;
   }
 
@@ -452,7 +452,7 @@ class TestQuicTransport
     return readLooper_;
   }
 
-  void unbindConnection() {}
+  void unbindConnection() override {}
 
   void onReadError(const folly::AsyncSocketException&) noexcept {}
 
