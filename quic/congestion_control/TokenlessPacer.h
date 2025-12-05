@@ -34,14 +34,14 @@ class TokenlessPacer : public Pacer {
 
   void setRttFactor(uint8_t numerator, uint8_t denominator) override;
 
-  std::chrono::microseconds getTimeUntilNextWrite(
+  [[nodiscard]] std::chrono::microseconds getTimeUntilNextWrite(
       TimePoint currentTime = Clock::now()) const override;
 
   uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) override;
 
   void setPacingRateCalculator(PacingRateCalculator pacingRateCalculator);
 
-  uint64_t getCachedWriteBatchSize() const override;
+  [[nodiscard]] uint64_t getCachedWriteBatchSize() const override;
 
   void onPacketSent() override;
   void onPacketsLoss() override;

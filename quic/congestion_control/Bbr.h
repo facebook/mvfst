@@ -58,12 +58,12 @@ class BbrCongestionController : public CongestionController {
   class MinRttSampler {
    public:
     virtual ~MinRttSampler() = default;
-    virtual std::chrono::microseconds minRtt() const = 0;
+    [[nodiscard]] virtual std::chrono::microseconds minRtt() const = 0;
 
     /**
      * Returns: true iff we have min rtt sample and it has expired.
      */
-    virtual bool minRttExpired() const = 0;
+    [[nodiscard]] virtual bool minRttExpired() const = 0;
 
     /**
      * rttSample: current rtt sample
@@ -86,7 +86,7 @@ class BbrCongestionController : public CongestionController {
    public:
     virtual ~BandwidthSampler() = default;
 
-    virtual Bandwidth getBandwidth() const = 0;
+    [[nodiscard]] virtual Bandwidth getBandwidth() const = 0;
 
     [[nodiscard]] virtual Bandwidth getLatestSample() const = 0;
 
@@ -95,7 +95,7 @@ class BbrCongestionController : public CongestionController {
         uint64_t roundTripCounter) = 0;
 
     virtual void onAppLimited() = 0;
-    virtual bool isAppLimited() const = 0;
+    [[nodiscard]] virtual bool isAppLimited() const = 0;
     virtual void setWindowLength(const uint64_t windowLength) noexcept = 0;
   };
 
@@ -135,25 +135,25 @@ class BbrCongestionController : public CongestionController {
         loss.has_value() ? &loss.value() : nullptr);
   }
 
-  uint64_t getWritableBytes() const noexcept override;
+  [[nodiscard]] uint64_t getWritableBytes() const noexcept override;
 
-  uint64_t getCongestionWindow() const noexcept override;
+  [[nodiscard]] uint64_t getCongestionWindow() const noexcept override;
 
   [[nodiscard]] Optional<Bandwidth> getBandwidth() const noexcept override;
 
-  CongestionControlType type() const noexcept override;
+  [[nodiscard]] CongestionControlType type() const noexcept override;
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
   void setExperimental(bool experimental) override;
 
-  bool isAppLimited() const noexcept override;
+  [[nodiscard]] bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
 
   // TODO: some of these do not have to be in public API.
-  bool inRecovery() const noexcept;
-  BbrState state() const noexcept;
+  [[nodiscard]] bool inRecovery() const noexcept;
+  [[nodiscard]] BbrState state() const noexcept;
 
  protected:
   [[nodiscard]] virtual Bandwidth bandwidth() const noexcept;
@@ -225,9 +225,9 @@ class BbrCongestionController : public CongestionController {
   bool updateRoundTripCounter(TimePoint largestAckedSentTime) noexcept;
   void updateRecoveryWindowWithAck(uint64_t bytesAcked) noexcept;
 
-  uint64_t calculateTargetCwnd(float gain) const noexcept;
+  [[nodiscard]] uint64_t calculateTargetCwnd(float gain) const noexcept;
   void updateCwnd(uint64_t ackedBytes, uint64_t excessiveBytes) noexcept;
-  std::chrono::microseconds minRtt() const noexcept;
+  [[nodiscard]] std::chrono::microseconds minRtt() const noexcept;
 
   bool isExperimental_{false};
   // Number of round trips the connection has witnessed

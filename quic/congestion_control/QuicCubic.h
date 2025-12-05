@@ -62,7 +62,7 @@ class Cubic : public CongestionController {
       bool tcpFriendly = true,
       bool ackTrain = false);
 
-  CubicStates state() const noexcept;
+  [[nodiscard]] CubicStates state() const noexcept;
 
   enum class ExitReason : uint8_t {
     SSTHRESH,
@@ -89,12 +89,12 @@ class Cubic : public CongestionController {
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacketWrapper& packet) override;
 
-  uint64_t getWritableBytes() const noexcept override;
-  uint64_t getCongestionWindow() const noexcept override;
+  [[nodiscard]] uint64_t getWritableBytes() const noexcept override;
+  [[nodiscard]] uint64_t getCongestionWindow() const noexcept override;
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
-  bool isAppLimited() const noexcept override;
+  [[nodiscard]] bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
 
@@ -103,7 +103,7 @@ class Cubic : public CongestionController {
       uint64_t ssthresh = INIT_SSTHRESH,
       TimePoint lastReductionTime = Clock::now()) noexcept;
 
-  CongestionControlType type() const noexcept override;
+  [[nodiscard]] CongestionControlType type() const noexcept override;
 
   void setExperimental(bool experimental) override {
     // This is a transitional change. Experimental setting will be removed.
@@ -115,7 +115,7 @@ class Cubic : public CongestionController {
   CubicStates state_{CubicStates::Hystart};
 
  private:
-  bool isAppIdle() const noexcept;
+  [[nodiscard]] bool isAppIdle() const noexcept;
   void onPacketAcked(const AckEvent& ack);
   void onPacketAckedInHystart(const AckEvent& ack);
   void onPacketAckedInSteady(const AckEvent& ack);
@@ -127,7 +127,7 @@ class Cubic : public CongestionController {
 
   void onEcnCongestionEvent(const AckEvent& ack);
 
-  float pacingGain() const noexcept;
+  [[nodiscard]] float pacingGain() const noexcept;
 
   void startHystartRttRound(TimePoint time) noexcept;
 

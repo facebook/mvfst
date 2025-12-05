@@ -42,17 +42,17 @@ class Copa : public CongestionController {
         loss.has_value() ? &loss.value() : nullptr);
   }
 
-  uint64_t getWritableBytes() const noexcept override;
-  uint64_t getCongestionWindow() const noexcept override;
-  CongestionControlType type() const noexcept override;
+  [[nodiscard]] uint64_t getWritableBytes() const noexcept override;
+  [[nodiscard]] uint64_t getCongestionWindow() const noexcept override;
+  [[nodiscard]] CongestionControlType type() const noexcept override;
 
   bool inSlowStart();
 
-  uint64_t getBytesInFlight() const noexcept;
+  [[nodiscard]] uint64_t getBytesInFlight() const noexcept;
 
   void setAppIdle(bool, TimePoint) noexcept override;
   void setAppLimited() override;
-  bool isAppLimited() const noexcept override;
+  [[nodiscard]] bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
 

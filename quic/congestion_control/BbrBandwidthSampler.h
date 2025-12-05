@@ -17,7 +17,7 @@ class BbrBandwidthSampler : public BbrCongestionController::BandwidthSampler {
  public:
   explicit BbrBandwidthSampler(QuicConnectionStateBase& conn);
 
-  Bandwidth getBandwidth() const noexcept override;
+  [[nodiscard]] Bandwidth getBandwidth() const noexcept override;
 
   [[nodiscard]] Bandwidth getLatestSample() const noexcept override;
 
@@ -34,7 +34,7 @@ class BbrBandwidthSampler : public BbrCongestionController::BandwidthSampler {
    */
   void onAppLimited() override;
 
-  bool isAppLimited() const noexcept override;
+  [[nodiscard]] bool isAppLimited() const noexcept override;
 
   void setWindowLength(const uint64_t windowLength) noexcept override;
 

@@ -72,7 +72,7 @@ struct Bandwidth {
   // Return the number of units one can send over 1 seconds with the current
   // bandwidth value.
   // TODO: 1s may not be the best choice. It can overflow units.
-  uint64_t normalize() const noexcept {
+  [[nodiscard]] uint64_t normalize() const noexcept {
     return interval == 0us ? 0 : (1'000'000us * units / interval);
   }
 
@@ -90,11 +90,11 @@ struct Bandwidth {
     return result;
   }
 
-  std::string describe() const noexcept;
-  std::string normalizedDescribe() const noexcept;
+  [[nodiscard]] std::string describe() const noexcept;
+  [[nodiscard]] std::string normalizedDescribe() const noexcept;
 
  private:
-  std::string unitName() const noexcept;
+  [[nodiscard]] std::string unitName() const noexcept;
 };
 
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs);
