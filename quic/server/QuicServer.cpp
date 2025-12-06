@@ -143,7 +143,7 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   CHECK_LE(maxWorkers, std::numeric_limits<uint8_t>::max())
       << "Quic server doesn't support more than "
       << (int)std::numeric_limits<uint8_t>::max() << " workers";
-  size_t numCpu = folly::hardware_concurrency();
+  size_t numCpu = folly::available_concurrency();
   if (maxWorkers == 0) {
     maxWorkers = numCpu;
   }

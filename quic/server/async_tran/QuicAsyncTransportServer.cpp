@@ -27,7 +27,7 @@ void QuicAsyncTransportServer::start(
     const folly::SocketAddress& address,
     size_t numThreads) {
   if (numThreads == 0) {
-    numThreads = folly::hardware_concurrency();
+    numThreads = folly::available_concurrency();
   }
   std::vector<folly::EventBase*> evbs;
   for (size_t i = 0; i < numThreads; ++i) {
