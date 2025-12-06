@@ -609,27 +609,32 @@ QuicTransportBaseLite::registerByteEventCallback(
             decltype(byteEventMap)>::type::mapped_type::value_type>(
             {{offset, cb}}));
   } else {
-    // Keep ByteEvents for the same stream sorted by offsets:
-    auto pos = std::upper_bound(
-        byteEventMapIt->second.begin(),
-        byteEventMapIt->second.end(),
-        offset,
-        [&](uint64_t o, const ByteEventDetail& p) { return o < p.offset; });
-    if (pos != byteEventMapIt->second.begin()) {
-      auto matchingEvent = std::find_if(
-          byteEventMapIt->second.begin(),
-          pos,
-          [offset, cb](const ByteEventDetail& p) {
-            return ((p.offset == offset) && (p.callback == cb));
-          });
-      if (matchingEvent != pos) {
-        // ByteEvent has been already registered for the same type, id,
-        // offset and for the same recipient, return an INVALID_OPERATION
-        // error to prevent duplicate registrations.
-        return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+    // Optimize for the common case: offset is larger than any existing offset.
+    auto& events = byteEventMapIt->second;
+    if (events.empty() || offset > events.back().offset) {
+      // Fast path: just append to the end.
+      events.emplace_back(offset, cb);
+    } else {
+      // Keep ByteEvents for the same stream sorted by offsets:
+      auto pos = std::upper_bound(
+          events.begin(),
+          events.end(),
+          offset,
+          [&](uint64_t o, const ByteEventDetail& p) { return o < p.offset; });
+      if (pos != events.begin()) {
+        auto matchingEvent = std::find_if(
+            events.begin(), pos, [offset, cb](const ByteEventDetail& p) {
+              return ((p.offset == offset) && (p.callback == cb));
+            });
+        if (matchingEvent != pos) {
+          // ByteEvent has been already registered for the same type, id,
+          // offset and for the same recipient, return an INVALID_OPERATION
+          // error to prevent duplicate registrations.
+          return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+        }
       }
+      events.emplace(pos, offset, cb);
     }
-    byteEventMapIt->second.emplace(pos, offset, cb);
   }
   auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
   CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
