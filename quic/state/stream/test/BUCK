@@ -14,7 +14,6 @@ mvfst_cpp_test(
         "//quic/common/events:folly_eventbase",
         "//quic/common/test:test_utils",
         "//quic/fizz/server/handshake:fizz_server_handshake",
-        "//quic/state:stream_functions",
         "//quic/state/stream:stream",
     ],
 )
