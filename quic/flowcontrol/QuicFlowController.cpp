@@ -9,7 +9,6 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
-#include <quic/logging/QLogger.h>
 
 #include <quic/state/StreamData.h>
 #include <algorithm>

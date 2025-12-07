@@ -11,7 +11,6 @@ mvfst_cpp_library(
     deps = [
         "//quic:constants",
         "//quic:exception",
-        "//quic/logging:qlogger",
     ],
     exported_deps = [
         "//quic/codec:types",
