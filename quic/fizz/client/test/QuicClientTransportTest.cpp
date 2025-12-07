@@ -1065,13 +1065,13 @@ TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
       folly::AsyncSocketException(
           folly::AsyncSocketException::INTERNAL_ERROR,
           "Where you wanna go",
-          -1));
+          INT_MIN));
   EXPECT_FALSE(client->isClosed());
   client->onReadError(
       folly::AsyncSocketException(
           folly::AsyncSocketException::INTERNAL_ERROR,
           "He never saw it coming at all",
-          -1));
+          INT_MIN));
   eventbase_->loopOnce();
   EXPECT_TRUE(client->isClosed());
 }
