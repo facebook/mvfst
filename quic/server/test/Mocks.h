@@ -33,7 +33,7 @@ class MockServerConnectionIdRejector : public ServerConnectionIdRejector {
 
 class MockQuicServerTransportFactory : public QuicServerTransportFactory {
  public:
-  ~MockQuicServerTransportFactory() override {}
+  ~MockQuicServerTransportFactory() override = default;
 
   // wrapper for mocked make since gmock doesn't support methods with rvalue ref
   QuicServerTransport::Ptr make(

@@ -17,7 +17,7 @@ namespace quic {
 
 class QuicServerTransportFactory {
  public:
-  virtual ~QuicServerTransportFactory() {}
+  virtual ~QuicServerTransportFactory() = default;
 
   virtual QuicServerTransport::Ptr make(
       folly::EventBase* evb,

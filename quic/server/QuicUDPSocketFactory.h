@@ -13,7 +13,7 @@ namespace quic {
 
 class QuicUDPSocketFactory {
  public:
-  virtual ~QuicUDPSocketFactory() {}
+  virtual ~QuicUDPSocketFactory() = default;
 
   virtual std::unique_ptr<FollyAsyncUDPSocketAlias> make(
       folly::EventBase* evb,
