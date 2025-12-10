@@ -51,14 +51,12 @@ struct Bandwidth {
     return units != 0 && interval != 0us;
   }
 
-  template <
-      typename T,
-      typename = std::enable_if_t<std::is_arithmetic<T>::value>>
+  template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
   const Bandwidth operator*(T t) const noexcept {
     return Bandwidth(std::ceil(units * t), interval, unitType, isAppLimited);
   }
 
-  template <typename T, typename = std::enable_if_t<std::is_integral<T>::value>>
+  template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
   const Bandwidth operator/(T t) const noexcept {
     return Bandwidth(units / t, interval, unitType, isAppLimited);
   }
