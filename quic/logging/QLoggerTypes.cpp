@@ -532,8 +532,7 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
       finalPacketLossTimeReorderingThreshDividend;
   data["used_zero_rtt"] = usedZeroRtt;
   data["quic_version"] =
-      static_cast<std::underlying_type<decltype(quicVersion)>::type>(
-          quicVersion);
+      static_cast<std::underlying_type_t<decltype(quicVersion)>>(quicVersion);
   data["initial_packets_received"] = initialPacketsReceived;
   data["unique_initial_crypto_frames_received"] =
       uniqueInitialCryptoFramesReceived;
