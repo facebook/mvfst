@@ -26,8 +26,7 @@ class DecodeTest : public Test {};
 
 ShortHeader makeHeader() {
   PacketNum packetNum = 100;
-  return ShortHeader(
-      ProtectionType::KeyPhaseZero, getTestConnectionId(), packetNum);
+  return {ProtectionType::KeyPhaseZero, getTestConnectionId(), packetNum};
 }
 
 // NormalizedAckBlocks are in order needed.

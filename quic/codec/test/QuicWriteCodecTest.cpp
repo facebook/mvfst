@@ -29,7 +29,7 @@ using namespace quic::test;
 using namespace testing;
 
 ShortHeader buildTestShortHeader() {
-  return ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01);
+  return {ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01};
 }
 
 QuicFrame parseQuicFrame(

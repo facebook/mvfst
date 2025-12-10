@@ -33,7 +33,7 @@ PacketNumEncodingResult encodePacketNumber(
   // will just do it.
   DCHECK_NE(lengthInBytes, 8);
   int64_t mask = (1ULL << lengthInBytes * 8) - 1;
-  return PacketNumEncodingResult(packetNum & mask, lengthInBytes);
+  return {packetNum & mask, lengthInBytes};
 }
 
 PacketNum decodePacketNumber(
