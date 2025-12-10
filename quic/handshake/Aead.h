@@ -26,7 +26,7 @@ class Aead {
  public:
   virtual ~Aead() = default;
 
-  virtual Optional<TrafficKey> getKey() const = 0;
+  [[nodiscard]] virtual Optional<TrafficKey> getKey() const = 0;
 
   /**
    * Encrypts plaintext inplace. Returns quic::Expected with the encrypted
@@ -65,6 +65,6 @@ class Aead {
    * Returns the number of bytes the aead will add to the plaintext (size of
    * ciphertext - size of plaintext).
    */
-  virtual size_t getCipherOverhead() const = 0;
+  [[nodiscard]] virtual size_t getCipherOverhead() const = 0;
 };
 } // namespace quic

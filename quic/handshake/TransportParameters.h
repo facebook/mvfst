@@ -82,7 +82,7 @@ struct TransportParameter {
    */
 
   // calc size needed to encode TransportParameter on the wire as shown above
-  uint64_t getEncodedSize() const {
+  [[nodiscard]] uint64_t getEncodedSize() const {
     // varint size of param + varint size of value's length + size of value
     uint64_t valueLen = value->computeChainDataLength();
     return getQuicIntegerSize(u64_tp(parameter)).value() +
@@ -90,7 +90,7 @@ struct TransportParameter {
   }
 
   // Encodes TransportParameter as shown above (avoids reallocations)
-  BufPtr encode() const {
+  [[nodiscard]] BufPtr encode() const {
     // reserve the exact size needed
     auto res =
         BufHelpers::createCombined(static_cast<size_t>(getEncodedSize()));

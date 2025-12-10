@@ -23,7 +23,8 @@ class Handshake {
  public:
   virtual ~Handshake() = default;
 
-  virtual const Optional<std::string>& getApplicationProtocol() const = 0;
+  [[nodiscard]] virtual const Optional<std::string>& getApplicationProtocol()
+      const = 0;
   /**
    * An API to get oneRttReadCiphers on key rotation. Each call will return a
    * one rtt read cipher using the current traffic secret and advance the
