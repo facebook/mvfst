@@ -450,9 +450,10 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
           std::is_same<
               std::remove_const_t<std::remove_reference_t<T0>>,
               quic::PacketNum>::value,
-          void>,
-      class = std::enable_if_t<are_same<T0, Ts...>::value, void>>
-  quic::BufPtr buildAckPacketForSentAppDataPackets(T0&& first, Ts&&... args) {
+          void>>
+  quic::BufPtr buildAckPacketForSentAppDataPackets(T0&& first, Ts&&... args)
+    requires are_same<T0, Ts...>::value
+  {
     std::vector<quic::PacketNum> packetNums{
         std::forward<T0>(first), std::forward<Ts>(args)...};
     return buildAckPacketForSentAppDataPackets(packetNums);
