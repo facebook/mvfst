@@ -28,7 +28,8 @@ class ConnectionIdAlgo {
   /**
    * Check if this implementation of algorithm can parse the given ConnectionId
    */
-  virtual bool canParse(const ConnectionId& id) const noexcept = 0;
+  [[nodiscard]] virtual bool canParse(
+      const ConnectionId& id) const noexcept = 0;
 
   /**
    * Parses ServerConnectionIdParams from the given connection id.

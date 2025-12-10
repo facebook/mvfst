@@ -39,14 +39,14 @@ class ContiguousReadCursor;
 struct ConnectionId {
   uint8_t* data();
 
-  const uint8_t* data() const;
+  [[nodiscard]] const uint8_t* data() const;
 
-  uint8_t size() const;
+  [[nodiscard]] uint8_t size() const;
 
   bool operator==(const ConnectionId& other) const;
   bool operator!=(const ConnectionId& other) const;
 
-  std::string hex() const;
+  [[nodiscard]] std::string hex() const;
 
   /**
    * Create a ConnectionId from a vector of bytes.

@@ -60,7 +60,7 @@ class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
   /**
    * Check if this implementation of algorithm can parse the given ConnectionId
    */
-  bool canParse(const ConnectionId& id) const noexcept override;
+  [[nodiscard]] bool canParse(const ConnectionId& id) const noexcept override;
 
   /**
    * Parses ServerConnectionIdParams from the given connection id.
