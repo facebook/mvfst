@@ -119,8 +119,8 @@ class FileQLogger : public BaseQLogger {
       StreamId id,
       std::string update,
       Optional<std::chrono::milliseconds> timeSinceStreamCreation) override;
-  virtual void addConnectionMigrationUpdate(bool intentionalMigration) override;
-  virtual void addPathValidationEvent(bool success) override;
+  void addConnectionMigrationUpdate(bool intentionalMigration) override;
+  void addPathValidationEvent(bool success) override;
   void addPriorityUpdate(
       quic::StreamId streamId,
       PriorityQueue::PriorityLogFields priority) override;
