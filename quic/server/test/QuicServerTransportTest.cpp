@@ -656,9 +656,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
           ->packet.header.getPacketSequenceNum();
 
   uint32_t buffersInPacket1 = 0;
-  for (size_t i = 0; i < server->getNonConstConn().outstandings.packets.size();
-       ++i) {
-    auto& packet = server->getNonConstConn().outstandings.packets[i];
+  for (auto& packet : server->getNonConstConn().outstandings.packets) {
     if (packet.packet.header.getPacketNumberSpace() !=
         PacketNumberSpace::AppData) {
       continue;
