@@ -2324,7 +2324,7 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
   folly::ScopedEventBaseThread evbThread;
   std::vector<folly::EventBase*> evbs;
   evbs.emplace_back(evbThread.getEventBase());
-  MockQuicStats* stats = new MockQuicStats();
+  auto* stats = new MockQuicStats();
   auto serverAddr = initializeServer(evbs, stats);
   auto client = makeUdpClient();
   auto transport =
@@ -2374,7 +2374,7 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   folly::ScopedEventBaseThread evbThread;
   std::vector<folly::EventBase*> evbs;
   evbs.emplace_back(evbThread.getEventBase());
-  MockQuicStats* stats = new MockQuicStats();
+  auto* stats = new MockQuicStats();
   auto serverAddr = initializeServer(evbs, stats);
   auto client = makeUdpClient();
   auto transport =

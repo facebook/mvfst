@@ -2294,7 +2294,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestPendingZeroRttData) {
   size_t expectedPendingLen =
       server->getConn().transportSettings.maxPacketsToBuffer;
   for (size_t i = 0; i < expectedPendingLen + 10; ++i) {
-    StreamId streamId = static_cast<StreamId>(i);
+    auto streamId = static_cast<StreamId>(i);
     auto packetData = packetToBuf(createStreamPacket(
         *clientConnectionId,
         server->getConn().serverConnectionId.value_or(getTestConnectionId(1)),
@@ -2321,7 +2321,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestPendingOneRttData) {
   size_t expectedPendingLen =
       server->getConn().transportSettings.maxPacketsToBuffer;
   for (size_t i = 0; i < expectedPendingLen + 10; ++i) {
-    StreamId streamId = static_cast<StreamId>(i);
+    auto streamId = static_cast<StreamId>(i);
     auto packetData = packetToBuf(createStreamPacket(
         *clientConnectionId,
         *server->getConn().serverConnectionId,
