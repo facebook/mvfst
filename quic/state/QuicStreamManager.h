@@ -13,7 +13,6 @@
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
 #include <quic/priority/PriorityQueue.h>
-#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 #include <numeric>

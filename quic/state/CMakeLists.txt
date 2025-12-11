@@ -10,7 +10,6 @@ add_library(
   QuicStreamUtilities.cpp
   StateData.cpp
   ClonedPacketIdentifier.cpp
-  QuicPriorityQueue.cpp
   QuicPathManager.cpp
 )
 

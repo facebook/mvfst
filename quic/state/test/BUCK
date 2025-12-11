@@ -1,4 +1,4 @@
-load("@fbcode//quic:defs.bzl", "mvfst_cpp_benchmark", "mvfst_cpp_library", "mvfst_cpp_test")
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
 
 oncall("traffic_protocols")
 
@@ -130,7 +130,6 @@ mvfst_cpp_test(
 mvfst_cpp_test(
     name = "QuicStreamManagerTest",
     srcs = [
-        "QuicPriorityQueueTest.cpp",
         "QuicStreamManagerTest.cpp",
     ],
     supports_static_listing = False,
@@ -140,7 +139,6 @@ mvfst_cpp_test(
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/priority:http_priority_queue",
         "//quic/server/state:server",
-        "//quic/state:quic_priority_queue",
         "//quic/state:quic_state_machine",
         "//quic/state/stream:stream",
     ],
@@ -184,16 +182,6 @@ mvfst_cpp_library(
         "fbsource//third-party/googletest:gmock",
         "fbsource//third-party/googletest:gtest",
         "//quic/state:ack_event",
-    ],
-)
-
-mvfst_cpp_benchmark(
-    name = "quic_priority_queue_benchmark",
-    srcs = ["QuicPriorityQueueBenchmark.cpp"],
-    deps = [
-        "//common/init:init",
-        "//folly:benchmark",
-        "//quic/state:quic_priority_queue",
     ],
 )
 

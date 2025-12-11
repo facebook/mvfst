@@ -28,7 +28,6 @@ quic_add_test(TARGET QuicStreamFunctionsTest
 
 quic_add_test(TARGET QuicStreamManagerTest
   SOURCES
-  QuicPriorityQueueTest.cpp
   QuicStreamManagerTest.cpp
   DEPENDS
   mvfst_client

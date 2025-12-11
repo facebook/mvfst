@@ -83,19 +83,6 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
-    name = "quic_priority_queue",
-    srcs = ["QuicPriorityQueue.cpp"],
-    headers = ["QuicPriorityQueue.h"],
-    exported_deps = [
-        "//quic:config",
-        "//quic/codec:types",
-    ],
-    exported_external_deps = [
-        "glog",
-    ],
-)
-
-mvfst_cpp_library(
     name = "quic_state_machine",
     srcs = [
         "QuicPathManager.cpp",
@@ -119,7 +106,6 @@ mvfst_cpp_library(
         ":loss_state",
         ":outstanding_packet",
         ":quic_connection_stats",
-        ":quic_priority_queue",
         ":retransmission_policy",
         ":stats_callback",
         ":transport_settings",

@@ -7,7 +7,6 @@
 
 #include <quic/logging/QLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
-#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/QuicTransportStatsCallback.h>
