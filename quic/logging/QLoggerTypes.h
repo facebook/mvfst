@@ -13,6 +13,7 @@
 #include <quic/priority/PriorityQueue.h>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace quic {
@@ -49,7 +50,7 @@ class RstStreamFrameLog : public QLogFrame {
       : streamId{streamIdIn},
         errorCode{errorCodeIn},
         offset{offsetIn},
-        reliableOffset{reliableOffsetIn} {}
+        reliableOffset{std::move(reliableOffsetIn)} {}
 
   ~RstStreamFrameLog() override = default;
   [[nodiscard]] folly::dynamic toDynamic() const override;
@@ -216,7 +217,7 @@ class ReadAckFrameLog : public QLogFrame {
   uint32_t ecnCECount;
 
   ReadAckFrameLog(
-      const ReadAckFrame::Vec& ackBlocksIn,
+      ReadAckFrame::Vec ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
       FrameType frameTypeIn = FrameType::ACK,
       OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
@@ -225,11 +226,11 @@ class ReadAckFrameLog : public QLogFrame {
       uint32_t ecnECT0CountIn = 0,
       uint32_t ecnECT1CountIn = 0,
       uint32_t ecnCECountIn = 0)
-      : ackBlocks{ackBlocksIn},
+      : ackBlocks{std::move(ackBlocksIn)},
         ackDelay{ackDelayIn},
         frameType{frameTypeIn},
-        maybeLatestRecvdPacketTime{maybeLatestRecvdPacketTimeIn},
-        maybeLatestRecvdPacketNum{maybeLatestRecvdPacketNumIn},
+        maybeLatestRecvdPacketTime{std::move(maybeLatestRecvdPacketTimeIn)},
+        maybeLatestRecvdPacketNum{std::move(maybeLatestRecvdPacketNumIn)},
         recvdPacketsTimestampRanges(std::move(recvdPacketsTimestampRangesIn)),
         ecnECT0Count(ecnECT0CountIn),
         ecnECT1Count(ecnECT1CountIn),
@@ -252,7 +253,7 @@ class WriteAckFrameLog : public QLogFrame {
   uint32_t ecnCECount;
 
   WriteAckFrameLog(
-      const WriteAckFrame::AckBlockVec& ackBlocksIn,
+      WriteAckFrame::AckBlockVec ackBlocksIn,
       std::chrono::microseconds ackDelayIn,
       FrameType frameTypeIn = FrameType::ACK,
       OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
@@ -261,11 +262,11 @@ class WriteAckFrameLog : public QLogFrame {
       uint32_t ecnECT0CountIn = 0,
       uint32_t ecnECT1CountIn = 0,
       uint32_t ecnCECountIn = 0)
-      : ackBlocks{ackBlocksIn},
+      : ackBlocks{std::move(ackBlocksIn)},
         ackDelay{ackDelayIn},
         frameType{frameTypeIn},
-        maybeLatestRecvdPacketTime{maybeLatestRecvdPacketTimeIn},
-        maybeLatestRecvdPacketNum{maybeLatestRecvdPacketNumIn},
+        maybeLatestRecvdPacketTime{std::move(maybeLatestRecvdPacketTimeIn)},
+        maybeLatestRecvdPacketNum{std::move(maybeLatestRecvdPacketNumIn)},
         recvdPacketsTimestampRanges{std::move(recvdPacketsTimestampRangesIn)},
         ecnECT0Count(ecnECT0CountIn),
         ecnECT1Count(ecnECT1CountIn),

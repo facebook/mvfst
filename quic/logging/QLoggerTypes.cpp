@@ -10,6 +10,8 @@
 #include <quic/QuicException.h>
 #include <quic/logging/QLoggerConstants.h>
 
+#include <utility>
+
 namespace quic {
 
 folly::dynamic PaddingFrameLog::toDynamic() const {
@@ -918,13 +920,13 @@ QLogMetricUpdateEvent::QLogMetricUpdateEvent(
       mrtt{mrttIn},
       srtt{srttIn},
       ackDelay{ackDelayIn},
-      rttVar{rttVarIn},
-      congestionWindow{congestionWindowIn},
-      bytesInFlight{bytesInFlightIn},
-      ssthresh{ssthreshIn},
-      packetsInFlight{packetsInFlightIn},
-      pacingRateBytesPerSec{pacingRateBytesPerSecIn},
-      ptoCount{ptoCountIn} {
+      rttVar{std::move(rttVarIn)},
+      congestionWindow{std::move(congestionWindowIn)},
+      bytesInFlight{std::move(bytesInFlightIn)},
+      ssthresh{std::move(ssthreshIn)},
+      packetsInFlight{std::move(packetsInFlightIn)},
+      pacingRateBytesPerSec{std::move(pacingRateBytesPerSecIn)},
+      ptoCount{std::move(ptoCountIn)} {
   eventType = QLogEventType::MetricUpdate;
   refTime = refTimeIn;
 }
