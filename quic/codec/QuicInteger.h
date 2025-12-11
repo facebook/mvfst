@@ -152,7 +152,7 @@ class QuicInteger {
    * Returns the real value of the QUIC integer that it was instantiated with.
    * This should normally never be used.
    */
-  uint64_t getValue() const;
+  [[nodiscard]] uint64_t getValue() const;
 
  private:
   uint64_t value_;

@@ -32,7 +32,7 @@ class PacketRebuilder {
 
   // TODO: Same as passing cipherOverhead into the CloningScheduler, this really
   // is a sad way to solve the writableBytes problem.
-  uint64_t getHeaderBytes() const;
+  [[nodiscard]] uint64_t getHeaderBytes() const;
 
  private:
   /**
@@ -44,7 +44,7 @@ class PacketRebuilder {
   ClonedPacketIdentifier cloneOutstandingPacket(
       OutstandingPacketWrapper& packet);
 
-  bool retransmittable(const QuicStreamState& stream) const {
+  [[nodiscard]] bool retransmittable(const QuicStreamState& stream) const {
     return stream.sendState == StreamSendState::Open;
   }
 
