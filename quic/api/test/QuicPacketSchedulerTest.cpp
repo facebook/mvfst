@@ -227,10 +227,9 @@ class QuicPacketSchedulerTestBase {
       uint32_t maxStreams,
       uint64_t maxOffset,
       uint64_t initialMaxOffset,
-      bool useNewPriorityQueue = false) {
+      bool = false) {
     auto conn = std::make_unique<QuicClientConnectionState>(
         FizzClientQuicHandshakeContext::Builder().build());
-    transportSettings.useNewPriorityQueue = useNewPriorityQueue;
     auto result =
         conn->streamManager->refreshTransportSettings(transportSettings);
     CHECK(!result.hasError()) << "Failed to refresh transport settings";
@@ -252,11 +251,6 @@ class QuicPacketSchedulerTest : public QuicPacketSchedulerTestBase,
                                 public testing::TestWithParam<bool> {
  public:
   StreamId nextScheduledStreamID(QuicConnectionStateBase& conn) {
-    auto oldWriteQueue = conn.streamManager->oldWriteQueue();
-    CHECK(oldWriteQueue || GetParam()) << "why old queue when using new";
-    if (oldWriteQueue) {
-      return oldWriteQueue->getNextScheduledStream();
-    }
     return conn.streamManager->writeQueue().peekNextScheduledID().asStreamID();
   }
 };
@@ -1510,11 +1504,7 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
   ASSERT_FALSE(result4.hasError());
 
   verifyStreamFrames(*builder, {f1, f2, f3});
-  if (GetParam()) {
-    EXPECT_TRUE(conn.streamManager->writeQueue().empty());
-  } else {
-    EXPECT_EQ(nextScheduledStreamID(conn), 0);
-  }
+  EXPECT_TRUE(conn.streamManager->writeQueue().empty());
 }
 
 TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
@@ -1701,11 +1691,7 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   verifyStreamFrames(*builder2, {f2, f4, f3, f1});
 
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
-  if (GetParam()) {
-    EXPECT_TRUE(conn.streamManager->writeQueue().empty());
-  } else {
-    EXPECT_EQ(nextScheduledStreamID(conn), stream3);
-  }
+  EXPECT_TRUE(conn.streamManager->writeQueue().empty());
 }
 
 TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
@@ -1719,11 +1705,7 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   auto builder1 = createPacketBuilder(conn);
   ASSERT_FALSE(scheduler.writeStreams(builder1).hasError());
 
-  if (GetParam()) {
-    EXPECT_TRUE(conn.streamManager->writeQueue().empty());
-  } else {
-    EXPECT_EQ(nextScheduledStreamID(conn), 0);
-  }
+  EXPECT_TRUE(conn.streamManager->writeQueue().empty());
 }
 
 TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
@@ -3437,6 +3419,6 @@ TEST_P(QuicPacketSchedulerTest, PathValidationCausesPaddingToFullPacket) {
 INSTANTIATE_TEST_SUITE_P(
     QuicPacketSchedulerTest,
     QuicPacketSchedulerTest,
-    ::testing::Values(false, true));
+    ::testing::Values(true));
 
 } // namespace quic::test

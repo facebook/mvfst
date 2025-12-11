@@ -476,9 +476,6 @@ struct TransportSettings {
   // to the client.
   bool disablePausedPriority{false};
 
-  // Use the new priority queue and scheduling implementation
-  bool useNewPriorityQueue{true};
-
   bool sendAckOnlyInitial{false};
 
   // Randomly skip one in N sequence numbers when sending packets.

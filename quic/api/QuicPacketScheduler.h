@@ -115,12 +115,6 @@ class StreamFrameScheduler {
 
   [[nodiscard]] quic::Expected<void, QuicError> writeStreamsHelper(
       PacketBuilderInterface& builder,
-      deprecated::PriorityQueue& writableStreams,
-      uint64_t& connWritableBytes,
-      bool streamPerPacket);
-
-  [[nodiscard]] quic::Expected<void, QuicError> writeStreamsHelper(
-      PacketBuilderInterface& builder,
       PriorityQueue& writableStreams,
       uint64_t& connWritableBytes,
       bool streamPerPacket);

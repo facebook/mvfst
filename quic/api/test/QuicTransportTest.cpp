@@ -151,10 +151,6 @@ class QuicTransportTest : public Test {
   }
 
   StreamId nextScheduledStreamID(QuicConnectionStateBase& conn) {
-    auto oldWriteQueue = conn.streamManager->oldWriteQueue();
-    if (oldWriteQueue) {
-      return oldWriteQueue->getNextScheduledStream();
-    }
     return conn.streamManager->writeQueue().peekNextScheduledID().asStreamID();
   }
 
@@ -5086,12 +5082,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandings.reset();
 
   // Test wrap around by skipping a stream
-  auto oldWriteQueue = conn.streamManager->oldWriteQueue();
-  if (oldWriteQueue) {
-    oldWriteQueue->setNextScheduledStream(s2);
-  } else {
-    conn.streamManager->writeQueue().getNextScheduledID(std::nullopt);
-  }
+  conn.streamManager->writeQueue().getNextScheduledID(std::nullopt);
   writableBytes = kDefaultUDPSendPacketLen;
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));

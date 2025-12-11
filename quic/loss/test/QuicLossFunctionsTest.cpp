@@ -176,10 +176,6 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   }
 
   StreamId writeQueueContains(QuicConnectionStateBase& conn, StreamId id) {
-    auto oldWriteQueue = conn.streamManager->oldWriteQueue();
-    if (oldWriteQueue) {
-      return oldWriteQueue->count(id);
-    }
     return conn.streamManager->writeQueue().contains(
         PriorityQueue::Identifier::fromStreamID(id));
   }

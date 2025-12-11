@@ -219,7 +219,6 @@ class QuicStreamManager {
     unidirectionalReadableStreams_ =
         std::move(other.unidirectionalReadableStreams_);
     peekableStreams_ = std::move(other.peekableStreams_);
-    oldWriteQueue_ = std::move(other.oldWriteQueue_);
     writeQueue_ = std::move(other.writeQueue_);
     controlWriteQueue_ = std::move(other.controlWriteQueue_);
     writableStreams_ = std::move(other.writableStreams_);
@@ -455,25 +454,16 @@ class QuicStreamManager {
     return *writeQueue_;
   }
 
-  auto* oldWriteQueue() {
-    return oldWriteQueue_.get();
-  }
-
   bool hasWritable() const {
-    return (oldWriteQueue_ && !oldWriteQueue_->empty()) ||
-        !writeQueue_->empty() || !controlWriteQueue_.empty();
+    return !writeQueue_->empty() || !controlWriteQueue_.empty();
   }
 
   void removeWritable(const QuicStreamState& stream) {
     if (stream.isControl) {
       controlWriteQueue_.erase(stream.id);
     } else {
-      if (oldWriteQueue_) {
-        oldWriteQueue()->erase(stream.id);
-      } else {
-        writeQueue().erase(PriorityQueue::Identifier::fromStreamID(stream.id));
-        connFlowControlBlocked_.erase(stream.id);
-      }
+      writeQueue().erase(PriorityQueue::Identifier::fromStreamID(stream.id));
+      connFlowControlBlocked_.erase(stream.id);
     }
     writableStreams_.erase(stream.id);
     lossStreams_.erase(stream.id);
@@ -481,9 +471,6 @@ class QuicStreamManager {
 
   void clearWritable() {
     writableStreams_.clear();
-    if (oldWriteQueue_) {
-      oldWriteQueue()->clear();
-    }
     writeQueue().clear();
     controlWriteQueue_.clear();
   }
@@ -536,9 +523,6 @@ class QuicStreamManager {
   // hard before calling it
   [[nodiscard]] quic::Expected<void, QuicError> refreshTransportSettings(
       const TransportSettings& settings);
-
-  [[nodiscard]] quic::Expected<void, QuicError> updatePriorityQueueImpl(
-      bool useNewPriorityQueue);
 
   void setStreamLimitWindowingFraction(uint64_t fraction) {
     if (fraction > 0) {
@@ -796,22 +780,18 @@ class QuicStreamManager {
   void setWriteQueueMaxNextsPerStream(uint64_t maxNextsPerStream);
 
   void addConnFCBlockedStream(StreamId id) {
-    if (!oldWriteQueue_) {
-      connFlowControlBlocked_.insert(id);
-    }
+    connFlowControlBlocked_.insert(id);
   }
 
   void onMaxData() {
-    if (!oldWriteQueue_) {
-      for (auto id : connFlowControlBlocked_) {
-        auto stream = findStream(id);
-        if (stream) {
-          writeQueue().insertOrUpdate(
-              PriorityQueue::Identifier::fromStreamID(id), stream->priority);
-        }
+    for (auto id : connFlowControlBlocked_) {
+      auto stream = findStream(id);
+      if (stream) {
+        writeQueue().insertOrUpdate(
+            PriorityQueue::Identifier::fromStreamID(id), stream->priority);
       }
-      connFlowControlBlocked_.clear();
     }
+    connFlowControlBlocked_.clear();
   }
 
  private:
@@ -899,7 +879,6 @@ class QuicStreamManager {
   UnorderedSet<StreamId> peekableStreams_;
 
   std::unique_ptr<PriorityQueue> writeQueue_;
-  std::unique_ptr<deprecated::PriorityQueue> oldWriteQueue_;
   std::set<StreamId> controlWriteQueue_;
   UnorderedSet<StreamId> writableStreams_;
   UnorderedSet<StreamId> txStreams_;

@@ -1214,27 +1214,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        bool useNewPriorityQueue = static_cast<bool>(std::get<uint64_t>(value));
-        auto serverConn = serverTransport.serverConn_;
-        VLOG(3) << "USE_NEW_PRIORITY_QUEUE KnobParam received: "
-                << useNewPriorityQueue;
-        auto refreshResult = serverConn->streamManager->updatePriorityQueueImpl(
-            useNewPriorityQueue);
-        if (refreshResult.hasError()) {
-          return quic::make_unexpected(QuicError(
-              TransportErrorCode::INTERNAL_ERROR,
-              "Refresh transport settings failed"));
-        } else {
-          std::swap(
-              useNewPriorityQueue,
-              serverConn->transportSettings.useNewPriorityQueue);
-        }
-        return {};
-      });
-  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MIN_STREAM_BUF_THRESH),
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {

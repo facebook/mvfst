@@ -4335,67 +4335,6 @@ TEST_F(QuicServerTransportTest, TestBurstSizeKnobHandlers) {
       kMaxWriteConnectionDataPacketLimit);
 }
 
-TEST_F(QuicServerTransportTest, TestUseNewPriorityQueueKnobHandler) {
-  auto& transportSettings = server->getNonConstConn().transportSettings;
-  transportSettings.advertisedInitialMaxStreamsBidi = 2;
-  auto tsres = server->getConn().streamManager->refreshTransportSettings(
-      transportSettings);
-  server->handleKnobParams(
-      {{.id =
-            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        .val = uint64_t(1)}});
-  EXPECT_TRUE(transportSettings.useNewPriorityQueue);
-  EXPECT_EQ(server->getConn().streamManager->oldWriteQueue(), nullptr);
-
-  server->handleKnobParams(
-      {{.id =
-            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        .val = uint64_t(0)}});
-  EXPECT_FALSE(transportSettings.useNewPriorityQueue);
-  EXPECT_NE(server->getConn().streamManager->oldWriteQueue(), nullptr);
-
-  EXPECT_EQ(
-      server->getConn().streamManager->openableRemoteBidirectionalStreams(), 2);
-  // updating knob with writable streams fails
-  auto peerStream = server->getConn().streamManager->getStream(0);
-  EXPECT_EQ(
-      server->getConn().streamManager->openableRemoteBidirectionalStreams(), 1);
-  auto streamId = server->createBidirectionalStream().value();
-
-  auto buf = folly::IOBuf::create(1100);
-  buf->append(1100);
-  auto serverWriteChain16 = server->writeChain(streamId, std::move(buf), false);
-
-  server->handleKnobParams(
-      {{.id =
-            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        .val = uint64_t(1)}});
-  EXPECT_FALSE(transportSettings.useNewPriorityQueue);
-  EXPECT_NE(server->getConn().streamManager->oldWriteQueue(), nullptr);
-  EXPECT_EQ(
-      server->getConn().streamManager->openableRemoteBidirectionalStreams(), 1);
-
-  // updating the knob now should not reset the openable streams
-  peerStream = server->getConn().streamManager->getStream(0);
-  (*peerStream)->sendState = StreamSendState::Closed;
-  (*peerStream)->recvState = StreamRecvState::Closed;
-  auto res =
-      server->getConn().streamManager->removeClosedStream((*peerStream)->id);
-  EXPECT_EQ(
-      server->getConn().streamManager->openableRemoteBidirectionalStreams(), 2);
-
-  // The switch back works
-  server->handleKnobParams(
-      {{.id =
-            static_cast<uint64_t>(TransportKnobParamId::USE_NEW_PRIORITY_QUEUE),
-        .val = uint64_t(0)}});
-  EXPECT_FALSE(transportSettings.useNewPriorityQueue);
-
-  // Peer openable streams unchanged
-  EXPECT_EQ(
-      server->getConn().streamManager->openableRemoteBidirectionalStreams(), 2);
-}
-
 TEST_F(QuicServerTransportTest, TestStreamBufKnobHandlers) {
   auto& transportSettings = server->getNonConstConn().transportSettings;
 

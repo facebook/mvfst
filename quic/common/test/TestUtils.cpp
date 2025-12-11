@@ -811,10 +811,8 @@ void overridePacketWithToken(
 }
 
 bool writableContains(QuicStreamManager& streamManager, StreamId streamId) {
-  auto oldQueue = streamManager.oldWriteQueue();
-  return (oldQueue && oldQueue->count(streamId) > 0) ||
-      streamManager.writeQueue().contains(
-          PriorityQueue::Identifier::fromStreamID(streamId)) > 0 ||
+  return streamManager.writeQueue().contains(
+             PriorityQueue::Identifier::fromStreamID(streamId)) > 0 ||
       streamManager.controlWriteQueue().count(streamId) > 0;
 }
 

@@ -515,48 +515,6 @@ quic::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
 
 quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
-    deprecated::PriorityQueue& writableStreams,
-    uint64_t& connWritableBytes,
-    bool streamPerPacket) {
-  // Fill a packet with non-control stream data, in priority order
-  for (size_t index = 0; index < writableStreams.levels.size() &&
-       builder.remainingSpaceInPkt() > 0;
-       index++) {
-    deprecated::PriorityQueue::Level& level = writableStreams.levels[index];
-    if (level.empty()) {
-      // No data here, keep going
-      continue;
-    }
-
-    level.iterator->begin();
-    do {
-      auto streamId = level.iterator->current();
-      auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
-      CHECK(stream) << "streamId=" << streamId
-                    << "inc=" << uint64_t(level.incremental);
-      auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
-      if (!writeResult.has_value()) {
-        return quic::make_unexpected(writeResult.error());
-      }
-      if (writeResult.value() == StreamWriteResult::PACKET_FULL) {
-        break;
-      }
-      auto remainingSpaceAfter = builder.remainingSpaceInPkt();
-      // If we wrote a stream frame and there's still space in the packet,
-      // that implies we ran out of data or flow control on the stream and
-      // we should bypass the nextsPerStream in the priority queue.
-      bool forceNext = remainingSpaceAfter > 0;
-      level.iterator->next(forceNext);
-      if (streamPerPacket) {
-        return {};
-      }
-    } while (!level.iterator->end());
-  }
-  return {};
-}
-
-quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
-    PacketBuilderInterface& builder,
     PriorityQueue& writableStreams,
     uint64_t& connWritableBytes,
     bool streamPerPacket) {
@@ -621,29 +579,15 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreams(
     }
     conn_.schedulingState.nextScheduledControlStream = result.value();
   }
-  auto* oldWriteQueue = conn_.streamManager->oldWriteQueue();
-  if (oldWriteQueue) {
-    if (!oldWriteQueue->empty()) {
-      auto result = writeStreamsHelper(
-          builder,
-          *oldWriteQueue,
-          connWritableBytes,
-          conn_.transportSettings.streamFramePerPacket);
-      if (!result.has_value()) {
-        return quic::make_unexpected(result.error());
-      }
-    }
-  } else {
-    auto& writeQueue = conn_.streamManager->writeQueue();
-    if (!writeQueue.empty()) {
-      auto result = writeStreamsHelper(
-          builder,
-          writeQueue,
-          connWritableBytes,
-          conn_.transportSettings.streamFramePerPacket);
-      if (!result.has_value()) {
-        return quic::make_unexpected(result.error());
-      }
+  auto& writeQueue = conn_.streamManager->writeQueue();
+  if (!writeQueue.empty()) {
+    auto result = writeStreamsHelper(
+        builder,
+        writeQueue,
+        connWritableBytes,
+        conn_.transportSettings.streamFramePerPacket);
+    if (!result.has_value()) {
+      return quic::make_unexpected(result.error());
     }
   }
   return {};
