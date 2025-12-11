@@ -88,7 +88,7 @@ class IntervalSet : private Container<Interval<T, Unit>> {
   using const_reverse_iterator =
       typename container_type::const_reverse_iterator;
 
-  IntervalSet() {}
+  IntervalSet() = default;
 
   IntervalSet(std::initializer_list<interval_type> intervals);
 
