@@ -22,7 +22,7 @@ class QLogFrame {
  public:
   QLogFrame() = default;
   virtual ~QLogFrame() = default;
-  virtual folly::dynamic toDynamic() const = 0;
+  [[nodiscard]] virtual folly::dynamic toDynamic() const = 0;
 };
 
 class PaddingFrameLog : public QLogFrame {
@@ -436,7 +436,7 @@ class QLogEvent {
  public:
   QLogEvent() = default;
   virtual ~QLogEvent() = default;
-  virtual folly::dynamic toDynamic() const = 0;
+  [[nodiscard]] virtual folly::dynamic toDynamic() const = 0;
   std::chrono::microseconds refTime;
   QLogEventType eventType;
 };

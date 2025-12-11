@@ -32,7 +32,7 @@ struct ReferenceTime {
   // Optional wall clock time if epoch is "unknown"
   std::string wallClockTime;
 
-  folly::dynamic toDynamic() const;
+  [[nodiscard]] folly::dynamic toDynamic() const;
 };
 
 /**
@@ -46,7 +46,7 @@ struct VantagePointInfo {
   // Optional name (e.g., hostname, server identifier)
   std::string name;
 
-  folly::dynamic toDynamic() const;
+  [[nodiscard]] folly::dynamic toDynamic() const;
 };
 
 /**
@@ -72,7 +72,7 @@ struct CommonFieldsInfo {
   // Optional group_id for event grouping
   std::string groupId;
 
-  folly::dynamic toDynamic() const;
+  [[nodiscard]] folly::dynamic toDynamic() const;
 };
 
 /**
