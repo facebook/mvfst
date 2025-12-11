@@ -64,6 +64,12 @@ DefaultCongestionControllerFactory::makeCongestionController(
           "constructed via CongestionControllerFactory.",
           LocalErrorCode::INTERNAL_ERROR);
     }
+    case CongestionControlType::Custom: {
+      throw QuicInternalException(
+          "Custom Congestion Controller cannot be "
+          "constructed via CongestionControllerFactory.",
+          LocalErrorCode::INTERNAL_ERROR);
+    }
     case CongestionControlType::None:
       break;
     case CongestionControlType::MAX:

@@ -30,6 +30,8 @@ std::string_view congestionControlTypeToString(CongestionControlType type) {
       return kCongestionControlNewRenoStr;
     case CongestionControlType::StaticCwnd:
       return kCongestionControlStaticCwndStr;
+    case CongestionControlType::Custom:
+      return kCongestionControlCustomStr;
     case CongestionControlType::None:
       return kCongestionControlNoneStr;
     case CongestionControlType::MAX:
@@ -57,6 +59,8 @@ std::optional<CongestionControlType> congestionControlStrToType(
     return quic::CongestionControlType::NewReno;
   } else if (str == kCongestionControlStaticCwndStr) {
     return quic::CongestionControlType::StaticCwnd;
+  } else if (str == kCongestionControlCustomStr) {
+    return quic::CongestionControlType::Custom;
   } else if (str == kCongestionControlNoneStr) {
     return quic::CongestionControlType::None;
   }
