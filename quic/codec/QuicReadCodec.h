@@ -130,22 +130,23 @@ class QuicReadCodec {
   Optional<VersionNegotiationPacket> tryParsingVersionNegotiation(
       BufQueue& queue);
 
-  const Aead* getOneRttReadCipher() const;
-  const Aead* getZeroRttReadCipher() const;
-  const Aead* getHandshakeReadCipher() const;
+  [[nodiscard]] const Aead* getOneRttReadCipher() const;
+  [[nodiscard]] const Aead* getZeroRttReadCipher() const;
+  [[nodiscard]] const Aead* getHandshakeReadCipher() const;
 
-  const Aead* getInitialCipher() const;
+  [[nodiscard]] const Aead* getInitialCipher() const;
 
-  const PacketNumberCipher* getInitialHeaderCipher() const;
-  const PacketNumberCipher* getOneRttHeaderCipher() const;
-  const PacketNumberCipher* getHandshakeHeaderCipher() const;
-  const PacketNumberCipher* getZeroRttHeaderCipher() const;
+  [[nodiscard]] const PacketNumberCipher* getInitialHeaderCipher() const;
+  [[nodiscard]] const PacketNumberCipher* getOneRttHeaderCipher() const;
+  [[nodiscard]] const PacketNumberCipher* getHandshakeHeaderCipher() const;
+  [[nodiscard]] const PacketNumberCipher* getZeroRttHeaderCipher() const;
 
-  const Optional<StatelessResetToken>& getStatelessResetToken() const;
+  [[nodiscard]] const Optional<StatelessResetToken>& getStatelessResetToken()
+      const;
 
   [[nodiscard]] ProtectionType getCurrentOneRttReadPhase() const;
 
-  CodecParameters getCodecParameters() const;
+  [[nodiscard]] CodecParameters getCodecParameters() const;
 
   void setInitialReadCipher(std::unique_ptr<Aead> initialReadCipher);
   void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher);
@@ -167,8 +168,8 @@ class QuicReadCodec {
   void setServerConnectionId(ConnectionId connId);
   void setStatelessResetToken(StatelessResetToken statelessResetToken);
   void setCryptoEqual(std::function<bool(ByteRange, ByteRange)> cryptoEqual);
-  const ConnectionId& getClientConnectionId() const;
-  const ConnectionId& getServerConnectionId() const;
+  [[nodiscard]] const ConnectionId& getClientConnectionId() const;
+  [[nodiscard]] const ConnectionId& getServerConnectionId() const;
 
   void setConnectionStatsCallback(QuicTransportStatsCallback* callback);
 

@@ -594,7 +594,7 @@ struct MaxStreamsFrame {
   explicit MaxStreamsFrame(uint64_t maxStreamsIn, bool isBidirectionalIn)
       : maxStreams(maxStreamsIn), isForBidirectional(isBidirectionalIn) {}
 
-  bool isForBidirectionalStream() const {
+  [[nodiscard]] bool isForBidirectionalStream() const {
     return isForBidirectional;
   }
 
@@ -638,11 +638,11 @@ struct StreamsBlockedFrame {
   explicit StreamsBlockedFrame(uint64_t streamLimitIn, bool isBidirectionalIn)
       : streamLimit(streamLimitIn), isForBidirectional(isBidirectionalIn) {}
 
-  bool isForBidirectionalStream() const {
+  [[nodiscard]] bool isForBidirectionalStream() const {
     return isForBidirectional;
   }
 
-  bool isForUnidirectionalStream() const {
+  [[nodiscard]] bool isForUnidirectionalStream() const {
     return !isForBidirectional;
   }
 
@@ -725,7 +725,7 @@ struct ConnectionCloseFrame {
         reasonPhrase(std::move(reasonPhraseIn)),
         closingFrameType(closingFrameTypeIn) {}
 
-  FrameType getClosingFrameType() const noexcept {
+  [[nodiscard]] FrameType getClosingFrameType() const noexcept {
     return closingFrameType;
   }
 
@@ -997,22 +997,22 @@ struct LongHeader {
 
   LongHeader& operator=(LongHeader&& other) = default;
 
-  Types getHeaderType() const noexcept;
-  const ConnectionId& getSourceConnId() const;
-  const ConnectionId& getDestinationConnId() const;
-  QuicVersion getVersion() const;
+  [[nodiscard]] Types getHeaderType() const noexcept;
+  [[nodiscard]] const ConnectionId& getSourceConnId() const;
+  [[nodiscard]] const ConnectionId& getDestinationConnId() const;
+  [[nodiscard]] QuicVersion getVersion() const;
 
   // Note this is defined in the header so it is inlined for performance.
-  PacketNumberSpace getPacketNumberSpace() const {
+  [[nodiscard]] PacketNumberSpace getPacketNumberSpace() const {
     return typeToPacketNumberSpace(longHeaderType_);
   }
 
-  ProtectionType getProtectionType() const;
-  bool hasToken() const;
-  const std::string& getToken() const;
+  [[nodiscard]] ProtectionType getProtectionType() const;
+  [[nodiscard]] bool hasToken() const;
+  [[nodiscard]] const std::string& getToken() const;
 
   // Note this is defined in the header so it is inlined for performance.
-  PacketNum getPacketSequenceNum() const {
+  [[nodiscard]] PacketNum getPacketSequenceNum() const {
     return packetSequenceNum_;
   }
 
@@ -1055,17 +1055,17 @@ struct ShortHeader {
       ConnectionId connId,
       PacketNum packetNum);
 
-  ProtectionType getProtectionType() const;
+  [[nodiscard]] ProtectionType getProtectionType() const;
 
-  PacketNumberSpace getPacketNumberSpace() const {
+  [[nodiscard]] PacketNumberSpace getPacketNumberSpace() const {
     return PacketNumberSpace::AppData;
   }
 
-  PacketNum getPacketSequenceNum() const {
+  [[nodiscard]] PacketNum getPacketSequenceNum() const {
     return packetSequenceNum_;
   }
 
-  const ConnectionId& getConnectionId() const;
+  [[nodiscard]] const ConnectionId& getConnectionId() const;
 
   void setPacketNumber(PacketNum packetNum);
 
@@ -1093,11 +1093,11 @@ struct PacketHeader {
   LongHeader* asLong();
   ShortHeader* asShort();
 
-  const LongHeader* asLong() const;
-  const ShortHeader* asShort() const;
+  [[nodiscard]] const LongHeader* asLong() const;
+  [[nodiscard]] const ShortHeader* asShort() const;
 
   // Note this is defined in the header so it is inlined for performance.
-  PacketNum getPacketSequenceNum() const {
+  [[nodiscard]] PacketNum getPacketSequenceNum() const {
     switch (headerForm_) {
       case HeaderForm::Long:
         return longHeader.getPacketSequenceNum();
@@ -1108,11 +1108,11 @@ struct PacketHeader {
     }
   }
 
-  HeaderForm getHeaderForm() const;
-  ProtectionType getProtectionType() const;
+  [[nodiscard]] HeaderForm getHeaderForm() const;
+  [[nodiscard]] ProtectionType getProtectionType() const;
 
   // Note this is defined in the header so it is inlined for performance.
-  PacketNumberSpace getPacketNumberSpace() const {
+  [[nodiscard]] PacketNumberSpace getPacketNumberSpace() const {
     switch (headerForm_) {
       case HeaderForm::Long:
         return longHeader.getPacketNumberSpace();
@@ -1141,10 +1141,10 @@ struct StreamTypeField {
  public:
   explicit StreamTypeField(uint8_t field) : field_(field) {}
 
-  bool hasFin() const;
-  bool hasDataLength() const;
-  bool hasOffset() const;
-  uint8_t fieldValue() const;
+  [[nodiscard]] bool hasFin() const;
+  [[nodiscard]] bool hasDataLength() const;
+  [[nodiscard]] bool hasOffset() const;
+  [[nodiscard]] uint8_t fieldValue() const;
 
   struct Builder {
    public:
