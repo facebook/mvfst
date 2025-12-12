@@ -31,6 +31,7 @@ mvfst_cpp_library(
     ],
     headers = [
         "QuicConstants.h",
+        "QuicTypealiases.h",
     ],
     deps = [
         "//folly/lang:assume",
