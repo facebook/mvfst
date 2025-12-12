@@ -612,6 +612,9 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
                  "fin": true,
                  "frame_type": "stream",
                  "offset": 0,
+                 "raw": {
+                   "length": 5
+                 },
                  "stream_id": "10"
                }
              ],

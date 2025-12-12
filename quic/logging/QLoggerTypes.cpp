@@ -159,6 +159,12 @@ folly::dynamic StreamFrameLog::toDynamic() const {
   d["frame_type"] = toQlogString(FrameType::STREAM);
   d["stream_id"] = folly::to<std::string>(streamId);
   d["offset"] = offset;
+  // per draft-ietf-quic-qlog-quic-events-12 sec 8.13.8 len is optional
+  if (len > 0) {
+    folly::dynamic raw = folly::dynamic::object();
+    raw["length"] = len;
+    d["raw"] = std::move(raw);
+  }
   return d;
 }
 
