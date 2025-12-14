@@ -1352,6 +1352,10 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
       }
     };
 
+    if (conn_->scone && conn_->scone->negotiated) {
+      conn_->scone->sentThisLoop = false;
+    }
+
     // if we're starting to write from app limited, notify observers
     if (conn_->appLimitedTracker.isAppLimited() &&
         conn_->congestionController) {
@@ -2692,6 +2696,24 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
       }
     }
   }
+
+  if (self->conn_->scone && self->connCallback_) {
+    while (!self->conn_->scone->pendingRateSignals.empty()) {
+      auto rateSignal = self->conn_->scone->pendingRateSignals.front();
+      self->conn_->scone->pendingRateSignals.pop_front();
+
+      VLOG(4) << "Received SCONE rate signal: "
+              << static_cast<int>(rateSignal.rate);
+      if (self->conn_->qLogger) {
+        self->conn_->qLogger->addTransportStateUpdate(
+            fmt::format("scone_rate_signal:{}", rateSignal.rate));
+      }
+
+      self->connCallback_->onSconeRateSignal(
+          rateSignal.rate, rateSignal.version);
+    }
+  }
+
   if (self->datagramCallback_ && !conn_->datagramState.readBuffer.empty()) {
     self->datagramCallback_->onDatagramsAvailable();
   }

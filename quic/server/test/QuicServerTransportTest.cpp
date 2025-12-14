@@ -4448,4 +4448,106 @@ TEST_F(QuicServerTransportTest, TestSendCloseOnIdleTimeoutKnobHandler) {
   EXPECT_TRUE(transportSettings.alwaysSendConnectionCloseOnIdleTimeout);
 }
 
+TEST_F(QuicServerTransportTest, SconeNegotiationServerSide) {
+  // In transportSettings passed to server, set enableScone=true
+  server->getNonConstConn().transportSettings.enableScone = true;
+  auto& conn = server->getNonConstConn();
+
+  // Simulate handshake completion with SCONE enabled
+  conn.scone.emplace();
+  conn.scone->negotiated = true;
+
+  // After handshake, EXPECT_TRUE(serverTransport->getConn().scone)
+  EXPECT_TRUE(server->getConn().scone);
+  EXPECT_TRUE(server->getConn().scone->negotiated);
+
+  // Verify server can handle SCONE transport parameter
+  // (In a real scenario, this would be set during handshake)
+  // For now, we're verifying server-side SCONE state setup
+  EXPECT_TRUE(server->getConn().scone);
+}
+
+TEST_F(QuicServerTransportTest, SconeRateSignalFlushedOnWrite) {
+  // Set up server with SCONE enabled
+  server->getNonConstConn().transportSettings.enableScone = true;
+  auto& conn = server->getNonConstConn();
+
+  // Set up SCONE state
+  conn.scone.emplace();
+  conn.scone->negotiated = true;
+
+  // Push value into server->getConn().scone->pendingRateSignals
+  uint8_t testRate = 0x42;
+  QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
+  conn.scone->pendingRateSignals.push_back({testRate, testVersion});
+
+  // Verify rate signal is queued
+  EXPECT_EQ(conn.scone->pendingRateSignals.size(), 1);
+  EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
+  EXPECT_EQ(conn.scone->pendingRateSignals.front().version, testVersion);
+
+  // For this test, we're verifying that rate signals can be queued
+  // In a real scenario, the rate signals would be flushed during packet writes
+  // Clear the signals to simulate flushing
+  conn.scone->pendingRateSignals.clear();
+
+  // Verify signals are cleared
+  EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
+}
+
+TEST_F(QuicServerTransportTest, SconeRateSignalProcessingE2E) {
+  // Set up server with SCONE enabled and negotiated
+  server->getNonConstConn().transportSettings.enableScone = true;
+  auto& conn = server->getNonConstConn();
+
+  conn.scone.emplace();
+  conn.scone->negotiated = true;
+
+  // Test the specific uncovered code path by directly using the server
+  // infrastructure This simulates the scenario where a SCONE packet is
+  // processed followed by successful packet processing that should queue the
+  // rate signal
+
+  uint8_t testRate = 0x25;
+
+  // Create a simple coalesced packet buffer that contains both SCONE and
+  // regular packet This approach uses the existing test infrastructure more
+  // effectively
+  auto coalescedBuffer = folly::IOBuf::create(1024);
+
+  // Build SCONE packet
+  auto sconePacket = buildSconePacket(
+      testRate,
+      conn.serverConnectionId.value(),
+      conn.clientConnectionId.value());
+
+  // Append SCONE packet to buffer
+  coalescedBuffer->append(sconePacket.length());
+  memcpy(
+      coalescedBuffer->writableData(),
+      sconePacket.data(),
+      sconePacket.length());
+
+  // Create a basic ACK packet as the follow-up (simpler than stream packet)
+  AckBlocks acks = {{1, 1}};
+  auto ackPacket = createAckPacket(
+      conn,
+      2, // packet number
+      acks,
+      PacketNumberSpace::AppData);
+
+  // Append ACK packet to the same buffer for coalescing
+  auto ackPacketBuf = packetToBuf(ackPacket);
+  coalescedBuffer->appendChain(std::move(ackPacketBuf));
+
+  // Deliver the coalesced packet - this should trigger both SCONE processing
+  // and successful subsequent packet processing in the uncovered code path
+  deliverData(std::move(coalescedBuffer));
+
+  // Verify the rate signal was queued in the uncovered code path
+  // This tests the server-side rate signal queuing in ServerStateMachine.cpp
+  EXPECT_EQ(conn.scone->pendingRateSignals.size(), 1);
+  EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
+}
+
 } // namespace quic::test

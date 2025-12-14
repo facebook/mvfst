@@ -892,4 +892,55 @@ quic::Expected<void, QuicError> InplaceQuicPacketBuilder::encodePacketHeader() {
   return {};
 }
 
+Buf buildSconePacket(
+    uint8_t rateSignal,
+    const ConnectionId& dstCid,
+    const ConnectionId& srcCid) {
+  // Calculate packet size: first byte + version + DCIL + SCIL + connection IDs
+  size_t packetSize = 1 + // first byte
+      sizeof(uint32_t) + // version
+      1 + // DCIL
+      dstCid.size() + // destination connection ID
+      1 + // SCIL
+      srcCid.size(); // source connection ID
+
+  auto buf = BufHelpers::create(packetSize);
+  BufAppender appender(buf.get(), 0);
+
+  // Rate signal encoding per IETF SCONE draft:
+  // - High 6 bits go in first byte (bits 0x3f)
+  // - Low 1 bit determines version (SCONE_VERSION_1 vs SCONE_VERSION_2)
+  //
+  // First byte: 0x80 (long header) | 0x40 (fixed bit) | (rateSignal >> 1)
+  // The fixed bit (0x40) MUST be set for every QUIC packet (QUIC Invariants).
+  uint8_t rateHighBits = (rateSignal >> 1) & 0x3F;
+  uint8_t firstByte = 0x80 | 0x40 | rateHighBits;
+  appender.writeBE<uint8_t>(firstByte);
+
+  // Select version based on low bit of rate signal
+  // SCONE_VERSION_1 (0x6f7dc0fd) has MSB=0, SCONE_VERSION_2 (0xef7dc0fd) has
+  // MSB=1
+  QuicVersion sconeVersion = (rateSignal & 0x1) ? QuicVersion::SCONE_VERSION_2
+                                                : QuicVersion::SCONE_VERSION_1;
+  appender.writeBE<uint32_t>(static_cast<uint32_t>(sconeVersion));
+
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(dstCid.size()));
+
+  if (dstCid.size() > 0) {
+    appender.push(dstCid.data(), dstCid.size());
+  }
+
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(srcCid.size()));
+
+  if (srcCid.size() > 0) {
+    appender.push(srcCid.data(), srcCid.size());
+  }
+
+  VLOG(4) << "SCONE build: rate=" << (int)rateSignal << " version=0x"
+          << std::hex << static_cast<uint32_t>(sconeVersion) << std::dec
+          << " dstCidLen=" << dstCid.size() << " srcCidLen=" << srcCid.size()
+          << " totalSize=" << packetSize;
+  return *std::move(buf);
+}
+
 } // namespace quic

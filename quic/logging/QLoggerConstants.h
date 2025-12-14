@@ -53,6 +53,7 @@ constexpr auto kRetry = "retry";
 constexpr auto kPtoAlarm = "pto alarm";
 constexpr auto kHandshakeAlarm = "handshake alarm";
 constexpr auto kLossTimeoutExpired = "loss timeout expired";
+constexpr auto kSconeSignal = "scone signal";
 constexpr auto kStart = "start";
 constexpr auto kWriteNst = "write nst";
 constexpr auto kTransportReady = "transport ready";

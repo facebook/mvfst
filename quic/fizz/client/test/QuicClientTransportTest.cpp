@@ -13,6 +13,8 @@
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <quic/QuicConstants.h>
+#include <quic/api/test/Mocks.h>
+#include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/events/HighResQuicTimer.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
@@ -117,13 +119,17 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
 
   std::shared_ptr<QuicServer> createServer(
       ProcessId processId,
-      bool withRetryPacket = false) {
+      bool withRetryPacket = false,
+      bool enableScone = false) {
     quic::TransportSettings transportSettings;
     transportSettings.zeroRttSourceTokenMatchingPolicy =
         ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
     std::array<uint8_t, kRetryTokenSecretLength> secret{};
     folly::Random::secureRandom(secret.data(), secret.size());
     transportSettings.retryTokenSecret = secret;
+    if (enableScone) {
+      transportSettings.enableScone = true;
+    }
     auto server = QuicServer::createQuicServer(transportSettings);
 
     auto statsFactory = std::make_unique<NiceMock<MockQuicStatsFactory>>();
@@ -466,6 +472,116 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
   expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+}
+
+// SCONE integration tests
+
+TEST_P(QuicClientTransportIntegrationTest, SconeNegotiationClientSide) {
+  // Before client creation: create server with SCONE enabled
+  server_->shutdown();
+  server_ = createServer(
+      ProcessId::ZERO,
+      false // withRetryPacket
+      ,
+      true // enableScone
+  );
+  serverAddr = server_->getAddress();
+  // Update client peer address to new server address
+  client->getNonConstConn().peerAddress = serverAddr;
+
+  // client->getTransportSettings().enableScone = true
+  TransportSettings clientSettings;
+  clientSettings.enableScone = true;
+  client->setTransportSettings(clientSettings);
+
+  expectTransportCallbacks();
+
+  // Connect as in NetworkTest
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+
+  // In onTransportReady():
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+
+    // ASSERT_TRUE(client->getConn().scone);
+    ASSERT_TRUE(client->getConn().scone);
+
+    // Check peer transport params for SCONE support
+    auto peerTps = client->getPeerTransportParams();
+    if (peerTps.has_value()) {
+      auto it =
+          findParameter(peerTps.value(), TransportParameterId::scone_supported);
+      EXPECT_TRUE(it != peerTps->end());
+    }
+
+    // Terminate loop
+    eventbase_.terminateLoopSoon();
+  }));
+
+  eventbase_.loopForever();
+}
+
+TEST_P(QuicClientTransportIntegrationTest, NegativePeerNotSupported) {
+  // Server enableScone=false (default), client=true → connection should succeed
+  // but SCONE should not be negotiated (graceful fallback)
+  // Note: server_ is already created with enableScone=false by default in
+  // SetUp()
+
+  TransportSettings clientSettings;
+  clientSettings.enableScone = true;
+  client->setTransportSettings(clientSettings);
+
+  expectTransportCallbacks();
+
+  // Connection should succeed even when server doesn't support SCONE
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+
+    // SCONE should NOT be negotiated when server doesn't support it
+    EXPECT_FALSE(client->getConn().scone.has_value());
+
+    eventbase_.terminateLoopSoon();
+  }));
+
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+  eventbase_.loopForever();
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTestBase,
+    SconePacketProcessingWithQLogger) {
+  // Test the specific uncovered code path in QuicClientTransportLite.cpp
+  // where SCONE packets are processed and logged to qLogger
+  auto& conn = client->getNonConstConn();
+
+  // Enable SCONE and set up qLogger to capture logs
+  conn.transportSettings.enableScone = true;
+  conn.scone.emplace();
+  conn.scone->negotiated = true;
+
+  // Create a mock qLogger to capture the SCONE logging
+  auto qLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+  conn.qLogger = qLogger;
+
+  // Expect the specific log message for SCONE reception
+  uint8_t testRate = 0x1A;
+  std::string expectedLogMessage =
+      fmt::format("scone_received:rate={}", static_cast<int>(testRate));
+
+  EXPECT_CALL(*qLogger, addTransportStateUpdate(expectedLogMessage)).Times(1);
+
+  // Build and deliver a SCONE packet to trigger the uncovered code path
+  auto sconePacket = buildSconePacket(
+      testRate,
+      conn.clientConnectionId.value(),
+      conn.serverConnectionId.value());
+
+  // Deliver the SCONE packet - this should trigger the uncovered code in
+  // QuicClientTransportLite.cpp that handles SCONE packet processing
+  deliverData(sconePacket.coalesce());
+
+  // The test passes if the qLogger received the expected log message
+  // This verifies the uncovered code path is executed
 }
 
 TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
@@ -3748,7 +3864,7 @@ TEST_F(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder2(
       client->getConn().udpSendPacketLen,
-      std::move(header),
+      std::move(header2),
       0 /* largestAcked */);
   ASSERT_FALSE(builder2.encodePacketHeader().hasError());
   ASSERT_FALSE(writeFrame(rstFrame, builder2).hasError());

@@ -489,6 +489,10 @@ std::string_view toString(QuicVersion version) {
       return "MVFST_EXPERIMENTAL5";
     case QuicVersion::MVFST_PRIMING:
       return "MVFST_PRIMING";
+    case QuicVersion::SCONE_VERSION_1:
+      return "SCONE_VERSION_1";
+    case QuicVersion::SCONE_VERSION_2:
+      return "SCONE_VERSION_2";
   }
   LOG(WARNING) << "toString has unhandled version type";
   return "UNKNOWN";

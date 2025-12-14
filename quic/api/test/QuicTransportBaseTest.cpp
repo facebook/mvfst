@@ -10,12 +10,15 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/DatagramHandlers.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -633,6 +636,10 @@ class TestQuicTransport
 
   void maybeStopWriteLooperAndArmSocketWritableEvent() {
     QuicTransportBase::maybeStopWriteLooperAndArmSocketWritableEvent();
+  }
+
+  void invokeReadDataAndCallbacks() {
+    QuicTransportBase::invokeReadDataAndCallbacks(true);
   }
 
   void closeImpl(
@@ -5284,4 +5291,29 @@ TEST_P(
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, SconeRateSignalCallbackProcessingSync) {
+  transport->transportConn->transportSettings.enableScone = true;
+  transport->transportConn->scone.emplace();
+  transport->transportConn->scone->negotiated = true;
+
+  uint8_t rateA = 0x1B; // 27
+  uint8_t rateB = 0x2C; // 44
+  QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
+  transport->transportConn->scone->pendingRateSignals.push_back(
+      {rateA, testVersion});
+  transport->transportConn->scone->pendingRateSignals.push_back(
+      {rateB, testVersion});
+
+  MockConnectionCallback cb;
+  transport->setConnectionCallback(&cb);
+  EXPECT_CALL(cb, onSconeRateSignal(rateA, testVersion)).Times(1);
+  EXPECT_CALL(cb, onSconeRateSignal(rateB, testVersion)).Times(1);
+
+  // Run everything on the event-base thread so that the connection callback is
+  // installed in the correct thread context before processing.
+  transport->invokeReadDataAndCallbacks();
+
+  EXPECT_TRUE(transport->transportConn->scone->pendingRateSignals.empty());
+  transport->setConnectionCallback(nullptr);
+}
 } // namespace quic::test

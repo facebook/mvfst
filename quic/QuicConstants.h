@@ -418,6 +418,9 @@ enum class QuicVersion : uint32_t {
   MVFST_EXPERIMENTAL4 = 0xfaceb014,
   MVFST_EXPERIMENTAL5 = 0xfaceb015,
   MVFST_PRIMING = 0xfacefeed, // Reserved for priming
+  // SCONE (Standard Communication with Network Elements) versions
+  SCONE_VERSION_1 = 0x6f7dc0fd,
+  SCONE_VERSION_2 = 0xef7dc0fd,
 };
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;
@@ -844,6 +847,8 @@ constexpr uint8_t kEcnCE = 0b11;
 // Config for randomly skipping one in N packet sequence numbers
 constexpr uint16_t kSkipOneInNPacketSequenceNumber = 1000;
 constexpr uint16_t kDistanceToClearSkippedPacketNumber = 1000;
+
+constexpr uint8_t kSconeNoAdvice = 0x7F;
 } // namespace quic
 
 // Restore Windows NO_ERROR macro if it was previously defined

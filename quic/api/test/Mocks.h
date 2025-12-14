@@ -145,6 +145,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       onKnobMock,
       (uint64_t, uint64_t, folly::IOBuf*),
       (noexcept));
+  MOCK_METHOD((void), onSconeRateSignal, (uint8_t, QuicVersion), (noexcept));
 
   void onKnob(uint64_t knobSpace, uint64_t knobId, BufPtr knobBlob) override {
     onKnobMock(knobSpace, knobId, knobBlob.get());

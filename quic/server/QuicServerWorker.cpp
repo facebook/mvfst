@@ -281,10 +281,16 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     versionNegotiationPacket.emplace(std::move(builder).buildPacket());
   }
   if (!versionNegotiationPacket) {
-    bool negotiationNeeded = std::find(
-                                 supportedVersions_.begin(),
-                                 supportedVersions_.end(),
-                                 invariant.version) == supportedVersions_.end();
+    // SCONE packets should bypass version negotiation entirely
+    bool isSconePacket =
+        (invariant.version == QuicVersion::SCONE_VERSION_1 ||
+         invariant.version == QuicVersion::SCONE_VERSION_2);
+
+    bool negotiationNeeded = !isSconePacket &&
+        std::find(
+            supportedVersions_.begin(),
+            supportedVersions_.end(),
+            invariant.version) == supportedVersions_.end();
 
     if (invariant.version == QuicVersion::MVFST_PRIMING &&
         !isPrimingEnabled_()) {
@@ -480,6 +486,7 @@ void QuicServerWorker::handleNetworkData(
     // We already checked that we can advance sizeof(uint8_t) bytes
     CHECK(cursor.tryReadBE(initialByte));
     HeaderForm headerForm = getHeaderForm(initialByte);
+
     if (headerForm == HeaderForm::Short) {
       if (auto maybeParsedShortHeader =
               parseShortHeaderInvariants(initialByte, cursor)) {
@@ -515,6 +522,13 @@ void QuicServerWorker::handleNetworkData(
         return;
       }
 
+      if (invariant.version == QuicVersion::SCONE_VERSION_1 ||
+          invariant.version == QuicVersion::SCONE_VERSION_2) {
+        VLOG(4) << "SCONE packet routing: isInitial=" << isInitial
+                << " is0RTT=" << is0Rtt
+                << " dstCIDLen=" << invariant.dstConnId.size()
+                << " srcCIDLen=" << invariant.srcConnId.size();
+      }
       bool isClientChosenDcid = isInitial || is0Rtt;
       if (!isClientChosenDcid &&
           invariant.dstConnId.size() < kMinSelfConnectionIdV1Size) {

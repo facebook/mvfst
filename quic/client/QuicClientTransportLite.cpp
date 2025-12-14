@@ -136,6 +136,11 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
   {
     BufQueue& udpData = udpPacket.buf;
 
+    // Track subsequent packet processing for conditional SCONE rate signal
+    // usage (spec requirement)
+    bool subsequentPacketProcessedSuccessfully = false;
+    pendingSconeRateSignal_.reset();
+
     if (!conn_->version) {
       // We only check for version negotiation packets before the version
       // is negotiated.
@@ -159,11 +164,29 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
       if (!res.has_value()) {
         return res;
       }
+      subsequentPacketProcessedSuccessfully = true;
     }
     VLOG_IF(4, !udpData.empty())
         << "Leaving " << udpData.chainLength()
         << " bytes unprocessed after attempting to process "
         << kMaxNumCoalescedPackets << " packets.";
+
+    // Apply SCONE rate signal only if subsequent packet was processed
+    // successfully (per spec)
+    if (pendingSconeRateSignal_.has_value() &&
+        subsequentPacketProcessedSuccessfully && conn_->scone) {
+      conn_->scone->pendingRateSignals.push_back(
+          pendingSconeRateSignal_.value());
+      VLOG(4) << "SCONE rate signal "
+              << static_cast<int>(pendingSconeRateSignal_.value().rate)
+              << " queued after successful packet processing";
+      pendingSconeRateSignal_.reset();
+    } else if (
+        pendingSconeRateSignal_.has_value() &&
+        !subsequentPacketProcessedSuccessfully) {
+      VLOG(4) << "Got SCONE but failed to process subsequent packet";
+      pendingSconeRateSignal_.reset();
+    }
   }
 
   // Process any deferred pending 1RTT and handshake packets if we have keys.
@@ -325,6 +348,19 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     return quic::make_unexpected(QuicError(
         *codecError->error.code.asTransportErrorCode(),
         std::move(codecError->error.message)));
+  }
+
+  if (auto* sp = parsedPacket.sconePacket()) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addTransportStateUpdate(
+          fmt::format("scone_received:rate={}", static_cast<int>(sp->rate)));
+    }
+
+    if (conn_->scone && sp->rate != kSconeNoAdvice) {
+      pendingSconeRateSignal_ = QuicConnectionStateBase::SconeRateSignal{
+          sp->rate, static_cast<QuicVersion>(sp->version)};
+    }
+    return {};
   }
 
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
@@ -889,6 +925,16 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
           return quic::make_unexpected(maxStreamsUni.error());
         }
 
+        if (conn_->transportSettings.enableScone) {
+          bool serverSupportsScone =
+              getSconeSupportedParameter(serverParams->parameters);
+          if (serverSupportsScone) {
+            conn_->scone.emplace();
+            conn_->scone->negotiated = true;
+            VLOG(4) << "SCONE negotiated successfully with server " << *this;
+          }
+        }
+
         auto processResult = processServerInitialParams(
             *clientConn_, serverParams.value(), packetNum);
         if (!processResult.has_value()) {
@@ -1263,6 +1309,11 @@ QuicClientTransportLite::startCryptoHandshake() {
     CHECK(maybeEncodedDirectEncapParam)
         << "Failed to encode direct encap param";
     customTransportParameters_.push_back(*maybeEncodedDirectEncapParam);
+  }
+
+  if (conn_->transportSettings.enableScone) {
+    VLOG(4) << "Sending SCONE transport parameter";
+    customTransportParameters_.push_back(encodeSconeSupportedParameter());
   }
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(

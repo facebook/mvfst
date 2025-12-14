@@ -578,4 +578,15 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
   PacketBuilderInterface& builder;
   uint32_t diff;
 };
+
+/**
+ * Build a SCONE packet with the given rate signal and connection IDs.
+ * The version is derived from the rate signal's low bit per IETF SCONE draft.
+ * Returns a buffer containing the SCONE packet ready to be sent.
+ */
+Buf buildSconePacket(
+    uint8_t rateSignal,
+    const ConnectionId& dstCid,
+    const ConnectionId& srcCid = ConnectionId::createZeroLength());
+
 } // namespace quic

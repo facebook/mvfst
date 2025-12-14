@@ -235,6 +235,47 @@ void updateErrnoCount(
   }
 }
 
+// Helper function to write SCONE packet if needed.
+// Returns the size of the SCONE packet written, or 0 if no packet was written.
+uint64_t writeSconePacketIfNeeded(
+    QuicConnectionStateBase& connection,
+    const PacketHeader& header,
+    PacketNumberSpace pnSpace) {
+  bool needScone = connection.scone && connection.scone->negotiated &&
+      !connection.scone->sentThisLoop &&
+      pnSpace == PacketNumberSpace::AppData &&
+      connection.nodeType == QuicNodeType::Server;
+
+  if (!needScone) {
+    return 0;
+  }
+
+  // SCONE packets are only sent with AppData (short headers)
+  auto sconeDstCid = header.asShort()->getConnectionId();
+  auto sconeSrcCid = ConnectionId::createZeroLength();
+  uint8_t sconeRateSignal = kSconeNoAdvice;
+  auto sconePacket =
+      buildSconePacket(sconeRateSignal, sconeDstCid, sconeSrcCid);
+  uint64_t sconeSize = sconePacket.computeChainDataLength();
+
+  if (connection.udpSendPacketLen <= (sconeSize + kMinInitialPacketSize)) {
+    VLOG(3) << "SCONE: Not enough space for SCONE packet in continuous buffer";
+    return 0;
+  }
+
+  memcpy(connection.bufAccessor->writableTail(), sconePacket.data(), sconeSize);
+  connection.bufAccessor->append(sconeSize);
+  connection.scone->sentThisLoop = true;
+
+  VLOG(4) << "SCONE: Wrote " << sconeSize << " bytes to continuous buffer";
+  if (connection.qLogger) {
+    connection.qLogger->addTransportStateUpdate(
+        fmt::format("scone_sent:rate={}", static_cast<int>(sconeRateSignal)));
+  }
+
+  return sconeSize;
+}
+
 [[nodiscard]] quic::Expected<DataPathResult, QuicError>
 continuousMemoryBuildScheduleEncrypt(
     QuicConnectionStateBase& connection,
@@ -247,6 +288,19 @@ continuousMemoryBuildScheduleEncrypt(
     IOBufQuicBatch& ioBufBatch,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
+  // SCONE: If needed, build the SCONE packet and write it to the buffer first.
+  uint64_t sconePacketSize =
+      writeSconePacketIfNeeded(connection, header, pnSpace);
+
+  // Defensive check: ensure we have enough space for the regular packet
+  if (connection.udpSendPacketLen < sconePacketSize) {
+    // This should never happen as writeSconePacketIfNeeded validates space,
+    // but adding defensive check for clarity
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "Insufficient space after SCONE packet"));
+  }
+
   auto prevSize = connection.bufAccessor->length();
 
   auto rollbackBuf = [&]() {
@@ -257,7 +311,7 @@ continuousMemoryBuildScheduleEncrypt(
   // It's the scheduler's job to invoke encode header
   InplaceQuicPacketBuilder pktBuilder(
       *connection.bufAccessor,
-      connection.udpSendPacketLen,
+      connection.udpSendPacketLen - sconePacketSize,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   pktBuilder.accountForCipherOverhead(cipherOverhead);
@@ -374,10 +428,35 @@ iobufChainBasedBuildScheduleEncrypt(
     IOBufQuicBatch& ioBufBatch,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
+  // SCONE: Pre-build SCONE packet and adjust max packet size to avoid overflow
+  std::unique_ptr<folly::IOBuf> preBuildSconePacket;
+  uint64_t adjustedMaxPacketSize = connection.udpSendPacketLen;
+  uint8_t sconeRateSignal = kSconeNoAdvice;
+  bool needScone = connection.scone && connection.scone->negotiated &&
+      !connection.scone->sentThisLoop &&
+      pnSpace == PacketNumberSpace::AppData &&
+      connection.nodeType == QuicNodeType::Server;
+  if (needScone) {
+    // AppData packets use short headers, so we get DCID from short header
+    ConnectionId sconeDstCid = header.asShort()->getConnectionId();
+    ConnectionId sconeSrcCid = ConnectionId::createZeroLength();
+    auto scone = buildSconePacket(sconeRateSignal, sconeDstCid, sconeSrcCid);
+    preBuildSconePacket = std::make_unique<folly::IOBuf>(std::move(scone));
+    uint64_t sconeSize = preBuildSconePacket->computeChainDataLength();
+
+    // SCONE packets are small; there should always be enough space
+    CHECK_GT(adjustedMaxPacketSize, sconeSize)
+        << "Insufficient space for SCONE packet";
+    adjustedMaxPacketSize -= sconeSize;
+    VLOG(4) << "SCONE: Reserved " << sconeSize
+            << " bytes, adjusted max packet size to " << adjustedMaxPacketSize;
+  }
+
   RegularQuicPacketBuilder pktBuilder(
-      connection.udpSendPacketLen,
+      adjustedMaxPacketSize,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
+  CHECK_EQ(pktBuilder.remainingSpaceInPkt(), adjustedMaxPacketSize);
   // It's the scheduler's job to invoke encode header
   pktBuilder.accountForCipherOverhead(cipherOverhead);
   auto result =
@@ -446,10 +525,26 @@ iobufChainBasedBuildScheduleEncrypt(
   }
   auto encodedSize = packetBuf->computeChainDataLength();
   auto encodedBodySize = encodedSize - headerLen;
-  if (encodedSize > connection.udpSendPacketLen) {
-    VLOG(3) << "Quic sending pkt larger than limit, encodedSize=" << encodedSize
-            << " encodedBodySize=" << encodedBodySize;
+
+  // SCONE: Prepend pre-built SCONE packet for co-alescing (size already
+  // accounted for)
+  if (needScone && preBuildSconePacket) {
+    preBuildSconePacket->prependChain(std::move(packetBuf));
+    packetBuf = std::move(preBuildSconePacket);
+    encodedSize = packetBuf->computeChainDataLength();
+    connection.scone->sentThisLoop = true;
+    VLOG(4) << "SCONE: Prepended SCONE packet, total size=" << encodedSize;
+
+    if (connection.qLogger) {
+      connection.qLogger->addTransportStateUpdate(
+          fmt::format("scone_sent:rate={}", static_cast<int>(sconeRateSignal)));
+    }
   }
+  if (encodedSize > connection.udpSendPacketLen) {
+    LOG(ERROR) << "Quic sending pkt larger than limit, encodedSize="
+               << encodedSize << " encodedBodySize=" << encodedBodySize;
+  }
+
   if (connection.transportSettings.isPriming && packetBuf) {
     packetBuf->coalesce();
     connection.primingData.emplace_back(std::move(packetBuf));
@@ -1732,8 +1827,9 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
           std::move(writeQueueTransaction));
     });
 
-    const auto& dataPlaneFunc =
-        connection.transportSettings.dataPathType == DataPathType::ChainedMemory
+    bool useChainedMemory = connection.transportSettings.dataPathType ==
+        DataPathType::ChainedMemory;
+    const auto& dataPlaneFunc = useChainedMemory
         ? iobufChainBasedBuildScheduleEncrypt
         : continuousMemoryBuildScheduleEncrypt;
 

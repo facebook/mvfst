@@ -47,7 +47,8 @@ enum class TransportParameterId : uint64_t {
   cwnd_hint_bytes = 0x00007492,
   client_direct_encap = 0x000042fc,
   server_direct_encap = 0x000042fd,
-  reliable_stream_reset = 0x17f7586d2cb571
+  reliable_stream_reset = 0x17f7586d2cb571,
+  scone_supported = 0x219e
 };
 
 struct TransportParameter {
@@ -152,6 +153,11 @@ quic::Expected<TransportParameter, QuicError> encodeIntegerParameter(
 TransportParameter encodeIPAddressParameter(
     TransportParameterId id,
     const folly::IPAddress& addr);
+
+bool getSconeSupportedParameter(
+    const std::vector<TransportParameter>& parameters);
+
+TransportParameter encodeSconeSupportedParameter();
 
 inline TransportParameter encodeEmptyParameter(TransportParameterId id) {
   TransportParameter param;

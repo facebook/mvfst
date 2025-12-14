@@ -242,4 +242,69 @@ TEST_F(TransportParametersTest, EncodeIPAddressParameterIPv6) {
   EXPECT_EQ(memcmp(actualRange.data(), expectedBytes, 16), 0);
 }
 
+// Test SCONE transport parameter generation when enabled
+TEST_F(TransportParametersTest, EncodeSconeTPWhenEnabled) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.enableScone = true;
+
+  auto params = getSupportedExtTransportParams(serverConn);
+
+  // Should contain SCONE supported parameter when enabled
+  auto it = findParameter(params, TransportParameterId::scone_supported);
+  EXPECT_TRUE(it != params.end());
+  EXPECT_TRUE(it->value->empty()); // Zero-length value
+}
+
+// Test SCONE transport parameter omission when disabled
+TEST_F(TransportParametersTest, OmitSconeTPWhenDisabled) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.enableScone = false;
+
+  auto params = getSupportedExtTransportParams(serverConn);
+
+  // Should not contain SCONE supported parameter when disabled
+  auto it = findParameter(params, TransportParameterId::scone_supported);
+  EXPECT_TRUE(it == params.end());
+}
+
+// Test SCONE parameter round-trip helper functions
+TEST_F(TransportParametersTest, RoundTripHelper) {
+  // Test with SCONE parameter present
+  auto encodedParam = encodeSconeSupportedParameter();
+  std::vector<TransportParameter> vecWithScone = {encodedParam};
+  EXPECT_TRUE(getSconeSupportedParameter(vecWithScone));
+
+  // Test with empty vector
+  std::vector<TransportParameter> emptyVec = {};
+  EXPECT_FALSE(getSconeSupportedParameter(emptyVec));
+
+  // Test with other parameters but no SCONE parameter
+  std::vector<TransportParameter> vecWithoutScone;
+  auto otherParam =
+      encodeIntegerParameter(TransportParameterId::idle_timeout, 5000);
+  ASSERT_FALSE(otherParam.hasError());
+  vecWithoutScone.push_back(otherParam.value());
+  EXPECT_FALSE(getSconeSupportedParameter(vecWithoutScone));
+}
+
+// Test SCONE parameter encoding/decoding - zero-length presence indicator
+TEST_F(TransportParametersTest, SconeSupportedParameter) {
+  // Test encoding - should create zero-length parameter
+  auto encodedParam = encodeSconeSupportedParameter();
+  EXPECT_EQ(encodedParam.parameter, TransportParameterId::scone_supported);
+  EXPECT_EQ(encodedParam.value->length(), 0); // Zero-length value
+
+  // Test decoding - presence check
+  std::vector<TransportParameter> paramListWithScone = {encodedParam};
+  std::vector<TransportParameter> paramListWithoutScone = {};
+
+  // Should return true when parameter is present
+  EXPECT_TRUE(getSconeSupportedParameter(paramListWithScone));
+
+  // Should return false when parameter is absent
+  EXPECT_FALSE(getSconeSupportedParameter(paramListWithoutScone));
+}
+
 } // namespace quic::test

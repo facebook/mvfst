@@ -9,6 +9,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/QuicException.h>
+#include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/StringUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
@@ -1438,5 +1439,234 @@ TEST_F(QuicReadCodecTest, KeyUpdateInitiate) {
     // A new key update can be initiated
     EXPECT_TRUE(codec->canInitiateKeyUpdate());
     EXPECT_TRUE(codec->advanceOneRttReadPhase());
+  }
+}
+
+TEST_F(QuicReadCodecTest, CoalescedSconeDecode) {
+  auto sc = buildSconePacket(5, getTestConnectionId(1), getTestConnectionId(0));
+
+  // Create a minimal short header packet
+  auto connId = getTestConnectionId();
+  PacketNum packetNum = 12321;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::copyBuffer("hello");
+  auto oneRtt = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */);
+  auto oneRttBuf = packetToBuf(oneRtt);
+
+  sc.prependChain(std::move(oneRttBuf));
+  auto q = bufToQueue(std::make_unique<folly::IOBuf>(std::move(sc)));
+  AckStates acks;
+  auto p1 = makeUnencryptedCodec()->parsePacket(q, acks);
+  EXPECT_TRUE(p1.sconePacket());
+
+  // Debug: check queue state after first parse
+  EXPECT_FALSE(q.empty())
+      << "Queue should not be empty after parsing SCONE packet";
+
+  auto p2 = makeEncryptedCodec(connId, createNoOpAead())->parsePacket(q, acks);
+  // Debug: check what type p2 actually is
+  if (p2.regularPacket()) {
+    EXPECT_TRUE(true);
+  } else if (p2.nothing()) {
+    FAIL() << "Second packet parsed as nothing, reason: "
+           << static_cast<int>(p2.nothing()->reason);
+  } else {
+    FAIL() << "Second packet parsed as unexpected type";
+  }
+}
+
+TEST_F(QuicReadCodecTest, SCONEHappyPath) {
+  // Build raw SCONE packet using BufAppender (rate=0x2A,
+  // 4-byte dst/src CIDs)
+  uint8_t rate = 0x2A; // 42 decimal
+  ConnectionId dstCid = getTestConnectionId(70);
+  ConnectionId srcCid = getTestConnectionId(90);
+
+  // Build SCONE packet using the proper function
+  auto sconePacketBuf = buildSconePacket(rate, dstCid, srcCid);
+  auto sconePacketEncoded =
+      std::make_unique<folly::IOBuf>(std::move(sconePacketBuf));
+
+  auto packetQueue = bufToQueue(std::move(sconePacketEncoded));
+
+  AckStates ackStates;
+  auto result = makeUnencryptedCodec()->parsePacket(packetQueue, ackStates);
+
+  // Verify SCONE packet was parsed correctly
+  // Debug: check what type of result we got
+  if (result.sconePacket()) {
+    auto sconePacket = result.sconePacket();
+    EXPECT_EQ(sconePacket->rate, rate);
+    // Version is derived from rate: even rates use VERSION_1, odd use VERSION_2
+    QuicVersion expectedVersion = (rate & 1) ? QuicVersion::SCONE_VERSION_2
+                                             : QuicVersion::SCONE_VERSION_1;
+    EXPECT_EQ(sconePacket->version, static_cast<uint32_t>(expectedVersion));
+    EXPECT_EQ(sconePacket->dstCid, dstCid);
+    EXPECT_EQ(sconePacket->srcCid, srcCid);
+  } else if (result.regularPacket()) {
+    FAIL() << "Expected SCONE packet but got regular packet";
+  } else if (result.nothing()) {
+    FAIL() << "Expected SCONE packet but got nothing - reason: "
+           << static_cast<int>(result.nothing()->reason._to_integral());
+  } else {
+    FAIL() << "Expected SCONE packet but got unknown result type";
+  }
+}
+
+TEST_F(QuicReadCodecTest, SCONERateSignalEncoding) {
+  // Test that rate signal encoding matches IETF SCONE draft:
+  // - High 6 bits go in first byte (bits 0x3f)
+  // - Low 1 bit determines version (VERSION_1 for 0, VERSION_2 for 1)
+
+  struct TestCase {
+    uint8_t rate;
+    uint8_t expectedByte0Bits; // bits 0x3f of first byte
+    QuicVersion expectedVersion;
+  };
+
+  std::vector<TestCase> testCases = {
+      {0, 0, QuicVersion::SCONE_VERSION_1}, // 0b0000000 -> high=0, low=0
+      {1, 0, QuicVersion::SCONE_VERSION_2}, // 0b0000001 -> high=0, low=1
+      {64, 32, QuicVersion::SCONE_VERSION_1}, // 0b1000000 -> high=32, low=0
+      {65, 32, QuicVersion::SCONE_VERSION_2}, // 0b1000001 -> high=32, low=1
+      {126, 63, QuicVersion::SCONE_VERSION_1}, // 0b1111110 -> high=63, low=0
+      {127, 63, QuicVersion::SCONE_VERSION_2}, // 0b1111111 -> high=63, low=1
+  };
+
+  ConnectionId dstCid = getTestConnectionId(1);
+  ConnectionId srcCid = getTestConnectionId(2);
+
+  for (const auto& tc : testCases) {
+    SCOPED_TRACE(fmt::format("rate={}", tc.rate));
+    auto buf = buildSconePacket(tc.rate, dstCid, srcCid);
+
+    // Verify first byte encoding
+    uint8_t firstByte = buf.data()[0];
+    EXPECT_EQ(firstByte & 0x3f, tc.expectedByte0Bits)
+        << "Rate " << (int)tc.rate << " first byte bits mismatch";
+
+    // Verify version selection
+    uint32_t version =
+        folly::Endian::big(*reinterpret_cast<const uint32_t*>(buf.data() + 1));
+    EXPECT_EQ(version, static_cast<uint32_t>(tc.expectedVersion))
+        << "Rate " << (int)tc.rate << " version mismatch";
+
+    // Verify round-trip
+    auto bufCopy = buf.clone();
+    auto packetQueue = bufToQueue(std::move(bufCopy));
+    AckStates ackStates;
+    auto result = makeUnencryptedCodec()->parsePacket(packetQueue, ackStates);
+    ASSERT_TRUE(result.sconePacket())
+        << "Rate " << (int)tc.rate << " parse failed";
+    EXPECT_EQ(result.sconePacket()->rate, tc.rate);
+  }
+}
+
+TEST_F(QuicReadCodecTest, SCONELengthMismatch) {
+  // Omit srcCidLen byte → parsePacket() returns nothing() with reason ==
+  // PARSE_ERROR_LONG_HEADER
+  uint8_t rate = 0x20; // 32 decimal, even so VERSION_1
+  ConnectionId dstCid = getTestConnectionId(70);
+
+  BufPtr sconePacketEncoded = std::make_unique<folly::IOBuf>();
+  BufAppender appender(sconePacketEncoded.get(), 100);
+
+  // SCONE packet format: firstByte + version + dstCidLen + dstCid + (missing
+  // srcCidLen)
+  // Per IETF draft: high 6 bits go in first byte, low 1 bit determines version
+  uint8_t rateHighBits = (rate >> 1) & 0x3F;
+  uint8_t firstByte = 0x80 | 0x40 | rateHighBits;
+  QuicVersion version =
+      (rate & 1) ? QuicVersion::SCONE_VERSION_2 : QuicVersion::SCONE_VERSION_1;
+  appender.writeBE<uint8_t>(firstByte);
+  appender.writeBE<uint32_t>(static_cast<uint32_t>(version));
+  appender.writeBE<uint8_t>(dstCid.size());
+  appender.push(dstCid.data(), dstCid.size());
+  // Intentionally omit srcCidLen byte to trigger length mismatch
+
+  auto packetQueue = bufToQueue(std::move(sconePacketEncoded));
+
+  AckStates ackStates;
+  auto result = makeUnencryptedCodec()->parsePacket(packetQueue, ackStates);
+
+  // Verify parsePacket returns nothing with PARSE_ERROR_LONG_HEADER reason
+  if (result.nothing()) {
+    EXPECT_EQ(
+        result.nothing()->reason,
+        PacketDropReason(PacketDropReason::PARSE_ERROR_LONG_HEADER));
+  } else if (result.regularPacket()) {
+    FAIL() << "Expected nothing but got regular packet";
+  } else if (result.sconePacket()) {
+    FAIL() << "Expected nothing but got SCONE packet";
+  } else if (result.statelessReset()) {
+    FAIL() << "Expected nothing but got stateless reset";
+  } else {
+    FAIL() << "Expected nothing but got unknown result type";
+  }
+}
+
+TEST_F(QuicReadCodecTest, UnknownVersionFallsThrough) {
+  // SCONE header with version 0xDEADBEEF + minimal Initial afterwards
+  // parsePacket() should return regularPacket(); verify
+  // header.getHeaderForm()==Long
+  uint8_t rate = 0x10;
+  uint32_t unknownVersion = 0xDEADBEEF;
+  ConnectionId dstCid = getTestConnectionId(70);
+  ConnectionId srcCid = getTestConnectionId(90);
+
+  BufPtr combinedPacket = std::make_unique<folly::IOBuf>();
+  BufAppender appender(combinedPacket.get(), 200);
+
+  // SCONE packet with unknown version - should be ignored
+  // First byte: 0x80 (long header) | 0x40 (fixed bit) | (rate & 0x3F)
+  uint8_t firstByte = 0x80 | 0x40 | (rate & 0x3F);
+  appender.writeBE<uint8_t>(firstByte);
+  appender.writeBE<uint32_t>(unknownVersion);
+  appender.writeBE<uint8_t>(dstCid.size());
+  appender.push(dstCid.data(), dstCid.size());
+  appender.writeBE<uint8_t>(srcCid.size());
+  appender.push(srcCid.data(), srcCid.size());
+
+  // Minimal Initial packet afterwards (similar to TooSmallBuffer pattern)
+  uint8_t initialByte = 0xC0; // Long header, Initial type
+  QuicVersion validVersion = QuicVersion::MVFST;
+
+  appender.writeBE<uint8_t>(initialByte);
+  appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(validVersion));
+  appender.writeBE<uint8_t>(dstCid.size());
+  appender.push(dstCid.data(), dstCid.size());
+  appender.writeBE<uint8_t>(srcCid.size());
+  appender.push(srcCid.data(), srcCid.size());
+
+  // Add minimal token and packet number
+  appender.writeBE<uint8_t>(0); // Token length = 0
+  appender.writeBE<uint8_t>(1); // Packet length = 1
+  appender.writeBE<uint8_t>(0); // Packet number = 0
+
+  auto packetQueue = bufToQueue(std::move(combinedPacket));
+
+  AckStates ackStates;
+  auto result = makeUnencryptedCodec()->parsePacket(packetQueue, ackStates);
+
+  // Should return nothing with UNEXPECTED_NOTHING for unknown SCONE version
+  if (result.nothing()) {
+    EXPECT_EQ(
+        result.nothing()->reason,
+        PacketDropReason(PacketDropReason::UNEXPECTED_NOTHING));
+  } else if (result.regularPacket()) {
+    FAIL() << "Expected nothing but got regular packet";
+  } else if (result.sconePacket()) {
+    FAIL() << "Expected nothing but got SCONE packet";
+  } else if (result.statelessReset()) {
+    FAIL() << "Expected nothing but got stateless reset";
+  } else {
+    FAIL() << "Expected nothing but got unknown result type";
   }
 }

@@ -14,6 +14,12 @@
 
 namespace quic {
 
+// Forward declarations
+OptionalIntegral<size_t> calculateSconePacketLength(Cursor cursor);
+Optional<CodecResult> tryParseSconePacket(
+    BufQueue& queue,
+    const ContiguousReadCursor& cursor);
+
 QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
 
 Optional<VersionNegotiationPacket> QuicReadCodec::tryParsingVersionNegotiation(
@@ -423,7 +429,14 @@ CodecResult QuicReadCodec::parsePacket(
     return CodecResult(Nothing());
   }
   auto headerForm = getHeaderForm(initialByte);
+
   if (headerForm == HeaderForm::Long) {
+    // Try parsing as SCONE packet
+    auto sconeResult = tryParseSconePacket(queue, cursor);
+    if (sconeResult.has_value()) {
+      return std::move(sconeResult.value());
+    }
+    // Not SCONE, continue with normal long header processing
     auto result = parseLongHeaderPacket(queue, ackStates);
     if (result.hasError()) {
       return CodecResult(CodecError(std::move(result.error())));
@@ -669,6 +682,11 @@ CodecResult::CodecResult(CodecError&& codecErrorIn)
   new (&error) CodecError(std::move(codecErrorIn));
 }
 
+CodecResult::CodecResult(SCONEPacket&& sconePacketIn)
+    : type_(CodecResult::Type::SCONE_PACKET) {
+  new (&sconePacket_) SCONEPacket(std::move(sconePacketIn));
+}
+
 CodecError* CodecResult::codecError() {
   if (type_ == CodecResult::Type::CODEC_ERROR) {
     return &error;
@@ -695,6 +713,9 @@ void CodecResult::destroyCodecResult() {
       break;
     case CodecResult::Type::CODEC_ERROR:
       error.~CodecError();
+      break;
+    case CodecResult::Type::SCONE_PACKET:
+      sconePacket_.~SCONEPacket();
       break;
   }
 }
@@ -723,6 +744,9 @@ CodecResult::CodecResult(CodecResult&& other) noexcept {
     case CodecResult::Type::CODEC_ERROR:
       new (&error) CodecError(std::move(other.error));
       break;
+    case CodecResult::Type::SCONE_PACKET:
+      new (&sconePacket_) SCONEPacket(std::move(other.sconePacket_));
+      break;
   }
   type_ = other.type_;
 }
@@ -747,6 +771,9 @@ CodecResult& CodecResult::operator=(CodecResult&& other) noexcept {
       break;
     case CodecResult::Type::CODEC_ERROR:
       new (&error) CodecError(std::move(other.error));
+      break;
+    case CodecResult::Type::SCONE_PACKET:
+      new (&sconePacket_) SCONEPacket(std::move(other.sconePacket_));
       break;
   }
   type_ = other.type_;
@@ -791,4 +818,158 @@ Nothing* CodecResult::nothing() {
   }
   return nullptr;
 }
+
+SCONEPacket* CodecResult::sconePacket() {
+  if (type_ == CodecResult::Type::SCONE_PACKET) {
+    return &sconePacket_;
+  }
+  return nullptr;
+}
+
+// Calculate SCONE packet length from buffer
+// Note: cursor should be positioned after the first byte (which contains
+// the long header bit, reserved bit, and rate signal high bits)
+OptionalIntegral<size_t> calculateSconePacketLength(Cursor cursor) {
+  // Need: version(4) + dstCidLen(1) at minimum
+  if (!cursor.canAdvance(4 + 1)) {
+    return {};
+  }
+
+  cursor.skip(4); // Skip version
+
+  uint8_t dstCidLen = cursor.read<uint8_t>();
+  if (!cursor.canAdvance(dstCidLen + 1)) { // dstCid + srcCidLen
+    return {};
+  }
+
+  cursor.skip(dstCidLen); // Skip destination CID
+  uint8_t srcCidLen = cursor.read<uint8_t>();
+  if (!cursor.canAdvance(srcCidLen)) {
+    return {};
+  }
+
+  // Total length: firstByte(1) + version(4) + dstCidLen(1) + dstCid +
+  // srcCidLen(1) + srcCid
+  return 1 + 4 + 1 + dstCidLen + 1 + srcCidLen;
+}
+
+Expected<SCONEPacket, TransportErrorCode> decodeScone(Cursor& cursor) {
+  // Initialize SCONEPacket with zero-length ConnectionIds
+  SCONEPacket sconePacket{
+      0, // rate
+      0, // version
+      ConnectionId::createZeroLength(), // dstCid
+      ConnectionId::createZeroLength() // srcCid
+  };
+
+  if (!cursor.canAdvance(1)) {
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+
+  uint8_t firstByte = cursor.read<uint8_t>();
+
+  if (!cursor.canAdvance(sizeof(uint32_t))) {
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+
+  sconePacket.version = cursor.readBE<uint32_t>();
+
+  // Rate signal is 7 bits per IETF SCONE draft:
+  // - High 6 bits from first byte (bits 0x3f)
+  // - Low 1 bit from MSB of version field (bit 31)
+  uint8_t rateHighBits = firstByte & 0x3F;
+  uint8_t rateLowBit = (sconePacket.version >> 31) & 0x1;
+  sconePacket.rate = (rateHighBits << 1) | rateLowBit;
+
+  VLOG(4) << "SCONE decode: rate=" << (int)sconePacket.rate << " version=0x"
+          << std::hex << sconePacket.version << std::dec;
+
+  if (!cursor.canAdvance(1)) {
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+
+  uint8_t dstCidLen = cursor.read<uint8_t>();
+
+  if (!cursor.canAdvance(dstCidLen)) {
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+
+  if (dstCidLen > 0) {
+    auto dstCidData = cursor.readFixedString(dstCidLen);
+    std::vector<uint8_t> dstCidVec(dstCidData.begin(), dstCidData.end());
+    auto dstCidResult = ConnectionId::create(dstCidVec);
+    if (dstCidResult.hasError()) {
+      return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    sconePacket.dstCid = std::move(dstCidResult.value());
+  }
+
+  if (!cursor.canAdvance(1)) {
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+
+  uint8_t srcCidLen = cursor.read<uint8_t>();
+
+  if (!cursor.canAdvance(srcCidLen)) {
+    return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+
+  if (srcCidLen > 0) {
+    auto srcCidData = cursor.readFixedString(srcCidLen);
+    std::vector<uint8_t> srcCidVec(srcCidData.begin(), srcCidData.end());
+    auto srcCidResult = ConnectionId::create(srcCidVec);
+    if (srcCidResult.hasError()) {
+      return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    sconePacket.srcCid = std::move(srcCidResult.value());
+  }
+
+  return sconePacket;
+}
+
+// Helper function to try parsing a SCONE packet from the queue.
+// Returns a CodecResult with the SCONE packet if successfully parsed,
+// or std::nullopt if this is not a SCONE packet.
+// Returns a CodecResult with error/Nothing if parsing failed.
+Optional<CodecResult> tryParseSconePacket(
+    BufQueue& queue,
+    const ContiguousReadCursor& cursor) {
+  // Check if this is a SCONE packet by peeking at version
+  if (!cursor.canAdvance(sizeof(uint32_t))) {
+    return std::nullopt; // Not enough data, not a SCONE packet
+  }
+
+  auto bytes = cursor.peekBytes();
+  uint32_t version =
+      folly::Endian::big(folly::loadUnaligned<uint32_t>(bytes.data()));
+
+  if (version != static_cast<uint32_t>(QuicVersion::SCONE_VERSION_1) &&
+      version != static_cast<uint32_t>(QuicVersion::SCONE_VERSION_2)) {
+    return std::nullopt; // Not a SCONE version
+  }
+
+  VLOG(4) << "Detected SCONE packet";
+  Cursor sconeCursor(queue.front());
+  sconeCursor.skip(1); // Skip initial byte
+  auto sconeLength = calculateSconePacketLength(sconeCursor);
+  if (!sconeLength.has_value()) {
+    return CodecResult(Nothing(PacketDropReason::PARSE_ERROR_LONG_HEADER));
+  }
+
+  if (queue.chainLength() < sconeLength.value()) {
+    return CodecResult(Nothing(PacketDropReason::PARSE_ERROR_LONG_HEADER));
+  }
+
+  auto sconeData = queue.splitAtMost(sconeLength.value());
+  Cursor sconeDataCursor(sconeData.get());
+
+  auto scone = decodeScone(sconeDataCursor);
+  if (!scone.has_value()) {
+    return CodecResult(Nothing(PacketDropReason::PARSE_ERROR_LONG_HEADER));
+  }
+
+  VLOG(4) << "Parsed SCONE packet with rate=" << (int)scone->rate;
+  return CodecResult(std::move(scone.value()));
+}
+
 } // namespace quic

@@ -511,6 +511,8 @@ struct TransportSettings {
 
   // TODO(T239869314): Remove this after experiment is done.
   std::chrono::milliseconds keepAliveTimeout{0};
+
+  bool enableScone{false};
 };
 
 } // namespace quic

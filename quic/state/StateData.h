@@ -747,6 +747,19 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Is the stream buffer low after the next write
   bool imminentStreamCompletion{false};
+
+  struct SconeRateSignal {
+    uint8_t rate;
+    QuicVersion version;
+  };
+
+  struct SconeState {
+    CircularDeque<SconeRateSignal> pendingRateSignals;
+    bool negotiated{false};
+    bool sentThisLoop{false};
+  };
+
+  Optional<SconeState> scone;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

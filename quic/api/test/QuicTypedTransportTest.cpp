@@ -108,6 +108,17 @@ class QuicTypedTransportAfterStartTest : public QuicTypedTransportTest<T> {
   }
 };
 
+template <typename T>
+class QuicTypedTransportSconeTest : public QuicTypedTransportAfterStartTest<T> {
+ public:
+  ~QuicTypedTransportSconeTest() override = default;
+
+  void SetUp() override {
+    QuicTypedTransportAfterStartTest<T>::SetUp();
+    this->getNonConstConn().transportSettings.enableScone = true;
+  }
+};
+
 TYPED_TEST_SUITE(
     QuicTypedTransportAfterStartTest,
     ::TransportTypes,
@@ -6027,6 +6038,15 @@ TYPED_TEST(
       postLoopState.maybeLastPacketSentTime);
 
   this->destroyTransport();
+}
+
+TYPED_TEST_SUITE(
+    QuicTypedTransportSconeTest,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
+TYPED_TEST(QuicTypedTransportSconeTest, TestSconeFlag) {
+  EXPECT_TRUE(this->getNonConstConn().transportSettings.enableScone);
 }
 
 } // namespace quic::test

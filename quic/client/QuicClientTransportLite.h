@@ -434,5 +434,8 @@ class QuicClientTransportLite
   using PathValidationCallbackMap =
       UnorderedMap<PathIdType, QuicPathManager::PathValidationCallback*>;
   PathValidationCallbackMap pathValidationCallbacks_;
+
+  // Track pending SCONE rate signal for conditional usage per spec
+  Optional<QuicConnectionStateBase::SconeRateSignal> pendingSconeRateSignal_;
 };
 } // namespace quic

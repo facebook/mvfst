@@ -177,7 +177,24 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     }
   }
 
+  if (ts.enableScone) {
+    customTps.push_back(encodeSconeSupportedParameter());
+  }
+
   return customTps;
+}
+
+bool getSconeSupportedParameter(
+    const std::vector<TransportParameter>& parameters) {
+  auto it = findParameter(parameters, TransportParameterId::scone_supported);
+  return it != parameters.end();
+}
+
+TransportParameter encodeSconeSupportedParameter() {
+  return TransportParameter{
+      TransportParameterId::scone_supported,
+      folly::IOBuf::create(0) // Zero-length value - presence indicates support
+  };
 }
 
 } // namespace quic

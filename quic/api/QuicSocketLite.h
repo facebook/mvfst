@@ -182,6 +182,13 @@ class QuicSocketLite {
      */
     virtual void
     onKnob(uint64_t /*knobSpace*/, uint64_t /*knobId*/, BufPtr /*knobBlob*/) {}
+
+    /**
+     * Invoked when we receive a SCONE rate signal from the peer
+     */
+    virtual void onSconeRateSignal(
+        uint8_t /*rateSignal*/,
+        QuicVersion /*sconeVersion*/) noexcept {}
   };
 
   /**

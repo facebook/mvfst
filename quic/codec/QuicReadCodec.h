@@ -49,6 +49,13 @@ struct CodecError {
   explicit CodecError(QuicError errorIn) : error(std::move(errorIn)) {}
 };
 
+struct SCONEPacket {
+  uint8_t rate;
+  uint32_t version;
+  ConnectionId dstCid;
+  ConnectionId srcCid;
+};
+
 struct CodecResult {
   enum class Type {
     REGULAR_PACKET,
@@ -56,7 +63,8 @@ struct CodecResult {
     CIPHER_UNAVAILABLE,
     STATELESS_RESET,
     NOTHING,
-    CODEC_ERROR
+    CODEC_ERROR,
+    SCONE_PACKET
   };
 
   ~CodecResult();
@@ -70,6 +78,7 @@ struct CodecResult {
   /* implicit */ CodecResult(RetryPacket&& retryPacket);
   /* implicit */ CodecResult(Nothing&& nothing);
   /* implicit */ CodecResult(CodecError&& codecErrorIn);
+  /* implicit */ CodecResult(SCONEPacket&& sconePacketIn);
 
   Type type();
   RegularQuicPacket* regularPacket();
@@ -78,6 +87,7 @@ struct CodecResult {
   RetryPacket* retryPacket();
   Nothing* nothing();
   CodecError* codecError();
+  SCONEPacket* sconePacket();
 
  private:
   void destroyCodecResult();
@@ -89,6 +99,7 @@ struct CodecResult {
     StatelessReset reset;
     Nothing none;
     CodecError error;
+    SCONEPacket sconePacket_;
   };
 
   Type type_;
@@ -242,5 +253,10 @@ class QuicReadCodec {
 
   QuicTransportStatsCallback* statsCallback_{nullptr};
 };
+
+/**
+ * Decode a SCONE packet from the given cursor.
+ */
+Expected<SCONEPacket, TransportErrorCode> decodeScone(Cursor& cursor);
 
 } // namespace quic

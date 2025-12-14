@@ -38,6 +38,8 @@ mvfst_cpp_test(
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic:constants",
+        "//quic/api/test:mocks",
+        "//quic/codec:pktbuilder",
         "//quic/common/events:folly_eventbase",
         "//quic/common/events:highres_quic_timer",
         "//quic/common/udpsocket:folly_async_udp_socket",
