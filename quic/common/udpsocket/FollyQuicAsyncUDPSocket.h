@@ -148,7 +148,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   /**
    * Returns the socket address this socket is bound to and crashes otherwise.
    */
-  [[nodiscard]] virtual const folly::SocketAddress& addressRef() const override;
+  [[nodiscard]] const folly::SocketAddress& addressRef() const override;
 
   /**
    * Manage the eventbase driving this socket
