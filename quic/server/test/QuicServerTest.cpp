@@ -30,6 +30,8 @@
 #include <quic/server/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>
 
+#include <memory>
+
 using namespace testing;
 using namespace folly;
 
@@ -191,8 +193,8 @@ class QuicServerWorkerTest : public Test {
     EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
     auto qSock = std::make_unique<quic::FollyQuicAsyncUDPSocket>(
         qEvb_, std::move(mockSock));
-    transport_.reset(new MockQuicTransport(
-        qEvb_, std::move(qSock), &connSetupCb, &connCb, nullptr));
+    transport_ = std::make_shared<MockQuicTransport>(
+        qEvb_, std::move(qSock), &connSetupCb, &connCb, nullptr);
     factory_ = std::make_unique<MockQuicServerTransportFactory>();
     EXPECT_CALL(*transport_, getEventBase()).WillRepeatedly(Return(qEvb_));
     EXPECT_CALL(*transport_, getOriginalPeerAddress())
