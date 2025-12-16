@@ -38,7 +38,7 @@ class ClientHandshakeTest : public Test {
  public:
   ~ClientHandshakeTest() override = default;
 
-  ClientHandshakeTest() {}
+  ClientHandshakeTest() = default;
 
   virtual void setupClientAndServerContext() {
     clientCtx = createClientCtx();
