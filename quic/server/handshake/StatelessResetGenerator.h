@@ -37,7 +37,8 @@ class StatelessResetGenerator {
       StatelessResetSecret secret,
       const std::string& addressStr);
 
-  StatelessResetToken generateToken(const ConnectionId& connId) const;
+  [[nodiscard]] StatelessResetToken generateToken(
+      const ConnectionId& connId) const;
 
  private:
   std::string addressStr_;

@@ -21,7 +21,7 @@ namespace quic {
 class ServerConnectionIdRejector {
  public:
   virtual ~ServerConnectionIdRejector() = default;
-  virtual bool rejectConnectionId(
+  [[nodiscard]] virtual bool rejectConnectionId(
       const ConnectionId& candidate) const noexcept = 0;
 };
 

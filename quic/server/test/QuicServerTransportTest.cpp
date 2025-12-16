@@ -4368,11 +4368,11 @@ TEST_F(QuicServerTransportTest, TestStreamBufKnobHandlers) {
 class QuicServerTransportCertTest : public QuicServerTransportTest {
  protected:
   class MockCert : public fizz::Cert {
-    std::string getIdentity() const override {
+    [[nodiscard]] std::string getIdentity() const override {
       return "";
     }
 
-    std::optional<std::string> getDER() const override {
+    [[nodiscard]] std::optional<std::string> getDER() const override {
       return std::nullopt;
     }
   };

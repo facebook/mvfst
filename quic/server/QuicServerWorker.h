@@ -180,7 +180,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   ~QuicServerWorker() override;
 
-  folly::EventBase* getEventBase() const;
+  [[nodiscard]] folly::EventBase* getEventBase() const;
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
@@ -230,7 +230,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * Returns listening address of this server
    */
-  const folly::SocketAddress& getAddress() const;
+  [[nodiscard]] const folly::SocketAddress& getAddress() const;
 
   /*
    * Returns the File Descriptor of the listening socket
@@ -277,7 +277,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   int getTakeoverHandlerSocketFD();
 
-  TakeoverProtocolVersion getTakeoverProtocolVersion() const noexcept;
+  [[nodiscard]] TakeoverProtocolVersion getTakeoverProtocolVersion()
+      const noexcept;
 
   /*
    * Sets the id of the server, that is later used in the routing of the packets
@@ -290,7 +291,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * The id will be used to set a bit in the ConnectionId for routing (which is
    * later used in the routing of the packets)
    */
-  ProcessId getProcessId() const noexcept;
+  [[nodiscard]] ProcessId getProcessId() const noexcept;
 
   /**
    * Set the id for this worker thread. Server can make routing decision by
@@ -301,7 +302,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * Returns the id for this worker thread.
    */
-  uint8_t getWorkerId() const noexcept;
+  [[nodiscard]] uint8_t getWorkerId() const noexcept;
 
   /**
    * Set the id for the host where this server is running.
@@ -356,7 +357,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * Return callback for recording various transport stats info.
    */
-  QuicTransportStatsCallback* getTransportStatsCallback() const noexcept;
+  [[nodiscard]] QuicTransportStatsCallback* getTransportStatsCallback()
+      const noexcept;
 
   /**
    * Set ConnectionIdAlgo implementation to encode and decode ConnectionId with
@@ -427,7 +429,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   void onHandshakeUnfinished() noexcept override;
 
   // From ServerConnectionIdRejector:
-  bool rejectConnectionId(
+  [[nodiscard]] bool rejectConnectionId(
       const ConnectionId& candidate) const noexcept override;
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override;
@@ -453,9 +455,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       QuicServerTransport::Ptr,
       SourceIdentityHash>;
 
-  const ConnIdToTransportMap& getConnectionIdMap() const;
+  [[nodiscard]] const ConnIdToTransportMap& getConnectionIdMap() const;
 
-  const SrcToTransportMap& getSrcToTransportMap() const;
+  [[nodiscard]] const SrcToTransportMap& getSrcToTransportMap() const;
 
   void shutdownAllConnections(LocalErrorCode error);
 
@@ -592,7 +594,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * Helper method to extract and log routing info from the given (dest) connId
    */
-  std::string logRoutingInfo(const ConnectionId& connId) const;
+  [[nodiscard]] std::string logRoutingInfo(const ConnectionId& connId) const;
 
   void eventRecvmsgCallback(MsgHdr* msgHdr, int res);
   void recvmsgMultishotCallback(MultishotHdr* msgHdr, int res, BufPtr io_buf);

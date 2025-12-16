@@ -47,7 +47,7 @@ struct TestingServerConnectionState : public QuicServerConnectionState {
       std::shared_ptr<FizzServerQuicHandshakeContext> context)
       : QuicServerConnectionState(std::move(context)) {}
 
-  uint32_t getDestructorGuardCount() const {
+  [[nodiscard]] uint32_t getDestructorGuardCount() const {
     return folly::DelayedDestruction::getDestructorGuardCount();
   }
 };

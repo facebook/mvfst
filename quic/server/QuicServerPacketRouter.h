@@ -86,7 +86,8 @@ class TakeoverPacketHandler {
 
   void stop();
 
-  TakeoverProtocolVersion getTakeoverProtocolVersion() const noexcept {
+  [[nodiscard]] TakeoverProtocolVersion getTakeoverProtocolVersion()
+      const noexcept {
     return TakeoverProtocolVersion::V0;
   }
 
@@ -138,7 +139,7 @@ class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   int getSocketFD();
 
-  const folly::SocketAddress& getAddress() const;
+  [[nodiscard]] const folly::SocketAddress& getAddress() const;
 
   // AsyncUDPSocket ReadCallback methods
   void getReadBuffer(void** buf, size_t* len) noexcept override;

@@ -26,7 +26,8 @@ class DefaultAppTokenValidator : public fizz::server::AppTokenValidator {
  public:
   explicit DefaultAppTokenValidator(QuicServerConnectionState* conn);
 
-  bool validate(const fizz::server::ResumptionState&) const override;
+  [[nodiscard]] bool validate(
+      const fizz::server::ResumptionState&) const override;
 
  private:
   QuicServerConnectionState* conn_;
