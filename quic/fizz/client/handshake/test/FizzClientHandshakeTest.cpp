@@ -30,6 +30,8 @@
 #include <quic/fizz/handshake/QuicFizzFactory.h>
 #include <quic/state/StateData.h>
 
+#include <memory>
+
 using namespace testing;
 
 namespace quic::test {
@@ -113,10 +115,11 @@ class ClientHandshakeTest : public Test {
                 std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
             ConnectionId::createZeroLength(),
             *conn);
-    fizzServer.reset(
-        new fizz::server::
-            FizzServer<ClientHandshakeTest, fizz::server::ServerStateMachine>(
-                serverState, serverReadBuf, readAeadOptions, *this, dg.get()));
+    fizzServer = std::make_unique<fizz::server::FizzServer<
+        ClientHandshakeTest,
+        fizz::server::ServerStateMachine>>(
+
+        serverState, serverReadBuf, readAeadOptions, *this, dg.get());
     connect();
     processHandshake();
     fizzServer->accept(&evb, serverCtx, serverTransportParameters);
