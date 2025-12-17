@@ -46,8 +46,6 @@ set(mvfst_LIBRARIES
   mvfst::mvfst_bufutil
   mvfst::mvfst_transport_knobs
   mvfst::mvfst_cc_algo
-  mvfst::mvfst_dsr_types
-  mvfst::mvfst_dsr_frontend
   mvfst::mvfst_fizz_client
   mvfst::mvfst_fizz_handshake
   mvfst::mvfst_flowcontrol
