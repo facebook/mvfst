@@ -112,14 +112,8 @@ std::string toString(const QuicError& error);
 std::vector<TransportErrorCode> getAllTransportErrorCodes();
 std::vector<LocalErrorCode> getAllLocalErrorCodes();
 
-inline std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error) {
-  os << toString(error);
-  return os;
-}
+std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error);
 
-inline std::ostream& operator<<(std::ostream& os, const QuicError& error) {
-  os << toString(error);
-  return os;
-}
+std::ostream& operator<<(std::ostream& os, const QuicError& error);
 
 } // namespace quic

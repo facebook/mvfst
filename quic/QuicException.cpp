@@ -267,4 +267,14 @@ std::string toString(const QuicError& error) {
   }
   return err;
 }
+
+std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error) {
+  os << toString(error);
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const QuicError& error) {
+  os << toString(error);
+  return os;
+}
 } // namespace quic
