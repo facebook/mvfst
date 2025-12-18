@@ -47,22 +47,34 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "congestion_controller_factory",
-    srcs = [
-        "CongestionControllerFactory.cpp",
-    ],
+    srcs = select({
+        "DEFAULT": ["CongestionControllerFactory.cpp"],
+        "ovr_config//os/constraints:android": ["CongestionControllerFactoryMobile.cpp"],
+        "ovr_config//os/constraints:iphoneos": ["CongestionControllerFactoryMobile.cpp"],
+    }),
     headers = [
         "CongestionControllerFactory.h",
     ],
-    deps = [
-        ":bbr",
-        ":bbr2",
-        ":bbr_bandwidth_sampler",
-        ":bbr_rtt_sampler",
-        ":copa",
-        ":copa2",
-        ":cubic",
-        ":newreno",
-    ],
+    deps = select({
+        "DEFAULT": [
+            ":bbr",
+            ":bbr2",
+            ":bbr_bandwidth_sampler",
+            ":bbr_rtt_sampler",
+            ":copa",
+            ":copa2",
+            ":cubic",
+            ":newreno",
+        ],
+        "ovr_config//os/constraints:android": [
+            ":copa",
+            ":cubic",
+        ],
+        "ovr_config//os/constraints:iphoneos": [
+            ":copa",
+            ":cubic",
+        ],
+    }),
     exported_deps = [
         "//quic:constants",
     ],

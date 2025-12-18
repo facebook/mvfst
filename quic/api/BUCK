@@ -96,14 +96,25 @@ mvfst_cpp_library(
         "//quic/common/events:quic_timer",
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/congestion_control:congestion_controller_factory",
-        "//quic/congestion_control:copa",
-        "//quic/congestion_control:cubic",
-        "//quic/congestion_control:newreno",
         "//quic/observer:socket_observer_container",
         "//quic/priority:priority_queue",
         "//quic/state:quic_state_machine",
         "//quic/state:retransmission_policy",
-    ],
+    ] + select({
+        "DEFAULT": [
+            "//quic/congestion_control:copa",
+            "//quic/congestion_control:cubic",
+            "//quic/congestion_control:newreno",
+        ],
+        "ovr_config//os/constraints:android": [
+            "//quic/congestion_control:copa",
+            "//quic/congestion_control:cubic",
+        ],
+        "ovr_config//os/constraints:iphoneos": [
+            "//quic/congestion_control:copa",
+            "//quic/congestion_control:cubic",
+        ],
+    }),
 )
 
 mvfst_cpp_library(
