@@ -12,6 +12,10 @@
 #include <folly/container/heap_vector_types.h>
 #include <folly/small_vector.h>
 
+#include <quic/common/third-party/optional.h>
+
+#include <chrono>
+
 namespace quic {
 template <class... Args>
 struct UnorderedMap : folly::F14FastMap<Args...> {};
@@ -59,5 +63,13 @@ using InlineSet = folly::heap_vector_set<
     typename Container::allocator_type,
     void,
     Container>;
+
+template <class T>
+using Optional = detail::tiny::optional<T>;
+
+template <class T>
+using OptionalIntegral = detail::tiny::optional<T>;
+
+using OptionalMicros = detail::tiny::optional<std::chrono::microseconds>;
 
 } // namespace quic

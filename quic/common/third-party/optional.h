@@ -70,6 +70,13 @@ Original repository: https://github.com/Sedeniono/tiny-optional
   #define QUIC_TINY_OPTIONAL_x64
 #elif (defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)) /*Is it x86?*/
   #define QUIC_TINY_OPTIONAL_x86
+#else
+  // For non-x86/x64 architectures (e.g., ARM, ARM64, RISC-V), automatically disable UB-tricks
+  // and use a separate bool instead. This makes tiny::optional portable to all architectures
+  // while still preserving custom sentinel support.
+  #ifndef QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS
+    #define QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS
+  #endif
 #endif
 
 // The user can define QUIC_TINY_OPTIONAL_USE_SEPARATE_BOOL_INSTEAD_OF_UB_TRICKS to disable the exploits of undefined

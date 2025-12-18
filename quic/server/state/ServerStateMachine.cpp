@@ -1822,9 +1822,6 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
   }
   auto parsedPacket = conn.readCodec->parsePacket(udpData, conn.ackStates);
 
-  // Track SCONE rate signal for conditional usage (spec requirement)
-  Optional<QuicConnectionStateBase::SconeRateSignal> pendingSconeRateSignal;
-
   switch (parsedPacket.type()) {
     case CodecResult::Type::CIPHER_UNAVAILABLE: {
       VLOG(10) << "drop cipher unavailable " << conn;

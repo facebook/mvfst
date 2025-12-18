@@ -11,6 +11,7 @@ mvfst_cpp_library(
             "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
             "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
             "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+            "ovr_config//os/constraints:macos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
         }),
     }),
     exported_deps = select({
@@ -18,9 +19,11 @@ mvfst_cpp_library(
             "//folly:small_vector",  # @manual
             "//folly/container:f14_hash",  # @manual
             "//folly/container:heap_vector_types",  # @manual
+            "//quic/common/third-party:tiny_optional",  # @manual
         ],
         "ovr_config//os/constraints:android": [],  # @manual
         "ovr_config//os/constraints:iphoneos": [],  # @manual
+        "ovr_config//os/constraints:macos": [],  # @manual
     }),
 )
 
