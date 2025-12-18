@@ -424,7 +424,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         [](const Optional<std::string>&, const BufPtr&) { return false; },
         []() -> BufPtr { return nullptr; });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(testing::_))
-        .Times(1);
+        .Times(testing::AtLeast(1));
   }
 
   virtual void setupConnection() {

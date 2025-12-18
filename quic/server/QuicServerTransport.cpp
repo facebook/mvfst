@@ -556,6 +556,16 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
     // No session ticket has been written yet, we should write one.
     return true;
   }
+
+  // Check if current peer address differs from the most recent source address.
+  // This triggers a new session ticket after connection migration to ensure
+  // the client gets a ticket with the new address for future 0-RTT attempts.
+  if (!serverConn_->tokenSourceAddresses.empty() &&
+      serverConn_->tokenSourceAddresses.back() !=
+          conn_->peerAddress.getIPAddress()) {
+    return true;
+  }
+
   // Conditions for writing more session tickets after the first one:
   // 1. includeCwndHintsInSessionTicket transport setting is set
   // 2. The current BDP is either smaller than or more than twice
@@ -612,15 +622,32 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
     appToken.transportParams = std::move(transportParamsResult.value());
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
     appToken.version = conn_->version.value();
-    // If a client connects to server for the first time and doesn't attempt
-    // early data, tokenSourceAddresses will not be set because
-    // validateAndUpdateSourceAddressToken is not called in this case.
-    // So checking if source address token is empty here and adding peerAddr
-    // if so.
-    // TODO accumulate recent source tokens
-    if (appToken.sourceAddresses.empty()) {
-      appToken.sourceAddresses.push_back(conn_->peerAddress.getIPAddress());
+
+    // Ensure the current peer address is always in the source addresses list.
+    // This handles:
+    // 1. First connection without 0-RTT (tokenSourceAddresses is empty)
+    // 2. Connection migration (new address may not be in tokenSourceAddresses)
+    auto currentPeerIP = conn_->peerAddress.getIPAddress();
+    auto it = std::find(
+        appToken.sourceAddresses.begin(),
+        appToken.sourceAddresses.end(),
+        currentPeerIP);
+
+    if (it == appToken.sourceAddresses.end()) {
+      // Current peer address not in the list, add it
+      if (appToken.sourceAddresses.size() >= kMaxNumTokenSourceAddresses) {
+        // Remove oldest address (front of list) to make room
+        appToken.sourceAddresses.erase(appToken.sourceAddresses.begin());
+      }
+      appToken.sourceAddresses.push_back(currentPeerIP);
+    } else if (it != appToken.sourceAddresses.end() - 1) {
+      // Move current address to the end (most recent) if not already there
+      appToken.sourceAddresses.erase(it);
+      appToken.sourceAddresses.push_back(currentPeerIP);
     }
+
+    // Keep connection state in sync with what was written to the session ticket
+    serverConn_->tokenSourceAddresses = appToken.sourceAddresses;
     if (conn_->earlyDataAppParamsGetter) {
       appToken.appParams = conn_->earlyDataAppParamsGetter();
     }

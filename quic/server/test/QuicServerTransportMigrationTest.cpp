@@ -2157,4 +2157,77 @@ TEST_P(
   EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
 }
 
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    SessionTicketSourceAddressesUpdatedAfterMigration) {
+  // This test verifies that after connection migration, a new session ticket
+  // is written with the new peer address included in the source addresses.
+  auto& conn = server->getNonConstConn();
+  conn.transportSettings.disableMigration = false;
+
+  // Set up initial source addresses (simulating previous 0-RTT validation)
+  auto initialIP = clientAddr.getIPAddress();
+  conn.tokenSourceAddresses = {initialIP};
+
+  // Set up expectation to capture the source addresses from
+  // writeNewSessionTicket
+  std::vector<folly::IPAddress> capturedSourceAddresses;
+  bool tokenCaptured = false;
+  EXPECT_CALL(*fakeHandshake, writeNewSessionTicket(_))
+      .WillOnce(
+          [&capturedSourceAddresses, &tokenCaptured](const AppToken& appToken) {
+            capturedSourceAddresses = appToken.sourceAddresses;
+            tokenCaptured = true;
+            return quic::Expected<void, QuicError>{};
+          });
+
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+
+  // Trigger migration by sending data from a new peer address
+  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  {
+    auto data = IOBuf::copyBuffer("migration data");
+    auto packetData = packetToBuf(createStreamPacket(
+        *clientConnectionId,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++,
+        2,
+        *data,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    deliverData(std::move(packetData), true, &newPeer);
+  }
+
+  // Verify migration occurred
+  EXPECT_EQ(conn.peerAddress, newPeer);
+
+  // Verify session ticket was written with new address
+  ASSERT_TRUE(tokenCaptured)
+      << "Session ticket should be written after migration";
+
+  auto newPeerIP = newPeer.getIPAddress();
+  auto it = std::find(
+      capturedSourceAddresses.begin(),
+      capturedSourceAddresses.end(),
+      newPeerIP);
+  EXPECT_NE(it, capturedSourceAddresses.end())
+      << "New peer address should be in session ticket source addresses";
+
+  // Verify the new address is at the end (most recently used)
+  EXPECT_EQ(capturedSourceAddresses.back(), newPeerIP)
+      << "New peer address should be at the end of source addresses";
+
+  // Verify we don't exceed the max number of addresses
+  EXPECT_LE(capturedSourceAddresses.size(), kMaxNumTokenSourceAddresses);
+
+  // Verify the connection state was also updated
+  auto stateIt = std::find(
+      conn.tokenSourceAddresses.begin(),
+      conn.tokenSourceAddresses.end(),
+      newPeerIP);
+  EXPECT_NE(stateIt, conn.tokenSourceAddresses.end())
+      << "Connection state tokenSourceAddresses should also contain new address";
+}
+
 } // namespace quic::test
