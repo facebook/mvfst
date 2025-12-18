@@ -6,6 +6,8 @@
  */
 
 #include <quic/client/QuicClientTransport.h>
+#include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
+#include <quic/loss/QuicLossFunctions.h>
 
 namespace quic {
 
@@ -23,11 +25,7 @@ QuicClientTransport::~QuicClientTransport() {
   // closeImpl may have been called earlier with drain = true, so force close.
   closeUdpSocket();
 
-  if (clientConn_->happyEyeballsState.secondSocket) {
-    auto sock = std::move(clientConn_->happyEyeballsState.secondSocket);
-    sock->pauseRead();
-    (void)sock->close();
-  }
+  cleanupHappyEyeballsState();
 }
 
 void QuicClientTransport::onNotifyDataAvailable(
@@ -177,6 +175,88 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
 
   return processPackets(
       localAddressRes.value(), std::move(networkData), server);
+}
+
+void QuicClientTransport::setHappyEyeballsEnabled(bool happyEyeballsEnabled) {
+  happyEyeballsEnabled_ = happyEyeballsEnabled;
+}
+
+void QuicClientTransport::setHappyEyeballsCachedFamily(
+    sa_family_t cachedFamily) {
+  happyEyeballsCachedFamily_ = cachedFamily;
+}
+
+void QuicClientTransport::addNewSocket(
+    std::unique_ptr<QuicAsyncUDPSocket> socket) {
+  happyEyeballsAddSocket(*clientConn_, std::move(socket));
+}
+
+void QuicClientTransport::
+    happyEyeballsConnAttemptDelayTimeoutExpired() noexcept {
+  // Declare 0-RTT data as lost so that they will be retransmitted over the
+  // second socket.
+  happyEyeballsStartSecondSocket(clientConn_->happyEyeballsState);
+  // If this gets called from the write path then we haven't added the packets
+  // to the outstanding packet list yet.
+  runOnEvbAsync([&](auto) {
+    auto result = markZeroRttPacketsLost(*conn_, markPacketLoss);
+    LOG_IF(ERROR, !result.has_value())
+        << "Failed to mark 0-RTT packets as lost.";
+  });
+}
+
+void QuicClientTransport::cleanupHappyEyeballsState() {
+  if (clientConn_->happyEyeballsState.secondSocket) {
+    auto sock = std::move(clientConn_->happyEyeballsState.secondSocket);
+    sock->pauseRead();
+    (void)sock->close();
+  }
+}
+
+void QuicClientTransport::startHappyEyeballsIfEnabled() {
+  if (happyEyeballsEnabled_) {
+    // TODO Supply v4 delay amount from somewhere when we want to tune this
+    startHappyEyeballs(
+        *clientConn_,
+        evb_.get(),
+        happyEyeballsCachedFamily_,
+        happyEyeballsConnAttemptDelayTimeout_,
+        happyEyeballsCachedFamily_ == AF_UNSPEC
+            ? kHappyEyeballsV4Delay
+            : kHappyEyeballsConnAttemptDelayWithCache,
+        this,
+        this,
+        socketOptions_);
+  }
+}
+
+void QuicClientTransport::happyEyeballsOnDataReceivedIfEnabled(
+    const folly::SocketAddress& peerAddress) {
+  if (happyEyeballsEnabled_) {
+    CHECK(socket_);
+    happyEyeballsOnDataReceived(
+        *clientConn_,
+        happyEyeballsConnAttemptDelayTimeout_,
+        socket_,
+        peerAddress);
+  }
+}
+
+void QuicClientTransport::cancelHappyEyeballsConnAttemptDelayTimeout() {
+  cancelTimeout(&happyEyeballsConnAttemptDelayTimeout_);
+}
+
+bool QuicClientTransport::happyEyeballsAddPeerAddressIfEnabled(
+    const folly::SocketAddress& peerAddress) {
+  if (happyEyeballsEnabled_) {
+    conn_->udpSendPacketLen = std::min(
+        conn_->udpSendPacketLen,
+        (peerAddress.getFamily() == AF_INET6 ? kDefaultV6UDPSendPacketLen
+                                             : kDefaultV4UDPSendPacketLen));
+    happyEyeballsAddPeerAddress(*clientConn_, peerAddress);
+    return true;
+  }
+  return false;
 }
 
 } // namespace quic

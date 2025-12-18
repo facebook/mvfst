@@ -33,6 +33,7 @@ class QuicClientTransport : public QuicTransportBase,
             std::move(handshakeFactory),
             connectionIdSize,
             useConnectionEndWithErrorCallback),
+        happyEyeballsConnAttemptDelayTimeout_(this),
         wrappedObserverContainer_(this) {
     conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   }
@@ -60,6 +61,7 @@ class QuicClientTransport : public QuicTransportBase,
             connectionIdSize,
             startingPacketNum,
             useConnectionEndWithErrorCallback),
+        happyEyeballsConnAttemptDelayTimeout_(this),
         wrappedObserverContainer_(this) {
     conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   }
@@ -95,6 +97,37 @@ class QuicClientTransport : public QuicTransportBase,
 
   void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override;
 
+  /**
+   * Happy Eyeballs support: Add a new socket for connection attempts.
+   */
+  void addNewSocket(std::unique_ptr<QuicAsyncUDPSocket> socket);
+
+  /**
+   * Happy Eyeballs support: Enable/disable Happy Eyeballs behavior.
+   */
+  void setHappyEyeballsEnabled(bool happyEyeballsEnabled);
+
+  /**
+   * Happy Eyeballs support: Set cached address family preference.
+   */
+  virtual void setHappyEyeballsCachedFamily(sa_family_t cachedFamily);
+
+  class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
+   public:
+    explicit HappyEyeballsConnAttemptDelayTimeout(
+        QuicClientTransport* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->happyEyeballsConnAttemptDelayTimeoutExpired();
+    }
+
+    void callbackCanceled() noexcept override {}
+
+   private:
+    QuicClientTransport* transport_;
+  };
+
  protected:
   // From QuicSocket
   [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
@@ -117,7 +150,27 @@ class QuicClientTransport : public QuicTransportBase,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
- private:
+  // Happy Eyeballs virtual method overrides
+  void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept override;
+
+  void cleanupHappyEyeballsState() override;
+
+  void startHappyEyeballsIfEnabled() override;
+
+  void happyEyeballsOnDataReceivedIfEnabled(
+      const folly::SocketAddress& peerAddress) override;
+
+  void cancelHappyEyeballsConnAttemptDelayTimeout() override;
+
+  [[nodiscard]] bool happyEyeballsAddPeerAddressIfEnabled(
+      const folly::SocketAddress& peerAddress) override;
+
+ protected:
+  // Happy Eyeballs state
+  HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
+  bool happyEyeballsEnabled_{false};
+  sa_family_t happyEyeballsCachedFamily_{AF_UNSPEC};
+
   // Container of observers for the socket / transport.
   //
   // This member MUST be last in the list of members to ensure it is destroyed

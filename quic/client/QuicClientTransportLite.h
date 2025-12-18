@@ -91,9 +91,6 @@ class QuicClientTransportLite
    * optional. If not called, INADDR_ANY will be used.
    */
   void setLocalAddress(folly::SocketAddress localAddress);
-  void addNewSocket(std::unique_ptr<QuicAsyncUDPSocket> socket);
-  void setHappyEyeballsEnabled(bool happyEyeballsEnabled);
-  virtual void setHappyEyeballsCachedFamily(sa_family_t cachedFamily);
 
   /**
    * Starts the connection.
@@ -259,22 +256,6 @@ class QuicClientTransportLite
 
   Optional<Handshake::TLSSummary> getTLSSummary() const override;
 
-  class HappyEyeballsConnAttemptDelayTimeout : public QuicTimerCallback {
-   public:
-    explicit HappyEyeballsConnAttemptDelayTimeout(
-        QuicClientTransportLite* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->happyEyeballsConnAttemptDelayTimeoutExpired();
-    }
-
-    void callbackCanceled() noexcept override {}
-
-   private:
-    QuicClientTransportLite* transport_;
-  };
-
  protected:
   // From QuicSocket
   SocketObserverContainer* getSocketObserverContainer() const override {
@@ -345,10 +326,21 @@ class QuicClientTransportLite
       ReceivedUdpPacket& udpPacket,
       const folly::SocketAddress& peerAddress);
 
-  [[nodiscard]]
-  quic::Expected<void, QuicError> startCryptoHandshake();
+  [[nodiscard]] quic::Expected<void, QuicError> startCryptoHandshake();
 
-  void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept;
+  virtual void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept;
+
+  virtual void cleanupHappyEyeballsState();
+
+  virtual void startHappyEyeballsIfEnabled();
+
+  virtual void happyEyeballsOnDataReceivedIfEnabled(
+      const folly::SocketAddress& peerAddress);
+
+  virtual void cancelHappyEyeballsConnAttemptDelayTimeout();
+
+  [[nodiscard]] virtual bool happyEyeballsAddPeerAddressIfEnabled(
+      const folly::SocketAddress& peerAddress);
 
   void handleAckFrame(
       const OutstandingPacketWrapper& outstandingPacket,
@@ -365,11 +357,9 @@ class QuicClientTransportLite
       uint64_t readBufferSize);
 
   Optional<std::string> hostname_;
-  HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
   QuicClientConnectionState* clientConn_;
 
- protected:
   void maybeQlogDatagram(size_t len);
 
   void trackDatagramsReceived(uint32_t totalPackets, uint32_t totalPacketLen);
@@ -402,11 +392,13 @@ class QuicClientTransportLite
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   RecvmmsgStorage recvmmsgStorage_;
 
- private:
-  [[nodiscard]] quic::Expected<void, QuicError> adjustGROBuffers();
-
   void runOnEvbAsync(
       std::function<void(std::shared_ptr<QuicClientTransportLite>)> func);
+
+  folly::SocketOptionMap socketOptions_;
+
+ private:
+  [[nodiscard]] quic::Expected<void, QuicError> adjustGROBuffers();
 
   /**
    * Send quic transport knobs defined by transportSettings.knobs to peer. This
@@ -418,10 +410,7 @@ class QuicClientTransportLite
   // Set it QuicClientTransportLite is in a self owning mode. This will be
   // cleaned up when the caller invokes a terminal call to the transport.
   std::shared_ptr<QuicClientTransportLite> selfOwning_;
-  bool happyEyeballsEnabled_{false};
-  sa_family_t happyEyeballsCachedFamily_{AF_UNSPEC};
   std::vector<TransportParameter> customTransportParameters_;
-  folly::SocketOptionMap socketOptions_;
   std::shared_ptr<QuicTransportStatsCallback> statsCallback_;
   // We will only send transport knobs once, this flag keeps track of it
   bool transportKnobsSent_{false};

@@ -10,6 +10,10 @@ mvfst_cpp_library(
     headers = [
         "QuicClientTransport.h",
     ],
+    deps = [
+        "//quic/happyeyeballs:happyeyeballs",
+        "//quic/loss:loss",
+    ],
     exported_deps = [
         ":client_lite",
         "//quic/api:transport",
