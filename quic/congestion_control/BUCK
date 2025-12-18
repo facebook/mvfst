@@ -314,6 +314,23 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "pacer_factory",
+    srcs = select({
+        "DEFAULT": ["PacerFactory.cpp"],
+        "ovr_config//os/constraints:android": ["PacerFactoryMobile.cpp"],
+        "ovr_config//os/constraints:iphoneos": ["PacerFactoryMobile.cpp"],
+    }),
+    headers = [
+        "PacerFactory.h",
+    ],
+    deps = select({
+        "DEFAULT": [":pacer"],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+    }),
+)
+
+mvfst_cpp_library(
     name = "packet_processor",
     headers = [
         "PacketProcessor.h",

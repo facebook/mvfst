@@ -10,7 +10,7 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/EcnL4sTracker.h>
-#include <quic/congestion_control/TokenlessPacer.h>
+#include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -2917,8 +2917,10 @@ void QuicTransportBaseLite::setTransportSettings(
              CongestionControlType::BBR2);
     auto minCwnd =
         usingBbr ? kMinCwndInMssForBbr : conn_->transportSettings.minCwndInMss;
-    conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
-    conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
+    conn_->pacer = createPacer(*conn_, minCwnd);
+    if (conn_->pacer) {
+      conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
+    }
     conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
   }
   setCongestionControl(conn_->transportSettings.defaultCongestionController);

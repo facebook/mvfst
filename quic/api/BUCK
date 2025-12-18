@@ -130,7 +130,7 @@ mvfst_cpp_library(
         ":loop_detector_callback",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/congestion_control:ecn_l4s_tracker",
-        "//quic/congestion_control:pacer",
+        "//quic/congestion_control:pacer_factory",
         "//quic/flowcontrol:flow_control",
         "//quic/loss:loss",
         "//quic/state:pacing_functions",
