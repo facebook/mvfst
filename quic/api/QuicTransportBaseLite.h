@@ -95,13 +95,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       ApplicationErrorCode errorCode) override;
 
-  quic::Expected<void, LocalErrorCode> updateReliableDeliveryCheckpoint(
-      StreamId id) override;
-
-  quic::Expected<void, LocalErrorCode> resetStreamReliably(
-      StreamId id,
-      ApplicationErrorCode errorCode) override;
-
   /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */
@@ -394,26 +387,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     QuicTransportBaseLite* transport_;
   };
 
-  class PingTimeout : public QuicTimerCallback {
-   public:
-    ~PingTimeout() override = default;
-
-    explicit PingTimeout(QuicTransportBaseLite* transport)
-        : transport_(transport) {}
-
-    void timeoutExpired() noexcept override {
-      transport_->pingTimeoutExpired();
-    }
-
-    void callbackCanceled() noexcept override {
-      // ignore, as this happens only when event  base dies
-      return;
-    }
-
-   private:
-    QuicTransportBaseLite* transport_;
-  };
-
   // DrainTimeout holds a raw pointer to the transport. This is fine because the
   // DrainTimeout is owned by the transport, and destroying the DrainTimeout
   // cancels it. I.e., destroying the transport destroys the DrainTimeout, which
@@ -499,104 +472,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   const folly::SocketAddress& getLocalAddress() const override;
 
-  using Observer = SocketObserverContainer::Observer;
-  using ManagedObserver = SocketObserverContainer::ManagedObserver;
-
-  /**
-   * Adds an observer.
-   *
-   * If the observer is already added, this is a no-op.
-   *
-   * @param observer     Observer to add.
-   * @return             Whether the observer was added (fails if no list).
-   */
-  bool addObserver(Observer* observer) {
-    if (auto list = getSocketObserverContainer()) {
-      list->addObserver(observer);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Adds an observer.
-   *
-   * If the observer is already added, this is a no-op.
-   *
-   * @param observer     Observer to add.
-   * @return             Whether the observer was added (fails if no list).
-   */
-  bool addObserver(std::shared_ptr<Observer> observer) {
-    if (auto list = getSocketObserverContainer()) {
-      list->addObserver(std::move(observer));
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Removes an observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether the observer was found and removed.
-   */
-  bool removeObserver(Observer* observer) {
-    if (auto list = getSocketObserverContainer()) {
-      return list->removeObserver(observer);
-    }
-    return false;
-  }
-
-  /**
-   * Removes an observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether the observer was found and removed.
-   */
-  bool removeObserver(std::shared_ptr<Observer> observer) {
-    if (auto list = getSocketObserverContainer()) {
-      return list->removeObserver(std::move(observer));
-    }
-    return false;
-  }
-
-  /**
-   * Get number of observers.
-   *
-   * @return             Number of observers.
-   */
-  [[nodiscard]] size_t numObservers() const {
-    if (auto list = getSocketObserverContainer()) {
-      return list->numObservers();
-    }
-    return 0;
-  }
-
-  /**
-   * Returns list of attached observers.
-   *
-   * @return             List of observers.
-   */
-  std::vector<Observer*> getObservers() {
-    if (auto list = getSocketObserverContainer()) {
-      return list->getObservers();
-    }
-    return {};
-  }
-
-  /**
-   * Returns list of attached observers that are of type T.
-   *
-   * @return             Attached observers of type T.
-   */
-  template <typename T = Observer>
-  std::vector<T*> findObservers() {
-    if (auto list = getSocketObserverContainer()) {
-      return list->findObservers<T>();
-    }
-    return {};
-  }
-
  protected:
   void setConnectionCallbackFromCtor(
       folly::MaybeManagedPtr<ConnectionCallback> callback);
@@ -652,7 +527,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
   void handleNewGroupedStreamCallbacks(std::vector<StreamId>& newPeerStreams);
-  void handlePingCallbacks();
   void handleKnobCallbacks();
   void handleAckEventCallbacks();
   void handleCancelByteEventCallbacks();
@@ -688,7 +562,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void updateWriteLooper(bool thisIteration);
   void updateReadLooper();
-  void updatePeekLooper();
 
   void maybeStopWriteLooperAndArmSocketWritableEvent();
 
@@ -703,12 +576,20 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void ackTimeoutExpired() noexcept;
   void pathValidationTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
-  void pingTimeoutExpired() noexcept;
+
+  // Virtual methods for Peek/Ping/Datagram functionality
+  // Empty implementations in Lite, overridden in Base
+  virtual void updatePeekLooper();
+  virtual void invokePeekDataAndCallbacks();
+  virtual void handlePingCallbacks();
+  virtual void cleanupPeekPingDatagramResources();
+  virtual void cancelPeekPingDatagramCallbacks(const QuicError& err);
+  virtual bool hasPeekCallback(StreamId id);
+  virtual void invokeDatagramCallbackIfSet();
 
   bool isTimeoutScheduled(QuicTimerCallback* callback) const;
 
   void invokeReadDataAndCallbacks(bool updateLoopersAndCheckForClosedStream);
-  void invokePeekDataAndCallbacks();
 
   quic::Expected<void, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
@@ -787,6 +668,16 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   [[nodiscard]] quic::Expected<void, QuicError> validateECNState();
 
+  /**
+   * Returns the SocketObserverContainer. Lite implementation returns nullptr.
+   * Full implementation (QuicTransportBase) overrides this to return actual
+   * observer container.
+   */
+  [[nodiscard]] SocketObserverContainer* getSocketObserverContainer()
+      const override {
+    return nullptr;
+  }
+
   std::shared_ptr<QuicEventBase> evb_;
   std::unique_ptr<QuicAsyncUDPSocket> socket_;
 
@@ -798,7 +689,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
   folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
-  PingCallback* pingCallback_{nullptr};
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.
   bool useConnectionEndWithErrorCallback_{false};
 
@@ -812,17 +702,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     ReadCallbackData(ReadCallback* readCallback) : readCb(readCallback) {}
   };
 
-  struct PeekCallbackData {
-    PeekCallback* peekCb;
-    bool resumed{true};
-
-    PeekCallbackData(PeekCallback* peekCallback) : peekCb(peekCallback) {}
-  };
-
-  DatagramCallback* datagramCallback_{nullptr};
-
   UnorderedMap<StreamId, ReadCallbackData> readCallbacks_;
-  UnorderedMap<StreamId, PeekCallbackData> peekCallbacks_;
 
   ConnectionWriteCallback* connWriteCallback_{nullptr};
   std::map<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
@@ -850,11 +730,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   AckTimeout ackTimeout_;
   PathValidationTimeout pathValidationTimeout_;
   DrainTimeout drainTimeout_;
-  PingTimeout pingTimeout_;
 
   FunctionLooper::Ptr writeLooper_;
   FunctionLooper::Ptr readLooper_;
-  FunctionLooper::Ptr peekLooper_;
 
   Optional<std::string> exceptionCloseWhat_;
 

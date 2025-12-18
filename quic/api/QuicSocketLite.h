@@ -339,70 +339,7 @@ class QuicSocketLite {
    * ===== Peek/Consume API =====
    */
 
-  /**
-   * Usage:
-   * class Application {
-   *   void onNewBidirectionalStream(StreamId id) {
-   *     socket_->setPeekCallback(id, this);
-   *   }
-   *
-   *   virtual void onDataAvailable(
-   *       StreamId id,
-   *       const folly::Range<PeekIterator>& peekData) noexcept override
-   *   {
-   *     auto amount = tryInterpret(peekData);
-   *     if (amount) {
-   *       socket_->consume(id, amount);
-   *     }
-   *   }
-   * };
-   */
-
   using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
-
-  class PeekCallback {
-   public:
-    virtual ~PeekCallback() = default;
-
-    /**
-     * Called from the transport layer when there is new data available to
-     * peek on a given stream.
-     * Callback can be called multiple times and it is up to application to
-     * de-dupe already peeked ranges.
-     */
-    virtual void onDataAvailable(
-        StreamId id,
-        const folly::Range<PeekIterator>& peekData) noexcept = 0;
-
-    /**
-     * Called from the transport layer during peek time when there is an error
-     * on the stream.
-     */
-    virtual void peekError(StreamId id, QuicError error) noexcept = 0;
-  };
-
-  /**
-   * Callback class for pings
-   */
-  class PingCallback {
-   public:
-    virtual ~PingCallback() = default;
-
-    /**
-     * Invoked when the ping is acknowledged
-     */
-    virtual void pingAcknowledged() noexcept = 0;
-
-    /**
-     * Invoked if the ping times out
-     */
-    virtual void pingTimeout() noexcept = 0;
-
-    /**
-     * Invoked when a ping is received
-     */
-    virtual void onPing() noexcept = 0;
-  };
 
   /**
    * Callback class for receiving ack notifications
@@ -483,20 +420,7 @@ class QuicSocketLite {
 
   /**
    * ===== Datagram API =====
-   *
-   * Datagram support is experimental. Currently there isn't delivery callback
-   * or loss notification support for Datagram.
    */
-
-  class DatagramCallback {
-   public:
-    virtual ~DatagramCallback() = default;
-
-    /**
-     * Notifies the DatagramCallback that datagrams are available for read.
-     */
-    virtual void onDatagramsAvailable() noexcept = 0;
-  };
 
   /**
    * Callback class for receiving write readiness notifications
@@ -569,24 +493,6 @@ class QuicSocketLite {
    * Cancel the given stream
    */
   virtual quic::Expected<void, LocalErrorCode> resetStream(
-      StreamId id,
-      ApplicationErrorCode error) = 0;
-
-  /**
-   * This is used in conjunction with reliable resets. When we send data on a
-   * stream and want to mark which offset will constitute the reliable size in a
-   * future call to resetStreamReliably, we call this function. This function
-   * can potentially be called multiple times on a stream to advance the offset,
-   * but it is an error to call it after sending a reset.
-   */
-  virtual quic::Expected<void, LocalErrorCode> updateReliableDeliveryCheckpoint(
-      StreamId id) = 0;
-
-  /**
-   * Send a reliable reset to the peer. The reliable size sent to the peer is
-   * determined by when checkpoint(streamId) was last called.
-   */
-  virtual quic::Expected<void, LocalErrorCode> resetStreamReliably(
       StreamId id,
       ApplicationErrorCode error) = 0;
 
@@ -868,104 +774,6 @@ class QuicSocketLite {
    * Returns varios stats of the connection.
    */
   [[nodiscard]] virtual QuicConnectionStats getConnectionsStats() const = 0;
-
-  using Observer = SocketObserverContainer::Observer;
-  using ManagedObserver = SocketObserverContainer::ManagedObserver;
-
-  /**
-   * Adds an observer.
-   *
-   * If the observer is already added, this is a no-op.
-   *
-   * @param observer     Observer to add.
-   * @return             Whether the observer was added (fails if no list).
-   */
-  bool addObserver(Observer* observer) {
-    if (auto list = getSocketObserverContainer()) {
-      list->addObserver(observer);
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Adds an observer.
-   *
-   * If the observer is already added, this is a no-op.
-   *
-   * @param observer     Observer to add.
-   * @return             Whether the observer was added (fails if no list).
-   */
-  bool addObserver(std::shared_ptr<Observer> observer) {
-    if (auto list = getSocketObserverContainer()) {
-      list->addObserver(std::move(observer));
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Removes an observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether the observer was found and removed.
-   */
-  bool removeObserver(Observer* observer) {
-    if (auto list = getSocketObserverContainer()) {
-      return list->removeObserver(observer);
-    }
-    return false;
-  }
-
-  /**
-   * Removes an observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether the observer was found and removed.
-   */
-  bool removeObserver(std::shared_ptr<Observer> observer) {
-    if (auto list = getSocketObserverContainer()) {
-      return list->removeObserver(std::move(observer));
-    }
-    return false;
-  }
-
-  /**
-   * Get number of observers.
-   *
-   * @return             Number of observers.
-   */
-  [[nodiscard]] size_t numObservers() const {
-    if (auto list = getSocketObserverContainer()) {
-      return list->numObservers();
-    }
-    return 0;
-  }
-
-  /**
-   * Returns list of attached observers.
-   *
-   * @return             List of observers.
-   */
-  std::vector<Observer*> getObservers() {
-    if (auto list = getSocketObserverContainer()) {
-      return list->getObservers();
-    }
-    return {};
-  }
-
-  /**
-   * Returns list of attached observers that are of type T.
-   *
-   * @return             Attached observers of type T.
-   */
-  template <typename T = Observer>
-  std::vector<T*> findObservers() {
-    if (auto list = getSocketObserverContainer()) {
-      return list->findObservers<T>();
-    }
-    return {};
-  }
 
   virtual ~QuicSocketLite() = default;
 

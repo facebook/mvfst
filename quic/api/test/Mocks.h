@@ -304,9 +304,9 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD(void, onSuspiciousReadLoops, (uint64_t, NoReadReason));
 };
 
-class MockObserver : public QuicSocketLite::ManagedObserver {
+class MockObserver : public QuicSocket::ManagedObserver {
  public:
-  using QuicSocketLite::ManagedObserver::ManagedObserver;
+  using QuicSocket::ManagedObserver::ManagedObserver;
   MOCK_METHOD((void), attached, (QuicSocketLite*), (noexcept));
   MOCK_METHOD((void), detached, (QuicSocketLite*), (noexcept));
   MOCK_METHOD(
@@ -321,12 +321,12 @@ class MockObserver : public QuicSocketLite::ManagedObserver {
   MOCK_METHOD(
       (void),
       closeStarted,
-      (QuicSocketLite*, const CloseStartedEvent&),
+      (QuicSocketLite*, const SocketObserverInterface::CloseStartedEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       closing,
-      (QuicSocketLite*, const ClosingEvent&),
+      (QuicSocketLite*, const SocketObserverInterface::ClosingEvent&),
       (noexcept));
 };
 
@@ -339,12 +339,12 @@ class MockLegacyObserver : public LegacyObserver {
   MOCK_METHOD(
       (void),
       closeStarted,
-      (QuicSocketLite*, const CloseStartedEvent&),
+      (QuicSocketLite*, const SocketObserverInterface::CloseStartedEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),
       closing,
-      (QuicSocketLite*, const ClosingEvent&),
+      (QuicSocketLite*, const SocketObserverInterface::ClosingEvent&),
       (noexcept));
   MOCK_METHOD(
       (void),

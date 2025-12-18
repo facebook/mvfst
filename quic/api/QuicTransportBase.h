@@ -204,6 +204,24 @@ class QuicTransportBase : public QuicSocket,
       size_t atMost = 0) override;
 
   /**
+   * This is used in conjunction with reliable resets. When we send data on a
+   * stream and want to mark which offset will constitute the reliable size in a
+   * future call to resetStreamReliably, we call this function. This function
+   * can potentially be called multiple times on a stream to advance the offset,
+   * but it is an error to call it after sending a reset.
+   */
+  quic::Expected<void, LocalErrorCode> updateReliableDeliveryCheckpoint(
+      StreamId id) override;
+
+  /**
+   * Send a reliable reset to the peer. The reliable size sent to the peer is
+   * determined by when checkpoint(streamId) was last called.
+   */
+  quic::Expected<void, LocalErrorCode> resetStreamReliably(
+      StreamId id,
+      ApplicationErrorCode error) override;
+
+  /**
    * Set control messages to be sent for socket_ write, note that it's for this
    * specific transport and does not change the other sockets sharing the same
    * fd.
@@ -247,6 +265,48 @@ class QuicTransportBase : public QuicSocket,
   void schedulePingTimeout(
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
+
+  void updatePeekLooper() override;
+  void invokePeekDataAndCallbacks() override;
+  void handlePingCallbacks() override;
+  void cleanupPeekPingDatagramResources() override;
+  void cancelPeekPingDatagramCallbacks(const QuicError& err) override;
+  bool hasPeekCallback(StreamId id) override;
+  void invokeDatagramCallbackIfSet() override;
+  void pingTimeoutExpired() noexcept;
+
+  class PingTimeout : public QuicTimerCallback {
+   public:
+    ~PingTimeout() override = default;
+
+    explicit PingTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->pingTimeoutExpired();
+    }
+
+    void callbackCanceled() noexcept override {
+      // ignore, as this happens only when event base dies
+      return;
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
+  struct PeekCallbackData {
+    PeekCallback* peekCb;
+    bool resumed{true};
+
+    PeekCallbackData(PeekCallback* peekCallback) : peekCb(peekCallback) {}
+  };
+
+  PingCallback* pingCallback_{nullptr};
+  PingTimeout pingTimeout_;
+  DatagramCallback* datagramCallback_{nullptr};
+  UnorderedMap<StreamId, PeekCallbackData> peekCallbacks_;
+  FunctionLooper::Ptr peekLooper_;
 
   bool handshakeDoneNotified_{false};
 

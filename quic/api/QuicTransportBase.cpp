@@ -37,7 +37,12 @@ QuicTransportBase::QuicTransportBase(
     : QuicTransportBaseLite(
           std::move(evb),
           std::move(socket),
-          useConnectionEndWithErrorCallback) {
+          useConnectionEndWithErrorCallback),
+      pingTimeout_(this),
+      peekLooper_(new FunctionLooper(
+          evb_,
+          [this]() { invokePeekDataAndCallbacks(); },
+          LooperType::PeekLooper)) {
   if (socket_) {
     std::function<Optional<folly::SocketCmsgMap>()> func = [&]() {
       return getAdditionalCmsgsForAsyncUDPSocket();
@@ -784,6 +789,34 @@ QuicTransportBase::maybeResetStreamFromReadError(
   return {};
 }
 
+quic::Expected<void, LocalErrorCode>
+QuicTransportBase::updateReliableDeliveryCheckpoint(StreamId id) {
+  if (!conn_->streamManager->streamExists(id)) {
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  auto stream =
+      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
+  if (stream->sendState == StreamSendState::ResetSent) {
+    // We already sent a reset, so there's really no reason why we should be
+    // doing any more checkpointing, especially since we cannot
+    // increase the reliable size in subsequent resets.
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  stream->reliableResetCheckpoint =
+      stream->currentWriteOffset + stream->pendingWrites.chainLength();
+  return {};
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBase::resetStreamReliably(
+    StreamId id,
+    ApplicationErrorCode errorCode) {
+  if (!conn_->transportSettings.advertisedReliableResetStreamSupport ||
+      !conn_->peerAdvertisedReliableStreamResetSupport) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  return resetStreamInternal(id, errorCode, true /* reliable */);
+}
+
 void QuicTransportBase::setCmsgs(const folly::SocketCmsgMap& options) {
   // TODO figure out what we want to do here in the unlikely error case.
   (void)socket_->setCmsgs(options);
@@ -819,6 +852,167 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 
   conn_->retransmissionPolicies.emplace(groupId, *policy);
   return {};
+}
+
+void QuicTransportBase::updatePeekLooper() {
+  if (peekCallbacks_.empty() || closeState_ != CloseState::OPEN) {
+    VLOG(10) << "Stopping peek looper " << *this;
+    peekLooper_->stop();
+    return;
+  }
+  VLOG(10) << "Updating peek looper, has "
+           << conn_->streamManager->peekableStreams().size()
+           << " peekable streams";
+  auto iter = std::find_if(
+      conn_->streamManager->peekableStreams().begin(),
+      conn_->streamManager->peekableStreams().end(),
+      [&peekCallbacks = peekCallbacks_](StreamId s) {
+        VLOG(10) << "Checking stream=" << s;
+        auto peekCb = peekCallbacks.find(s);
+        if (peekCb == peekCallbacks.end()) {
+          VLOG(10) << "No peek callbacks for stream=" << s;
+          return false;
+        }
+        if (!peekCb->second.resumed) {
+          VLOG(10) << "peek callback for stream=" << s << " not resumed";
+        }
+
+        if (!peekCb->second.peekCb) {
+          VLOG(10) << "no peekCb in peekCb stream=" << s;
+        }
+        return peekCb->second.peekCb && peekCb->second.resumed;
+      });
+  if (iter != conn_->streamManager->peekableStreams().end()) {
+    VLOG(10) << "Scheduling peek looper " << *this;
+    peekLooper_->run();
+  } else {
+    VLOG(10) << "Stopping peek looper " << *this;
+    peekLooper_->stop();
+  }
+}
+
+void QuicTransportBase::invokePeekDataAndCallbacks() {
+  auto self = sharedGuard();
+  SCOPE_EXIT {
+    checkForClosedStream();
+    updatePeekLooper();
+    updateWriteLooper(true);
+  };
+  // TODO: add protection from calling "consume" in the middle of the peek -
+  // one way is to have a peek counter that is incremented when peek calblack
+  // is called and decremented when peek is done. once counter transitions
+  // to 0 we can execute "consume" calls that were done during "peek", for that,
+  // we would need to keep stack of them.
+  std::vector<StreamId> peekableStreamsCopy;
+  const auto& peekableStreams = conn_->streamManager->peekableStreams();
+  peekableStreamsCopy.reserve(peekableStreams.size());
+  std::copy(
+      peekableStreams.begin(),
+      peekableStreams.end(),
+      std::back_inserter(peekableStreamsCopy));
+  VLOG(10) << __func__
+           << " peekableListCopy.size()=" << peekableStreamsCopy.size();
+  for (StreamId streamId : peekableStreamsCopy) {
+    auto callback = peekCallbacks_.find(streamId);
+    // This is a likely bug. Need to think more on whether events can
+    // be dropped
+    // remove streamId from list of peekable - as opposed to "read",  "peek" is
+    // only called once per streamId and not on every EVB loop until application
+    // reads the data.
+    conn_->streamManager->peekableStreams().erase(streamId);
+    if (callback == peekCallbacks_.end()) {
+      VLOG(10) << " No peek callback for stream=" << streamId;
+      continue;
+    }
+    auto peekCb = callback->second.peekCb;
+    auto stream = CHECK_NOTNULL(
+        conn_->streamManager->getStream(streamId).value_or(nullptr));
+    if (peekCb && stream->streamReadError) {
+      VLOG(10) << "invoking peek error callbacks on stream=" << streamId << " "
+               << *this;
+      peekCb->peekError(streamId, QuicError(*stream->streamReadError));
+    } else if (
+        peekCb && !stream->streamReadError && stream->hasPeekableData()) {
+      VLOG(10) << "invoking peek callbacks on stream=" << streamId << " "
+               << *this;
+
+      peekDataFromQuicStream(
+          *stream,
+          [&](StreamId id, const folly::Range<PeekIterator>& peekRange) {
+            peekCb->onDataAvailable(id, peekRange);
+          });
+    } else {
+      VLOG(10) << "Not invoking peek callbacks on stream=" << streamId;
+    }
+  }
+}
+
+void QuicTransportBase::handlePingCallbacks() {
+  if (conn_->pendingEvents.notifyPingReceived && pingCallback_ != nullptr) {
+    conn_->pendingEvents.notifyPingReceived = false;
+    if (pingCallback_ != nullptr) {
+      pingCallback_->onPing();
+    }
+  }
+
+  if (!conn_->pendingEvents.cancelPingTimeout) {
+    return; // nothing to cancel
+  }
+  if (!isTimeoutScheduled(&pingTimeout_)) {
+    // set cancelpingTimeOut to false, delayed acks
+    conn_->pendingEvents.cancelPingTimeout = false;
+    return; // nothing to do, as timeout has already fired
+  }
+  cancelTimeout(&pingTimeout_);
+  if (pingCallback_ != nullptr) {
+    pingCallback_->pingAcknowledged();
+  }
+  conn_->pendingEvents.cancelPingTimeout = false;
+}
+
+void QuicTransportBase::pingTimeoutExpired() noexcept {
+  // If timeout expired just call the  call back Provided
+  if (pingCallback_ != nullptr) {
+    pingCallback_->pingTimeout();
+  }
+}
+
+void QuicTransportBase::cleanupPeekPingDatagramResources() {
+  VLOG(10) << "Stopping peek looper due to close " << *this;
+  peekLooper_->stop();
+  cancelTimeout(&pingTimeout_);
+}
+
+void QuicTransportBase::cancelPeekPingDatagramCallbacks(const QuicError& err) {
+  // Call error callbacks on all peek callbacks
+  auto peekCallbacksCopy = peekCallbacks_;
+  for (auto& [streamId, peekCbData] : peekCallbacksCopy) {
+    if (peekCbData.peekCb) {
+      auto stream = CHECK_NOTNULL(
+          conn_->streamManager->getStream(streamId).value_or(nullptr));
+      if (!stream->groupId) {
+        peekCbData.peekCb->peekError(streamId, err);
+      } else {
+        peekCbData.peekCb->peekError(streamId, err);
+      }
+    }
+  }
+  peekCallbacks_.clear();
+
+  // Clear datagram and ping callbacks
+  datagramCallback_ = nullptr;
+  pingCallback_ = nullptr;
+}
+
+bool QuicTransportBase::hasPeekCallback(StreamId id) {
+  auto peekCb = peekCallbacks_.find(id);
+  return peekCb != peekCallbacks_.end() && peekCb->second.peekCb != nullptr;
+}
+
+void QuicTransportBase::invokeDatagramCallbackIfSet() {
+  if (datagramCallback_ && !conn_->datagramState.readBuffer.empty()) {
+    datagramCallback_->onDatagramsAvailable();
+  }
 }
 
 } // namespace quic

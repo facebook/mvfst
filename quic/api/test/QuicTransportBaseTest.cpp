@@ -4399,8 +4399,9 @@ TEST_F(QuicTransportImplTest, ObserverDetachOnCloseStartedDuringDestroy) {
   InSequence s;
 
   EXPECT_CALL(*cb, closeStarted(transport.get(), _))
-      .WillOnce(Invoke([&cb](auto callbackTransport, auto /* errorOpt */) {
-        EXPECT_TRUE(callbackTransport->removeObserver(cb.get()));
+      .WillOnce(Invoke([&cb](auto* callbackTransport, const auto& /* event */) {
+        auto* fullTransport = dynamic_cast<QuicSocket*>(callbackTransport);
+        EXPECT_TRUE(fullTransport && fullTransport->removeObserver(cb.get()));
       }));
   EXPECT_CALL(*cb, observerDetach(transport.get()));
   transport = nullptr;
@@ -4417,8 +4418,9 @@ TEST_F(QuicTransportImplTest, ObserverDetachOnClosingDuringDestroy) {
 
   EXPECT_CALL(*cb, closeStarted(transport.get(), _));
   EXPECT_CALL(*cb, closing(transport.get(), _))
-      .WillOnce(Invoke([&cb](auto callbackTransport, auto /* errorOpt */) {
-        EXPECT_TRUE(callbackTransport->removeObserver(cb.get()));
+      .WillOnce(Invoke([&cb](auto* callbackTransport, const auto& /* event */) {
+        auto* fullTransport = dynamic_cast<QuicSocket*>(callbackTransport);
+        EXPECT_TRUE(fullTransport && fullTransport->removeObserver(cb.get()));
       }));
   EXPECT_CALL(*cb, observerDetach(transport.get()));
   transport = nullptr;

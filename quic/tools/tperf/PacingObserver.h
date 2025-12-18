@@ -15,7 +15,7 @@
 namespace quic {
 
 template <typename BucketEndPredicate>
-class BucketedPacingObserver : public QuicSocketLite::ManagedObserver {
+class BucketedPacingObserver : public QuicSocket::ManagedObserver {
  public:
   explicit BucketedPacingObserver(
       const std::shared_ptr<QLogger>& logger,
@@ -31,17 +31,21 @@ class BucketedPacingObserver : public QuicSocketLite::ManagedObserver {
   explicit BucketedPacingObserver(
       const std::shared_ptr<QLogger>& logger,
       Args&&... args)
-      : QuicSocketLite::ManagedObserver(
-            EventSetBuilder()
-                .enable(Events::packetsWrittenEvents)
-                .enable(Events::pacingRateUpdatedEvents)
+      : QuicSocket::ManagedObserver(
+            QuicSocket::ManagedObserver::EventSetBuilder()
+                .enable(
+                    QuicSocket::ManagedObserver::Events::packetsWrittenEvents)
+                .enable(
+                    QuicSocket::ManagedObserver::Events::
+                        pacingRateUpdatedEvents)
                 .build()),
         logger_(logger),
         bucketEndPredicate_(std::forward<Args>(args)...) {}
 
   void pacingRateUpdated(
       QuicSocketLite* /* socket */,
-      const PacingRateUpdateEvent& event) noexcept override {
+      const SocketObserverInterface::PacingRateUpdateEvent& event) noexcept
+      override {
     if (bucketEndPredicate_()) {
       auto avgPacingRate = runningExpectedPacingRateCount_
           ? (runningExpectedPacingRateSum_ / runningExpectedPacingRateCount_)
@@ -85,7 +89,7 @@ class BucketedPacingObserver : public QuicSocketLite::ManagedObserver {
 
   void packetsWritten(
       QuicSocketLite* /* socket */,
-      const PacketsWrittenEvent& event) override {
+      const SocketObserverInterface::PacketsWrittenEvent& event) override {
     packetsSentSinceLastUpdate_ += event.numPacketsWritten;
   }
 
