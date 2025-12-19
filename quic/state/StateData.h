@@ -207,7 +207,7 @@ struct Pacer {
   /**
    * Getter API of the most recent write batch size.
    */
-  virtual uint64_t getCachedWriteBatchSize() const = 0;
+  [[nodiscard]] virtual uint64_t getCachedWriteBatchSize() const = 0;
 
   virtual void onPacketSent() = 0;
   virtual void onPacketsLoss() = 0;
@@ -634,7 +634,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   /**
    * Returns the SocketObserverContainer or nullptr if not available.
    */
-  SocketObserverContainer* getSocketObserverContainer() const {
+  [[nodiscard]] SocketObserverContainer* getSocketObserverContainer() const {
     if (const auto observerContainerLocked = observerContainer.lock()) {
       return observerContainerLocked.get();
     }

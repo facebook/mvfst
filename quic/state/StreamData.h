@@ -434,7 +434,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   // Returns true if both send and receive state machines are in a terminal
   // state
-  bool inTerminalStates() const {
+  [[nodiscard]] bool inTerminalStates() const {
     bool sendInTerminalState = sendState == StreamSendState::Closed ||
         sendState == StreamSendState::Invalid;
 
@@ -445,18 +445,18 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   // If the stream is still writable.
-  bool writable() const {
+  [[nodiscard]] bool writable() const {
     return sendState == StreamSendState::Open && !finalWriteOffset.has_value();
   }
 
-  bool shouldSendFlowControl() const {
+  [[nodiscard]] bool shouldSendFlowControl() const {
     return recvState == StreamRecvState::Open;
   }
 
   // If the stream has writable data. That is, in a
   // regular stream write, it will be able to write something. So it either
   // needs to have data in the pendingWrites chain, or it has EOF to send.
-  bool hasWritableData(bool connFlowControlOpen = true) const {
+  [[nodiscard]] bool hasWritableData(bool connFlowControlOpen = true) const {
     if (!pendingWrites.empty()) {
       CHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
       return connFlowControlOpen &&
@@ -488,13 +488,13 @@ struct QuicStreamState : public QuicStreamLike {
     return currentWriteOffset;
   }
 
-  bool hasReadableData() const {
+  [[nodiscard]] bool hasReadableData() const {
     return (readBuffer.size() > 0 &&
             currentReadOffset == readBuffer.front().offset) ||
         (finalReadOffset && currentReadOffset == *finalReadOffset);
   }
 
-  bool hasPeekableData() const {
+  [[nodiscard]] bool hasPeekableData() const {
     return readBuffer.size() > 0;
   }
 

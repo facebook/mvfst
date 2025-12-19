@@ -408,7 +408,7 @@ class QuicStreamManager {
    * Return a const reference to the underlying container holding the stream
    * state.
    */
-  const auto& streams() const {
+  [[nodiscard]] const auto& streams() const {
     return streams_;
   }
 
@@ -453,7 +453,7 @@ class QuicStreamManager {
     return *writeQueue_;
   }
 
-  bool hasWritable() const {
+  [[nodiscard]] bool hasWritable() const {
     return !writeQueue_->empty() || !controlWriteQueue_.empty();
   }
 
@@ -474,7 +474,7 @@ class QuicStreamManager {
     controlWriteQueue_.clear();
   }
 
-  const auto& blockedStreams() const {
+  [[nodiscard]] const auto& blockedStreams() const {
     return blockedStreams_;
   }
 
@@ -486,7 +486,7 @@ class QuicStreamManager {
     blockedStreams_.erase(streamId);
   }
 
-  bool hasBlocked() const {
+  [[nodiscard]] bool hasBlocked() const {
     return !blockedStreams_.empty();
   }
 
@@ -541,7 +541,7 @@ class QuicStreamManager {
     return ret;
   }
 
-  const auto& windowUpdates() const {
+  [[nodiscard]] const auto& windowUpdates() const {
     return windowUpdates_;
   }
 
@@ -557,7 +557,7 @@ class QuicStreamManager {
     windowUpdates_.erase(streamId);
   }
 
-  bool hasWindowUpdates() const {
+  [[nodiscard]] bool hasWindowUpdates() const {
     return !windowUpdates_.empty();
   }
 
@@ -569,7 +569,7 @@ class QuicStreamManager {
     closedStreams_.insert(streamId);
   }
 
-  const auto& deliverableStreams() const {
+  [[nodiscard]] const auto& deliverableStreams() const {
     return deliverableStreams_;
   }
 
@@ -591,11 +591,11 @@ class QuicStreamManager {
     return ret;
   }
 
-  bool hasDeliverable() const {
+  [[nodiscard]] bool hasDeliverable() const {
     return !deliverableStreams_.empty();
   }
 
-  bool deliverableContains(StreamId streamId) const {
+  [[nodiscard]] bool deliverableContains(StreamId streamId) const {
     return deliverableStreams_.count(streamId) > 0;
   }
 
@@ -719,7 +719,7 @@ class QuicStreamManager {
     return streams_.size();
   }
 
-  const auto& stopSendingStreams() const {
+  [[nodiscard]] const auto& stopSendingStreams() const {
     return stopSendingStreams_;
   }
 
@@ -757,7 +757,7 @@ class QuicStreamManager {
     flowControlUpdated_.clear();
   }
 
-  bool isAppIdle() const;
+  [[nodiscard]] bool isAppIdle() const;
 
   [[nodiscard]] bool getNumBidirectionalGroups() const {
     return openBidirectionalLocalStreamGroups_.size();

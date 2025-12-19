@@ -196,7 +196,7 @@ struct OutstandingPacket {
   // lost.
   bool declaredLost : 1;
 
-  quic::PacketNum getPacketSequenceNum() const {
+  [[nodiscard]] quic::PacketNum getPacketSequenceNum() const {
     return packet.header.getPacketSequenceNum();
   }
 
