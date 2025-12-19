@@ -911,7 +911,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
           bool serverSupportsScone =
               getSconeSupportedParameter(serverParams->parameters);
           if (serverSupportsScone) {
-            conn_->scone.emplace();
+            conn_->scone.emplace(QuicConnectionStateBase::SconeState{});
             conn_->scone->negotiated = true;
             VLOG(4) << "SCONE negotiated successfully with server " << *this;
           }
