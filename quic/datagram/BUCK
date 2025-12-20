@@ -1,0 +1,18 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "datagram_flow_manager",
+    srcs = ["DatagramFlowManager.cpp"],
+    headers = ["DatagramFlowManager.h"],
+    deps = [],
+    exported_deps = [
+        "//folly/container:f14_hash",
+        "//folly/io:iobuf",
+        "//quic:constants",
+        "//quic/common:buf_util",
+        "//quic/common:circular_deque",
+        "//quic/priority:priority_queue",
+    ],
+)

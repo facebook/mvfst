@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/codec/QuicInteger.h>
 #include <quic/common/Expected.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
@@ -157,6 +158,18 @@ void QuicConnectionStateBase::retirePeerConnectionId(ConnectionId peerCid) {
   peerConnectionIds.erase(cidData);
 
   return;
+}
+
+namespace {
+// Static function for QUIC datagram overhead calculation
+uint64_t quicDatagramOverhead(uint64_t datagramLen) {
+  return kDatagramFrameTypeSize + getQuicIntegerSize(datagramLen).value();
+}
+} // namespace
+
+QuicConnectionStateBase::DatagramState::DatagramState() {
+  // Set up QUIC-specific overhead calculator using function pointer
+  flowManager.setOverheadCalculator(quicDatagramOverhead);
 }
 
 } // namespace quic

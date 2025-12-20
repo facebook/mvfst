@@ -141,6 +141,10 @@ struct DatagramConfig {
   CongestionControlMode trackingMode{CongestionControlMode::Constrained};
   uint32_t readBufSize{kDefaultMaxDatagramsBuffered};
   uint32_t writeBufSize{kDefaultMaxDatagramsBuffered};
+  // Schedule datagrams via PriorityQueue with streams instead of separately
+  bool scheduleDatagramsWithStreams{false};
+  // Default priority for datagrams when scheduleDatagramsWithStreams is true
+  uint8_t defaultDatagramPriority{0};
 };
 
 struct AckReceiveTimestampsConfig {

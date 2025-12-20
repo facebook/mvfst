@@ -721,8 +721,12 @@ constexpr uint16_t kMaxDatagramFrameSize = 65535;
 // Maximum overhead for a QUIC packet containing a single datagram frame
 // i.e. Max Short Header + Max Datagram Frame Header
 constexpr uint16_t kMaxDatagramPacketOverhead = 25 + 16;
+// DATAGRAM frame type (0x31) always encodes as 1 byte
+constexpr uint64_t kDatagramFrameTypeSize = 1;
 // The Maximum number of datagrams (in/out) to buffer
 constexpr uint32_t kDefaultMaxDatagramsBuffered = 75;
+// Default flow ID for all datagrams
+constexpr uint32_t kDefaultDatagramFlowId = 0;
 
 // Minimum interval between new session tickets sent by the server in
 // milliseconds

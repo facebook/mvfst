@@ -21,6 +21,9 @@
 namespace quic {
 class QLogger;
 
+// Default priority for datagrams when scheduling with streams
+extern const PriorityQueue::Priority kDefaultDatagramPriority;
+
 namespace detail {
 
 constexpr uint8_t kStreamIncrement = 0x04;

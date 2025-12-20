@@ -335,7 +335,10 @@ FrameScheduler::scheduleFramesForPacket(
       return quic::make_unexpected(result.error());
     }
   }
+  // When scheduleDatagramsWithStreams is enabled, datagrams are handled by
+  // streamFrameScheduler above.
   if (datagramFrameScheduler_ &&
+      !conn_.transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
       datagramFrameScheduler_->hasPendingDatagramFrames()) {
     auto datagramRes = datagramFrameScheduler_->writeDatagramFrames(wrapper);
     if (!datagramRes.has_value()) {
@@ -513,6 +516,35 @@ quic::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
   return *writableStreamItr;
 }
 
+// Helper to write a datagram from a flow
+// Returns {buf, flowEmpty, datagramLen} - buf is nullptr if nothing written
+static quic::Expected<DatagramFlowManager::DatagramPopResult, QuicError>
+writeDatagramFrame(
+    QuicConnectionStateBase& conn,
+    uint32_t flowId,
+    PacketBuilderInterface& builder) {
+  // Try to pop the datagram if it fits (overhead calculated internally)
+  auto popResult = conn.datagramState.flowManager.popDatagramIfFits(
+      flowId, builder.remainingSpaceInPkt());
+
+  if (!popResult.buf) {
+    // Doesn't fit - return popResult as-is
+    return popResult;
+  }
+
+  // Write the datagram frame
+  auto datagramFrame =
+      DatagramFrame(popResult.datagramLen, std::move(popResult.buf));
+  auto res = writeFrame(datagramFrame, builder);
+  if (!res.has_value()) {
+    return quic::make_unexpected(res.error());
+  }
+  CHECK_GT(res.value(), 0);
+  QUIC_STATS(conn.statsCallback, onDatagramWrite, popResult.datagramLen);
+  // Return popResult directly; buf has been moved into the DatagramFrame above
+  return popResult;
+}
+
 quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
     PriorityQueue& writableStreams,
@@ -526,36 +558,61 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
   // them in QuicStreamManager and re-insert when more f/c arrives
   while (!writableStreams.empty() && builder.remainingSpaceInPkt() > 0) {
     auto id = writableStreams.peekNextScheduledID();
-    // we only support streams here for now
-    CHECK(id.isStreamID());
-    auto streamId = id.asStreamID();
-    auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
-    CHECK(stream) << "streamId=" << streamId;
-    // TODO: this is counting STREAM frame overhead against the stream itself
-    auto lastWriteBytes = builder.remainingSpaceInPkt();
-    auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
-    if (!writeResult.has_value()) {
-      return quic::make_unexpected(writeResult.error());
-    }
-    if (writeResult.value() == StreamWriteResult::PACKET_FULL) {
-      break;
-    }
-    auto remainingSpaceAfter = builder.remainingSpaceInPkt();
-    lastWriteBytes -= remainingSpaceAfter;
-    // If we wrote a stream frame and there's still space in the packet,
-    // that implies we ran out of data or flow control on the stream and
-    // we should erase the stream from writableStreams, the caller can rollback
-    // the transaction if the packet write fails
-    if (remainingSpaceAfter > 0) {
-      if (writeResult.value() == StreamWriteResult::CONN_FC_LIMITED) {
-        conn_.streamManager->addConnFCBlockedStream(streamId);
+
+    // Handle datagrams scheduled via PriorityQueue
+    if (id.isDatagramFlowID()) {
+      auto flowId = id.asDatagramFlowID();
+      auto writeResult = writeDatagramFrame(conn_, flowId, builder);
+      if (!writeResult.has_value()) {
+        return quic::make_unexpected(writeResult.error());
       }
-      writableStreams.erase(id);
-    } else { // the loop will break
-      writableStreams.consume(lastWriteBytes);
-    }
-    if (streamPerPacket) {
-      return {};
+      auto& result = writeResult.value();
+      if (result.datagramLen == 0) {
+        // Front Datagram doesn't fit
+        break;
+      }
+      // Successfully wrote datagram
+      if (result.flowEmpty) {
+        writableStreams.erase(id);
+      } else {
+        // Consume bytes written for fairness
+        writableStreams.consume(result.datagramLen);
+      }
+      if (conn_.transportSettings.datagramConfig.framePerPacket) {
+        break;
+      }
+    } else {
+      // Handle streams
+      CHECK(id.isStreamID());
+      auto streamId = id.asStreamID();
+      auto stream = CHECK_NOTNULL(conn_.streamManager->findStream(streamId));
+      CHECK(stream) << "streamId=" << streamId;
+      // TODO: this is counting STREAM frame overhead against the stream itself
+      auto lastWriteBytes = builder.remainingSpaceInPkt();
+      auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
+      if (!writeResult.has_value()) {
+        return quic::make_unexpected(writeResult.error());
+      }
+      if (writeResult.value() == StreamWriteResult::PACKET_FULL) {
+        break;
+      }
+      auto remainingSpaceAfter = builder.remainingSpaceInPkt();
+      lastWriteBytes -= remainingSpaceAfter;
+      // If we wrote a stream frame and there's still space in the packet,
+      // that implies we ran out of data or flow control on the stream and
+      // we should erase the stream from writableStreams, the caller can
+      // rollback the transaction if the packet write fails
+      if (remainingSpaceAfter > 0) {
+        if (writeResult.value() == StreamWriteResult::CONN_FC_LIMITED) {
+          conn_.streamManager->addConnFCBlockedStream(streamId);
+        }
+        writableStreams.erase(id);
+      } else { // the loop will break
+        writableStreams.consume(lastWriteBytes);
+      }
+      if (streamPerPacket) {
+        return {};
+      }
     }
   }
   return {};
@@ -752,41 +809,26 @@ DatagramFrameScheduler::DatagramFrameScheduler(QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
 bool DatagramFrameScheduler::hasPendingDatagramFrames() const {
-  return !conn_.datagramState.writeBuffer.empty();
+  return conn_.datagramState.flowManager.hasDatagramsToSend();
 }
 
 quic::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     PacketBuilderInterface& builder) {
   bool sent = false;
-  for (size_t i = 0; i <= conn_.datagramState.writeBuffer.size(); ++i) {
-    auto& payload = conn_.datagramState.writeBuffer.front();
-    auto len = payload.chainLength();
-    uint64_t spaceLeft = builder.remainingSpaceInPkt();
-    QuicInteger frameTypeQuicInt(static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
-    auto frameTypeSize = frameTypeQuicInt.getSize();
-    if (!frameTypeSize.has_value()) {
-      return quic::make_unexpected(frameTypeSize.error());
+
+  // Write datagrams from default flow when not using PriorityQueue scheduling
+  size_t maxIters = conn_.datagramState.flowManager.getDatagramCount();
+  for (size_t i = 0; i < maxIters; ++i) {
+    auto writeResult =
+        writeDatagramFrame(conn_, kDefaultDatagramFlowId, builder);
+    if (!writeResult.has_value()) {
+      return quic::make_unexpected(writeResult.error());
     }
-    QuicInteger datagramLenInt(len);
-    auto datagramLenSize = datagramLenInt.getSize();
-    if (!datagramLenSize.has_value()) {
-      return quic::make_unexpected(datagramLenSize.error());
+    if (writeResult->datagramLen == 0) {
+      break;
     }
-    uint64_t datagramFrameLength =
-        frameTypeSize.value() + len + datagramLenSize.value();
-    if (datagramFrameLength <= spaceLeft) {
-      auto datagramFrame = DatagramFrame(len, payload.move());
-      auto res = writeFrame(datagramFrame, builder);
-      if (!res.has_value()) {
-        return quic::make_unexpected(res.error());
-      }
-      // Must always succeed since we have already checked that there is enough
-      // space to write the frame
-      CHECK_GT(res.value(), 0);
-      QUIC_STATS(conn_.statsCallback, onDatagramWrite, len);
-      conn_.datagramState.writeBuffer.pop_front();
-      sent = true;
-    }
+    sent = true;
+
     if (conn_.transportSettings.datagramConfig.framePerPacket) {
       break;
     }

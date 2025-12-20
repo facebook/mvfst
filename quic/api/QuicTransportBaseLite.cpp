@@ -1534,7 +1534,7 @@ void QuicTransportBaseLite::closeImpl(
 
   // Clear out all the buffered datagrams
   conn_->datagramState.readBuffer.clear();
-  conn_->datagramState.writeBuffer.clear();
+  conn_->datagramState.flowManager = DatagramFlowManager();
 
   // Clear out all the pending events.
   conn_->pendingEvents = QuicConnectionStateBase::PendingEvents();

@@ -207,6 +207,7 @@ mvfst_cpp_test(
         "//quic/codec:types",
         "//quic/congestion_control:static_cwnd_congestion_controller",
         "//quic/fizz/client/test:quic_client_transport_test_util",
+        "//quic/priority:http_priority_queue",
         "//quic/server/test:quic_server_transport_test_util",
         "//quic/state:ack_event",
         "//quic/state:outstanding_packet",

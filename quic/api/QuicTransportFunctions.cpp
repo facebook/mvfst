@@ -2137,6 +2137,10 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
     return WriteDataReason::BLOCKED;
   }
   // If we have lost data or flow control + stream data.
+  // Note streamManager hasWritable now can return true when only datagrams
+  // are writable :|
+  // If we're out of flow control though, hasDatagramsToSend will also be
+  // true
   if (conn.streamManager->hasLoss() ||
       (getSendConnFlowControlBytesWire(conn) != 0 &&
        conn.streamManager->hasWritable())) {
@@ -2156,7 +2160,7 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (conn.pendingEvents.sendPing) {
     return WriteDataReason::PING;
   }
-  if (!conn.datagramState.writeBuffer.empty()) {
+  if (conn.datagramState.flowManager.hasDatagramsToSend()) {
     return WriteDataReason::DATAGRAM;
   }
   return WriteDataReason::NO_WRITE;

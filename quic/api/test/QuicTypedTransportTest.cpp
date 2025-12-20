@@ -15,6 +15,7 @@
 #include <quic/codec/Types.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/fizz/client/test/QuicClientTransportTestUtil.h>
+#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/test/QuicServerTransportTestUtil.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
@@ -54,6 +55,31 @@ bool hasDatagramFrame(const quic::RegularQuicWritePacket::Vec& frames) {
     return frame.type() == quic::QuicWriteFrame::Type::DatagramFrame;
   });
 }
+
+// Config wrapper for datagram tests to parameterize
+// scheduleDatagramsWithStreams
+template <typename Transport, bool ScheduleWithStreams>
+struct DatagramTransportConfig {
+  using TransportType = Transport;
+  static constexpr bool scheduleDatagramsWithStreams = ScheduleWithStreams;
+};
+
+using DatagramTransportTypes = testing::Types<
+    DatagramTransportConfig<quic::test::QuicClientTransportTestBase, false>,
+    DatagramTransportConfig<quic::test::QuicClientTransportTestBase, true>,
+    DatagramTransportConfig<quic::test::QuicServerTransportTestBase, false>,
+    DatagramTransportConfig<quic::test::QuicServerTransportTestBase, true>>;
+
+class DatagramTransportTypeNames {
+ public:
+  template <typename T>
+  static std::string GetName(int) {
+    std::string name =
+        TransportTypeNames::GetName<typename T::TransportType>(0);
+    name += T::scheduleDatagramsWithStreams ? "_WithStreams" : "_NoStreams";
+    return name;
+  }
+};
 
 } // namespace
 
@@ -5484,12 +5510,12 @@ TYPED_TEST(
 
 template <typename T>
 class QuicTypedTransportAfterStartTestDatagram
-    : public QuicTypedTransportAfterStartTest<T> {
+    : public QuicTypedTransportAfterStartTest<typename T::TransportType> {
  public:
   ~QuicTypedTransportAfterStartTestDatagram() override = default;
 
   void SetUp() override {
-    QuicTypedTransportAfterStartTest<T>::SetUp();
+    QuicTypedTransportAfterStartTest<typename T::TransportType>::SetUp();
 
     // Clear outstanding packets
     this->getNonConstConn().outstandings.reset();
@@ -5497,6 +5523,11 @@ class QuicTypedTransportAfterStartTestDatagram
     // Enable DATAGRAM support by setting maxWriteFrameSize > 0
     this->getNonConstConn().transportSettings.datagramConfig.enabled = true;
     this->getNonConstConn().datagramState.maxWriteFrameSize = 1200;
+
+    // Set scheduleDatagramsWithStreams based on test config
+    this->getNonConstConn()
+        .transportSettings.datagramConfig.scheduleDatagramsWithStreams =
+        T::scheduleDatagramsWithStreams;
 
     // Set up mock congestion controller
     auto mockCongestionController =
@@ -5552,6 +5583,11 @@ class QuicTypedTransportAfterStartTestDatagram
         this->getTransport()->createBidirectionalStream();
     CHECK(maybeStreamId.has_value());
     const auto& streamId = maybeStreamId.value();
+    // Set stream priority before writing: priority=0, incremental=false
+    // Datagram flows now always use the default, which is priority=3. Mixed
+    // tests assumed streams are higher pri than datagrams.
+    this->getTransport()->setStreamPriority(
+        streamId, HTTPPriorityQueue::Priority(0, false));
     const auto mvfstWriteStreamResult = this->getTransport()->writeChain(
         streamId, IOBuf::copyBuffer(bufToWrite), false /* eof */);
     CHECK(mvfstWriteStreamResult.has_value());
@@ -5573,8 +5609,8 @@ class QuicTypedTransportAfterStartTestDatagram
 
 TYPED_TEST_SUITE(
     QuicTypedTransportAfterStartTestDatagram,
-    ::TransportTypes,
-    ::TransportTypeNames);
+    ::DatagramTransportTypes,
+    ::DatagramTransportTypeNames);
 
 /**
  * Test DATAGRAM congestion control mode.

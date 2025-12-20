@@ -2184,9 +2184,9 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
   DatagramFrameScheduler scheduler(conn);
   // Add datagrams
   std::string s1(conn.udpSendPacketLen / 3, '*');
-  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s1));
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer(s1));
   std::string s2(conn.udpSendPacketLen / 3, '%');
-  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s2));
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer(s2));
   NiceMock<MockQuicPacketBuilder> builder;
   EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
   EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
@@ -2212,9 +2212,9 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
   DatagramFrameScheduler scheduler(conn);
   // Add datagrams
   std::string s1(conn.udpSendPacketLen / 3, '*');
-  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s1));
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer(s1));
   std::string s2(conn.udpSendPacketLen / 3, '%');
-  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s2));
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer(s2));
   NiceMock<MockQuicPacketBuilder> builder;
   EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
   EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
@@ -2245,7 +2245,7 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
   DatagramFrameScheduler scheduler(conn);
   // Add datagram
   std::string s(conn.udpSendPacketLen / 3, '*');
-  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s));
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer(s));
   NiceMock<MockQuicPacketBuilder> builder;
   EXPECT_CALL(builder, remainingSpaceInPkt())
       .WillRepeatedly(Return(conn.udpSendPacketLen / 4));
@@ -3414,6 +3414,109 @@ TEST_P(QuicPacketSchedulerTest, PathValidationCausesPaddingToFullPacket) {
   auto pktLen = result.value().packet->header.computeChainDataLength() +
       result.value().packet->body.computeChainDataLength();
   EXPECT_EQ(pktLen, conn.udpSendPacketLen);
+}
+
+TEST_P(QuicPacketSchedulerTest, DatagramDoubleSchedulerBug) {
+  // Regression test for production CHECK failure:
+  // "popDatagramIfFits called for flow with no datagrams"
+  //
+  // Original bug scenario (before fix):
+  // 1. When both streamFrames and datagramFrames schedulers are enabled with
+  //    scheduleDatagramsWithStreams=true and framePerPacket=true
+  // 2. StreamFrameScheduler writes 1 datagram via priority queue, then stops
+  // (framePerPacket)
+  // 3. DatagramFrameScheduler writes remaining datagram(s), emptying the flow
+  // 4. But the flow ID remains in the priority queue
+  // 5. Next packet with a stream causes scheduler to try popping from empty
+  // flow -> CRASH
+  //
+  // Fix: Prevent datagramFrameScheduler from running when
+  // scheduleDatagramsWithStreams=true, since datagrams are being handled
+  // exclusively by streamFrameScheduler via priority queue.
+
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState = QuicConnectionStateBase::DatagramState();
+  conn.datagramState.maxWriteFrameSize = std::numeric_limits<uint16_t>::max();
+
+  // Allow stream creation and set flow control
+  ASSERT_FALSE(
+      conn.streamManager->setMaxLocalBidirectionalStreams(10).hasError());
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+
+  // Enable both schedulers
+  conn.transportSettings.datagramConfig.scheduleDatagramsWithStreams = true;
+  conn.transportSettings.datagramConfig.framePerPacket =
+      true; // KEY: stops after 1 datagram
+
+  // Add 2 small datagrams
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer("d1"));
+  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer("d2"));
+
+  // Add to priority queue
+  auto dgId =
+      PriorityQueue::Identifier::fromDatagramFlowID(kDefaultDatagramFlowId);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      dgId, kDefaultDatagramPriority);
+
+  // Packet 1: Both schedulers run, consuming both datagrams but leaving flow ID
+  // in queue
+  auto connId = getTestConnectionId();
+  PacketNum pn1 = getNextPacketNum(conn, PacketNumberSpace::AppData);
+  ShortHeader header1(ProtectionType::KeyPhaseZero, connId, pn1);
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(header1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  FrameScheduler scheduler1 =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::AppData,
+              PacketNumberSpace::AppData,
+              "Scheduler1")
+              .streamFrames() // Writes 1 datagram via pqueue, stops
+              .datagramFrames()) // Writes remaining datagram(s)
+          .build();
+
+  ASSERT_FALSE(
+      scheduler1
+          .scheduleFramesForPacket(std::move(builder1), conn.udpSendPacketLen)
+          .hasError());
+
+  // After fix: Only stream scheduler runs (datagram scheduler is disabled).
+  // With framePerPacket=true, only 1 datagram is written per packet.
+  // So we expect 1 datagram remaining and flow ID still in queue.
+  EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 1);
+  EXPECT_TRUE(conn.streamManager->writeQueue().contains(dgId));
+
+  // Packet 2: Write the remaining datagram
+  PacketNum pn2 = getNextPacketNum(conn, PacketNumberSpace::AppData);
+  ShortHeader header2(ProtectionType::KeyPhaseZero, connId, pn2);
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(header2),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  FrameScheduler scheduler2 = std::move(
+                                  FrameScheduler::Builder(
+                                      conn,
+                                      EncryptionLevel::AppData,
+                                      PacketNumberSpace::AppData,
+                                      "Scheduler2")
+                                      .streamFrames())
+                                  .build();
+
+  ASSERT_FALSE(
+      scheduler2
+          .scheduleFramesForPacket(std::move(builder2), conn.udpSendPacketLen)
+          .hasError());
+
+  // After packet 2: All datagrams written, flow ID removed from queue
+  EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 0);
+  EXPECT_FALSE(conn.streamManager->writeQueue().contains(dgId));
 }
 
 INSTANTIATE_TEST_SUITE_P(

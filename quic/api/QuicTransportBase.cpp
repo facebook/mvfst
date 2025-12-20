@@ -618,7 +618,16 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
     QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
     return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
   }
-  if (conn_->datagramState.writeBuffer.size() >=
+
+  // Check if datagram is too large to ever fit
+  auto datagramLen = buf->computeChainDataLength();
+  if (datagramLen == 0 ||
+      datagramLen > conn_->datagramState.maxWriteFrameSize) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
+    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
+  }
+
+  if (conn_->datagramState.flowManager.getDatagramCount() >=
       conn_->datagramState.maxWriteBufferSize) {
     QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
     if (!conn_->transportSettings.datagramConfig.sendDropOldDataFirst) {
@@ -626,10 +635,21 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
       // exactly why the datagram got dropped
       return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
     } else {
-      conn_->datagramState.writeBuffer.pop_front();
+      // Drop oldest datagram from any flow
+      conn_->datagramState.flowManager.popDatagram();
     }
   }
-  conn_->datagramState.writeBuffer.emplace_back(std::move(buf));
+  conn_->datagramState.flowManager.addDatagram(std::move(buf));
+
+  // Add to PriorityQueue if scheduling with streams is enabled
+  if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
+      conn_->streamManager) {
+    auto id =
+        PriorityQueue::Identifier::fromDatagramFlowID(kDefaultDatagramFlowId);
+    conn_->streamManager->writeQueue().insertOrUpdate(
+        id, kDefaultDatagramPriority);
+  }
+
   updateWriteLooper(true);
   return {};
 }
