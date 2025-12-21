@@ -252,11 +252,10 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::stopSending(
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto* stream = conn_->streamManager->getStream(id).value_or(nullptr);
-  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   if (stream->recvState == StreamRecvState::Closed) {
     // skip STOP_SENDING if ingress is already closed
     return {};
@@ -320,13 +319,10 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
   }
   [[maybe_unused]] auto self = sharedGuard();
   try {
-    // Check whether stream exists before calling getStream to avoid
-    // creating a peer stream if it does not exist yet.
-    if (!conn_->streamManager->streamExists(id)) {
+    auto* stream = conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
       return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-    CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     if (!stream->writable()) {
       return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
     }
@@ -494,11 +490,10 @@ QuicTransportBaseLite::notifyPendingWriteOnStream(
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   if (!stream->writable()) {
     return quic::make_unexpected(LocalErrorCode::STREAM_CLOSED);
   }
@@ -524,14 +519,13 @@ QuicTransportBaseLite::notifyPendingWriteOnStream(
       return;
     }
     auto writeCallback = wcbIt->second;
-    if (!self->conn_->streamManager->streamExists(id)) {
+    auto* stream = self->conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
       self->pendingWriteCallbacks_.erase(wcbIt);
       writeCallback->onStreamWriteError(
           id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
       return;
     }
-    auto stream = CHECK_NOTNULL(
-        self->conn_->streamManager->getStream(id).value_or(nullptr));
     if (!stream->writable()) {
       self->pendingWriteCallbacks_.erase(wcbIt);
       writeCallback->onStreamWriteError(
@@ -560,7 +554,8 @@ QuicTransportBaseLite::registerByteEventCallback(
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   [[maybe_unused]] auto self = sharedGuard();
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   if (!cb) {
@@ -603,8 +598,6 @@ QuicTransportBaseLite::registerByteEventCallback(
       events.emplace(pos, offset, cb);
     }
   }
-  auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
 
   // Notify recipients that the registration was successful.
   cb->onByteEventRegistered(ByteEvent{id, offset, type});
@@ -693,11 +686,10 @@ void QuicTransportBaseLite::setConnectionCallbackFromCtor(
 }
 
 Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return LocalErrorCode::STREAM_NOT_EXISTS;
   }
-  auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   conn_->streamManager->setStreamAsControl(*stream);
   return std::nullopt;
 }
@@ -733,11 +725,10 @@ QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
     updateWriteLooper(true);
   };
   try {
-    if (!conn_->streamManager->streamExists(id)) {
+    auto* stream = conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
       return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-    CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     auto readResult = readDataFromQuicStream(*stream, maxLen);
     if (!readResult.has_value()) {
       VLOG(4) << "read() error " << readResult.error().message << " " << *this;
@@ -924,11 +915,10 @@ QuicTransportBaseLite::getByteEventMapConst(const ByteEvent::Type type) const {
 
 quic::Expected<QuicSocketLite::StreamTransportInfo, LocalErrorCode>
 QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   auto packets = getNumPacketsTxWithNewData(*stream);
   return StreamTransportInfo{
       stream->totalHolbTime,
@@ -965,11 +955,10 @@ uint64_t QuicTransportBaseLite::getConnectionBufferAvailable() const {
 
 quic::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
 QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-  CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
   return QuicSocketLite::FlowControlState(
       getSendStreamFlowControlBytesAPI(*stream),
       stream->flowControlState.peerAdvertisedMaxOffset,
@@ -1674,11 +1663,10 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStreamInternal(
   try {
     // Check whether stream exists before calling getStream to avoid
     // creating a peer stream if it does not exist yet.
-    if (!conn_->streamManager->streamExists(id)) {
+    auto* stream = conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
       return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    auto stream = conn_->streamManager->getStream(id).value_or(nullptr);
-    CHECK(stream) << "Invalid stream in " << __func__ << ": " << id;
     if (stream->appErrorCodeToPeer &&
         *stream->appErrorCodeToPeer != errorCode) {
       // We can't change the error code across resets for a stream

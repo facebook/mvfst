@@ -326,6 +326,21 @@ class QuicStreamManager {
    */
   bool streamExists(StreamId streamId);
 
+  /*
+   * Optimized stream lookup that handles lazy state materialization.
+   *
+   * Fast path: If stream state is already materialized, returns it immediately.
+   * Slow path: If stream exists but state not materialized, creates state.
+   *
+   * Returns:
+   * - Pointer to stream state if stream exists (may materialize state lazily)
+   * - nullptr if stream doesn't exist or was closed
+   *
+   * This is the recommended replacement for streamExists() + getStream()
+   * pattern. Safe for both local and remote streams.
+   */
+  QuicStreamState* FOLLY_NULLABLE getStreamIfExists(StreamId streamId);
+
   uint64_t openableLocalBidirectionalStreams() {
     CHECK_GE(
         maxLocalBidirectionalStreamId_,

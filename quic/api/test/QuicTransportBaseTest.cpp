@@ -5318,4 +5318,46 @@ TEST_F(QuicTransportImplTest, SconeRateSignalCallbackProcessingSync) {
   EXPECT_TRUE(transport->transportConn->scone->pendingRateSignals.empty());
   transport->setConnectionCallback(nullptr);
 }
+
+// Test that we can call APIs on implicitly opened streams that don't have
+// materialized state yet. This is a regression test for a bug where
+// getStreamIfExists() was incorrectly using findStream() instead of the
+// streamExists() + getStream() pattern, causing it to return nullptr for
+// streams that existed in the open set but didn't have state materialized.
+TEST_P(
+    QuicTransportImplTestBase,
+    ImplicitlyOpenedStreamWithUnmaterializedState) {
+  // Set up the transport
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+
+  // In QUIC, when you receive data on stream N, it implicitly opens all
+  // streams with IDs < N. For a server receiving from a client:
+  // - Client bidirectional streams have IDs: 0, 4, 8, 12, ...
+  // So receiving on stream 8 implicitly opens streams 0 and 4.
+
+  // Receive data on stream 8 - this implicitly opens streams 0 and 4
+  transport->addDataToStream(
+      8, StreamBuffer(folly::IOBuf::copyBuffer("data on stream 8"), 0));
+
+  // Stream 4 is now implicitly opened (in the open set) but doesn't have
+  // materialized state yet. The bug would cause setReadCallback to return
+  // STREAM_NOT_EXISTS because findStream() would return nullptr.
+
+  // Try to set a read callback on the implicitly opened stream 4
+  NiceMock<MockReadCallback> readCb;
+  auto result = transport->setReadCallback(4, &readCb);
+
+  // This should succeed - the stream exists and state should be materialized
+  EXPECT_FALSE(result.hasError())
+      << "setReadCallback should succeed on implicitly opened stream";
+
+  // Verify we can perform other operations on the implicitly opened stream
+  auto priorityResult = transport->getStreamPriority(4);
+  EXPECT_FALSE(priorityResult.hasError())
+      << "getStreamPriority should succeed on implicitly opened stream";
+
+  // Clean up: remove the read callback before transport is destroyed
+  ASSERT_FALSE(transport->setReadCallback(4, nullptr).hasError());
+}
+
 } // namespace quic::test

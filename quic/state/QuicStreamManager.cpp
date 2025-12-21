@@ -136,6 +136,32 @@ QuicStreamState* QuicStreamManager::findStream(StreamId streamId) {
   }
 }
 
+QuicStreamState* QuicStreamManager::getStreamIfExists(StreamId streamId) {
+  // Fast path: state already materialized (common case)
+  auto* stream = findStream(streamId);
+  if (stream) {
+    return stream;
+  }
+
+  // Slow path: check if stream exists but state not materialized
+  if (!streamExists(streamId)) {
+    return nullptr; // Stream doesn't exist or was closed
+  }
+
+  // Stream exists in open set but state needs lazy materialization
+  auto result = getStream(streamId);
+  if (!result.has_value()) {
+    // Error materializing state (should be rare)
+    return nullptr;
+  }
+  // At this point result.value() should never be nullptr because:
+  // - We verified streamExists() is true (stream is in open set)
+  // - getStream() only returns nullptr for closed streams
+  // - Closed streams are removed from open sets
+  DCHECK(result.value() != nullptr);
+  return result.value();
+}
+
 quic::Expected<void, QuicError>
 QuicStreamManager::setMaxLocalBidirectionalStreams(
     uint64_t maxStreams,

@@ -115,12 +115,11 @@ quic::Expected<size_t, LocalErrorCode> QuicTransportBase::getStreamWriteOffset(
   if (isReceivingStream(conn_->nodeType, id)) {
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
-  if (!conn_->streamManager->streamExists(id)) {
-    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
   try {
-    auto stream =
-        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
+    auto* stream = conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
     return stream->currentWriteOffset;
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -139,12 +138,11 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
   if (isReceivingStream(conn_->nodeType, id)) {
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
-  if (!conn_->streamManager->streamExists(id)) {
-    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
   try {
-    auto stream =
-        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
+    auto* stream = conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
+      return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
     return stream->pendingWrites.chainLength();
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -169,15 +167,14 @@ QuicTransportBase::getConnectionFlowControl() const {
 
 quic::Expected<uint64_t, LocalErrorCode>
 QuicTransportBase::getMaxWritableOnStream(StreamId id) const {
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   if (isReceivingStream(conn_->nodeType, id)) {
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
 
-  auto stream =
-      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   return maxWritableOnStream(*stream);
 }
 
@@ -199,11 +196,10 @@ QuicTransportBase::setStreamFlowControlWindow(
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream =
-      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   stream->flowControlState.windowSize = windowSize;
   maybeSendStreamWindowUpdate(*stream, Clock::now());
   updateWriteLooper(true);
@@ -341,11 +337,10 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::peek(
     updateWriteLooper(true);
   };
 
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream =
-      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
 
   if (stream->streamReadError) {
     switch (stream->streamReadError->type()) {
@@ -364,11 +359,10 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::peek(
 quic::Expected<void, LocalErrorCode> QuicTransportBase::consume(
     StreamId id,
     size_t amount) {
-  if (!conn_->streamManager->streamExists(id)) {
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream =
-      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   auto result = consume(id, stream->currentReadOffset, amount);
   if (!result.has_value()) {
     return quic::make_unexpected(result.error().first);
@@ -391,15 +385,11 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
   };
   Optional<uint64_t> readOffset;
   try {
-    // Need to check that the stream exists first so that we don't
-    // accidentally let the API create a peer stream that was not
-    // sent by the peer.
-    if (!conn_->streamManager->streamExists(id)) {
+    auto* stream = conn_->streamManager->getStreamIfExists(id);
+    if (!stream) {
       return quic::make_unexpected(
           ConsumeError{LocalErrorCode::STREAM_NOT_EXISTS, readOffset});
     }
-    auto stream =
-        CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
     readOffset = stream->currentReadOffset;
     if (stream->currentReadOffset != offset) {
       return quic::make_unexpected(
@@ -705,7 +695,7 @@ QuicTransportBase::getStreamPriority(StreamId id) {
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  if (auto stream = conn_->streamManager->findStream(id)) {
+  if (auto stream = conn_->streamManager->getStreamIfExists(id)) {
     return stream->priority;
   }
   return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
