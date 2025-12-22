@@ -27,7 +27,8 @@ struct ResumptionState;
 
 namespace {
 class FailingAppTokenValidator : public fizz::server::AppTokenValidator {
-  bool validate(const fizz::server::ResumptionState&) const override {
+  [[nodiscard]] bool validate(
+      const fizz::server::ResumptionState&) const override {
     return false;
   }
 };
