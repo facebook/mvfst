@@ -815,7 +815,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "Bad connection close triggering frame type value"));
   }
-  FrameType triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
+  auto triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
 
   auto reasonPhraseLength = quic::decodeQuicInteger(cursor);
   if (!reasonPhraseLength ||
@@ -826,7 +826,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeConnectionCloseFrame(
   }
 
   std::string reasonPhrase;
-  size_t len = static_cast<size_t>(reasonPhraseLength->first);
+  auto len = static_cast<size_t>(reasonPhraseLength->first);
   auto bytes = cursor.peekBytes();
   size_t available = std::min(bytes.size(), len);
   reasonPhrase.append(reinterpret_cast<const char*>(bytes.data()), available);
@@ -856,7 +856,7 @@ quic::Expected<ConnectionCloseFrame, QuicError> decodeApplicationClose(
   }
 
   std::string reasonPhrase;
-  size_t len = static_cast<size_t>(reasonPhraseLength->first);
+  auto len = static_cast<size_t>(reasonPhraseLength->first);
   auto bytes = cursor.peekBytes();
   size_t available = std::min(bytes.size(), len);
   reasonPhrase.append(reinterpret_cast<const char*>(bytes.data()), available);
