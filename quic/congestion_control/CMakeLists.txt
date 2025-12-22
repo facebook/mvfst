@@ -16,6 +16,7 @@ add_library(
   Copa.cpp
   Copa2.cpp
   NewReno.cpp
+  PacerFactory.cpp
   QuicCubic.cpp
   ServerCongestionControllerFactory.cpp
   SimulatedTBF.cpp
