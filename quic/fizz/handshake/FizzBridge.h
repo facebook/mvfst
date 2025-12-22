@@ -28,7 +28,7 @@ class FizzAead final : public Aead {
     return std::unique_ptr<FizzAead>(new FizzAead(std::move(fizzAeadIn)));
   }
 
-  Optional<TrafficKey> getKey() const override;
+  [[nodiscard]] Optional<TrafficKey> getKey() const override;
 
   /**
    * Forward calls to fizz::Aead, catching any exceptions and converting them to
@@ -72,7 +72,7 @@ class FizzAead final : public Aead {
     }
   }
 
-  size_t getCipherOverhead() const override {
+  [[nodiscard]] size_t getCipherOverhead() const override {
     return fizzAead->getCipherOverhead();
   }
 
