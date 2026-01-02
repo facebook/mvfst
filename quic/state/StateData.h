@@ -304,7 +304,7 @@ struct ReadDatagram {
 };
 
 struct QuicConnectionStateBase : public folly::DelayedDestruction {
-  virtual ~QuicConnectionStateBase() override = default;
+  ~QuicConnectionStateBase() override = default;
 
   explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {}
 

@@ -339,7 +339,7 @@ inline folly::StringPiece streamStateToString(StreamRecvState state) {
 }
 
 struct QuicStreamState : public QuicStreamLike {
-  virtual ~QuicStreamState() override = default;
+  ~QuicStreamState() override = default;
 
   QuicStreamState(StreamId id, QuicConnectionStateBase& conn);
 
