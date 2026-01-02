@@ -18,6 +18,7 @@ mvfst_cpp_library(
         "//fizz/protocol:exporter",
         "//fizz/protocol:protocol",
         "//quic/codec:pktbuilder",
+        "//quic/common:mvfst_logging",
     ],
     exported_deps = [
         ":psk_cache",

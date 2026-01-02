@@ -10,6 +10,7 @@
 #include <linux/ethtool.h>
 #include <linux/sockios.h>
 #include <net/if.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/xsk/BaseXskContainer.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -49,7 +50,7 @@ void BaseXskContainer::initializeQueueParams(const std::string& interfaceName) {
 
   int sock = ::socket(AF_INET, SOCK_DGRAM, 0);
   if (::ioctl(sock, SIOCETHTOOL, &ifr) < 0) {
-    LOG(FATAL) << "Failed to get number of ethernet channels";
+    MVLOG_FATAL << "Failed to get number of ethernet channels";
   }
   ::close(sock);
 

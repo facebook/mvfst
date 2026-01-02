@@ -13,6 +13,7 @@ mvfst_cpp_library(
     deps = [
         "//fizz/crypto:utils",
         "//folly/io/async:async_udp_socket",
+        "//quic/common:mvfst_logging",
         "//quic/common/test:test_client_utils",
         "//quic/common/udpsocket:folly_async_udp_socket",
         "//quic/fizz/client/handshake:fizz_client_handshake",
@@ -41,6 +42,7 @@ mvfst_cpp_library(
         "//quic/congestion_control:static_cwnd_congestion_controller",
     ],
     exported_deps = [
+        "//quic/common:mvfst_logging",
         "//quic/logging:file_qlogger",
         "//quic/observer:socket_observer_types",
         "//quic/server:accept_observer",
@@ -58,6 +60,7 @@ mvfst_cpp_binary(
         ":tperf_server",
         "//folly/init:init",
         "//folly/portability:gflags",
+        "//quic/common:mvfst_logging",
     ] + select({
         "DEFAULT": ["//folly:memcpy-use"],
         "ovr_config//os:windows": [],
@@ -75,6 +78,7 @@ mvfst_cpp_library(
     exported_deps = [
         "//quic:constants",
         "//quic/api:transport",
+        "//quic/common:mvfst_logging",
         "//quic/congestion_control:bandwidth",
         "//quic/state:quic_state_machine",
     ],

@@ -15,6 +15,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/QuicPacketBuilder.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/events/HighResQuicTimer.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
@@ -318,16 +319,16 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
                      auto) mutable {
             auto readData = c->read(id, 1000);
             auto copy = readData->first->clone();
-            LOG(INFO) << "Client received data=" << copy->toString()
-                      << " on stream=" << id
-                      << " read=" << readData->first->computeChainDataLength()
-                      << " sent=" << dataCopy->computeChainDataLength();
+            MVLOG_INFO << "Client received data=" << copy->toString()
+                       << " on stream=" << id
+                       << " read=" << readData->first->computeChainDataLength()
+                       << " sent=" << dataCopy->computeChainDataLength();
             streamData->append(std::move(readData->first), readData->second);
             if (readData->second) {
               auto clearCallbackResult = c->setReadCallback(id, nullptr);
               if (!clearCallbackResult.has_value()) {
-                LOG(WARNING) << "Failed to clear read callback: "
-                             << toString(clearCallbackResult.error());
+                MVLOG_WARNING << "Failed to clear read callback: "
+                              << toString(clearCallbackResult.error());
               }
             }
           }));
@@ -336,8 +337,8 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
         streamData->setException(err);
         auto clearErrorCallbackResult = client->setReadCallback(sid, nullptr);
         if (!clearErrorCallbackResult.has_value()) {
-          LOG(WARNING) << "Failed to clear read callback on error: "
-                       << toString(clearErrorCallbackResult.error());
+          MVLOG_WARNING << "Failed to clear read callback on error: "
+                        << toString(clearErrorCallbackResult.error());
         }
       }));
   return streamData->promise.getFuture().within(30s);
@@ -418,7 +419,7 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
   client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
-        LOG(ERROR) << "error: " << errorCode.message;
+        MVLOG_ERROR << "error: " << errorCode.message;
         const TransportErrorCode* transportError =
             errorCode.code.asTransportErrorCode();
         EXPECT_NE(transportError, nullptr);
@@ -444,7 +445,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   client->setTransportSettings(tp);
   EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
-        LOG(ERROR) << "error: " << errorCode.message;
+        MVLOG_ERROR << "error: " << errorCode.message;
         const LocalErrorCode* localError = errorCode.code.asLocalErrorCode();
         EXPECT_NE(localError, nullptr);
         this->checkTransportSummaryEvent(qLogger);
@@ -1044,7 +1045,7 @@ TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
   client->detachEventBase();
   folly::Baton<> baton;
   bool responseRecvd = false;
-  VLOG(10) << "changing threads";
+  MVVLOG(10) << "changing threads";
   newEvb.getEventBase()->runInEventBaseThreadAndWait([&] {
     client->attachEventBase(newQEvb);
     auto streamId2 = client->createBidirectionalStream().value();
@@ -1097,7 +1098,7 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
                 .thenError(
                     folly::tag_t<std::runtime_error>{},
                     [&](const std::runtime_error& e) {
-                      LOG(INFO) << e.what();
+                      MVLOG_INFO << e.what();
                       resetRecvd = true;
                     })
                 .ensure([&] { eventbase_.terminateLoopSoon(); });
@@ -1146,7 +1147,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
       .thenError(
           folly::tag_t<std::runtime_error>{},
           [&](const std::runtime_error& e) {
-            LOG(INFO) << e.what();
+            MVLOG_INFO << e.what();
             resetRecvd = true;
             token2 = client->getConn().statelessResetToken;
           })
@@ -2526,8 +2527,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->toString()
-              << " on stream=" << streamId;
+    MVLOG_INFO << "Client received data=" << copy->toString()
+               << " on stream=" << streamId;
     EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
     dataDelivered = true;
     eventbase_->terminateLoopSoon();
@@ -2633,8 +2634,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->clone()->toString()
-              << " on stream=" << streamId;
+    MVLOG_INFO << "Client received data=" << copy->clone()->toString()
+               << " on stream=" << streamId;
     EXPECT_EQ(copy->toString(), expected->clone()->toString());
     dataDelivered = true;
     eventbase_->terminateLoopSoon();
@@ -2703,8 +2704,8 @@ TEST_F(
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->toString()
-              << " on stream=" << streamId;
+    MVLOG_INFO << "Client received data=" << copy->toString()
+               << " on stream=" << streamId;
     EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
     dataDelivered = true;
     eventbase_->terminateLoopSoon();
@@ -2977,8 +2978,8 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
     auto readData = client->read(streamId, 1000);
     auto copy = readData->first->clone();
-    LOG(INFO) << "Client received data=" << copy->toString()
-              << " on stream=" << streamId;
+    MVLOG_INFO << "Client received data=" << copy->toString()
+               << " on stream=" << streamId;
     EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
     dataDelivered = true;
     eventbase_->terminateLoopSoon();

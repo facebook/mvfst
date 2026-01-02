@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/Copa.h>
 
 #include <quic/common/TimeUtil.h>
@@ -24,9 +25,9 @@ Copa::Copa(QuicConnectionStateBase& conn)
           100000, /*100ms*/
           0us,
           0) {
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+  MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.transportSettings.copaDeltaParam.has_value()) {
     deltaParam_ = conn_.transportSettings.copaDeltaParam.value();
   }
@@ -34,9 +35,9 @@ Copa::Copa(QuicConnectionStateBase& conn)
 }
 
 void Copa::onRemoveBytesFromInflight(uint64_t /* bytes */) {
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+  MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -54,12 +55,13 @@ void Copa::onRemoveBytesFromInflight(uint64_t /* bytes */) {
 }
 
 void Copa::onPacketSent(const OutstandingPacketWrapper& packet) {
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes
-           << " bytesBufferred=" << conn_.flowControlState.sumCurStreamBufferLen
-           << " packetNum=" << packet.packet.header.getPacketSequenceNum()
-           << " " << conn_;
+  MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes
+             << " bytesBufferred="
+             << conn_.flowControlState.sumCurStreamBufferLen
+             << " packetNum=" << packet.packet.header.getPacketSequenceNum()
+             << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -96,9 +98,9 @@ void Copa::checkAndUpdateDirection(const TimePoint ackTime) {
   }
   auto elapsed_time = ackTime - velocityState_.lastCwndRecordTime.value();
 
-  VLOG(10) << __func__ << " elapsed time for direction update "
-           << elapsed_time.count() << ", srtt " << conn_.lossState.srtt.count()
-           << " " << conn_;
+  MVVLOG(10) << __func__ << " elapsed time for direction update "
+             << elapsed_time.count() << ", srtt "
+             << conn_.lossState.srtt.count() << " " << conn_;
 
   if (elapsed_time >= conn_.lossState.srtt) {
     auto newDirection = cwndBytes_ > velocityState_.lastRecordedCwndBytes
@@ -118,11 +120,11 @@ void Copa::checkAndUpdateDirection(const TimePoint ackTime) {
         velocityState_.velocity = 2 * velocityState_.velocity;
       }
     }
-    VLOG(10) << __func__ << " updated direction from "
-             << velocityState_.direction << " to " << newDirection
-             << " velocityState_.numTimesDirectionSame "
-             << velocityState_.numTimesDirectionSame << " velocity "
-             << velocityState_.velocity << " " << conn_;
+    MVVLOG(10) << __func__ << " updated direction from "
+               << velocityState_.direction << " to " << newDirection
+               << " velocityState_.numTimesDirectionSame "
+               << velocityState_.numTimesDirectionSame << " velocity "
+               << velocityState_.velocity << " " << conn_;
     velocityState_.direction = newDirection;
     velocityState_.lastCwndRecordTime = ackTime;
     velocityState_.lastRecordedCwndBytes = cwndBytes_;
@@ -135,8 +137,8 @@ void Copa::changeDirection(
   if (velocityState_.direction == newDirection) {
     return;
   }
-  VLOG(10) << __func__ << " Suddenly direction change to " << newDirection
-           << " " << conn_;
+  MVVLOG(10) << __func__ << " Suddenly direction change to " << newDirection
+             << " " << conn_;
   velocityState_.direction = newDirection;
   velocityState_.velocity = 1;
   velocityState_.numTimesDirectionSame = 0;
@@ -176,19 +178,19 @@ void Copa::onPacketAcked(const AckEvent& ack) {
           .count());
   auto rttStandingMicroSec = standingRTTFilter_.GetBest().count();
 
-  VLOG(10) << __func__ << "ack size=" << ack.ackedBytes
-           << " num packets acked=" << ack.ackedBytes / conn_.udpSendPacketLen
-           << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes
-           << " rttMin=" << rttMin.count()
-           << " sRTT=" << conn_.lossState.srtt.count()
-           << " lRTT=" << conn_.lossState.lrtt.count()
-           << " mRTT=" << conn_.lossState.mrtt.count()
-           << " rttvar=" << conn_.lossState.rttvar.count()
-           << " packetsBufferred="
-           << conn_.flowControlState.sumCurStreamBufferLen
-           << " packetsRetransmitted=" << conn_.lossState.rtxCount << " "
-           << conn_;
+  MVVLOG(10) << __func__ << "ack size=" << ack.ackedBytes
+             << " num packets acked=" << ack.ackedBytes / conn_.udpSendPacketLen
+             << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes
+             << " rttMin=" << rttMin.count()
+             << " sRTT=" << conn_.lossState.srtt.count()
+             << " lRTT=" << conn_.lossState.lrtt.count()
+             << " mRTT=" << conn_.lossState.mrtt.count()
+             << " rttvar=" << conn_.lossState.rttvar.count()
+             << " packetsBufferred="
+             << conn_.flowControlState.sumCurStreamBufferLen
+             << " packetsRetransmitted=" << conn_.lossState.rtxCount << " "
+             << conn_;
 
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
@@ -206,8 +208,9 @@ void Copa::onPacketAcked(const AckEvent& ack) {
   }
 
   if (rttStandingMicroSec < rttMin.count()) {
-    VLOG(3) << __func__ << "delay negative, rttStanding=" << rttStandingMicroSec
-            << " rttMin=" << rttMin.count() << " " << conn_;
+    MVVLOG(3) << __func__
+              << "delay negative, rttStanding=" << rttStandingMicroSec
+              << " rttMin=" << rttMin.count() << " " << conn_;
     return;
   }
 
@@ -220,15 +223,15 @@ void Copa::onPacketAcked(const AckEvent& ack) {
   }
 
   if (rttStandingMicroSec == 0) {
-    VLOG(3) << __func__ << "rttStandingMicroSec zero, lrtt = "
-            << conn_.lossState.lrtt.count() << " rttMin=" << rttMin.count()
-            << " " << conn_;
+    MVVLOG(3) << __func__ << "rttStandingMicroSec zero, lrtt = "
+              << conn_.lossState.lrtt.count() << " rttMin=" << rttMin.count()
+              << " " << conn_;
     return;
   }
 
-  VLOG(10) << __func__
-           << " estimated queuing delay microsec =" << delayInMicroSec << " "
-           << conn_;
+  MVVLOG(10) << __func__
+             << " estimated queuing delay microsec =" << delayInMicroSec << " "
+             << conn_;
 
   bool increaseCwnd = false;
   if (delayInMicroSec == 0) {
@@ -240,8 +243,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
         (deltaParam_ * delayInMicroSec);
     auto currentRate = (1.0 * cwndBytes_ * 1000000) / rttStandingMicroSec;
 
-    VLOG(10) << __func__ << " estimated target rate=" << targetRate
-             << " current rate=" << currentRate << " " << conn_;
+    MVVLOG(10) << __func__ << " estimated target rate=" << targetRate
+               << " current rate=" << currentRate << " " << conn_;
     increaseCwnd = targetRate >= currentRate;
   }
 
@@ -258,8 +261,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
         lastCwndDoubleTime_ = ack.ackTime;
       } else if (
           ack.ackTime - lastCwndDoubleTime_.value() > conn_.lossState.srtt) {
-        VLOG(10) << __func__ << " doubling cwnd per RTT from=" << cwndBytes_
-                 << " due to slow start" << " " << conn_;
+        MVVLOG(10) << __func__ << " doubling cwnd per RTT from=" << cwndBytes_
+                   << " due to slow start" << " " << conn_;
         addAndCheckOverflow(
             cwndBytes_,
             cwndBytes_,
@@ -278,8 +281,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
       uint64_t addition = (ack.ackedPackets.size() * conn_.udpSendPacketLen *
                            conn_.udpSendPacketLen * velocityState_.velocity) /
           (deltaParam_ * cwndBytes_);
-      VLOG(10) << __func__ << " increasing cwnd from=" << cwndBytes_ << " by "
-               << addition << " " << conn_;
+      MVVLOG(10) << __func__ << " increasing cwnd from=" << cwndBytes_ << " by "
+                 << addition << " " << conn_;
       addAndCheckOverflow(
           cwndBytes_,
           addition,
@@ -297,8 +300,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
     uint64_t reduction = (ack.ackedPackets.size() * conn_.udpSendPacketLen *
                           conn_.udpSendPacketLen * velocityState_.velocity) /
         (deltaParam_ * cwndBytes_);
-    VLOG(10) << __func__ << " decreasing cwnd from=" << cwndBytes_ << " by "
-             << reduction << " " << conn_;
+    MVVLOG(10) << __func__ << " decreasing cwnd from=" << cwndBytes_ << " by "
+               << reduction << " " << conn_;
     isSlowStart_ = false;
     subtractAndCheckUnderflow(
         cwndBytes_,
@@ -314,9 +317,9 @@ void Copa::onPacketAcked(const AckEvent& ack) {
 }
 
 void Copa::onPacketLoss(const LossEvent& loss) {
-  VLOG(10) << __func__ << " lostBytes=" << loss.lostBytes
-           << " lostPackets=" << loss.lostPackets << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+  MVVLOG(10) << __func__ << " lostBytes=" << loss.lostBytes
+             << " lostPackets=" << loss.lostPackets << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -334,9 +337,9 @@ void Copa::onPacketLoss(const LossEvent& loss) {
   DCHECK(loss.largestLostPacketNum.has_value());
   if (loss.persistentCongestion) {
     // TODO See if we should go to slowStart here
-    VLOG(10) << __func__ << " writable=" << getWritableBytes()
-             << " cwnd=" << cwndBytes_
-             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+    MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+               << " cwnd=" << cwndBytes_
+               << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
     if (conn_.qLogger) {
       conn_.qLogger->addMetricUpdate(
           conn_.lossState.lrtt,

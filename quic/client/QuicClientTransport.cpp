@@ -6,13 +6,14 @@
  */
 
 #include <quic/client/QuicClientTransport.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/loss/QuicLossFunctions.h>
 
 namespace quic {
 
 QuicClientTransport::~QuicClientTransport() {
-  VLOG(10) << "Destroyed connection to server=" << conn_->peerAddress;
+  MVVLOG(10) << "Destroyed connection to server=" << conn_->peerAddress;
   // The caller probably doesn't need the conn callback after destroying the
   // transport.
   resetConnectionCallbacks();

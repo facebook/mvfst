@@ -10,6 +10,7 @@ mvfst_cpp_library(
     headers = [
         "Utils.h",
     ],
+    deps = ["//quic/common:mvfst_logging"],
     exported_deps = [
         "//folly/io:iobuf",
         "//quic/common:optional",

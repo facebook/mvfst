@@ -9,6 +9,7 @@
 
 #include <string>
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/server/AcceptObserver.h>
@@ -37,7 +38,7 @@ class TPerfObserver : public quic::LegacyObserver {
       const quic::SocketObserverInterface::
           AppLimitedEvent& /* appLimitedEvent */) override {
     if (logAppRateLimited_) {
-      LOG(INFO) << "appRateLimited detected";
+      MVLOG_INFO << "appRateLimited detected";
     }
   }
 
@@ -45,7 +46,7 @@ class TPerfObserver : public quic::LegacyObserver {
       quic::QuicSocketLite*, /* socket */
       const struct LossEvent& /* lossEvent */) override {
     if (logLoss_) {
-      LOG(INFO) << "packetLoss detected";
+      MVLOG_INFO << "packetLoss detected";
     }
   }
 
@@ -53,7 +54,7 @@ class TPerfObserver : public quic::LegacyObserver {
       quic::QuicSocketLite*, /* socket */
       const PacketRTT& /* RTT sample */) override {
     if (logRttSample_) {
-      LOG(INFO) << "rttSample generated";
+      MVLOG_INFO << "rttSample generated";
     }
   }
 
@@ -86,15 +87,15 @@ class TPerfAcceptObserver : public quic::AcceptObserver {
   }
 
   void acceptorDestroy(quic::QuicServerWorker* /* worker */) noexcept override {
-    LOG(INFO) << "quic server worker destroyed";
+    MVLOG_INFO << "quic server worker destroyed";
   }
 
   void observerAttach(quic::QuicServerWorker* /* worker */) noexcept override {
-    LOG(INFO) << "TPerfAcceptObserver attached";
+    MVLOG_INFO << "TPerfAcceptObserver attached";
   }
 
   void observerDetach(quic::QuicServerWorker* /* worker */) noexcept override {
-    LOG(INFO) << "TPerfAcceptObserver detached";
+    MVLOG_INFO << "TPerfAcceptObserver detached";
   }
 
  private:

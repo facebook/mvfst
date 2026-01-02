@@ -75,6 +75,7 @@ mvfst_cpp_test(
         "//quic:config",
         "//quic:constants",
         "//quic/api/test:mocks",
+        "//quic/common:mvfst_logging",
         "//quic/common/test:test_utils",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/logging/test:mocks",

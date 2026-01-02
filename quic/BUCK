@@ -54,6 +54,7 @@ mvfst_cpp_library(
     headers = [
         "QuicException.h",
     ],
+    deps = ["//quic/common:mvfst_logging"],
     exported_deps = [
         ":constants",
         ":tls_exception",

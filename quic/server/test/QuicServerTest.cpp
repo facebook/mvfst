@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/QuicServer.h>
 
 #include <folly/futures/Promise.h>
@@ -824,7 +825,7 @@ TEST_F(QuicServerWorkerTest, RetireConnIds) {
 TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto connId = getTestConnectionId(hostId_);
-  LOG(ERROR) << "from test CID: " << int(connId.size());
+  MVLOG_ERROR << "from test CID: " << int(connId.size());
   createQuicConnection(kClientAddr, connId);
 
   auto data = folly::IOBuf::copyBuffer("data");

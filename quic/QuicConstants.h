@@ -221,8 +221,6 @@ BETTER_ENUM(
     PACER_MIN_BURST_PACKETS = 0x1000B,
     // Controls  write connection data packets limit.
     MAX_WRITE_CONN_DATA_PKT_LIM = 0x1000C,
-    // Knob for using the new priority queue implementation
-    USE_NEW_PRIORITY_QUEUE = 0x1000D,
     // Threshold for writer to send entire stream buffer
     MIN_STREAM_BUF_THRESH = 0x1000E,
     // Controls how much excess CWND allowed on imminent stream completion.

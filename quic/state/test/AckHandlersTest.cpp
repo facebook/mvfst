@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/api/test/Mocks.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
@@ -4731,9 +4732,9 @@ class AckEventForAppDataTest : public Test {
           switch (packetFrame.type()) {
             case QuicWriteFrame::Type::WriteStreamFrame: {
               const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
-              VLOG(4) << "Received ack for stream=" << frame.streamId
-                      << " offset=" << frame.offset << " fin=" << frame.fin
-                      << " len=" << frame.len << " " << *conn_;
+              MVVLOG(4) << "Received ack for stream=" << frame.streamId
+                        << " offset=" << frame.offset << " fin=" << frame.fin
+                        << " len=" << frame.len << " " << *conn_;
               auto ackedStreamResult =
                   conn_->streamManager->getStream(frame.streamId);
               CHECK(!ackedStreamResult.hasError()) << ackedStreamResult.error();

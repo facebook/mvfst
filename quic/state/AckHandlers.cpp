@@ -7,6 +7,7 @@
 
 #include <folly/MapUtil.h>
 #include <folly/tracing/StaticTracepoint.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
@@ -210,8 +211,8 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         ackedPacketIterator->packet.header.getPacketNumberSpace();
     ackedPacketIterator->metadata.scheduledForDestruction = true;
     conn.outstandings.scheduledForDestructionCount++;
-    VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
-             << " space=" << currentPacketNumberSpace << conn;
+    MVVLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
+               << " space=" << currentPacketNumberSpace << conn;
     // If we hit a packet which has been declared lost we need to count the
     // spurious loss and ignore all other processing.
     if (ackedPacketIterator->declaredLost) {
@@ -557,13 +558,13 @@ void parseAckReceiveTimestamps(
       // sent by peer.
       if (packetReceiveTimeStamps.size() >=
           maxReceiveTimestampsRequestedFromPeer) {
-        LOG(ERROR) << " Received more timestamps "
-                   << packetReceiveTimeStamps.size()
-                   << " than requested timestamps from peer: "
-                   << maxReceiveTimestampsRequestedFromPeer << " current PN "
-                   << receivedPacketNum << " largest PN "
-                   << frame.maybeLatestRecvdPacketNum.value() << " deltas  "
-                   << timeStampRange.deltas.size();
+        MVLOG_ERROR << " Received more timestamps "
+                    << packetReceiveTimeStamps.size()
+                    << " than requested timestamps from peer: "
+                    << maxReceiveTimestampsRequestedFromPeer << " current PN "
+                    << receivedPacketNum << " largest PN "
+                    << frame.maybeLatestRecvdPacketNum.value() << " deltas  "
+                    << timeStampRange.deltas.size();
         return;
       }
       receiveTimeStamp -= delta;

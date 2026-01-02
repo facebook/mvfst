@@ -8,7 +8,7 @@
 #pragma once
 
 #include <folly/Synchronized.h>
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/common/test/TestUtils.h>
 #include <quic/samples/echo/EchoHandler.h>
@@ -93,7 +93,7 @@ class EchoServer {
     }
     if (disableRtx) {
       if (!enableStreamGroups) {
-        LOG(FATAL) << "disable_rtx requires use_stream_groups to be enabled";
+        MVLOG_FATAL << "disable_rtx requires use_stream_groups to be enabled";
       }
     }
     server_ = QuicServer::createQuicServer(std::move(settings));
@@ -117,7 +117,7 @@ class EchoServer {
     folly::SocketAddress addr1(host_.c_str(), port_);
     addr1.setFromHostPort(host_, port_);
     server_->start(addr1, 0);
-    LOG(INFO) << "Echo server started at: " << addr1.describe();
+    MVLOG_INFO << "Echo server started at: " << addr1.describe();
     eventbase_.loopForever();
   }
 

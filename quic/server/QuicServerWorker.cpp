@@ -11,6 +11,7 @@
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/MvfstLogging.h>
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -72,7 +73,8 @@ QuicServerWorker::QuicServerWorker(
     // together, we will need a better value.
     bufAccessor_ = std::make_unique<BufAccessor>(
         kDefaultMaxUDPPayload * transportSettings_.maxBatchSize);
-    VLOG(10) << "GSO write buf accessor created for ContinuousMemory data path";
+    MVVLOG(10)
+        << "GSO write buf accessor created for ContinuousMemory data path";
   }
 }
 
@@ -136,8 +138,8 @@ void QuicServerWorker::bind(
   socket_->setTXTime({CLOCK_MONOTONIC, /*deadline=*/false});
 
   socket_->setMaxReadsPerEvent(transportSettings_.maxServerRecvPacketsPerLoop);
-  VLOG(3) << "Socket max reads per event set to "
-          << socket_->getMaxReadsPerEvent();
+  MVVLOG(3) << "Socket max reads per event set to "
+            << socket_->getMaxReadsPerEvent();
 
   if (mvfst_hook_on_socket_create) {
     mvfst_hook_on_socket_create(socket_->getNetworkSocket().toFd());
@@ -213,7 +215,7 @@ void QuicServerWorker::start() {
         evb_.get(), transportSettings_.pacingTimerResolution);
   }
   socket_->resumeRead(this);
-  VLOG(10) << fmt::format(
+  MVVLOG(10) << fmt::format(
       "Registered read on worker={}, thread={}, processId={}",
       fmt::ptr(this),
       folly::getCurrentThreadID(),
@@ -266,7 +268,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
   Optional<std::pair<VersionNegotiationPacket, BufPtr>>
       versionNegotiationPacket;
   if (isInitial && datagramLen < kMinInitialPacketSize) {
-    VLOG(3) << "Dropping initial packet due to invalid size";
+    MVVLOG(3) << "Dropping initial packet due to invalid size";
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET_SIZE);
     return true;
@@ -298,7 +300,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     }
 
     if (negotiationNeeded && !isInitial) {
-      VLOG(3) << "Dropping non-initial packet due to invalid version";
+      MVVLOG(3) << "Dropping non-initial packet due to invalid version";
       QUIC_STATS(
           statsCallback_,
           onPacketDropped,
@@ -313,7 +315,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     }
   }
   if (versionNegotiationPacket) {
-    VLOG(4) << "Version negotiation sent to client=" << client;
+    MVVLOG(4) << "Version negotiation sent to client=" << client;
     auto len = versionNegotiationPacket->second->computeChainDataLength();
     QUIC_STATS(statsCallback_, onWrite, len);
     QUIC_STATS(statsCallback_, onPacketProcessed);
@@ -330,7 +332,7 @@ void QuicServerWorker::sendVersionNegotiationPacket(
   VersionNegotiationPacketBuilder builder(
       invariant.dstConnId, invariant.srcConnId, supportedVersions_);
   auto versionNegotiationPacket = std::move(builder).buildPacket();
-  VLOG(4) << "Version negotiation sent to client=" << client;
+  MVVLOG(4) << "Version negotiation sent to client=" << client;
   auto len = versionNegotiationPacket.second->computeChainDataLength();
   QUIC_STATS(statsCallback_, onWrite, len);
   QUIC_STATS(statsCallback_, onPacketProcessed);
@@ -361,7 +363,7 @@ void QuicServerWorker::onDataAvailable(
         packetReceiveTime -= rxDelayUs;
         QUIC_STATS(statsCallback_, onRxDelaySample, rxDelayUs.count());
       } else {
-        VLOG(10) << "Negative rx delay: " << rxDelayUs.count() << "us";
+        MVVLOG(10) << "Negative rx delay: " << rxDelayUs.count() << "us";
       }
     }
   }
@@ -372,7 +374,7 @@ void QuicServerWorker::onDataAvailable(
   }
   largestPacketReceiveTime_ =
       std::max(largestPacketReceiveTime_, packetReceiveTime);
-  VLOG(10) << fmt::format(
+  MVVLOG(10) << fmt::format(
       "Worker={}, Received data on thread={}, processId={}",
       fmt::ptr(this),
       folly::getCurrentThreadID(),
@@ -463,17 +465,17 @@ void QuicServerWorker::handleNetworkData(
     ContiguousReadCursor cursor(
         udpPacket.buf.front()->data(), udpPacket.buf.front()->length());
     if (shutdown_) {
-      VLOG(4) << "Packet received after shutdown, dropping";
+      MVVLOG(4) << "Packet received after shutdown, dropping";
       packetDropReason = PacketDropReason::SERVER_SHUTDOWN;
     } else if (isBlockListedSrcPort_(client.getPort())) {
-      VLOG(4) << "Dropping packet with blocklisted src port: "
-              << client.getPort();
+      MVVLOG(4) << "Dropping packet with blocklisted src port: "
+                << client.getPort();
       packetDropReason = PacketDropReason::INVALID_SRC_PORT;
     } else if (!callback_) {
-      VLOG(0) << "Worker callback is null.  Dropping packet.";
+      MVVLOG(0) << "Worker callback is null.  Dropping packet.";
       packetDropReason = PacketDropReason::WORKER_NOT_INITIALIZED;
     } else if (!cursor.canAdvance(sizeof(uint8_t))) {
-      VLOG(4) << "Dropping packet too small";
+      MVVLOG(4) << "Dropping packet too small";
       packetDropReason = PacketDropReason::INVALID_PACKET_INITIAL_BYTE;
     }
 
@@ -533,7 +535,7 @@ void QuicServerWorker::handleNetworkData(
       if (!isClientChosenDcid &&
           invariant.dstConnId.size() < kMinSelfConnectionIdV1Size) {
         // drop packet if connId is present but is not valid.
-        VLOG(3) << "Dropping packet due to invalid connectionId";
+        MVVLOG(3) << "Dropping packet due to invalid connectionId";
         packetDropReason = PacketDropReason::INVALID_PACKET_CID;
         return;
       }
@@ -552,12 +554,12 @@ void QuicServerWorker::handleNetworkData(
     }
 
     if (!tryHandlingAsHealthCheck(client, *udpPacket.buf.front())) {
-      VLOG(6) << "Failed to parse long header";
+      MVVLOG(6) << "Failed to parse long header";
       packetDropReason = PacketDropReason::PARSE_ERROR_LONG_HEADER;
     }
   } catch (const std::exception& ex) {
     // Drop the packet.
-    VLOG(6) << "Failed to parse packet header " << ex.what();
+    MVVLOG(6) << "Failed to parse packet header " << ex.what();
     packetDropReason = PacketDropReason::PARSE_ERROR_EXCEPTION;
   }
 }
@@ -648,7 +650,7 @@ bool QuicServerWorker::tryHandlingAsHealthCheck(
     // say that we are OK. The response is much smaller than the
     // request, so we are not creating an amplification vector. Also
     // ignore the error code.
-    VLOG(4) << "Health check request, response=OK";
+    MVVLOG(4) << "Health check request, response=OK";
     socket_->write(client, BufHelpers::copyBuffer("OK"));
     return true;
   }
@@ -666,7 +668,7 @@ void QuicServerWorker::forwardNetworkData(
   if (!routingData.clientChosenDcid &&
       !connIdAlgo_->canParse(routingData.destinationConnId)) {
     if (packetForwardingEnabled_ && !isForwardedData) {
-      VLOG(3) << fmt::format(
+      MVVLOG(3) << fmt::format(
           "Forwarding packet with unknown connId version from client={} to another process, routingInfo={}",
           client.describe(),
           logRoutingInfo(routingData.destinationConnId));
@@ -675,7 +677,7 @@ void QuicServerWorker::forwardNetworkData(
       QUIC_STATS(statsCallback_, onPacketForwarded);
       return;
     } else {
-      VLOG(3) << fmt::format(
+      MVVLOG(3) << fmt::format(
           "Dropping packet due to unknown connectionId version, routingInfo={}",
           logRoutingInfo(routingData.destinationConnId));
       QUIC_STATS(
@@ -779,8 +781,8 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
     const folly::SocketAddress& client) {
   // parse dst conn-id to determine if packet was misrouted
   if (!connIdAlgo_->canParse(dstConnId)) {
-    VLOG(3) << "Dropping packet with bad DCID, routingInfo="
-            << logRoutingInfo(dstConnId);
+    MVVLOG(3) << "Dropping packet with bad DCID, routingInfo="
+              << logRoutingInfo(dstConnId);
     // TODO do we need to reset?
     return PacketDropReason::PARSE_ERROR_BAD_DCID;
   }
@@ -788,7 +790,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
   auto maybeParsedConnIdParam = connIdAlgo_->parseConnectionId(dstConnId);
   if (maybeParsedConnIdParam.hasError()) {
     const auto& ex = maybeParsedConnIdParam.error();
-    VLOG(3) << fmt::format(
+    MVVLOG(3) << fmt::format(
         "Dropping packet due to DCID parsing error={}, "
         "routingInfo = {} ",
         ex.message,
@@ -799,7 +801,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
 
   const auto& connIdParams = maybeParsedConnIdParam.value();
   if (connIdParams.hostId != prevHostId_ && connIdParams.hostId != hostId_) {
-    VLOG(3) << fmt::format(
+    MVVLOG(3) << fmt::format(
         "Dropping packet routed to wrong host, from client={}, routingInfo={},",
         client.describe(),
         logRoutingInfo(dstConnId));
@@ -808,7 +810,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
   if (connIdParams.processId == static_cast<uint8_t>(processId_)) {
     // There's no existing connection for the packet's CID or the client's
     // addr, and doesn't belong to the old server. Send a Reset.
-    VLOG(3) << fmt::format(
+    MVVLOG(3) << fmt::format(
         "Dropping packet, unknown DCID, from client={}, routingInfo={},",
         client.describe(),
         logRoutingInfo(dstConnId));
@@ -864,7 +866,7 @@ void QuicServerWorker::dispatchPacketData(
     // already been fwd-ed
     if (!packetForwardingEnabled_ || isForwardedData) {
       packetDropReason = PacketDropReason::CANNOT_FORWARD_DATA;
-      VLOG(3) << fmt::format(
+      MVVLOG(3) << fmt::format(
           "Dropping packet, cannot forward, from client={}, routingInfo={},",
           client.describe(),
           logRoutingInfo(dstConnId));
@@ -876,7 +878,7 @@ void QuicServerWorker::dispatchPacketData(
     // Optimistically route to another server if the packet type is not
     // Initial and if there is not any connection associated with the given
     // packet
-    VLOG(4) << fmt::format(
+    MVVLOG(4) << fmt::format(
         "Forwarding packet from client={} to another process, routingInfo={}",
         client.describe(),
         logRoutingInfo(dstConnId));
@@ -903,15 +905,15 @@ void QuicServerWorker::dispatchPacketData(
   };
 
   if (cit != connectionIdMap_.end()) {
-    VLOG(10) << "Found existing connection for CID=" << dstConnId.hex() << " "
-             << *cit->second.get();
+    MVVLOG(10) << "Found existing connection for CID=" << dstConnId.hex() << " "
+               << *cit->second.get();
     fwdNetworkDataToTransport(cit->second.get());
     return;
   }
 
   if (routingData.headerForm == HeaderForm::Short) {
     // Drop if short header packet w/ unrecognized dst conn id
-    VLOG(3) << fmt::format(
+    MVVLOG(3) << fmt::format(
         "Dropping short header packet with no connid match routingInfo={}",
         logRoutingInfo(dstConnId));
     // try forwarding the packet to the old server (if it is enabled)
@@ -925,8 +927,8 @@ void QuicServerWorker::dispatchPacketData(
   CHECK(routingData.headerForm == HeaderForm::Long);
   auto sit = sourceAddressMap_.find(std::make_pair(client, dstConnId));
   if (sit != sourceAddressMap_.end()) {
-    VLOG(4) << "Found existing connection for client=" << client << " "
-            << sit->second.get();
+    MVVLOG(4) << "Found existing connection for client=" << client << " "
+              << sit->second.get();
     fwdNetworkDataToTransport(sit->second.get());
     return;
   }
@@ -945,7 +947,7 @@ void QuicServerWorker::dispatchPacketData(
 
   // non-initial packet w/o existing connection may have been misrouted.
   if (!routingData.isInitial) {
-    VLOG(3) << fmt::format(
+    MVVLOG(3) << fmt::format(
         "Dropping packet from client={}, routingInfo={}",
         client.describe(),
         logRoutingInfo(dstConnId));
@@ -956,7 +958,7 @@ void QuicServerWorker::dispatchPacketData(
 
   // check that we have a proper quic version before creating transport
   CHECK(quicVersion.has_value()) << "no QUIC version to create transport";
-  VLOG(4) << fmt::format(
+  MVVLOG(4) << fmt::format(
       "Creating new connection for client={}, routingInfo={}",
       client.describe(),
       logRoutingInfo(dstConnId));
@@ -967,7 +969,7 @@ void QuicServerWorker::dispatchPacketData(
   if (networkData.getTotalData() < kMinInitialPacketSize ||
       !isValidConnIdLength(dstConnId)) {
     // Don't even attempt to forward the packet, just drop it.
-    VLOG(3) << "Dropping small initial packet from client=" << client;
+    MVVLOG(3) << "Dropping small initial packet from client=" << client;
     packetDropReason = PacketDropReason::INVALID_PACKET_SIZE_INITIAL;
     return;
   }
@@ -1142,7 +1144,7 @@ void QuicServerWorker::sendRetryPacket(
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
   if (!transportSettings_.retryTokenSecret.has_value()) {
-    VLOG(4) << "Not sending retry packet since retry token secret is not set";
+    MVVLOG(4) << "Not sending retry packet since retry token secret is not set";
     return;
   }
 
@@ -1235,9 +1237,9 @@ void QuicServerWorker::stopPacketForwarding() {
 
 void QuicServerWorker::onReadError(
     const folly::AsyncSocketException& ex) noexcept {
-  VLOG(4) << "QuicServer readerr: " << ex.what();
+  MVVLOG(4) << "QuicServer readerr: " << ex.what();
   if (!callback_) {
-    VLOG(0) << "Worker callback is null.  Ignoring worker error.";
+    MVVLOG(0) << "Worker callback is null.  Ignoring worker error.";
     return;
   }
   callback_->handleWorkerError(LocalErrorCode::INTERNAL_ERROR);
@@ -1275,7 +1277,7 @@ uint8_t QuicServerWorker::getWorkerId() const noexcept {
 
 void QuicServerWorker::setHostId(uint32_t hostId) noexcept {
   if (hostId_ == hostId) {
-    LOG(WARNING) << "HostId is already set to " << hostId;
+    MVLOG_WARNING << "HostId is already set to " << hostId;
     return;
   }
   prevHostId_ = hostId_;
@@ -1361,7 +1363,8 @@ QuicServerWorker::getSrcToTransportMap() const {
 void QuicServerWorker::onConnectionIdAvailable(
     QuicServerTransport::Ptr transport,
     ConnectionId id) noexcept {
-  VLOG(4) << "Adding into connectionIdMap_ for CID=" << id << " " << *transport;
+  MVVLOG(4) << "Adding into connectionIdMap_ for CID=" << id << " "
+            << *transport;
   QuicServerTransport* transportPtr = transport.get();
   std::weak_ptr<QuicServerTransport> weakTransport = transport;
   auto result =
@@ -1371,9 +1374,9 @@ void QuicServerWorker::onConnectionIdAvailable(
     // or different ones.
     auto it = result.first;
     QuicServerTransport* existingTransportPtr = it->second.get();
-    LOG(ERROR) << "connectionIdMap_ already has CID=" << id
-               << " Is same transport: "
-               << (existingTransportPtr == transportPtr);
+    MVLOG_ERROR << "connectionIdMap_ already has CID=" << id
+                << " Is same transport: "
+                << (existingTransportPtr == transportPtr);
   } else if (boundServerTransports_.emplace(transportPtr, weakTransport)
                  .second) {
     if (!isScheduled()) {
@@ -1388,9 +1391,9 @@ void QuicServerWorker::onConnectionIdRetired(
     ConnectionId id) noexcept {
   auto it = connectionIdMap_.find(id);
   if (it == connectionIdMap_.end()) {
-    LOG(ERROR) << "Failed to retire CID=" << id << " " << transport;
+    MVLOG_ERROR << "Failed to retire CID=" << id << " " << transport;
   } else {
-    VLOG(4) << "Retiring CID=" << id << " " << transport;
+    MVVLOG(4) << "Retiring CID=" << id << " " << transport;
     connectionIdMap_.erase(it);
   }
 }
@@ -1401,10 +1404,10 @@ void QuicServerWorker::onConnectionIdBound(
   CHECK(clientInitialDestCid);
   auto source = std::make_pair(
       transport->getOriginalPeerAddress(), *clientInitialDestCid);
-  VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
+  MVVLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
   auto iter = sourceAddressMap_.find(source);
   if (iter == sourceAddressMap_.end() || iter->second != transport) {
-    LOG(ERROR) << "Transport not match, client=" << *transport;
+    MVLOG_ERROR << "Transport not match, client=" << *transport;
   } else {
     sourceAddressMap_.erase(source);
   }
@@ -1414,7 +1417,7 @@ void QuicServerWorker::onConnectionUnbound(
     QuicServerTransport* transport,
     const QuicServerTransport::SourceIdentity& source,
     const std::vector<ConnectionIdData>& connectionIdData) noexcept {
-  VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
+  MVVLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
 
   auto& localConnectionError = transport->getState()->localConnectionError;
   if (transport->getConnectionsStats().totalBytesSent == 0 &&
@@ -1436,7 +1439,7 @@ void QuicServerWorker::onConnectionUnbound(
   }
 
   for (auto& connId : connectionIdData) {
-    VLOG(4) << fmt::format(
+    MVVLOG(4) << fmt::format(
         "Removing CID from connectionIdMap_, routingInfo={}",
         logRoutingInfo(connId.connId));
     auto it = connectionIdMap_.find(connId.connId);
@@ -1446,12 +1449,12 @@ void QuicServerWorker::onConnectionUnbound(
     // still hold a pointer to the incorrect transport.
     QuicServerTransport* incorrectTransportPtr = nullptr;
     if (it == connectionIdMap_.end()) {
-      VLOG(3) << "CID not found in connectionIdMap_ CID= " << connId.connId;
+      MVVLOG(3) << "CID not found in connectionIdMap_ CID= " << connId.connId;
     } else {
       QuicServerTransport* existingPtr = it->second.get();
       if (existingPtr != transport) {
-        LOG(ERROR) << "Incorrect transport being removed for duplicate CID="
-                   << connId.connId;
+        MVLOG_ERROR << "Incorrect transport being removed for duplicate CID="
+                    << connId.connId;
         incorrectTransportPtr = existingPtr;
       }
     }
@@ -1459,7 +1462,7 @@ void QuicServerWorker::onConnectionUnbound(
     if (incorrectTransportPtr != nullptr) {
       if (boundServerTransports_.find(incorrectTransportPtr) !=
           boundServerTransports_.end()) {
-        LOG(ERROR)
+        MVLOG_ERROR
             << "boundServerTransports_ contains deleted transport for duplicate CID="
             << connId.connId;
       }
@@ -1478,9 +1481,9 @@ void QuicServerWorker::onHandshakeUnfinished() noexcept {
 }
 
 void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
-  VLOG(4) << "QuicServer shutdown all connections."
-          << " addressMap=" << sourceAddressMap_.size()
-          << " connectionIdMap=" << connectionIdMap_.size();
+  MVVLOG(4) << "QuicServer shutdown all connections."
+            << " addressMap=" << sourceAddressMap_.size()
+            << " connectionIdMap=" << connectionIdMap_.size();
   if (shutdown_) {
     return;
   }

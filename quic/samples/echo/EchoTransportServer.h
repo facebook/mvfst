@@ -8,7 +8,7 @@
 #pragma once
 
 #include <folly/Synchronized.h>
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
@@ -97,11 +97,11 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
   }
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override {
-    LOG(INFO) << "onReadError " << ex.what();
+    MVLOG_INFO << "onReadError " << ex.what();
   }
 
   void onReadClosed() noexcept override {
-    LOG(INFO) << "onReadClosed";
+    MVLOG_INFO << "onReadClosed";
   }
 
  private:
@@ -124,7 +124,7 @@ class EchoTransportServer {
     socket->bind(folly::SocketAddress(host_, port_));
     socket->resumeRead(&udpAcceptor);
 
-    LOG(INFO) << "Echo transport server started at: " << socket->address();
+    MVLOG_INFO << "Echo transport server started at: " << socket->address();
     eventbase_.loopForever();
   }
 

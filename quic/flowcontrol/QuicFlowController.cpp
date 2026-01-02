@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 
 #include <quic/QuicConstants.h>
@@ -99,7 +100,7 @@ void maybeIncreaseFlowControlWindow(
   CHECK(updateTime > *timeOfLastFlowControlUpdate);
   if (std::chrono::duration_cast<decltype(srtt)>(
           updateTime - *timeOfLastFlowControlUpdate) < 2 * srtt) {
-    VLOG(10) << "doubling flow control window";
+    MVVLOG(10) << "doubling flow control window";
     windowSize *= 2;
   }
 }
@@ -176,8 +177,8 @@ bool maybeSendStreamWindowUpdate(
       flowControlState.timeOfLastFlowControlUpdate,
       updateTime);
   if (newAdvertisedOffset) {
-    VLOG(10) << "Queued flow control update for stream=" << stream.id
-             << " offset=" << *newAdvertisedOffset;
+    MVVLOG(10) << "Queued flow control update for stream=" << stream.id
+               << " offset=" << *newAdvertisedOffset;
     stream.conn.streamManager->queueWindowUpdate(stream.id);
     QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlUpdate);
     return true;
@@ -236,16 +237,17 @@ quic::Expected<void, QuicError> updateFlowControlOnRead(
     return incrementResult;
   }
   if (maybeSendConnWindowUpdate(stream.conn, readTime)) {
-    VLOG(4) << "Read trigger conn window update "
-            << " readOffset=" << stream.conn.flowControlState.sumCurReadOffset
-            << " maxOffset=" << stream.conn.flowControlState.advertisedMaxOffset
-            << " window=" << stream.conn.flowControlState.windowSize;
+    MVVLOG(4) << "Read trigger conn window update "
+              << " readOffset=" << stream.conn.flowControlState.sumCurReadOffset
+              << " maxOffset="
+              << stream.conn.flowControlState.advertisedMaxOffset
+              << " window=" << stream.conn.flowControlState.windowSize;
   }
   if (maybeSendStreamWindowUpdate(stream, readTime)) {
-    VLOG(4) << "Read trigger stream window update stream=" << stream.id
-            << " readOffset=" << stream.currentReadOffset
-            << " maxOffset=" << stream.flowControlState.advertisedMaxOffset
-            << " window=" << stream.flowControlState.windowSize;
+    MVVLOG(4) << "Read trigger stream window update stream=" << stream.id
+              << " readOffset=" << stream.currentReadOffset
+              << " maxOffset=" << stream.flowControlState.advertisedMaxOffset
+              << " window=" << stream.flowControlState.windowSize;
   }
   return {};
 }
@@ -271,11 +273,12 @@ quic::Expected<void, QuicError> updateFlowControlOnReceiveReset(
       return incrementResult;
     }
     if (maybeSendConnWindowUpdate(stream.conn, resetTime)) {
-      VLOG(4) << "Reset trigger conn window update "
-              << " readOffset=" << stream.conn.flowControlState.sumCurReadOffset
-              << " maxOffset="
-              << stream.conn.flowControlState.advertisedMaxOffset
-              << " window=" << stream.conn.flowControlState.windowSize;
+      MVVLOG(4) << "Reset trigger conn window update "
+                << " readOffset="
+                << stream.conn.flowControlState.sumCurReadOffset
+                << " maxOffset="
+                << stream.conn.flowControlState.advertisedMaxOffset
+                << " window=" << stream.conn.flowControlState.windowSize;
     }
   }
   return {};
@@ -420,7 +423,7 @@ void handleConnWindowUpdate(
 
 void handleConnBlocked(QuicConnectionStateBase& conn) {
   conn.pendingEvents.connWindowUpdate = true;
-  VLOG(4) << "Blocked triggered conn window update";
+  MVVLOG(4) << "Blocked triggered conn window update";
 }
 
 void handleStreamBlocked(QuicStreamState& stream) {
@@ -429,7 +432,7 @@ void handleStreamBlocked(QuicStreamState& stream) {
         stream.flowControlState, Clock::now(), stream.conn.lossState.srtt);
   }
   stream.conn.streamManager->queueWindowUpdate(stream.id);
-  VLOG(4) << "Blocked triggered stream window update stream=" << stream.id;
+  MVVLOG(4) << "Blocked triggered stream window update stream=" << stream.id;
 }
 
 uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
@@ -497,7 +500,7 @@ void onConnWindowUpdateSent(
   conn.flowControlState.advertisedMaxOffset = maximumDataSent;
   conn.flowControlState.timeOfLastFlowControlUpdate = sentTime;
   conn.pendingEvents.connWindowUpdate = false;
-  VLOG(4) << "sent window for conn";
+  MVVLOG(4) << "sent window for conn";
 }
 
 void onStreamWindowUpdateSent(
@@ -507,12 +510,12 @@ void onStreamWindowUpdateSent(
   stream.flowControlState.advertisedMaxOffset = maximumDataSent;
   stream.flowControlState.timeOfLastFlowControlUpdate = sentTime;
   stream.conn.streamManager->removeWindowUpdate(stream.id);
-  VLOG(4) << "sent window for stream=" << stream.id;
+  MVVLOG(4) << "sent window for stream=" << stream.id;
 }
 
 void onConnWindowUpdateLost(QuicConnectionStateBase& conn) {
   conn.pendingEvents.connWindowUpdate = true;
-  VLOG(4) << "Loss triggered conn window update";
+  MVVLOG(4) << "Loss triggered conn window update";
 }
 
 void onStreamWindowUpdateLost(QuicStreamState& stream) {
@@ -520,7 +523,7 @@ void onStreamWindowUpdateLost(QuicStreamState& stream) {
     return;
   }
   stream.conn.streamManager->queueWindowUpdate(stream.id);
-  VLOG(4) << "Loss triggered stream window update stream=" << stream.id;
+  MVVLOG(4) << "Loss triggered stream window update stream=" << stream.id;
 }
 
 void onBlockedLost(QuicStreamState& stream) {

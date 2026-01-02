@@ -13,6 +13,7 @@ mvfst_cpp_library(
     deps = [
         "//folly/io/async:async_ssl_socket",
         "//folly/io/async:async_udp_socket",
+        "//quic/common:mvfst_logging",
         "//quic/common/udpsocket:folly_async_udp_socket",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/fizz/client/handshake:fizz_client_handshake",

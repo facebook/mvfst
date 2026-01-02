@@ -11,6 +11,7 @@
 
 #include <quic/api/QuicSocket.h>
 #include <quic/client/connector/QuicConnector.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
@@ -56,7 +57,7 @@ void QuicConnector::connect(
     std::shared_ptr<quic::QuicTransportStatsCallback>
         quicTransportStatsCallback) {
   if (isBusy()) {
-    LOG(ERROR) << "Already connecting...";
+    MVLOG_ERROR << "Already connecting...";
     return;
   }
   qEvb_ = std::make_shared<FollyQuicEventBase>(eventBase);
@@ -87,7 +88,7 @@ void QuicConnector::connect(
   quicClient_->setSocketOptions(socketOptions);
   quicClient_->setSupportedVersions(supportedQuicVersions);
 
-  VLOG(4) << "connecting to " << connectAddr.describe();
+  MVVLOG(4) << "connecting to " << connectAddr.describe();
 
   doConnect(connectTimeout);
 }

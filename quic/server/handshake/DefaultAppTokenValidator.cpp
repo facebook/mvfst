@@ -18,7 +18,7 @@
 #include <folly/IPAddress.h>
 #include <quic/common/Optional.h>
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <chrono>
 #include <string>
@@ -51,13 +51,13 @@ bool DefaultAppTokenValidator::validate(
   };
 
   if (!resumptionState.appToken) {
-    VLOG(10) << "App token does not exist";
+    MVVLOG(10) << "App token does not exist";
     return validated = false;
   }
 
   auto appToken = decodeAppToken(*resumptionState.appToken);
   if (!appToken) {
-    VLOG(10) << "Failed to decode app token";
+    MVVLOG(10) << "Failed to decode app token";
     return validated = false;
   }
 
@@ -67,7 +67,7 @@ bool DefaultAppTokenValidator::validate(
   // This is a minimum to allow sending additional optional params
   // that can be ignored by servers that don't support them.
   if (params.size() < kMinimumNumOfParamsInTheTicket) {
-    VLOG(10)
+    MVVLOG(10)
         << "Number of parameters in the ticket is less than the minimum expected";
     return validated = false;
   }
@@ -83,7 +83,7 @@ bool DefaultAppTokenValidator::validate(
   if (!ticketIdleTimeout ||
       conn_->transportSettings.idleTimeout !=
           std::chrono::milliseconds(*ticketIdleTimeout)) {
-    VLOG(10) << "Changed idle timeout";
+    MVVLOG(10) << "Changed idle timeout";
     return validated = false;
   }
 
@@ -97,7 +97,7 @@ bool DefaultAppTokenValidator::validate(
   const auto& ticketPacketSize = ticketPacketSizeResult.value();
   if (!ticketPacketSize ||
       conn_->transportSettings.maxRecvPacketSize < *ticketPacketSize) {
-    VLOG(10) << "Decreased max receive packet size";
+    MVVLOG(10) << "Decreased max receive packet size";
     return validated = false;
   }
 
@@ -114,7 +114,7 @@ bool DefaultAppTokenValidator::validate(
   if (!ticketMaxData ||
       conn_->transportSettings.advertisedInitialConnectionFlowControlWindow <
           *ticketMaxData) {
-    VLOG(10) << "Decreased max data";
+    MVVLOG(10) << "Decreased max data";
     return validated = false;
   }
 
@@ -160,7 +160,7 @@ bool DefaultAppTokenValidator::validate(
       !ticketMaxStreamDataUni ||
       conn_->transportSettings.advertisedInitialUniStreamFlowControlWindow <
           *ticketMaxStreamDataUni) {
-    VLOG(10) << "Decreased max stream data";
+    MVVLOG(10) << "Decreased max stream data";
     return validated = false;
   }
 
@@ -188,7 +188,7 @@ bool DefaultAppTokenValidator::validate(
       !ticketMaxStreamsUni ||
       conn_->transportSettings.advertisedInitialMaxStreamsUni <
           *ticketMaxStreamsUni) {
-    VLOG(10) << "Decreased max streams";
+    MVVLOG(10) << "Decreased max streams";
     return validated = false;
   }
 
@@ -204,7 +204,7 @@ bool DefaultAppTokenValidator::validate(
   }
   if (conn_->transportSettings.advertisedExtendedAckFeatures !=
       ticketExtendedAckFeatures) {
-    VLOG(10) << "Extended ack support changed";
+    MVVLOG(10) << "Extended ack support changed";
     return validated = false;
   }
 
@@ -212,7 +212,7 @@ bool DefaultAppTokenValidator::validate(
 
   if (!validateAndUpdateSourceToken(
           *conn_, std::move(appToken->sourceAddresses))) {
-    VLOG(10) << "No exact match from source address token";
+    MVVLOG(10) << "No exact match from source address token";
     return validated = false;
   }
 
@@ -224,7 +224,7 @@ bool DefaultAppTokenValidator::validate(
               ? quic::Optional<std::string>(*resumptionState.alpn)
               : std::nullopt,
           appToken->appParams)) {
-    VLOG(10) << "Invalid app params";
+    MVVLOG(10) << "Invalid app params";
     return validated = false;
   }
 

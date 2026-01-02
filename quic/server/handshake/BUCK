@@ -12,6 +12,7 @@ mvfst_cpp_library(
         "ServerHandshakeFactory.h",
     ],
     deps = [
+        "//quic/common:mvfst_logging",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/state:stream_functions",
     ],
@@ -74,6 +75,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/api:transport",
         "//quic/api:transport_helpers",
+        "//quic/common:mvfst_logging",
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/handshake:transport_parameters",
         "//quic/server/state:server",
@@ -118,6 +120,7 @@ mvfst_cpp_library(
     deps = [
         "//folly:range",
         "//quic/codec:decode",
+        "//quic/common:mvfst_logging",
     ],
     exported_deps = [
         "//fizz/server:aead_token_cipher",

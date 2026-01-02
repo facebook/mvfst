@@ -6,8 +6,8 @@
  */
 
 #include <folly/json/json.h> // @manual=//folly:dynamic
-#include <glog/logging.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/TransportKnobs.h>
 
 namespace quic {
@@ -81,7 +81,7 @@ Optional<TransportKnobParams> parseTransportKnobs(
               knobParams.push_back(
                   {paramId, static_cast<uint64_t>(cctype.value())});
             } else {
-              LOG(ERROR) << "unknown cc type " << val;
+              MVLOG_ERROR << "unknown cc type " << val;
               return std::nullopt;
             }
             /*
@@ -102,7 +102,7 @@ Optional<TransportKnobParams> parseTransportKnobs(
             uint64_t factor = 0;
             auto pos = s.find('/');
             if (pos == std::string::npos) {
-              LOG(ERROR)
+              MVLOG_ERROR
                   << "rtt factor knob expected format {numerator}/{denominator}";
               return std::nullopt;
             }
@@ -114,7 +114,7 @@ Optional<TransportKnobParams> parseTransportKnobs(
             if (numerator <= 0 || denominator <= 0 ||
                 numerator >= kKnobFractionMax ||
                 denominator >= kKnobFractionMax) {
-              LOG(ERROR)
+              MVLOG_ERROR
                   << "rtt factor knob numerator and denominator must be ints in range (0,"
                   << kKnobFractionMax << "]";
               return std::nullopt;
@@ -125,14 +125,14 @@ Optional<TransportKnobParams> parseTransportKnobs(
             knobParams.push_back({paramId, factor});
           } else if (paramId == TransportKnobParamId::NO_OP) {
             // No further processing needed. Ignore this knob parameter.
-            VLOG(4) << "Skipping over noop transport knob";
+            MVVLOG(4) << "Skipping over noop transport knob";
             continue;
           } else if (paramId == TransportKnobParamId::ACK_FREQUENCY_POLICY) {
             knobParams.push_back({paramId, val.asString()});
           } else if (paramId == TransportKnobParamId::CC_CONFIG) {
             knobParams.push_back({paramId, val.asString()});
           } else {
-            LOG(ERROR)
+            MVLOG_ERROR
                 << "string param type is not valid for this knob with id= "
                 << TransportKnobParamId::_from_integral(paramId);
             return std::nullopt;
@@ -142,12 +142,13 @@ Optional<TransportKnobParams> parseTransportKnobs(
         default:
           // Quic transport knob param values cannot be of type ARRAY, NULLT or
           // OBJECT
-          LOG(ERROR) << "Invalid transport knob param value type" << val.type();
+          MVLOG_ERROR << "Invalid transport knob param value type"
+                      << val.type();
           return std::nullopt;
       }
     }
   } catch (const std::exception& e) {
-    LOG(ERROR) << "fail to parse knobs: " << e.what();
+    MVLOG_ERROR << "fail to parse knobs: " << e.what();
     return std::nullopt;
   }
 

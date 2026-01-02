@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/mvfst-config.h>
 
 #include <quic/QuicConstants.h>
@@ -156,7 +157,7 @@ struct QuicStreamLike {
       }
     }();
     if (lenAdjustment && len == 0) {
-      LOG(FATAL) << "ACK for empty stream frame with no fin.";
+      MVLOG_FATAL << "ACK for empty stream frame with no fin.";
     }
     return ackedIntervals.tryInsert(offset, offset + len - lenAdjustment);
   }

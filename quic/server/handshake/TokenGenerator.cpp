@@ -6,6 +6,7 @@
  */
 
 #include <folly/io/IOBuf.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/handshake/TokenGenerator.h>
 
 #include <folly/Range.h>
@@ -34,8 +35,8 @@ Optional<BufPtr> TokenGenerator::encryptToken(
   auto maybeEncryptedToken = cipher_.encrypt(
       std::move(plainTextToken), token.genAeadAssocData().get());
   if (!maybeEncryptedToken) {
-    LOG(ERROR) << "Failed to encypt addr validation token with IP "
-               << token.clientIp.str();
+    MVLOG_ERROR << "Failed to encypt addr validation token with IP "
+                << token.clientIp.str();
     return Optional<BufPtr>();
   }
 
@@ -60,7 +61,7 @@ uint64_t TokenGenerator::decryptToken(
   auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 
   if (parseResult.hasError()) {
-    LOG(ERROR) << "Failed to parse decrypted retry token";
+    MVLOG_ERROR << "Failed to parse decrypted retry token";
     return 0;
   }
 

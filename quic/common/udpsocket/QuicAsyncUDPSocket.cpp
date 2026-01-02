@@ -7,6 +7,7 @@
 
 #include <type_traits>
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 
 namespace quic {
@@ -37,7 +38,8 @@ T* QuicAsyncUDPSocket::getTypedSocket() const {
   if (sock) {
     return sock;
   } else {
-    LOG(WARNING) << "Failed to cast QuicAsyncUDPSocket to " << typeid(T).name();
+    MVLOG_WARNING << "Failed to cast QuicAsyncUDPSocket to "
+                  << typeid(T).name();
     return nullptr;
   }
 }

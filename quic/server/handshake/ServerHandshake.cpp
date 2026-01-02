@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/handshake/ServerHandshake.h>
 
 #include <quic/fizz/handshake/FizzBridge.h>
@@ -54,7 +55,7 @@ quic::Expected<void, QuicError> ServerHandshake::doHandshake(
       appDataReadBuf_.append(std::move(data));
       break;
     default:
-      LOG(FATAL) << "Unhandled EncryptionLevel";
+      MVLOG_FATAL << "Unhandled EncryptionLevel";
   }
   processPendingEvents();
   if (error_) {
@@ -240,7 +241,7 @@ const Optional<std::string>& ServerHandshake::getApplicationProtocol() const {
 
 void ServerHandshake::onError(
     const std::pair<std::string, TransportErrorCode>& error) {
-  VLOG(10) << "ServerHandshake error " << error.first;
+  MVVLOG(10) << "ServerHandshake error " << error.first;
   error_ = error;
   handshakeEventAvailable_ = true;
 }
@@ -321,7 +322,7 @@ void ServerHandshake::processPendingEvents() {
           processSocketData(appDataReadBuf_);
           break;
         default:
-          LOG(FATAL) << "Unhandled EncryptionLevel";
+          MVLOG_FATAL << "Unhandled EncryptionLevel";
       }
     } else if (!processPendingCryptoEvent()) {
       actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);
@@ -554,7 +555,7 @@ void ServerHandshake::computeCiphers(CipherKind kind, ByteRange secret) {
   std::unique_ptr<Aead> aead = buildAead(secret);
   auto headerCipherResult = buildHeaderCipher(secret);
   if (headerCipherResult.hasError()) {
-    LOG(ERROR) << "Failed to build header cipher";
+    MVLOG_ERROR << "Failed to build header cipher";
     onError(
         std::make_pair(
             "Failed to build header cipher",

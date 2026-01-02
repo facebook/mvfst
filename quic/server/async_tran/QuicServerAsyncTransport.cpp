@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/async_tran/QuicServerAsyncTransport.h>
 
 namespace quic {
@@ -21,7 +22,7 @@ void QuicServerAsyncTransport::onNewBidirectionalStream(StreamId id) noexcept {
 
 void QuicServerAsyncTransport::onNewUnidirectionalStream(
     StreamId /*id*/) noexcept {
-  LOG(FATAL) << "Unidirectional stream not supported";
+  MVLOG_FATAL << "Unidirectional stream not supported";
 }
 
 void QuicServerAsyncTransport::onStopSending(

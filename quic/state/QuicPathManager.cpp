@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/QuicPathManager.h>
 #include <quic/state/StateData.h>
 
@@ -207,8 +208,8 @@ void QuicPathManager::onPathChallengeSent(
   auto maybePath = getPathByChallengeDataImpl(pathChallenge.pathData);
   if (maybePath) {
     auto& path = *maybePath;
-    VLOG(6) << "Path challenge sent for path=" << path.id << " at "
-            << Clock::now().time_since_epoch().count();
+    MVVLOG(6) << "Path challenge sent for path=" << path.id << " at "
+              << Clock::now().time_since_epoch().count();
 
     if (path.status != PathStatus::Validated) {
       path.lastChallengeSentTimestamp = Clock::now();
@@ -269,8 +270,8 @@ const PathInfo* QuicPathManager::onPathResponseReceived(
   path.status = PathStatus::Validated;
   path.pathValidationTime = Clock::now();
 
-  VLOG(6) << "Path response received for path=" << path.id << " at "
-          << path.pathValidationTime->time_since_epoch().count();
+  MVVLOG(6) << "Path response received for path=" << path.id << " at "
+            << path.pathValidationTime->time_since_epoch().count();
 
   path.rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
       Clock::now() - *path.lastChallengeSentTimestamp);
@@ -300,8 +301,8 @@ const PathInfo* QuicPathManager::onPathResponseReceived(
   conn_.pendingEvents.schedulePathValidationTimeout =
       !pathsPendingResponse_.empty();
 
-  VLOG(6) << "Path validated with RTT=" << path.rttSample.value().count()
-          << " pending response count=" << pathsPendingResponse_.size();
+  MVVLOG(6) << "Path validated with RTT=" << path.rttSample.value().count()
+            << " pending response count=" << pathsPendingResponse_.size();
 
   return maybePath;
 }
@@ -317,7 +318,7 @@ Optional<TimePoint> QuicPathManager::getEarliestChallengeTimeout() const {
 }
 
 void QuicPathManager::onPathValidationTimeoutExpired(TimePoint timeNow) {
-  VLOG(6) << "Path validation timeout expired";
+  MVVLOG(6) << "Path validation timeout expired";
   auto it = pathsPendingResponse_.begin();
   while (it != pathsPendingResponse_.end()) {
     auto pathId = *it;
@@ -397,8 +398,8 @@ bool QuicPathManager::maybeRestoreCongestionControlAndRttStateForCurrentPath() {
     conn_.lossState.lrtt = cachedState->lrtt;
     conn_.lossState.rttvar = cachedState->rttvar;
     conn_.lossState.mrtt = cachedState->mrtt;
-    VLOG(6) << "Recovered cached state for path " << pathInfo.id << " for peer "
-            << pathInfo.peerAddress.describe();
+    MVVLOG(6) << "Recovered cached state for path " << pathInfo.id
+              << " for peer " << pathInfo.peerAddress.describe();
   } else {
     // No valid state to restore.
     if (pathInfo.rttSample) {
@@ -584,8 +585,8 @@ Expected<void, QuicError> QuicPathManager::assignDestinationCidForPath(
   }
   path.destinationConnectionId = nextCidResult.value();
 
-  VLOG(4) << "Assigned destination CID=" << *path.destinationConnectionId
-          << " for path=" << path.id;
+  MVVLOG(4) << "Assigned destination CID=" << *path.destinationConnectionId
+            << " for path=" << path.id;
 
   if (cidToRetire) {
     conn_.retirePeerConnectionId(*cidToRetire);

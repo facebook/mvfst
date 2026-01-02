@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
 #include <quic/flowcontrol/QuicFlowController.h>
@@ -52,7 +53,7 @@ quic::Expected<void, QuicError> sendStopSendingSMHandler(
       if (stream.conn.nodeType == QuicNodeType::Server &&
           getSendStreamFlowControlBytesWire(stream) == 0 &&
           !stream.finalWriteOffset) {
-        VLOG(3) << "Client gives up a flow control blocked stream";
+        MVVLOG(3) << "Client gives up a flow control blocked stream";
       }
       stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
       break;
@@ -110,7 +111,7 @@ quic::Expected<void, QuicError> sendRstSMHandler(
       break;
     }
     case StreamSendState::Closed: {
-      VLOG(4) << "Ignoring SendReset from closed state.";
+      MVVLOG(4) << "Ignoring SendReset from closed state.";
       break;
     }
     case StreamSendState::ResetSent: {
@@ -140,10 +141,10 @@ quic::Expected<void, QuicError> sendAckSMHandler(
         CHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
         CHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
         CHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
-        VLOG(10) << "Open: acked stream data stream=" << stream.id
-                 << " offset=" << ackedBuffer->second->offset
-                 << " len=" << ackedBuffer->second->data.chainLength()
-                 << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
+        MVVLOG(10) << "Open: acked stream data stream=" << stream.id
+                   << " offset=" << ackedBuffer->second->offset
+                   << " len=" << ackedBuffer->second->data.chainLength()
+                   << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
         auto updateResult = stream.updateAckedIntervals(
             ackedBuffer->second->offset,
             ackedBuffer->second->data.chainLength(),
@@ -195,8 +196,8 @@ quic::Expected<void, QuicError> sendRstAckSMHandler(
     Optional<uint64_t> reliableSize) {
   switch (stream.sendState) {
     case StreamSendState::ResetSent: {
-      VLOG(10) << "ResetSent: Transition to closed stream=" << stream.id << " "
-               << stream.conn;
+      MVVLOG(10) << "ResetSent: Transition to closed stream=" << stream.id
+                 << " " << stream.conn;
       // Note that we set minReliableSizeAcked to 0 for non-reliable resets.
       if (!stream.minReliableSizeAcked.has_value()) {
         stream.minReliableSizeAcked = reliableSize.value_or(0);

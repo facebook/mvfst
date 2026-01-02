@@ -8,6 +8,7 @@
 #include <folly/Random.h>
 #include <gtest/gtest.h>
 #include <quic/common/CircularDeque.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
 #include <memory>
 #include <numeric>
@@ -29,10 +30,10 @@ bool verifyStorageContent(
       [](const T& first, const T& second) -> bool { return first == second; });
   if (!allMatch) {
     for (const auto& val : cd) {
-      LOG(ERROR) << "CircularDeque elem:" << val;
+      MVLOG_ERROR << "CircularDeque elem:" << val;
     }
     for (const auto& val : expected) {
-      LOG(ERROR) << "expected elem:" << val;
+      MVLOG_ERROR << "expected elem:" << val;
     }
   }
   return allMatch;
@@ -307,7 +308,7 @@ TEST(CircularDequeTest, EmplaceWrapEnd) {
   CircularDeque<int> cd;
   cd.resize(1);
   cd.clear();
-  LOG(ERROR) << "max: " << cd.max_size();
+  MVLOG_ERROR << "max: " << cd.max_size();
   // {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
   // begin_ 0
   // end_ 10

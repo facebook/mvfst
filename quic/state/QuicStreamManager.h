@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/mvfst-config.h>
 
 #include <quic/QuicConstants.h>
@@ -143,8 +144,8 @@ class QuicStreamManager {
     auto refreshResult = refreshTransportSettings(transportSettings);
     if (refreshResult.hasError()) {
       // Constructor cannot return error easily. Log or handle internally.
-      LOG(ERROR) << "Failed initial transport settings refresh: "
-                 << refreshResult.error().message;
+      MVLOG_ERROR << "Failed initial transport settings refresh: "
+                  << refreshResult.error().message;
       // Consider throwing here if construction must fail, or setting an error
       // state. For now, logging is consistent with previous changes.
     }
@@ -245,8 +246,8 @@ class QuicStreamManager {
     auto refreshResult = refreshTransportSettings(transportSettings);
     if (refreshResult.hasError()) {
       // Constructor cannot return error easily. Log or handle internally.
-      LOG(ERROR) << "Failed initial transport settings refresh: "
-                 << refreshResult.error().message;
+      MVLOG_ERROR << "Failed initial transport settings refresh: "
+                  << refreshResult.error().message;
       // Consider throwing here if construction must fail, or setting an error
       // state. For now, logging is consistent with previous changes.
     }

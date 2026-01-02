@@ -11,6 +11,7 @@ mvfst_cpp_library(
     headers = [
         "QuicAsyncUDPSocket.h",
     ],
+    deps = ["//quic/common:mvfst_logging"],
     exported_deps = [
         "//folly:network_address",
         "//folly:range",
@@ -37,6 +38,7 @@ mvfst_cpp_library(
     deps = [
         "//folly:likely",
         "//quic:exception",
+        "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
     ],
     exported_deps = [
@@ -55,6 +57,7 @@ mvfst_cpp_library(
     deps = [
         "//folly/io/async:async_socket_exception",
         "//quic:exception",
+        "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
     ],
     exported_deps = [
@@ -84,6 +87,7 @@ mvfst_cpp_library(
         ":quic_async_udp_socket_impl",
         "//quic:exception",
         "//quic/common:expected",
+        "//quic/common:mvfst_logging",
         "//quic/common:network_data",
         "//quic/common/events:libev_eventbase",
     ],

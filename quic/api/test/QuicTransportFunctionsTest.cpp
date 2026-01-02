@@ -7,6 +7,7 @@
 
 #include <folly/Range.h>
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/QuicPacketBuilder.h>
@@ -2536,7 +2537,7 @@ TEST_F(
                    *stream, folly::IOBuf::copyBuffer("cd"), false /* eof */)
                    .hasError());
   uint64_t frame2Offset = frameLen;
-  LOG(INFO) << "frame2Offset = " << frame2Offset;
+  MVLOG_INFO << "frame2Offset = " << frame2Offset;
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, false /* fin */);
   packet2.packet.frames.push_back(frame2);
@@ -2554,7 +2555,7 @@ TEST_F(
                    *stream, folly::IOBuf::copyBuffer("ef"), false /* eof */)
                    .hasError());
   uint64_t frame3Offset = (frameLen * 2);
-  LOG(INFO) << "frame3Offset = " << frame3Offset;
+  MVLOG_INFO << "frame3Offset = " << frame3Offset;
   auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   WriteStreamFrame frame3(stream->id, frame3Offset, frameLen, false /* fin */);
   packet3.packet.frames.push_back(frame3);

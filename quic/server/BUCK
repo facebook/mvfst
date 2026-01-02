@@ -67,6 +67,7 @@ mvfst_cpp_library(
         "//folly/system:hardware_concurrency",
         "//folly/system:thread_id",
         "//quic/codec:header_codec",
+        "//quic/common:mvfst_logging",
         "//quic/common:optional",
         "//quic/common:socket_util",
         "//quic/congestion_control:bbr",

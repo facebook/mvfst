@@ -6,6 +6,7 @@
  */
 
 #include <quic/codec/QuicWriteCodec.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <algorithm>
 
@@ -69,8 +70,8 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     headerSize += groupIdIntSize.value();
   }
   if (builder.remainingSpaceInPkt() < headerSize) {
-    VLOG(4) << "No space in packet for stream header. stream=" << id
-            << " remaining=" << builder.remainingSpaceInPkt();
+    MVVLOG(4) << "No space in packet for stream header. stream=" << id
+              << " remaining=" << builder.remainingSpaceInPkt();
     return std::nullopt;
   }
   QuicInteger offsetInt(offset);
@@ -116,14 +117,14 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     } else {
       // This should never really happen as dataLen is bounded by the remaining
       // space in the packet which should be << kEightByteLimit.
-      LOG(FATAL) << "Stream frame length too large.";
+      MVLOG_FATAL << "Stream frame length too large.";
     }
   }
   if (dataLenLen > 0) {
     if (dataLen != 0 &&
         headerSize + dataLenLen >= builder.remainingSpaceInPkt()) {
-      VLOG(4) << "No space in packet for stream header. stream=" << id
-              << " remaining=" << builder.remainingSpaceInPkt();
+      MVVLOG(4) << "No space in packet for stream header. stream=" << id
+                << " remaining=" << builder.remainingSpaceInPkt();
       return std::nullopt;
     }
     // We have to encode the actual data length in the header.
@@ -138,8 +139,8 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     return std::nullopt;
   }
   if (builder.remainingSpaceInPkt() < headerSize) {
-    VLOG(4) << "No space in packet for stream header. stream=" << id
-            << " remaining=" << builder.remainingSpaceInPkt();
+    MVVLOG(4) << "No space in packet for stream header. stream=" << id
+              << " remaining=" << builder.remainingSpaceInPkt();
     return std::nullopt;
   }
 
@@ -202,8 +203,8 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
       intFrameTypeRes.value() + offsetIntegerRes.value() + lengthBytes;
 
   if (spaceLeftInPkt <= cryptoFrameHeaderSize) {
-    VLOG(3) << "No space left in packet to write cryptoFrame header of size: "
-            << cryptoFrameHeaderSize << ", space left=" << spaceLeftInPkt;
+    MVVLOG(3) << "No space left in packet to write cryptoFrame header of size: "
+              << cryptoFrameHeaderSize << ", space left=" << spaceLeftInPkt;
     return Optional<WriteCryptoFrame>(std::nullopt);
   }
   size_t spaceRemaining = spaceLeftInPkt - cryptoFrameHeaderSize;
@@ -1456,7 +1457,7 @@ quic::Expected<size_t, QuicError> writeFrame(
       return size_t(0);
     }
     default: {
-      LOG(FATAL) << "Unknown / unsupported frame type received";
+      MVLOG_FATAL << "Unknown / unsupported frame type received";
     }
   }
 }

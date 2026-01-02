@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 #include <quic/QuicConstants.h>
@@ -100,7 +101,7 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
   if (buffer.eof) {
     bufferEofOffset = bufferEndOffset;
   } else if (buffer.data.chainLength() == 0) {
-    VLOG(10) << "Empty stream without EOF";
+    MVVLOG(10) << "Empty stream without EOF";
     return {};
   }
 
@@ -523,7 +524,7 @@ QuicCryptoStream* getCryptoStream(
     case EncryptionLevel::AppData:
       return &cryptoState.oneRttStream;
     default:
-      LOG(FATAL) << "Unhandled EncryptionLevel";
+      MVLOG_FATAL << "Unhandled EncryptionLevel";
   }
   folly::assume_unreachable();
 }

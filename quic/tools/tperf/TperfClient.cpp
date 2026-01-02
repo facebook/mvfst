@@ -9,6 +9,7 @@
 
 #include <fizz/crypto/Utils.h>
 #include <folly/io/async/AsyncUDPSocket.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
@@ -57,18 +58,19 @@ TPerfClient::TPerfClient(
 void TPerfClient::timeoutExpired() noexcept {
   quicClient_->closeNow(std::nullopt);
   constexpr double bytesPerMegabit = 131072;
-  LOG(INFO) << "Received " << receivedBytes_ << " bytes in "
-            << duration_.count() << " seconds.";
-  LOG(INFO) << "Overall throughput: "
-            << (receivedBytes_ / bytesPerMegabit) / duration_.count() << "Mb/s";
+  MVLOG_INFO << "Received " << receivedBytes_ << " bytes in "
+             << duration_.count() << " seconds.";
+  MVLOG_INFO << "Overall throughput: "
+             << (receivedBytes_ / bytesPerMegabit) / duration_.count()
+             << "Mb/s";
   // Per Stream Stats
-  LOG(INFO) << "Average per Stream throughput: "
-            << ((receivedBytes_ / receivedStreams_) / bytesPerMegabit) /
+  MVLOG_INFO << "Average per Stream throughput: "
+             << ((receivedBytes_ / receivedStreams_) / bytesPerMegabit) /
           duration_.count()
-            << "Mb/s over " << receivedStreams_ << " streams";
+             << "Mb/s over " << receivedStreams_ << " streams";
   if (receivedStreams_ != 1) {
-    LOG(INFO) << "Histogram per Stream bytes: " << std::endl;
-    LOG(INFO) << "Lo\tHi\tNum\tSum";
+    MVLOG_INFO << "Histogram per Stream bytes: " << std::endl;
+    MVLOG_INFO << "Lo\tHi\tNum\tSum";
     for (const auto bytes : bytesPerStream_) {
       bytesPerStreamHistogram_.addValue(bytes.second);
     }
@@ -77,11 +79,11 @@ void TPerfClient::timeoutExpired() noexcept {
     std::vector<std::string> lines;
     folly::split('\n', os.str(), lines);
     for (const auto& line : lines) {
-      LOG(INFO) << line;
+      MVLOG_INFO << line;
     }
-    LOG(INFO) << "Per stream bytes breakdown: ";
+    MVLOG_INFO << "Per stream bytes breakdown: ";
     for (const auto& [k, v] : bytesPerStream_) {
-      LOG(INFO) << fmt::format("stream: {}, bytes: {}", k, v);
+      MVLOG_INFO << fmt::format("stream: {}, bytes: {}", k, v);
     }
   }
 }
@@ -89,8 +91,8 @@ void TPerfClient::timeoutExpired() noexcept {
 void TPerfClient::readAvailable(quic::StreamId streamId) noexcept {
   auto readData = quicClient_->read(streamId, 0);
   if (readData.hasError()) {
-    LOG(FATAL) << "TPerfClient failed read from stream=" << streamId
-               << ", error=" << (uint32_t)readData.error();
+    MVLOG_FATAL << "TPerfClient failed read from stream=" << streamId
+                << ", error=" << (uint32_t)readData.error();
   }
 
   auto readBytes = readData->first->computeChainDataLength();
@@ -112,12 +114,12 @@ void TPerfClient::readError(
 }
 
 void TPerfClient::onNewBidirectionalStream(quic::StreamId id) noexcept {
-  LOG(INFO) << "TPerfClient: new bidirectional stream=" << id;
+  MVLOG_INFO << "TPerfClient: new bidirectional stream=" << id;
   quicClient_->setReadCallback(id, this);
 }
 
 void TPerfClient::onNewUnidirectionalStream(quic::StreamId id) noexcept {
-  VLOG(5) << "TPerfClient: new unidirectional stream=" << id;
+  MVVLOG(5) << "TPerfClient: new unidirectional stream=" << id;
   if (!timerScheduled_) {
     timerScheduled_ = true;
     fEvb_.timer().scheduleTimeout(this, duration_);
@@ -127,17 +129,17 @@ void TPerfClient::onNewUnidirectionalStream(quic::StreamId id) noexcept {
 }
 
 void TPerfClient::onTransportReady() noexcept {
-  LOG(INFO) << "TPerfClient: onTransportReady";
+  MVLOG_INFO << "TPerfClient: onTransportReady";
 }
 
 void TPerfClient::onStopSending(
     quic::StreamId id,
     quic::ApplicationErrorCode /*error*/) noexcept {
-  VLOG(10) << "TPerfClient got StopSending stream id=" << id;
+  MVVLOG(10) << "TPerfClient got StopSending stream id=" << id;
 }
 
 void TPerfClient::onConnectionEnd() noexcept {
-  LOG(INFO) << "TPerfClient connection end";
+  MVLOG_INFO << "TPerfClient connection end";
 
   fEvb_.terminateLoopSoon();
 }
@@ -147,22 +149,22 @@ void TPerfClient::onConnectionSetupError(QuicError error) noexcept {
 }
 
 void TPerfClient::onConnectionError(QuicError error) noexcept {
-  LOG(ERROR) << "TPerfClient error: " << toString(error.code);
+  MVLOG_ERROR << "TPerfClient error: " << toString(error.code);
   fEvb_.terminateLoopSoon();
 }
 
 void TPerfClient::onStreamWriteReady(
     quic::StreamId id,
     uint64_t maxToSend) noexcept {
-  LOG(INFO) << "TPerfClient stream" << id
-            << " is write ready with maxToSend=" << maxToSend;
+  MVLOG_INFO << "TPerfClient stream" << id
+             << " is write ready with maxToSend=" << maxToSend;
 }
 
 void TPerfClient::onStreamWriteError(
     quic::StreamId id,
     QuicError error) noexcept {
-  LOG(ERROR) << "TPerfClient write error with stream=" << id
-             << " error=" << toString(error);
+  MVLOG_ERROR << "TPerfClient write error with stream=" << id
+              << " error=" << toString(error);
 }
 
 void TPerfClient::start() {
@@ -210,7 +212,7 @@ void TPerfClient::start() {
   }
 
   if (useAckReceiveTimestamps_) {
-    LOG(INFO) << " Using ACK receive timestamps on client";
+    MVLOG_INFO << " Using ACK receive timestamps on client";
 
     settings.maybeAckReceiveTimestampsConfigSentToPeer = {
         .maxReceiveTimestampsPerAck = maxAckReceiveTimestampsToSend_,
@@ -234,7 +236,7 @@ void TPerfClient::start() {
 
   quicClient_->setTransportSettings(settings);
 
-  LOG(INFO) << "TPerfClient connecting to " << addr.describe();
+  MVLOG_INFO << "TPerfClient connecting to " << addr.describe();
   quicClient_->start(this, this);
   fEvb_.loopForever();
 }

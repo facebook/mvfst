@@ -41,6 +41,7 @@ mvfst_cpp_library(
         "//quic/common:time_util",
     ],
     exported_deps = [
+        "//quic/common:mvfst_logging",
         "//quic/state:quic_state_machine",
     ],
 )
@@ -74,7 +75,7 @@ mvfst_cpp_library(
             ":copa",
             ":cubic",
         ],
-    }),
+    }) + ["//quic/common:mvfst_logging"],
     exported_deps = [
         "//quic:constants",
     ],
@@ -134,6 +135,7 @@ mvfst_cpp_library(
     deps = [
         ":ecn_l4s_tracker",
         "//folly:chrono",
+        "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
         "//quic/state:state_functions",
     ],
@@ -156,6 +158,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":congestion_control_functions",
+        "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
     ],
     exported_deps = [
@@ -176,6 +179,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":congestion_control_functions",
+        "//quic/common:mvfst_logging",
         "//quic/common:time_util",
         "//quic/logging:qlogger_constants",
     ],
@@ -199,6 +203,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":congestion_control_functions",
+        "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
     ],
     exported_deps = [
@@ -244,6 +249,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":congestion_control_functions",
+        "//quic/common:mvfst_logging",
     ],
     exported_deps = [
         ":bandwidth",

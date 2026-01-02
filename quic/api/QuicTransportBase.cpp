@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicTransportBase.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <folly/Chrono.h>
 #include <folly/ScopeGuard.h>
@@ -94,7 +95,8 @@ void QuicTransportBase::closeGracefully() {
   }
 
   // Stop reads and cancel all the app callbacks.
-  VLOG(10) << "Stopping read and peek loopers due to graceful close " << *this;
+  MVVLOG(10) << "Stopping read and peek loopers due to graceful close "
+             << *this;
   readLooper_->stop();
   peekLooper_->stop();
   cancelAllAppCallbacks(
@@ -122,13 +124,13 @@ quic::Expected<size_t, LocalErrorCode> QuicTransportBase::getStreamWriteOffset(
     }
     return stream->currentWriteOffset;
   } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(ex.errorCode());
   } catch (const QuicTransportException& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const std::exception& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
 }
@@ -145,13 +147,13 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
     }
     return stream->pendingWrites.chainLength();
   } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(ex.errorCode());
   } catch (const QuicTransportException& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const std::exception& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
   }
 }
@@ -226,13 +228,13 @@ void QuicTransportBase::unsetAllDeliveryCallbacks() {
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::pauseRead(StreamId id) {
-  VLOG(4) << __func__ << " " << *this << " stream=" << id;
+  MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
   return pauseOrResumeRead(id, false);
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::resumeRead(
     StreamId id) {
-  VLOG(4) << __func__ << " " << *this << " stream=" << id;
+  MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
   return pauseOrResumeRead(id, true);
 }
 
@@ -274,8 +276,8 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setPeekCallback(
 quic::Expected<void, LocalErrorCode> QuicTransportBase::setPeekCallbackInternal(
     StreamId id,
     PeekCallback* cb) noexcept {
-  VLOG(4) << "Setting setPeekCallback for stream=" << id << " cb=" << cb << " "
-          << *this;
+  MVVLOG(4) << "Setting setPeekCallback for stream=" << id << " cb=" << cb
+            << " " << *this;
   auto peekCbIt = peekCallbacks_.find(id);
   if (peekCbIt == peekCallbacks_.end()) {
     // Don't allow initial setting of a nullptr callback.
@@ -285,8 +287,8 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setPeekCallbackInternal(
     peekCbIt = peekCallbacks_.emplace(id, PeekCallbackData(cb)).first;
   }
   if (!cb) {
-    VLOG(10) << "Resetting the peek callback to nullptr " << "stream=" << id
-             << " peekCb=" << peekCbIt->second.peekCb;
+    MVVLOG(10) << "Resetting the peek callback to nullptr " << "stream=" << id
+               << " peekCb=" << peekCbIt->second.peekCb;
   }
   peekCbIt->second.peekCb = cb;
   updatePeekLooper();
@@ -294,13 +296,13 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setPeekCallbackInternal(
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::pausePeek(StreamId id) {
-  VLOG(4) << __func__ << " " << *this << " stream=" << id;
+  MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
   return pauseOrResumePeek(id, false);
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::resumePeek(
     StreamId id) {
-  VLOG(4) << __func__ << " " << *this << " stream=" << id;
+  MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
   return pauseOrResumePeek(id, true);
 }
 
@@ -415,20 +417,20 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
     }
     return {};
   } catch (const QuicTransportException& ex) {
-    VLOG(4) << "consume() error " << ex.what() << " " << *this;
+    MVVLOG(4) << "consume() error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("consume() error")));
     return quic::make_unexpected(
         ConsumeError{LocalErrorCode::TRANSPORT_ERROR, readOffset});
   } catch (const QuicInternalException& ex) {
-    VLOG(4) << __func__ << " " << ex.what() << " " << *this;
+    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("consume() error")));
     return quic::make_unexpected(ConsumeError{ex.errorCode(), readOffset});
   } catch (const std::exception& ex) {
-    VLOG(4) << "consume() error " << ex.what() << " " << *this;
+    MVVLOG(4) << "consume() error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
@@ -489,7 +491,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setPingCallback(
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  VLOG(4) << "Setting ping callback " << " cb=" << cb << " " << *this;
+  MVVLOG(4) << "Setting ping callback " << " cb=" << cb << " " << *this;
 
   pingCallback_ = cb;
   return {};
@@ -584,7 +586,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setDatagramCallback(
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  VLOG(4) << "Setting datagram callback " << " cb=" << cb << " " << *this;
+  MVVLOG(4) << "Setting datagram callback " << " cb=" << cb << " " << *this;
 
   datagramCallback_ = cb;
   updateReadLooper();
@@ -707,7 +709,7 @@ bool QuicTransportBase::isDetachable() {
 }
 
 void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
-  VLOG(10) << __func__ << " " << *this;
+  MVVLOG(10) << __func__ << " " << *this;
   DCHECK(!getEventBase());
   DCHECK(evbIn && evbIn->isInEventBaseThread());
   evb_ = std::move(evbIn);
@@ -739,7 +741,7 @@ void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
 }
 
 void QuicTransportBase::detachEventBase() {
-  VLOG(10) << __func__ << " " << *this;
+  MVVLOG(10) << __func__ << " " << *this;
   DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   if (socket_) {
     socket_->detachEventBase();
@@ -866,37 +868,37 @@ QuicTransportBase::setStreamGroupRetransmissionPolicy(
 
 void QuicTransportBase::updatePeekLooper() {
   if (peekCallbacks_.empty() || closeState_ != CloseState::OPEN) {
-    VLOG(10) << "Stopping peek looper " << *this;
+    MVVLOG(10) << "Stopping peek looper " << *this;
     peekLooper_->stop();
     return;
   }
-  VLOG(10) << "Updating peek looper, has "
-           << conn_->streamManager->peekableStreams().size()
-           << " peekable streams";
+  MVVLOG(10) << "Updating peek looper, has "
+             << conn_->streamManager->peekableStreams().size()
+             << " peekable streams";
   auto iter = std::find_if(
       conn_->streamManager->peekableStreams().begin(),
       conn_->streamManager->peekableStreams().end(),
       [&peekCallbacks = peekCallbacks_](StreamId s) {
-        VLOG(10) << "Checking stream=" << s;
+        MVVLOG(10) << "Checking stream=" << s;
         auto peekCb = peekCallbacks.find(s);
         if (peekCb == peekCallbacks.end()) {
-          VLOG(10) << "No peek callbacks for stream=" << s;
+          MVVLOG(10) << "No peek callbacks for stream=" << s;
           return false;
         }
         if (!peekCb->second.resumed) {
-          VLOG(10) << "peek callback for stream=" << s << " not resumed";
+          MVVLOG(10) << "peek callback for stream=" << s << " not resumed";
         }
 
         if (!peekCb->second.peekCb) {
-          VLOG(10) << "no peekCb in peekCb stream=" << s;
+          MVVLOG(10) << "no peekCb in peekCb stream=" << s;
         }
         return peekCb->second.peekCb && peekCb->second.resumed;
       });
   if (iter != conn_->streamManager->peekableStreams().end()) {
-    VLOG(10) << "Scheduling peek looper " << *this;
+    MVVLOG(10) << "Scheduling peek looper " << *this;
     peekLooper_->run();
   } else {
-    VLOG(10) << "Stopping peek looper " << *this;
+    MVVLOG(10) << "Stopping peek looper " << *this;
     peekLooper_->stop();
   }
 }
@@ -920,8 +922,8 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
       peekableStreams.begin(),
       peekableStreams.end(),
       std::back_inserter(peekableStreamsCopy));
-  VLOG(10) << __func__
-           << " peekableListCopy.size()=" << peekableStreamsCopy.size();
+  MVVLOG(10) << __func__
+             << " peekableListCopy.size()=" << peekableStreamsCopy.size();
   for (StreamId streamId : peekableStreamsCopy) {
     auto callback = peekCallbacks_.find(streamId);
     // This is a likely bug. Need to think more on whether events can
@@ -931,20 +933,20 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
     // reads the data.
     conn_->streamManager->peekableStreams().erase(streamId);
     if (callback == peekCallbacks_.end()) {
-      VLOG(10) << " No peek callback for stream=" << streamId;
+      MVVLOG(10) << " No peek callback for stream=" << streamId;
       continue;
     }
     auto peekCb = callback->second.peekCb;
     auto stream = CHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     if (peekCb && stream->streamReadError) {
-      VLOG(10) << "invoking peek error callbacks on stream=" << streamId << " "
-               << *this;
+      MVVLOG(10) << "invoking peek error callbacks on stream=" << streamId
+                 << " " << *this;
       peekCb->peekError(streamId, QuicError(*stream->streamReadError));
     } else if (
         peekCb && !stream->streamReadError && stream->hasPeekableData()) {
-      VLOG(10) << "invoking peek callbacks on stream=" << streamId << " "
-               << *this;
+      MVVLOG(10) << "invoking peek callbacks on stream=" << streamId << " "
+                 << *this;
 
       peekDataFromQuicStream(
           *stream,
@@ -952,7 +954,7 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
             peekCb->onDataAvailable(id, peekRange);
           });
     } else {
-      VLOG(10) << "Not invoking peek callbacks on stream=" << streamId;
+      MVVLOG(10) << "Not invoking peek callbacks on stream=" << streamId;
     }
   }
 }
@@ -988,7 +990,7 @@ void QuicTransportBase::pingTimeoutExpired() noexcept {
 }
 
 void QuicTransportBase::cleanupPeekPingDatagramResources() {
-  VLOG(10) << "Stopping peek looper due to close " << *this;
+  MVVLOG(10) << "Stopping peek looper due to close " << *this;
   peekLooper_->stop();
   cancelTimeout(&pingTimeout_);
 }

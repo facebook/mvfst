@@ -23,6 +23,7 @@ mvfst_cpp_library(
         "//folly/io:iobuf",
         "//quic:config",
         "//quic:constants",
+        "//quic/common:mvfst_logging",
         "//quic/common/events:eventbase",
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/state:quic_state_machine",
@@ -74,6 +75,7 @@ mvfst_cpp_library(
         ":quic_batch_writer",
         "//folly:chrono",
         "//folly:scope_guard",
+        "//quic/common:mvfst_logging",
         "//quic/common:time_util",
         "//quic/logging:qlogger_constants",
         "//quic/loss:loss",
@@ -128,6 +130,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":loop_detector_callback",
+        "//quic/common:mvfst_logging",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/congestion_control:ecn_l4s_tracker",
         "//quic/congestion_control:pacer_factory",
@@ -182,6 +185,7 @@ mvfst_cpp_library(
     deps = [
         "//folly/tracing:static_tracepoint",
         "//quic/common:buf_accessor",
+        "//quic/common:mvfst_logging",
         "//quic/common:socket_util",
         "//quic/common:string_utils",
         "//quic/happyeyeballs:happyeyeballs",
@@ -231,6 +235,7 @@ mvfst_cpp_library(
         "QuicStreamAsyncTransport.h",
     ],
     deps = [
+        "//quic/common:mvfst_logging",
         "//quic/common/events:folly_eventbase",
     ],
     exported_deps = [

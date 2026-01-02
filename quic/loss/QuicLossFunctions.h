@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/Optional.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
@@ -122,11 +123,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    */
   if (!hasDataToWrite && conn.outstandings.clonedPacketIdentifiers.empty() &&
       totalPacketsOutstanding == conn.outstandings.numClonedPackets()) {
-    VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
-             << " outstanding=" << totalPacketsOutstanding
-             << " handshakePackets="
-             << conn.outstandings.packetCount[PacketNumberSpace::Handshake]
-             << " " << conn;
+    MVVLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
+               << " outstanding=" << totalPacketsOutstanding
+               << " handshakePackets="
+               << conn.outstandings.packetCount[PacketNumberSpace::Handshake]
+               << " " << conn;
     conn.pendingEvents.setLossDetectionAlarm = false;
     timeout.cancelLossTimeout();
     return;
@@ -140,12 +141,12 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   if (conn.lossState.currentAlarmMethod ==
           LossState::AlarmMethod::EarlyRetransmitOrReordering &&
       !earliestLossTimer(conn).first) {
-    VLOG(10) << __func__
-             << " unset alarm due to invalidated early retran timer";
+    MVVLOG(10) << __func__
+               << " unset alarm due to invalidated early retran timer";
     timeout.cancelLossTimeout();
   }
   if (!conn.pendingEvents.setLossDetectionAlarm) {
-    VLOG_IF(10, !timeout.isLossTimeoutScheduled())
+    MVVLOG_IF(10, !timeout.isLossTimeoutScheduled())
         << __func__ << " alarm not scheduled"
         << " outstanding=" << totalPacketsOutstanding << " initialPackets="
         << conn.outstandings.packetCount[PacketNumberSpace::Initial]
@@ -157,19 +158,19 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   timeout.cancelLossTimeout();
   auto alarmDuration = calculateAlarmDuration<ClockType>(conn);
   conn.lossState.currentAlarmMethod = alarmDuration.second;
-  VLOG(10) << __func__ << " setting transmission"
-           << " alarm=" << alarmDuration.first.count() << "ms"
-           << " method=" << conn.lossState.currentAlarmMethod
-           << " haDataToWrite=" << hasDataToWrite
-           << " outstanding=" << totalPacketsOutstanding
-           << " outstanding clone=" << conn.outstandings.numClonedPackets()
-           << " clonedPacketIdentifiers="
-           << conn.outstandings.clonedPacketIdentifiers.size()
-           << " initialPackets="
-           << conn.outstandings.packetCount[PacketNumberSpace::Initial]
-           << " handshakePackets="
-           << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
-           << nodeToString(conn.nodeType) << " " << conn;
+  MVVLOG(10) << __func__ << " setting transmission"
+             << " alarm=" << alarmDuration.first.count() << "ms"
+             << " method=" << conn.lossState.currentAlarmMethod
+             << " haDataToWrite=" << hasDataToWrite
+             << " outstanding=" << totalPacketsOutstanding
+             << " outstanding clone=" << conn.outstandings.numClonedPackets()
+             << " clonedPacketIdentifiers="
+             << conn.outstandings.clonedPacketIdentifiers.size()
+             << " initialPackets="
+             << conn.outstandings.packetCount[PacketNumberSpace::Initial]
+             << " handshakePackets="
+             << conn.outstandings.packetCount[PacketNumberSpace::Handshake]
+             << " " << nodeToString(conn.nodeType) << " " << conn;
   timeout.scheduleLossTimeout(alarmDuration.first);
   conn.pendingEvents.setLossDetectionAlarm = false;
 }
@@ -219,7 +220,8 @@ template <class ClockType = Clock>
     const LossVisitor& lossVisitor) {
   auto now = ClockType::now();
   if (conn.outstandings.packets.empty()) {
-    VLOG(10) << "Transmission alarm fired with no outstanding packets " << conn;
+    MVVLOG(10) << "Transmission alarm fired with no outstanding packets "
+               << conn;
     return {};
   }
   if (conn.lossState.currentAlarmMethod ==
@@ -251,14 +253,14 @@ template <class ClockType = Clock>
   }
   conn.pendingEvents.setLossDetectionAlarm =
       conn.outstandings.numOutstanding() > 0;
-  VLOG(10) << __func__ << " setLossDetectionAlarm="
-           << conn.pendingEvents.setLossDetectionAlarm
-           << " outstanding=" << conn.outstandings.numOutstanding()
-           << " initialPackets="
-           << conn.outstandings.packetCount[PacketNumberSpace::Initial]
-           << " handshakePackets="
-           << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
-           << conn;
+  MVVLOG(10) << __func__ << " setLossDetectionAlarm="
+             << conn.pendingEvents.setLossDetectionAlarm
+             << " outstanding=" << conn.outstandings.numOutstanding()
+             << " initialPackets="
+             << conn.outstandings.packetCount[PacketNumberSpace::Initial]
+             << " handshakePackets="
+             << conn.outstandings.packetCount[PacketNumberSpace::Handshake]
+             << " " << conn;
   return {};
 }
 
@@ -340,7 +342,7 @@ template <class ClockType = Clock>
     conn.congestionController->onRemoveBytesFromInflight(
         conn.lossState.inflightBytes);
   }
-  VLOG(10) << __func__ << " marked=" << lossEvent.lostPackets;
+  MVVLOG(10) << __func__ << " marked=" << lossEvent.lostPackets;
   return {};
 }
 

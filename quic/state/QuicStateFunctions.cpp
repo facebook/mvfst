@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/QuicStateFunctions.h>
 
 #include <quic/common/TimeUtil.h>
@@ -129,29 +130,30 @@ void updateAckSendStateOnRecvPacket(
     if ((pktHasCryptoData && !skipCryptoAck) || exceedsReorderThreshold ||
         ++ackState.numRxPacketsRecvd + ackState.numNonRxPacketsRecvd >=
             thresh) {
-      VLOG(10) << conn
-               << " ack immediately because packet threshold pktHasCryptoData="
-               << pktHasCryptoData << " pktHasRetransmittableData="
-               << static_cast<int>(pktHasRetransmittableData)
-               << " numRxPacketsRecvd="
-               << static_cast<int>(ackState.numRxPacketsRecvd)
-               << " numNonRxPacketsRecvd="
-               << static_cast<int>(ackState.numNonRxPacketsRecvd);
+      MVVLOG(10)
+          << conn
+          << " ack immediately because packet threshold pktHasCryptoData="
+          << pktHasCryptoData << " pktHasRetransmittableData="
+          << static_cast<int>(pktHasRetransmittableData)
+          << " numRxPacketsRecvd="
+          << static_cast<int>(ackState.numRxPacketsRecvd)
+          << " numNonRxPacketsRecvd="
+          << static_cast<int>(ackState.numNonRxPacketsRecvd);
       conn.pendingEvents.scheduleAckTimeout = false;
       ackState.needsToSendAckImmediately = true;
     } else if (!ackState.needsToSendAckImmediately) {
-      VLOG(10) << conn << " scheduling ack timeout pktHasCryptoData="
-               << pktHasCryptoData << " pktHasRetransmittableData="
-               << static_cast<int>(pktHasRetransmittableData)
-               << " numRxPacketsRecvd="
-               << static_cast<int>(ackState.numRxPacketsRecvd)
-               << " numNonRxPacketsRecvd="
-               << static_cast<int>(ackState.numNonRxPacketsRecvd);
+      MVVLOG(10) << conn << " scheduling ack timeout pktHasCryptoData="
+                 << pktHasCryptoData << " pktHasRetransmittableData="
+                 << static_cast<int>(pktHasRetransmittableData)
+                 << " numRxPacketsRecvd="
+                 << static_cast<int>(ackState.numRxPacketsRecvd)
+                 << " numNonRxPacketsRecvd="
+                 << static_cast<int>(ackState.numNonRxPacketsRecvd);
       conn.pendingEvents.scheduleAckTimeout = true;
     }
   } else if (
       ++ackState.numNonRxPacketsRecvd + ackState.numRxPacketsRecvd >= thresh) {
-    VLOG(10)
+    MVVLOG(10)
         << conn
         << " ack immediately because exceeds nonrx threshold numNonRxPacketsRecvd="
         << static_cast<int>(ackState.numNonRxPacketsRecvd)
@@ -167,7 +169,7 @@ void updateAckSendStateOnRecvPacket(
 }
 
 void updateAckStateOnAckTimeout(QuicConnectionStateBase& conn) {
-  VLOG(10) << conn << " ack immediately due to ack timeout";
+  MVVLOG(10) << conn << " ack immediately due to ack timeout";
   conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
   conn.ackStates.appDataAckState.numRxPacketsRecvd = 0;
   conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 0;
@@ -178,7 +180,8 @@ void updateAckSendStateOnSentPacketWithAcks(
     QuicConnectionStateBase& conn,
     AckState& ackState,
     PacketNum largestAckScheduled) {
-  VLOG(10) << conn << " unset ack immediately due to sending packet with acks";
+  MVVLOG(10) << conn
+             << " unset ack immediately due to sending packet with acks";
   conn.pendingEvents.scheduleAckTimeout = false;
   ackState.needsToSendAckImmediately = false;
   // When we send an ack we're most likely going to ack the largest received

@@ -5,8 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
+#include <quic/QuicException.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/Optional.h>
 #include <quic/common/StringUtils.h>
 #include <quic/common/udpsocket/LibevQuicAsyncUDPSocket.h>
@@ -39,8 +40,8 @@ LibevQuicAsyncUDPSocket::~LibevQuicAsyncUDPSocket() {
     // Use quic::Expected result even in destructor? Best effort close.
     auto closeResult = LibevQuicAsyncUDPSocket::close();
     if (closeResult.hasError()) {
-      LOG(ERROR) << "Error closing socket in destructor: "
-                 << closeResult.error().message;
+      MVLOG_ERROR << "Error closing socket in destructor: "
+                  << closeResult.error().message;
     }
   }
   if (evb_) {
@@ -91,7 +92,7 @@ ssize_t LibevQuicAsyncUDPSocket::write(
   if (fd_ == -1) {
     // Return error consistent with syscall failure on bad FD
     errno = EBADF;
-    LOG(ERROR)
+    MVLOG_ERROR
         << "LibevQuicAsyncUDPSocket::write failed: socket not initialized";
     return -1;
   }
@@ -108,7 +109,7 @@ ssize_t LibevQuicAsyncUDPSocket::write(
       // Return error consistent with syscall failure for wrong address on
       // connected socket
       errno = EINVAL; // Or maybe EISCONN? EINVAL seems appropriate.
-      LOG(ERROR)
+      MVLOG_ERROR
           << "LibevQuicAsyncUDPSocket::write failed: wrong destination for connected socket";
       return -1;
     }
@@ -135,13 +136,13 @@ int LibevQuicAsyncUDPSocket::writem(
     iovec* /*iov*/,
     size_t* /*numIovecsInBuffer*/,
     size_t /*count*/) {
-  LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
+  MVLOG_FATAL << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
     std::function<Optional<folly::SocketCmsgMap>()>&&
     /* additionalCmsgsFunc */) {
-  LOG(WARNING)
+  MVLOG_WARNING
       << "Setting an additional cmsgs function is not implemented for LibevQuicAsyncUDPSocket";
   // Return success despite warning, or error if strictness needed
   return {};
@@ -169,7 +170,7 @@ const folly::SocketAddress& LibevQuicAsyncUDPSocket::addressRef() const {
 
 void LibevQuicAsyncUDPSocket::attachEventBase(
     std::shared_ptr<QuicEventBase> /* evb */) {
-  LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
+  MVLOG_FATAL << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
 }
 
 [[nodiscard]] std::shared_ptr<QuicEventBase>
@@ -208,7 +209,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::close() {
 }
 
 void LibevQuicAsyncUDPSocket::detachEventBase() {
-  LOG(FATAL) << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
+  MVLOG_FATAL << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setCmsgs(
@@ -594,12 +595,12 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setFD(
   // TODO: Check if fd is valid? setsockopt?
   // TODO: Close existing fd_ if owned?
   if (fd_ != -1 && ownership_ == FDOwnership::OWNS) {
-    LOG(WARNING) << "Closing existing owned FD in setFD";
+    MVLOG_WARNING << "Closing existing owned FD in setFD";
     auto closeRes = close(); // Close existing owned FD
     if (closeRes.hasError()) {
       // Log error but continue trying to set the new FD
-      LOG(ERROR) << "Failed to close existing FD in setFD: "
-                 << closeRes.error().message;
+      MVLOG_ERROR << "Failed to close existing FD in setFD: "
+                  << closeRes.error().message;
     }
   }
 
@@ -680,15 +681,15 @@ size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
   size_t num = 0;
   while (fd_ != -1) {
     ret = ::recvmsg(fd_, &msg, MSG_ERRQUEUE);
-    VLOG(5)
+    MVVLOG(5)
         << "LibevQuicAsyncUDPSocket::handleSocketErrors(): recvmsg returned "
         << ret;
 
     if (ret < 0) {
       if (errno != EAGAIN) {
         auto errnoCopy = errno;
-        LOG(ERROR) << "::recvmsg exited with code " << ret
-                   << ", errno: " << errnoCopy;
+        MVLOG_ERROR << "::recvmsg exited with code " << ret
+                    << ", errno: " << errnoCopy;
         folly::AsyncSocketException ex(
             folly::AsyncSocketException::INTERNAL_ERROR,
             "MSG_ERRQUEUE recvmsg() failed",

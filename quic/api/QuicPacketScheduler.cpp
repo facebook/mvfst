@@ -8,6 +8,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicPacketScheduler.h>
 #include <quic/common/BufAccessor.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <cstdint>
 
@@ -438,10 +439,10 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
     if (dataLen) {
       wroteStreamFrame = true;
       writeStreamFrameData(builder, buffer->data, *dataLen);
-      VLOG(4) << "Wrote loss data for stream=" << stream.id
-              << " offset=" << buffer->offset << " bytes=" << *dataLen
-              << " fin=" << (buffer->eof && *dataLen == bufferLen) << " "
-              << conn_;
+      MVVLOG(4) << "Wrote loss data for stream=" << stream.id
+                << " offset=" << buffer->offset << " bytes=" << *dataLen
+                << " fin=" << (buffer->eof && *dataLen == bufferLen) << " "
+                << conn_;
     } else {
       // Either we filled the packet or ran out of data for this stream (EOF?)
       break;
@@ -691,11 +692,11 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
     return false;
   }
   writeStreamFrameData(builder, stream.pendingWrites, *dataLen);
-  VLOG(4) << "Wrote stream frame stream=" << stream.id
-          << " offset=" << stream.currentWriteOffset
-          << " bytesWritten=" << *dataLen
-          << " finWritten=" << (canWriteFin && *dataLen == bufferLen) << " "
-          << conn_;
+  MVVLOG(4) << "Wrote stream frame stream=" << stream.id
+            << " offset=" << stream.currentWriteOffset
+            << " bytesWritten=" << *dataLen
+            << " finWritten=" << (canWriteFin && *dataLen == bufferLen) << " "
+            << conn_;
   connWritableBytes -= dataLen.value();
   return true;
 }
@@ -855,7 +856,7 @@ quic::Expected<void, QuicError> WindowUpdateScheduler::writeWindowUpdates(
       return quic::make_unexpected(bytesResult.error());
     }
     if (bytesResult.value()) {
-      VLOG(4) << "Wrote max_data=" << maximumData << " " << conn_;
+      MVVLOG(4) << "Wrote max_data=" << maximumData << " " << conn_;
     }
   }
   for (const auto& windowUpdateStream : conn_.streamManager->windowUpdates()) {
@@ -872,8 +873,8 @@ quic::Expected<void, QuicError> WindowUpdateScheduler::writeWindowUpdates(
     if (!bytesResult.value()) {
       break;
     }
-    VLOG(4) << "Wrote max_stream_data stream=" << stream->id
-            << " maximumData=" << maximumData << " " << conn_;
+    MVVLOG(4) << "Wrote max_stream_data stream=" << stream->id
+              << " maximumData=" << maximumData << " " << conn_;
   }
   return {};
 }
@@ -935,8 +936,8 @@ quic::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
     if (!res.value()) {
       return cryptoDataWritten;
     }
-    VLOG(4) << "Wrote retransmitted crypto" << " offset=" << buffer.offset
-            << " bytes=" << res.value()->len << " " << conn_;
+    MVVLOG(4) << "Wrote retransmitted crypto" << " offset=" << buffer.offset
+              << " bytes=" << res.value()->len << " " << conn_;
     cryptoDataWritten = true;
   }
 
@@ -947,9 +948,9 @@ quic::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
       return quic::make_unexpected(res.error());
     }
     if (res.value()) {
-      VLOG(4) << "Wrote crypto frame"
-              << " offset=" << cryptoStream_.currentWriteOffset
-              << " bytesWritten=" << res.value()->len << " " << conn_;
+      MVVLOG(4) << "Wrote crypto frame"
+                << " offset=" << cryptoStream_.currentWriteOffset
+                << " bytesWritten=" << res.value()->len << " " << conn_;
       cryptoDataWritten = true;
     }
   }

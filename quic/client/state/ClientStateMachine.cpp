@@ -7,6 +7,7 @@
 
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/Types.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/loss/QuicLossFunctions.h>
 
 #include <quic/QuicConstants.h>
@@ -102,15 +103,15 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
     auto pathIdRes = newConn->pathManager->addValidatedPath(
         currentPath->localAddress, currentPath->peerAddress);
     if (pathIdRes.hasError()) {
-      LOG(FATAL) << "error adding validated path to a retry connection. "
-                 << toString(pathIdRes.error());
+      MVLOG_FATAL << "error adding validated path to a retry connection. "
+                  << toString(pathIdRes.error());
     }
     newConn->currentPathId = pathIdRes.value();
     if (newConn->serverConnectionId.has_value()) {
       auto setCidRes = newConn->pathManager->setDestinationCidForPath(
           newConn->currentPathId, newConn->serverConnectionId.value());
       if (setCidRes.hasError()) {
-        LOG(FATAL)
+        MVLOG_FATAL
             << "error setting destination connection id in a retry connection. "
             << toString(setCidRes.error());
       }
@@ -119,7 +120,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
 
   auto result = markZeroRttPacketsLost(*newConn, markPacketLoss);
   if (result.hasError()) {
-    LOG(FATAL) << "error marking packets lost. " << toString(result.error());
+    MVLOG_FATAL << "error marking packets lost. " << toString(result.error());
   }
 
   return newConn;
@@ -358,14 +359,14 @@ quic::Expected<void, QuicError> processServerInitialParams(
             *packetSize)));
   }
 
-  VLOG(10) << "Client advertised flow control ";
-  VLOG(10) << "conn=" << maxData.value_or(0);
-  VLOG(10) << " stream bidi local=" << maxStreamDataBidiLocal.value_or(0)
-           << " ";
-  VLOG(10) << " stream bidi remote=" << maxStreamDataBidiRemote.value_or(0)
-           << " ";
-  VLOG(10) << " stream uni=" << maxStreamDataUni.value_or(0) << " ";
-  VLOG(10) << conn;
+  MVVLOG(10) << "Client advertised flow control ";
+  MVVLOG(10) << "conn=" << maxData.value_or(0);
+  MVVLOG(10) << " stream bidi local=" << maxStreamDataBidiLocal.value_or(0)
+             << " ";
+  MVVLOG(10) << " stream bidi remote=" << maxStreamDataBidiRemote.value_or(0)
+             << " ";
+  MVVLOG(10) << " stream uni=" << maxStreamDataUni.value_or(0) << " ";
+  MVVLOG(10) << conn;
   conn.flowControlState.peerAdvertisedMaxOffset = maxData.value_or(0);
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
       maxStreamDataBidiLocal.value_or(0);

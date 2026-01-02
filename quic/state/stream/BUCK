@@ -15,6 +15,7 @@ mvfst_cpp_library(
         "StreamStateFunctions.h",
     ],
     deps = [
+        "//quic/common:mvfst_logging",
         "//quic/flowcontrol:flow_control",
     ],
     exported_deps = [

@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/IoBufQuicBatch.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/SocketUtil.h>
 #include <quic/common/StringUtils.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
@@ -146,8 +147,8 @@ quic::Expected<bool, QuicError> IOBufQuicBatch::flushInternal() {
     auto errorMsg =
         fmt::format("{}{}", firstSocketErrorMsg, secondSocketErrorMsg);
     // Both sockets becomes fatal, close connection
-    VLOG(4) << "Error writing to the socket " << errorMsg << " "
-            << peerAddress_;
+    MVVLOG(4) << "Error writing to the socket " << errorMsg << " "
+              << peerAddress_;
 
     // We can get write error for any reason, close the conn only if network
     // is unreachable, for all others, we throw a transport exception

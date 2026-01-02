@@ -11,6 +11,7 @@ mvfst_cpp_library(
         "QuicClientTransport.h",
     ],
     deps = [
+        "//quic/common:mvfst_logging",
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/loss:loss",
     ],
@@ -35,6 +36,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/api:loop_detector_callback",
         "//quic/api:transport_helpers",
+        "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/flowcontrol:flow_control",
@@ -79,6 +81,7 @@ mvfst_cpp_library(
         ":client_extension",
         "//quic/codec:decode",
         "//quic/codec:types",
+        "//quic/common:mvfst_logging",
         "//quic/common:time_util",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/loss:loss",

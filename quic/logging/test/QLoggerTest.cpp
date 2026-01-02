@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/logging/QLogger.h>
 
 #include <folly/FileUtil.h>
@@ -1522,7 +1523,7 @@ TEST_F(QLoggerTest, CompressedStream) {
 
   std::string outputPath =
       fmt::format("{}/{}.qlog.gz", dir, (q->dcid.value()).hex());
-  LOG(INFO) << outputPath;
+  MVLOG_INFO << outputPath;
   delete q;
 
   std::string compressedData;

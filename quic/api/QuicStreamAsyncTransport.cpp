@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicStreamAsyncTransport.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 
 namespace quic {
@@ -70,8 +71,8 @@ void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
     streamWriteOffset_ += *streamWriteOffset;
     auto res = sock_->notifyPendingWriteOnStream(*id_, this);
     if (!res) {
-      LOG(WARNING) << "Failed to notify pending write on stream: "
-                   << toString(res.error());
+      MVLOG_WARNING << "Failed to notify pending write on stream: "
+                    << toString(res.error());
     }
   }
 }
@@ -92,14 +93,14 @@ void QuicStreamAsyncTransport::setReadCB(
     if (!readCb_) {
       auto pauseResult = sock_->pauseRead(*id_);
       if (pauseResult.hasError()) {
-        VLOG(1) << "Failed to pause read: " << toString(pauseResult.error());
+        MVVLOG(1) << "Failed to pause read: " << toString(pauseResult.error());
       }
     } else if (sock_->resumeRead(*id_).hasError()) {
       // this is our first time installing the read callback
       auto setCallbackResult = sock_->setReadCallback(*id_, this);
       if (setCallbackResult.hasError()) {
-        VLOG(1) << "Failed to set read callback: "
-                << toString(setCallbackResult.error());
+        MVVLOG(1) << "Failed to set read callback: "
+                  << toString(setCallbackResult.error());
       }
     }
     // It should be ok to do this immediately, rather than in the loop
@@ -119,8 +120,8 @@ void QuicStreamAsyncTransport::addWriteCallback(
   if (id_) {
     auto res = sock_->notifyPendingWriteOnStream(*id_, this);
     if (!res) {
-      VLOG(1) << "Failed to notify pending write on stream: "
-              << toString(res.error());
+      MVVLOG(1) << "Failed to notify pending write on stream: "
+                << toString(res.error());
     }
   }
 }
@@ -205,8 +206,8 @@ void QuicStreamAsyncTransport::closeNow() {
     auto res =
         sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
     if (!res) {
-      VLOG(1) << "Failed to stop sending during closeNow: "
-              << toString(res.error());
+      MVVLOG(1) << "Failed to stop sending during closeNow: "
+                << toString(res.error());
     }
     shutdownWriteNow();
   }
@@ -218,14 +219,14 @@ void QuicStreamAsyncTransport::closeWithReset() {
     auto res1 =
         sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
     if (!res1) {
-      VLOG(1) << "Failed to stop sending during closeWithReset: "
-              << toString(res1.error());
+      MVVLOG(1) << "Failed to stop sending during closeWithReset: "
+                << toString(res1.error());
     }
     auto res2 =
         sock_->resetStream(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
     if (!res2) {
-      VLOG(1) << "Failed to reset stream during closeWithReset: "
-              << toString(res2.error());
+      MVVLOG(1) << "Failed to reset stream during closeWithReset: "
+                << toString(res2.error());
     }
   }
   folly::AsyncSocketException ex(
@@ -239,8 +240,8 @@ void QuicStreamAsyncTransport::shutdownWrite() {
     if (id_) {
       auto res = sock_->notifyPendingWriteOnStream(*id_, this);
       if (!res) {
-        VLOG(1) << "Failed to notify pending write on stream: "
-                << toString(res.error());
+        MVVLOG(1) << "Failed to notify pending write on stream: "
+                  << toString(res.error());
       }
     }
   }
@@ -257,10 +258,10 @@ void QuicStreamAsyncTransport::shutdownWriteNow() {
     auto res =
         sock_->resetStream(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
     if (!res) {
-      VLOG(1) << "Failed to reset stream during shutdownWriteNow: "
-              << toString(res.error());
+      MVVLOG(1) << "Failed to reset stream during shutdownWriteNow: "
+                << toString(res.error());
     } else {
-      VLOG(4) << "Reset stream from shutdownWriteNow";
+      MVVLOG(4) << "Reset stream from shutdownWriteNow";
     }
   }
 }
@@ -299,11 +300,11 @@ folly::EventBase* QuicStreamAsyncTransport::getEventBase() const {
 
 void QuicStreamAsyncTransport::attachEventBase(
     folly::EventBase* /*eventBase*/) {
-  LOG(FATAL) << "Does QUICSocket support this?";
+  MVLOG_FATAL << "Does QUICSocket support this?";
 }
 
 void QuicStreamAsyncTransport::detachEventBase() {
-  LOG(FATAL) << "Does QUICSocket support this?";
+  MVLOG_FATAL << "Does QUICSocket support this?";
 }
 
 bool QuicStreamAsyncTransport::isDetachable() const {
@@ -447,14 +448,14 @@ void QuicStreamAsyncTransport::handleRead() {
     if (!readCb_ || readEOF_ != EOFState::NOT_SEEN) {
       auto res = sock_->setReadCallback(*id_, nullptr);
       if (!res) {
-        VLOG(1) << "Failed to clear read callback: " << toString(res.error());
+        MVVLOG(1) << "Failed to clear read callback: " << toString(res.error());
       }
     }
   }
 }
 
 void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
-  VLOG(4) << __func__ << " " << maxToSend;
+  MVVLOG(4) << __func__ << " " << maxToSend;
   CHECK(id_);
   // overkill until there are delivery cbs
   folly::DelayedDestruction::DestructorGuard dg(this);
@@ -479,11 +480,11 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   if (writeEOF) {
     writeEOF_ = EOFState::DELIVERED;
   } else if (writeBuf_.chainLength()) {
-    VLOG(4) << __func__ << " buffered data, requesting callback";
+    MVVLOG(4) << __func__ << " buffered data, requesting callback";
     auto res2 = sock_->notifyPendingWriteOnStream(*id_, this);
     if (!res2) {
-      VLOG(1) << "Failed to notify pending write on stream: "
-              << toString(res2.error());
+      MVVLOG(1) << "Failed to notify pending write on stream: "
+                << toString(res2.error());
     }
   }
   // not actually sent.  Mirrors AsyncSocket and invokes when data is in
@@ -493,10 +494,10 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
 }
 
 void QuicStreamAsyncTransport::invokeWriteCallbacks() {
-  VLOG(4) << __func__ << " " << streamWriteOffset_;
+  MVVLOG(4) << __func__ << " " << streamWriteOffset_;
   while (!writeCallbacks_.empty() &&
          writeCallbacks_.front().first <= streamWriteOffset_) {
-    VLOG(4) << __func__ << " " << writeCallbacks_.front().first;
+    MVVLOG(4) << __func__ << " " << writeCallbacks_.front().first;
     auto wcb = writeCallbacks_.front().second;
     writeCallbacks_.pop_front();
     wcb->writeSuccess();
@@ -508,7 +509,7 @@ void QuicStreamAsyncTransport::invokeWriteCallbacks() {
 
 void QuicStreamAsyncTransport::failWrites(
     const folly::AsyncSocketException& ex) {
-  VLOG(4) << __func__;
+  MVVLOG(4) << __func__;
   while (!writeCallbacks_.empty()) {
     auto& front = writeCallbacks_.front();
     auto wcb = front.second;
@@ -552,13 +553,13 @@ void QuicStreamAsyncTransport::closeNowImpl(folly::AsyncSocketException&& ex) {
   if (id_) {
     auto res1 = sock_->setReadCallback(*id_, nullptr);
     if (!res1) {
-      VLOG(1) << "Failed to clear read callback during cleanup: "
-              << toString(res1.error());
+      MVVLOG(1) << "Failed to clear read callback during cleanup: "
+                << toString(res1.error());
     }
     auto res2 = sock_->unregisterStreamWriteCallback(*id_);
     if (!res2) {
-      VLOG(1) << "Failed to unregister write callback during cleanup: "
-              << toString(res2.error());
+      MVVLOG(1) << "Failed to unregister write callback during cleanup: "
+                << toString(res2.error());
     }
     id_.reset();
   }

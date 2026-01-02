@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
 
 #include <fizz/backend/openssl/certificate/OpenSSLSelfCertImpl.h>
@@ -433,9 +434,9 @@ BufPtr packetToBufCleartext(
     const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum) {
-  VLOG(10) << __func__ << " packet header: "
-           << quic::hexlify(
-                  std::string(packet.header.clone()->moveToFbString()));
+  MVVLOG(10) << __func__ << " packet header: "
+             << quic::hexlify(
+                    std::string(packet.header.clone()->moveToFbString()));
   auto packetBuf = packet.header.clone();
   BufPtr body;
   if (!packet.body.empty()) {
@@ -548,8 +549,8 @@ void updateAckState(
   auto addResult =
       addPacketToAckState(conn, getAckState(conn, pnSpace), packetNum, packet);
   if (!addResult.has_value()) {
-    LOG(FATAL) << "Failed to add packet to ack state in test: "
-               << static_cast<int>(addResult.error());
+    MVLOG_FATAL << "Failed to add packet to ack state in test: "
+                << static_cast<int>(addResult.error());
   }
   uint64_t distance = addResult.value();
   updateAckSendStateOnRecvPacket(

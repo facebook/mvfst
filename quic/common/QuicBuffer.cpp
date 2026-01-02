@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/QuicBuffer.h>
 
 #include <utility>
@@ -444,7 +444,7 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
   while (aCurrent->length() == 0) {
     aCurrent = aCurrent->next();
     if (aCurrent == a) {
-      LOG(FATAL) << "Unreachable, we checked aLength != 0";
+      MVLOG_FATAL << "Unreachable, we checked aLength != 0";
     }
   }
 
@@ -452,8 +452,8 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
     bCurrent = bCurrent->next();
     if (bCurrent == b) {
       // All buffers in other chain are empty
-      LOG(FATAL) << "Unreachable, since aLength == bLength and "
-                 << "aLength != 0";
+      MVLOG_FATAL << "Unreachable, since aLength == bLength and "
+                  << "aLength != 0";
     }
   }
 

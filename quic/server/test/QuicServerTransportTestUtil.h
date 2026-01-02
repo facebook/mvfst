@@ -14,6 +14,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/Types.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/TransportKnobs.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
@@ -232,11 +233,11 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     server->setConnectionIdAlgo(connIdAlgo_.get());
     server->setClientConnectionId(*clientConnectionId);
     server->setClientChosenDestConnectionId(*initialDestinationConnectionId);
-    VLOG(20) << __func__ << " client connId=" << clientConnectionId->hex()
-             << ", server connId="
-             << (server->getConn().serverConnectionId
-                     ? server->getConn().serverConnectionId->hex()
-                     : " (n/a)");
+    MVVLOG(20) << __func__ << " client connId=" << clientConnectionId->hex()
+               << ", server connId="
+               << (server->getConn().serverConnectionId
+                       ? server->getConn().serverConnectionId->hex()
+                       : " (n/a)");
     SetUpChild();
   }
 

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -393,14 +394,14 @@ quic::Expected<void, QuicError> processClientInitialParams(
             *packetSize)));
   }
 
-  VLOG(10) << "Client advertised flow control ";
-  VLOG(10) << "conn=" << maxData.value_or(0);
-  VLOG(10) << " stream bidi local=" << maxStreamDataBidiLocal.value_or(0)
-           << " ";
-  VLOG(10) << " stream bidi remote=" << maxStreamDataBidiRemote.value_or(0)
-           << " ";
-  VLOG(10) << " stream uni=" << maxStreamDataUni.value_or(0) << " ";
-  VLOG(10) << conn;
+  MVVLOG(10) << "Client advertised flow control ";
+  MVVLOG(10) << "conn=" << maxData.value_or(0);
+  MVVLOG(10) << " stream bidi local=" << maxStreamDataBidiLocal.value_or(0)
+             << " ";
+  MVVLOG(10) << " stream bidi remote=" << maxStreamDataBidiRemote.value_or(0)
+             << " ";
+  MVVLOG(10) << " stream uni=" << maxStreamDataUni.value_or(0) << " ";
+  MVVLOG(10) << conn;
   conn.flowControlState.peerAdvertisedMaxOffset = maxData.value_or(0);
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
       maxStreamDataBidiLocal.value_or(0);
@@ -704,7 +705,7 @@ void maybeUpdateTransportFromAppToken(
   }
   auto appToken = decodeAppToken(*tokenBuf.value());
   if (!appToken) {
-    VLOG(10) << "Failed to decode app token";
+    MVVLOG(10) << "Failed to decode app token";
     return;
   }
   auto& params = appToken->transportParams.parameters;
@@ -788,9 +789,9 @@ quic::Expected<void, QuicError> onConnectionMigration(
     conn.pathManager->cacheCurrentCongestionAndRttState();
   }
 
-  VLOG(4) << "Client migrating to a different path. " << connPath->peerAddress
-          << " (" << connPath->id << ") --> " << readPath->peerAddress << " ("
-          << readPath->id << ")";
+  MVVLOG(4) << "Client migrating to a different path. " << connPath->peerAddress
+            << " (" << connPath->id << ") --> " << readPath->peerAddress << " ("
+            << readPath->id << ")";
 
   auto switchPathRes = conn.pathManager->switchCurrentPath(readPathId);
   if (switchPathRes.hasError()) {
@@ -841,7 +842,7 @@ static void handleCipherUnavailable(
     size_t packetSize,
     ServerEvents::ReadData& readData) {
   if (!originalData->packet || originalData->packet->empty()) {
-    VLOG(10) << "drop because no data " << conn;
+    MVVLOG(10) << "drop because no data " << conn;
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kNoData);
     }
@@ -851,7 +852,7 @@ static void handleCipherUnavailable(
   }
   if (originalData->protectionType != ProtectionType::ZeroRtt &&
       originalData->protectionType != ProtectionType::KeyPhaseZero) {
-    VLOG(10) << "drop because unexpected protection level " << conn;
+    MVVLOG(10) << "drop because unexpected protection level " << conn;
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kUnexpectedProtectionLevel);
     }
@@ -866,7 +867,7 @@ static void handleCipherUnavailable(
       (conn.pendingZeroRttData ? conn.pendingZeroRttData->size() : 0) +
       (conn.pendingOneRttData ? conn.pendingOneRttData->size() : 0);
   if (combinedSize >= conn.transportSettings.maxPacketsToBuffer) {
-    VLOG(10) << "drop because max buffered " << conn;
+    MVVLOG(10) << "drop because max buffered " << conn;
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
     }
@@ -894,12 +895,12 @@ static void handleCipherUnavailable(
         readData.udpPacket.timings,
         readData.udpPacket.tosValue);
     pendingData->emplace_back(std::move(pendingReadData));
-    VLOG(10) << "Adding pending data to "
-             << toString(originalData->protectionType)
-             << " buffer size=" << pendingData->size() << " " << conn;
+    MVVLOG(10) << "Adding pending data to "
+               << toString(originalData->protectionType)
+               << " buffer size=" << pendingData->size() << " " << conn;
   } else {
-    VLOG(10) << "drop because " << toString(originalData->protectionType)
-             << " buffer no longer available " << conn;
+    MVVLOG(10) << "drop because " << toString(originalData->protectionType)
+               << " buffer no longer available " << conn;
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
     }
@@ -930,7 +931,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     CHECK(cursor.tryReadBE(initialByte));
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
-      VLOG(4) << "Could not parse initial packet header";
+      MVVLOG(4) << "Could not parse initial packet header";
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             0,
@@ -945,7 +946,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     }
     QuicVersion version = parsedLongHeader->invariant.version;
     if (version == QuicVersion::VERSION_NEGOTIATION) {
-      VLOG(4) << "Server dropping VN packet";
+      MVVLOG(4) << "Server dropping VN packet";
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             0,
@@ -963,7 +964,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         parsedLongHeader->invariant.dstConnId;
 
     if (initialDestinationConnectionId.size() < kDefaultConnectionIdSize) {
-      VLOG(4) << "Initial connectionid too small";
+      MVVLOG(4) << "Initial connectionid too small";
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             0,
@@ -1091,8 +1092,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         break;
       }
       case CodecResult::Type::RETRY: {
-        VLOG(10) << "drop because the server is not supposed to "
-                 << "receive a retry " << conn;
+        MVVLOG(10) << "drop because the server is not supposed to "
+                   << "receive a retry " << conn;
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kRetry);
         }
@@ -1103,7 +1104,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         break;
       }
       case CodecResult::Type::STATELESS_RESET: {
-        VLOG(10) << "drop because reset " << conn;
+        MVVLOG(10) << "drop because reset " << conn;
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kReset);
         }
@@ -1114,8 +1115,9 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         return {};
       }
       case CodecResult::Type::NOTHING: {
-        VLOG(10) << "drop no data, reason: "
-                 << parsedPacket.nothing()->reason._to_string() << " " << conn;
+        MVVLOG(10) << "drop no data, reason: "
+                   << parsedPacket.nothing()->reason._to_string() << " "
+                   << conn;
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(
               packetSize, parsedPacket.nothing()->reason._to_string());
@@ -1161,7 +1163,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       // We were unable to parse the packet, drop for now. All the drop reasons
       // should have already been logged into QLogger and QuicTrace inside the
       // previous switch-case block. All stats have already been updated.
-      VLOG(10) << "Not able to parse QUIC packet " << conn;
+      MVVLOG(10) << "Not able to parse QUIC packet " << conn;
       continue;
     }
     if (regularOptional->frames.empty()) {
@@ -1301,9 +1303,9 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       switch (packetFrame.type()) {
         case QuicWriteFrame::Type::WriteStreamFrame: {
           const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
-          VLOG(4) << "Server received ack for stream=" << frame.streamId
-                  << " offset=" << frame.offset << " fin=" << frame.fin
-                  << " len=" << frame.len << " " << conn;
+          MVVLOG(4) << "Server received ack for stream=" << frame.streamId
+                    << " offset=" << frame.offset << " fin=" << frame.fin
+                    << " len=" << frame.len << " " << conn;
           auto ackedStream =
               conn.streamManager->getStream(frame.streamId).value_or(nullptr);
           if (ackedStream) {
@@ -1323,8 +1325,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
         case QuicWriteFrame::Type::RstStreamFrame: {
           const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
-          VLOG(4) << "Server received ack for reset stream=" << frame.streamId
-                  << " " << conn;
+          MVVLOG(4) << "Server received ack for reset stream=" << frame.streamId
+                    << " " << conn;
           auto stream =
               conn.streamManager->getStream(frame.streamId).value_or(nullptr);
           if (stream) {
@@ -1338,8 +1340,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         case QuicWriteFrame::Type::WriteAckFrame: {
           const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
           DCHECK(!frame.ackBlocks.empty());
-          VLOG(4) << "Server received ack for largestAcked="
-                  << frame.ackBlocks.front().end << " " << conn;
+          MVVLOG(4) << "Server received ack for largestAcked="
+                    << frame.ackBlocks.front().end << " " << conn;
           commonAckVisitorForAckFrame(ackState, frame);
           break;
         }
@@ -1398,8 +1400,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     for (auto& quicFrame : regularPacket.frames) {
       switch (quicFrame.type()) {
         case QuicFrame::Type::ReadAckFrame: {
-          VLOG(10) << "Server received ack frame packet=" << packetNum << " "
-                   << conn;
+          MVVLOG(10) << "Server received ack frame packet=" << packetNum << " "
+                     << conn;
           isNonProbingPacket = true;
           ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
 
@@ -1438,8 +1440,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Reliable resets not supported"));
           }
-          VLOG(10) << "Server received reset stream=" << frame.streamId << " "
-                   << conn;
+          MVVLOG(10) << "Server received reset stream=" << frame.streamId << " "
+                     << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
           auto streamResult = conn.streamManager->getStream(frame.streamId);
@@ -1462,11 +1464,11 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           pktHasCryptoData = true;
           isNonProbingPacket = true;
           ReadCryptoFrame& cryptoFrame = *quicFrame.asReadCryptoFrame();
-          VLOG(10) << "Server received crypto data offset="
-                   << cryptoFrame.offset
-                   << " len=" << cryptoFrame.data->computeChainDataLength()
-                   << " currentReadOffset="
-                   << getCryptoStream(*conn.cryptoState, encryptionLevel);
+          MVVLOG(10) << "Server received crypto data offset="
+                     << cryptoFrame.offset
+                     << " len=" << cryptoFrame.data->computeChainDataLength()
+                     << " currentReadOffset="
+                     << getCryptoStream(*conn.cryptoState, encryptionLevel);
           auto cryptoStream =
               getCryptoStream(*conn.cryptoState, encryptionLevel);
           auto readBufferSize = cryptoStream->readBuffer.size();
@@ -1487,10 +1489,10 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
         case QuicFrame::Type::ReadStreamFrame: {
           ReadStreamFrame& frame = *quicFrame.asReadStreamFrame();
-          VLOG(10) << "Server received stream data for stream="
-                   << frame.streamId << ", offset=" << frame.offset
-                   << " len=" << frame.data->computeChainDataLength()
-                   << " fin=" << frame.fin << " " << conn;
+          MVVLOG(10) << "Server received stream data for stream="
+                     << frame.streamId << ", offset=" << frame.offset
+                     << " len=" << frame.data->computeChainDataLength()
+                     << " fin=" << frame.fin << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
           auto streamResult = conn.streamManager->getStream(
@@ -1511,8 +1513,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
         case QuicFrame::Type::MaxDataFrame: {
           MaxDataFrame& connWindowUpdate = *quicFrame.asMaxDataFrame();
-          VLOG(10) << "Server received max data offset="
-                   << connWindowUpdate.maximumData << " " << conn;
+          MVVLOG(10) << "Server received max data offset="
+                     << connWindowUpdate.maximumData << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
           handleConnWindowUpdate(conn, connWindowUpdate, packetNum);
@@ -1521,10 +1523,10 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         case QuicFrame::Type::MaxStreamDataFrame: {
           MaxStreamDataFrame& streamWindowUpdate =
               *quicFrame.asMaxStreamDataFrame();
-          VLOG(10) << "Server received max stream data stream="
-                   << streamWindowUpdate.streamId
-                   << " offset=" << streamWindowUpdate.maximumData << " "
-                   << conn;
+          MVVLOG(10) << "Server received max stream data stream="
+                     << streamWindowUpdate.streamId
+                     << " offset=" << streamWindowUpdate.maximumData << " "
+                     << conn;
           if (isReceivingStream(conn.nodeType, streamWindowUpdate.streamId)) {
             return quic::make_unexpected(QuicError(
                 TransportErrorCode::STREAM_STATE_ERROR,
@@ -1545,7 +1547,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           break;
         }
         case QuicFrame::Type::DataBlockedFrame: {
-          VLOG(10) << "Server received blocked " << conn;
+          MVVLOG(10) << "Server received blocked " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
           handleConnBlocked(conn);
@@ -1554,8 +1556,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         case QuicFrame::Type::StreamDataBlockedFrame: {
           StreamDataBlockedFrame& blocked =
               *quicFrame.asStreamDataBlockedFrame();
-          VLOG(10) << "Server received blocked stream=" << blocked.streamId
-                   << " " << conn;
+          MVVLOG(10) << "Server received blocked stream=" << blocked.streamId
+                     << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
           auto streamResult = conn.streamManager->getStream(blocked.streamId);
@@ -1574,8 +1576,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           // stream limit set by us
           // TODO implement the handler
           isNonProbingPacket = true;
-          VLOG(10) << "Server received streams blocked limit="
-                   << blocked.streamLimit << ", " << conn;
+          MVVLOG(10) << "Server received streams blocked limit="
+                     << blocked.streamLimit << ", " << conn;
 
           break;
         }
@@ -1584,14 +1586,14 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
           auto errMsg = fmt::format(
               "Server closed by peer reason={}", connFrame.reasonPhrase);
-          VLOG(4) << errMsg << " " << conn;
+          MVVLOG(4) << errMsg << " " << conn;
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
           conn.peerConnectionError =
               QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
           if (getSendConnFlowControlBytesWire(conn) == 0 &&
               conn.flowControlState.sumCurStreamBufferLen) {
-            VLOG(2) << "Client gives up a flow control blocked connection";
+            MVVLOG(2) << "Client gives up a flow control blocked connection";
           }
           return {};
         }
@@ -1621,8 +1623,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
         case QuicFrame::Type::DatagramFrame: {
           DatagramFrame& frame = *quicFrame.asDatagramFrame();
-          VLOG(10) << "Server received datagram data: " << " len="
-                   << frame.length;
+          MVVLOG(10) << "Server received datagram data: " << " len="
+                     << frame.length;
           // Datagram isn't retransmittable. But we would like to ack them
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;
@@ -1718,8 +1720,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
             regularPacket.header.asShort()->getConnectionId();
         conn.readCodec->setServerConnectionId(conn.serverConnectionId.value());
 
-        VLOG(4) << "Client using new connection id for this server: "
-                << conn.serverConnectionId.value();
+        MVVLOG(4) << "Client using new connection id for this server: "
+                  << conn.serverConnectionId.value();
       }
     }
 
@@ -1824,7 +1826,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
 
   switch (parsedPacket.type()) {
     case CodecResult::Type::CIPHER_UNAVAILABLE: {
-      VLOG(10) << "drop cipher unavailable " << conn;
+      MVVLOG(10) << "drop cipher unavailable " << conn;
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
       }
@@ -1835,8 +1837,8 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
       break;
     }
     case CodecResult::Type::RETRY: {
-      VLOG(10) << "drop because the server is not supposed to "
-               << "receive a retry " << conn;
+      MVVLOG(10) << "drop because the server is not supposed to "
+                 << "receive a retry " << conn;
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kRetry);
       }
@@ -1847,7 +1849,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
       break;
     }
     case CodecResult::Type::STATELESS_RESET: {
-      VLOG(10) << "drop because reset " << conn;
+      MVVLOG(10) << "drop because reset " << conn;
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kReset);
       }
@@ -1858,8 +1860,8 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
       break;
     }
     case CodecResult::Type::NOTHING: {
-      VLOG(10) << "drop no data, reason: "
-               << parsedPacket.nothing()->reason._to_string() << " " << conn;
+      MVVLOG(10) << "drop no data, reason: "
+                 << parsedPacket.nothing()->reason._to_string() << " " << conn;
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(
             packetSize, parsedPacket.nothing()->reason._to_string());
@@ -1889,7 +1891,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
   if (!regularOptional) {
     // We were unable to parse the packet, drop for now.
     // Packet drop has already been added to qlog and stats
-    VLOG(10) << "Not able to parse QUIC packet " << conn;
+    MVVLOG(10) << "Not able to parse QUIC packet " << conn;
     return {};
   }
   if (regularOptional->frames.empty()) {
@@ -1926,7 +1928,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
         ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
         auto errMsg = fmt::format(
             "Server closed by peer reason={}", connFrame.reasonPhrase);
-        VLOG(4) << errMsg << " " << conn;
+        MVVLOG(4) << errMsg << " " << conn;
         // we want to deliver app callbacks with the peer supplied error,
         // but send a NO_ERROR to the peer.
         conn.peerConnectionError =

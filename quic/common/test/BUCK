@@ -112,6 +112,7 @@ mvfst_cpp_library(
         "//fizz/protocol/clock/test:mock_clock",
         "//fizz/protocol/test:mocks",
         "//quic/api:transport_helpers",
+        "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/server/handshake:stateless_reset_generator",
@@ -193,6 +194,7 @@ mvfst_cpp_test(
         ":test_utils",
         "//folly:random",
         "//quic/common:circular_deque",
+        "//quic/common:mvfst_logging",
     ],
 )
 

@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicBatchWriterFactory.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -15,17 +16,17 @@ void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
 }
 
 BatchWriterPtr makeGsoBatchWriter(uint32_t) {
-  LOG(FATAL) << "not implemented for mobile";
+  MVLOG_FATAL << "not implemented for mobile";
   return nullptr;
 }
 
 BatchWriterPtr makeGsoInPlaceBatchWriter(uint32_t, QuicConnectionStateBase&) {
-  LOG(FATAL) << "not implemented for mobile";
+  MVLOG_FATAL << "not implemented for mobile";
   return nullptr;
 }
 
 BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t) {
-  LOG(FATAL) << "not implemented for mobile";
+  MVLOG_FATAL << "not implemented for mobile";
   return nullptr;
 }
 

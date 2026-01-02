@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/Bbr2.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
@@ -61,7 +62,7 @@ Bbr2CongestionController::Bbr2CongestionController(
     if (conn_.pacer) {
       conn_.pacer->refreshPacingRate(cwndBytes_, 0us);
     } else {
-      LOG(WARNING) << "BBR2 was initialized on a connection without a pacer";
+      MVLOG_WARNING << "BBR2 was initialized on a connection without a pacer";
     }
   }
   enterStartup();
@@ -124,10 +125,10 @@ void Bbr2CongestionController::onPacketAckOrLoss(
     }
   };
   SCOPE_EXIT {
-    VLOG(6) << "State=" << bbr2StateToString(state_)
-            << " inflight=" << conn_.lossState.inflightBytes
-            << " cwnd=" << getCongestionWindow() << "(gain=" << cwndGain_
-            << ")";
+    MVVLOG(6) << "State=" << bbr2StateToString(state_)
+              << " inflight=" << conn_.lossState.inflightBytes
+              << " cwnd=" << getCongestionWindow() << "(gain=" << cwndGain_
+              << ")";
   };
 
   if (lossEvent && lossEvent->lostPackets > 0) {
@@ -323,12 +324,12 @@ void Bbr2CongestionController::setPacing() {
   }
   uint64_t pacingWindow =
       bandwidth_ * minRtt_ * pacingGain_ * (100 - kPacingMarginPercent) / 100;
-  VLOG(6) << "Setting pacing to "
-          << Bandwidth(pacingWindow, minRtt_).normalizedDescribe()
-          << " from bandwidth_=" << bandwidth_.normalizedDescribe()
-          << " pacingGain_=" << pacingGain_
-          << " kPacingMarginPercent=" << kPacingMarginPercent
-          << " units=" << pacingWindow << " interval=" << minRtt_.count();
+  MVVLOG(6) << "Setting pacing to "
+            << Bandwidth(pacingWindow, minRtt_).normalizedDescribe()
+            << " from bandwidth_=" << bandwidth_.normalizedDescribe()
+            << " pacingGain_=" << pacingGain_
+            << " kPacingMarginPercent=" << kPacingMarginPercent
+            << " units=" << pacingWindow << " interval=" << minRtt_.count();
 
   if (state_ == State::Startup && !fullBwReached_) {
     pacingWindow = std::max(
@@ -423,7 +424,7 @@ void Bbr2CongestionController::checkProbeRttDone() {
 
 void Bbr2CongestionController::restoreCwnd() {
   cwndBytes_ = std::max(cwndBytes_, previousCwndBytes_);
-  VLOG(6) << "Restored cwnd: " << cwndBytes_;
+  MVVLOG(6) << "Restored cwnd: " << cwndBytes_;
 }
 
 void Bbr2CongestionController::exitProbeRtt() {
@@ -440,8 +441,8 @@ void Bbr2CongestionController::updateLatestDeliverySignals() {
   lossRoundStart_ = false;
 
   bandwidthLatest_ = std::max(bandwidthLatest_, currentBwSample_);
-  VLOG(6) << "Bandwidth latest=" << bandwidthLatest_.normalizedDescribe()
-          << "  AppLimited=" << bandwidthLatest_.isAppLimited;
+  MVVLOG(6) << "Bandwidth latest=" << bandwidthLatest_.normalizedDescribe()
+            << "  AppLimited=" << bandwidthLatest_.isAppLimited;
   inflightLatest_ = std::max(inflightLatest_, currentAckMaxInflightBytes_);
 
   auto pkt = currentAckEvent_->getLargestNewlyAckedPacket();
@@ -463,8 +464,8 @@ void Bbr2CongestionController::updateCongestionSignals(
   // Update max bandwidth
   if (bandwidthLatest_ > maxBwFilter_.GetBest() ||
       !bandwidthLatest_.isAppLimited) {
-    VLOG(6) << "Updating bandwidth filter with sample: "
-            << bandwidthLatest_.normalizedDescribe();
+    MVVLOG(6) << "Updating bandwidth filter with sample: "
+              << bandwidthLatest_.normalizedDescribe();
     maxBwFilter_.Update(bandwidthLatest_, cycleCount_);
   }
 
@@ -599,8 +600,8 @@ void Bbr2CongestionController::enterDrain() {
 
 void Bbr2CongestionController::checkDrain() {
   if (state_ == State::Drain) {
-    VLOG(6) << "Current inflight" << conn_.lossState.inflightBytes
-            << " target inflight " << getTargetInflightWithGain(1.0);
+    MVVLOG(6) << "Current inflight" << conn_.lossState.inflightBytes
+              << " target inflight " << getTargetInflightWithGain(1.0);
   }
   if (state_ == State::Drain &&
       conn_.lossState.inflightBytes <= getTargetInflightWithGain(1.0)) {
@@ -892,7 +893,7 @@ void Bbr2CongestionController::saveCwnd() {
   } else {
     previousCwndBytes_ = std::max(cwndBytes_, previousCwndBytes_);
   }
-  VLOG(6) << "Saved cwnd: " << previousCwndBytes_;
+  MVVLOG(6) << "Saved cwnd: " << previousCwndBytes_;
 }
 
 uint64_t Bbr2CongestionController::getTargetInflightWithGain(float gain) const {

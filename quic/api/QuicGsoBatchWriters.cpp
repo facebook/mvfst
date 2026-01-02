@@ -7,6 +7,7 @@
 
 #include <quic/api/QuicGsoBatchWriters.h>
 #include <quic/common/BufAccessor.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 
 namespace {
@@ -150,8 +151,8 @@ ssize_t GSOInplacePacketBatchWriter::write(
       << "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
       << ", nextPacketSize_=" << nextPacketSize_;
   if (diffToEnd >= conn_.udpSendPacketLen + kPacketSizeViolationTolerance) {
-    LOG(ERROR) << "Remaining buffer contents larger than udpSendPacketLen by "
-               << (diffToEnd - conn_.udpSendPacketLen);
+    MVLOG_ERROR << "Remaining buffer contents larger than udpSendPacketLen by "
+                << (diffToEnd - conn_.udpSendPacketLen);
   }
   uint64_t diffToStart = lastPacketEnd_ - buf->data();
   buf->trimEnd(diffToEnd);

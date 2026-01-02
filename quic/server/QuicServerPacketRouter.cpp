@@ -7,6 +7,7 @@
 
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerWorker.h>
@@ -85,10 +86,11 @@ void TakeoverHandlerCallback::onDataAvailable(
     size_t len,
     bool truncated,
     OnDataAvailableParams /*params*/) noexcept {
-  VLOG(10) << "Worker=" << this << " Received (takeover) data on thread="
-           << folly::getCurrentThreadID()
-           << ", workerId=" << static_cast<uint32_t>(worker_->getWorkerId())
-           << ", processId=" << static_cast<uint32_t>(worker_->getProcessId());
+  MVVLOG(10) << "Worker=" << this << " Received (takeover) data on thread="
+             << folly::getCurrentThreadID()
+             << ", workerId=" << static_cast<uint32_t>(worker_->getWorkerId())
+             << ", processId="
+             << static_cast<uint32_t>(worker_->getProcessId());
   // Move readBuffer_ first so that we can get rid
   // of it immediately so that if we return early,
   // we've flushed it.
@@ -105,7 +107,7 @@ void TakeoverHandlerCallback::onDataAvailable(
 void TakeoverHandlerCallback::onReadError(
     const folly::AsyncSocketException& ex) noexcept {
   folly::DelayedDestruction::DestructorGuard dg(this);
-  VLOG(4) << "Error on TakeoverHandlerCallback " << ex.what();
+  MVVLOG(4) << "Error on TakeoverHandlerCallback " << ex.what();
   if (socket_) {
     socket_->pauseRead();
     // delete the socket_ in the next loop
@@ -188,22 +190,22 @@ void TakeoverPacketHandler::processForwardedPacket(
   ContiguousReadCursor cursor(data->data(), data->length());
   uint32_t protocol = 0;
   if (!cursor.tryReadBE(protocol)) {
-    VLOG(4) << "Cannot read takeover protocol version. Dropping.";
+    MVVLOG(4) << "Cannot read takeover protocol version. Dropping.";
     return;
   }
   if (protocol != static_cast<uint32_t>(takeoverProtocol_)) {
-    VLOG(4) << "Unexpected takeover protocol version=" << protocol;
+    MVVLOG(4) << "Unexpected takeover protocol version=" << protocol;
     return;
   }
   uint16_t addrLen = 0;
   if (!cursor.tryReadBE(addrLen)) {
-    VLOG(4) << "Malformed packet received. Dropping.";
+    MVVLOG(4) << "Malformed packet received. Dropping.";
     return;
   }
   if (addrLen > kMaxBufSizeForTakeoverEncapsulation) {
-    VLOG(2) << "Buffer size for takeover encapsulation: " << addrLen
-            << " exceeds the max limit: "
-            << kMaxBufSizeForTakeoverEncapsulation;
+    MVVLOG(2) << "Buffer size for takeover encapsulation: " << addrLen
+              << " exceeds the max limit: "
+              << kMaxBufSizeForTakeoverEncapsulation;
     return;
   }
   struct sockaddr* sockaddr = nullptr;
@@ -212,8 +214,8 @@ void TakeoverPacketHandler::processForwardedPacket(
     sockaddr = (struct sockaddr*)addrData.data();
     cursor.skip(addrLen);
   } else {
-    VLOG(4) << "Cannot extract peerAddress address of length=" << addrLen
-            << " from the forwarded packet. Dropping the packet.";
+    MVVLOG(4) << "Cannot extract peerAddress address of length=" << addrLen
+              << " from the forwarded packet. Dropping the packet.";
     return;
   }
   folly::SocketAddress peerAddress;
@@ -221,14 +223,15 @@ void TakeoverPacketHandler::processForwardedPacket(
     CHECK_NOTNULL(sockaddr);
     peerAddress.setFromSockaddr(sockaddr, addrLen);
   } catch (const std::exception& ex) {
-    LOG(ERROR) << "Invalid client address encoded: addrlen=" << addrLen
-               << " ex=" << ex.what();
+    MVLOG_ERROR << "Invalid client address encoded: addrlen=" << addrLen
+                << " ex=" << ex.what();
     return;
   }
   // decode the packetReceiveTime
   uint64_t pktReceiveEpoch = 0;
   if (!cursor.tryReadBE(pktReceiveEpoch)) {
-    VLOG(4) << "Malformed packet received without packetReceiveTime. Dropping.";
+    MVVLOG(4)
+        << "Malformed packet received without packetReceiveTime. Dropping.";
     return;
   }
   Clock::duration tick(pktReceiveEpoch);

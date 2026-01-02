@@ -7,6 +7,7 @@
 
 #include <quic/QuicException.h>
 #include <quic/codec/Types.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -457,7 +458,7 @@ std::string_view toString(FrameType frame) {
     case quic::FrameType::ACK_EXTENDED:
       return "ACK_EXTENDED";
   }
-  LOG(WARNING) << "toString has unhandled frame type";
+  MVLOG_WARNING << "toString has unhandled frame type";
   return "UNKNOWN";
 }
 
@@ -494,7 +495,7 @@ std::string_view toString(QuicVersion version) {
     case QuicVersion::SCONE_VERSION_2:
       return "SCONE_VERSION_2";
   }
-  LOG(WARNING) << "toString has unhandled version type";
+  MVLOG_WARNING << "toString has unhandled version type";
   return "UNKNOWN";
 }
 
@@ -509,7 +510,7 @@ std::string_view toString(LongHeader::Types type) {
     case LongHeader::Types::ZeroRtt:
       return "ZERORTT";
   }
-  LOG(WARNING) << "toString has unhandled long header type";
+  MVLOG_WARNING << "toString has unhandled long header type";
   return "UNKNOWN";
 }
 
@@ -520,7 +521,7 @@ std::string_view toString(TokenType type) {
     case TokenType::NewToken:
       return "NewToken";
   }
-  LOG(WARNING) << "toString has unhandled token type";
+  MVLOG_WARNING << "toString has unhandled token type";
   return "UNKNOWN";
 }
 

@@ -23,6 +23,7 @@ mvfst_cpp_test(
         "//folly:file_util",
         "//folly:random",
         "//folly/portability:filesystem",
+        "//quic/common:mvfst_logging",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:bbr",
         "//quic/logging:file_qlogger",

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/api/QuicSocket.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/common/BufUtil.h>
 
@@ -35,13 +36,13 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "Got bidirectional stream id=" << id;
+    MVLOG_INFO << "Got bidirectional stream id=" << id;
     CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onNewBidirectionalStreamGroup(
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "Got bidirectional stream group id=" << groupId;
+    MVLOG_INFO << "Got bidirectional stream group id=" << groupId;
     CHECK(streamGroupsData_.find(groupId) == streamGroupsData_.cend());
     streamGroupsData_.emplace(groupId, PerStreamData{});
     if (disableRtx_) {
@@ -55,19 +56,19 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void onNewBidirectionalStreamInGroup(
       quic::StreamId id,
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "Got bidirectional stream id=" << id
-              << " in group=" << groupId;
+    MVLOG_INFO << "Got bidirectional stream id=" << id
+               << " in group=" << groupId;
     CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "Got unidirectional stream id=" << id;
+    MVLOG_INFO << "Got unidirectional stream id=" << id;
     CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onNewUnidirectionalStreamGroup(
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "Got unidirectional stream group id=" << groupId;
+    MVLOG_INFO << "Got unidirectional stream group id=" << groupId;
     CHECK(streamGroupsData_.find(groupId) == streamGroupsData_.cend());
     streamGroupsData_.emplace(groupId, PerStreamData{});
   }
@@ -75,19 +76,19 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void onNewUnidirectionalStreamInGroup(
       quic::StreamId id,
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "Got unidirectional stream id=" << id
-              << " in group=" << groupId;
+    MVLOG_INFO << "Got unidirectional stream id=" << id
+               << " in group=" << groupId;
     CHECK(sock->setReadCallback(id, this).has_value());
   }
 
   void onStopSending(
       quic::StreamId id,
       quic::ApplicationErrorCode error) noexcept override {
-    LOG(INFO) << "Got StopSending stream id=" << id << " error=" << error;
+    MVLOG_INFO << "Got StopSending stream id=" << id << " error=" << error;
   }
 
   void onConnectionEnd() noexcept override {
-    LOG(INFO) << "Socket closed";
+    MVLOG_INFO << "Socket closed";
   }
 
   void onConnectionSetupError(QuicError error) noexcept override {
@@ -95,16 +96,16 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onConnectionError(QuicError error) noexcept override {
-    LOG(ERROR) << "Socket error=" << toString(error.code) << " "
-               << error.message;
+    MVLOG_ERROR << "Socket error=" << toString(error.code) << " "
+                << error.message;
   }
 
   void readAvailable(quic::StreamId id) noexcept override {
-    LOG(INFO) << "read available for stream id=" << id;
+    MVLOG_INFO << "read available for stream id=" << id;
 
     auto res = sock->read(id, 0);
     if (res.hasError()) {
-      LOG(ERROR) << "Got error=" << toString(res.error());
+      MVLOG_ERROR << "Got error=" << toString(res.error());
       CHECK(sock->setReadCallback(id, nullptr).has_value());
       return;
     }
@@ -114,15 +115,15 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     quic::BufPtr data = std::move(res.value().first);
     bool eof = res.value().second;
     auto dataLen = (data ? data->computeChainDataLength() : 0);
-    LOG(INFO) << "Got len=" << dataLen << " eof=" << uint32_t(eof)
-              << " total=" << input_[id].first.chainLength() + dataLen
-              << " data="
-              << ((data) ? data->clone()->toString() : std::string());
+    MVLOG_INFO << "Got len=" << dataLen << " eof=" << uint32_t(eof)
+               << " total=" << input_[id].first.chainLength() + dataLen
+               << " data="
+               << ((data) ? data->clone()->toString() : std::string());
     input_[id].first.append(std::move(data));
     input_[id].second = eof;
     if (eof) {
       echo(id, input_[id]);
-      LOG(INFO) << "uninstalling read callback";
+      MVLOG_INFO << "uninstalling read callback";
       CHECK(sock->setReadCallback(id, nullptr).has_value());
     }
   }
@@ -130,15 +131,15 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void readAvailableWithGroup(
       quic::StreamId id,
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "read available for stream id=" << id
-              << "; groupId=" << groupId;
+    MVLOG_INFO << "read available for stream id=" << id
+               << "; groupId=" << groupId;
 
     auto it = streamGroupsData_.find(groupId);
     CHECK(it != streamGroupsData_.end());
 
     auto res = sock->read(id, 0);
     if (res.hasError()) {
-      LOG(ERROR) << "Got error=" << toString(res.error());
+      MVLOG_ERROR << "Got error=" << toString(res.error());
       return;
     }
 
@@ -150,10 +151,10 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     quic::BufPtr data = std::move(res.value().first);
     bool eof = res.value().second;
     auto dataLen = (data ? data->computeChainDataLength() : 0);
-    LOG(INFO) << "Got len=" << dataLen << " eof=" << uint32_t(eof)
-              << " total=" << input_[id].first.chainLength() + dataLen
-              << " data="
-              << ((data) ? data->clone()->toString() : std::string());
+    MVLOG_INFO << "Got len=" << dataLen << " eof=" << uint32_t(eof)
+               << " total=" << input_[id].first.chainLength() + dataLen
+               << " data="
+               << ((data) ? data->clone()->toString() : std::string());
 
     streamData[id].first.append(std::move(data));
     streamData[id].second = eof;
@@ -163,8 +164,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void readError(quic::StreamId id, QuicError error) noexcept override {
-    LOG(ERROR) << "Got read error on stream=" << id
-               << " error=" << toString(error);
+    MVLOG_ERROR << "Got read error on stream=" << id
+                << " error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
     // resetStream
@@ -174,30 +175,30 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       quic::StreamId id,
       quic::StreamGroupId groupId,
       QuicError error) noexcept override {
-    LOG(ERROR) << "Got read error on stream=" << id << "; group=" << groupId
-               << " error=" << toString(error);
+    MVLOG_ERROR << "Got read error on stream=" << id << "; group=" << groupId
+                << " error=" << toString(error);
   }
 
   void onDatagramsAvailable() noexcept override {
     auto res = sock->readDatagrams();
     if (res.hasError()) {
-      LOG(ERROR) << "readDatagrams() error: " << res.error();
+      MVLOG_ERROR << "readDatagrams() error: " << res.error();
       return;
     }
-    LOG(INFO) << "received " << res->size() << " datagrams";
+    MVLOG_INFO << "received " << res->size() << " datagrams";
     echoDg(std::move(res.value()));
   }
 
   void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
       override {
-    LOG(INFO) << "socket is write ready with maxToSend=" << maxToSend;
+    MVLOG_INFO << "socket is write ready with maxToSend=" << maxToSend;
     echo(id, input_[id]);
   }
 
   void onStreamWriteError(quic::StreamId id, QuicError error) noexcept
       override {
-    LOG(ERROR) << "write error with stream=" << id
-               << " error=" << toString(error);
+    MVLOG_ERROR << "write error with stream=" << id
+                << " error=" << toString(error);
   }
 
   folly::EventBase* getEventBase() {
@@ -217,7 +218,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     echoedData->appendToChain(data.first.move());
     auto res = sock->writeChain(id, std::move(echoedData), true, nullptr);
     if (res.hasError()) {
-      LOG(ERROR) << "write error=" << toString(res.error());
+      MVLOG_ERROR << "write error=" << toString(res.error());
     } else {
       // echo is done, clear EOF
       data.second = false;
@@ -231,7 +232,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
       echoedData->appendToChain(datagram.bufQueue().front()->cloneCoalesced());
       auto res = sock->writeDatagram(std::move(echoedData));
       if (res.hasError()) {
-        LOG(ERROR) << "writeDatagram error=" << toString(res.error());
+        MVLOG_ERROR << "writeDatagram error=" << toString(res.error());
       }
     }
   }

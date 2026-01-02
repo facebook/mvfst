@@ -7,6 +7,7 @@
 
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/EventBaseBackendBase.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/QuicServer.h>
 
 namespace quic {
@@ -56,7 +57,7 @@ WindowsEventBaseBackend::WindowsEventBaseBackend() {
 
 WindowsEventBaseBackend::WindowsEventBaseBackend(event_base* evb) : evb_(evb) {
   if (UNLIKELY(evb_ == nullptr)) {
-    LOG(ERROR) << "EventBase(): Pass nullptr as event base.";
+    MVLOG_ERROR << "EventBase(): Pass nullptr as event base.";
     throw std::invalid_argument("EventBase(): event base cannot be nullptr");
   }
 }

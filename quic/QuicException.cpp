@@ -9,7 +9,7 @@
 #include <quic/QuicException.h>
 #include <quic/QuicTLSException.h> // @manual
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 #include <vector>
 
 namespace quic {
@@ -171,7 +171,7 @@ std::string toString(TransportErrorCode code) {
     return cryptoErrorToString(code);
   }
 
-  LOG(WARNING) << "toString has unhandled ErrorCode";
+  MVLOG_WARNING << "toString has unhandled ErrorCode";
   return "Unknown error";
 }
 

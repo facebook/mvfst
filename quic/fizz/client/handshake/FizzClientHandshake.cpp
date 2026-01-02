@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 
 #include <fizz/protocol/Exporter.h>
@@ -349,7 +350,7 @@ class FizzClientHandshake::ActionMoveVisitor {
   }
 
   void operator()(fizz::client::ReportEarlyWriteFailed&) {
-    LOG(DFATAL) << "QUIC TLS app data write";
+    MVLOG_DFATAL << "QUIC TLS app data write";
   }
 
   void operator()(fizz::ReportError& err) {

@@ -8,6 +8,7 @@
 #include <quic/api/QuicAckScheduler.h>
 #include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -90,9 +91,9 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         auto streamResult =
             conn_.streamManager->getStream(streamFrame.streamId);
         if (streamResult.hasError()) {
-          VLOG(4) << "Failed to get stream " << streamFrame.streamId
-                  << " for cloning WriteStreamFrame: "
-                  << streamResult.error().message;
+          MVVLOG(4) << "Failed to get stream " << streamFrame.streamId
+                    << " for cloning WriteStreamFrame: "
+                    << streamResult.error().message;
           // Propagate error
           return quic::make_unexpected(streamResult.error());
         }
@@ -113,8 +114,8 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
               lastFrame && bufferLen && !hasAckFrame,
               streamFrame.streamGroupId);
           if (res.hasError()) {
-            VLOG(4) << "Failed to write stream frame header for cloning: "
-                    << res.error().message;
+            MVVLOG(4) << "Failed to write stream frame header for cloning: "
+                      << res.error().message;
             return quic::make_unexpected(res.error());
           }
 
@@ -181,9 +182,9 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         auto streamResult =
             conn_.streamManager->getStream(maxStreamDataFrame.streamId);
         if (streamResult.hasError()) {
-          VLOG(4) << "Failed to get stream " << maxStreamDataFrame.streamId
-                  << " for cloning MaxStreamDataFrame: "
-                  << streamResult.error().message;
+          MVVLOG(4) << "Failed to get stream " << maxStreamDataFrame.streamId
+                    << " for cloning MaxStreamDataFrame: "
+                    << streamResult.error().message;
           return quic::make_unexpected(streamResult.error());
         }
         auto* stream = streamResult.value();

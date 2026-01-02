@@ -6,6 +6,7 @@
  */
 
 #include <quic/codec/QuicInteger.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -32,8 +33,8 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
     uint64_t atMost) {
   // checks
   if (atMost == 0 || !cursor.canAdvance(1)) {
-    VLOG(10) << "Not enough bytes to decode integer, cursor len="
-             << cursor.remaining();
+    MVVLOG(10) << "Not enough bytes to decode integer, cursor len="
+               << cursor.remaining();
     return std::nullopt;
   }
 
@@ -50,7 +51,7 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
 
   // not enough bytes to decode, undo cursor
   if (!cursor.canAdvance(bytesExpected) || atMost < bytesExpected) {
-    VLOG(10) << "Could not decode integer numBytes=" << bytesExpected;
+    MVVLOG(10) << "Could not decode integer numBytes=" << bytesExpected;
     return std::nullopt;
   }
   // result storage
@@ -72,7 +73,7 @@ QuicInteger::QuicInteger(uint64_t value) : value_(value) {}
 quic::Expected<size_t, QuicError> QuicInteger::getSize() const {
   auto size = getQuicIntegerSize(value_);
   if (size.hasError()) {
-    LOG(ERROR) << "Value too large value=" << value_;
+    MVLOG_ERROR << "Value too large value=" << value_;
     std::string errorMsg = "Value too large ";
     errorMsg += std::to_string(value_);
     return quic::make_unexpected(

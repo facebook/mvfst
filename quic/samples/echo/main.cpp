@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <fizz/crypto/Utils.h>
 #include <folly/init/Init.h>
@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 
   if (FLAGS_mode == "server") {
     if (FLAGS_connect_only) {
-      LOG(ERROR) << "connect_only is not supported in server mode";
+      MVLOG_ERROR << "connect_only is not supported in server mode";
       return -1;
     }
     EchoServer server(
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {
-      LOG(ERROR) << "EchoClient expected --host and --port";
+      MVLOG_ERROR << "EchoClient expected --host and --port";
       return -2;
     }
     EchoClient client(
@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
     auto res = client.start(FLAGS_token);
     return res.hasError() ? EXIT_FAILURE : EXIT_SUCCESS;
   } else {
-    LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
+    MVLOG_ERROR << "Unknown mode specified: " << FLAGS_mode;
     return -1;
   }
   return 0;

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/NewReno.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
@@ -26,9 +27,9 @@ NewReno::NewReno(QuicConnectionStateBase& conn)
 }
 
 void NewReno::onRemoveBytesFromInflight(uint64_t /* bytes */) {
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+  MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -48,11 +49,11 @@ void NewReno::onRemoveBytesFromInflight(uint64_t /* bytes */) {
 }
 
 void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes
-           << " packetNum=" << packet.packet.header.getPacketSequenceNum()
-           << " " << conn_;
+  MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes
+             << " packetNum=" << packet.packet.header.getPacketSequenceNum()
+             << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -73,9 +74,9 @@ void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
 
 void NewReno::onAckEvent(const AckEvent& ack) {
   DCHECK(ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_
-           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+  MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -155,14 +156,14 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
         conn_.transportSettings.minCwndInMss);
     // This causes us to exit slow start.
     ssthresh_ = cwndBytes_;
-    VLOG(10) << __func__ << " exit slow start, ssthresh=" << ssthresh_
-             << " packetNum=" << *loss.largestLostPacketNum
-             << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
-             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+    MVVLOG(10) << __func__ << " exit slow start, ssthresh=" << ssthresh_
+               << " packetNum=" << *loss.largestLostPacketNum
+               << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
+               << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   } else {
-    VLOG(10) << __func__ << " packetNum=" << *loss.largestLostPacketNum
-             << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
-             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+    MVVLOG(10) << __func__ << " packetNum=" << *loss.largestLostPacketNum
+               << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
+               << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   }
 
   if (conn_.qLogger) {
@@ -182,9 +183,9 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
         conn_.lossState.ptoCount);
   }
   if (loss.persistentCongestion) {
-    VLOG(10) << __func__ << " writable=" << getWritableBytes()
-             << " cwnd=" << cwndBytes_
-             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+    MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+               << " cwnd=" << cwndBytes_
+               << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
     if (conn_.qLogger) {
       conn_.qLogger->addMetricUpdate(
           conn_.lossState.lrtt,

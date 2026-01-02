@@ -15,6 +15,7 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/StringUtils.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
@@ -216,7 +217,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
   }
   packetsWritten += connectionDataResult->packetsWritten;
   bytesWritten += connectionDataResult->bytesWritten;
-  VLOG_IF(10, packetsWritten || probesWritten)
+  MVVLOG_IF(10, packetsWritten || probesWritten)
       << nodeToString(connection.nodeType) << " written data "
       << (exceptCryptoStream ? "without crypto data " : "")
       << "to socket packets=" << packetsWritten << " probes=" << probesWritten
@@ -399,8 +400,8 @@ continuousMemoryBuildScheduleEncrypt(
   }
   connection.bufAccessor->release(std::move(packetBuf));
   if (encodedSize > connection.udpSendPacketLen) {
-    VLOG(3) << "Quic sending pkt larger than limit, encodedSize="
-            << encodedSize;
+    MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
+              << encodedSize;
   }
   // TODO: I think we should add an API that doesn't need a buffer.
   auto writeResult =
@@ -541,8 +542,8 @@ iobufChainBasedBuildScheduleEncrypt(
     }
   }
   if (encodedSize > connection.udpSendPacketLen) {
-    LOG(ERROR) << "Quic sending pkt larger than limit, encodedSize="
-               << encodedSize << " encodedBodySize=" << encodedBodySize;
+    MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
+              << encodedSize << " encodedBodySize=" << encodedBodySize;
   }
 
   if (connection.transportSettings.isPriming && packetBuf) {
@@ -666,9 +667,9 @@ quic::Expected<bool, QuicError> handleStreamWritten(
     // only writes one STREAM frame for a stream in a packet. If that doesn't
     // hold, we need to avoid double-counting.
     ++stream.numPacketsTxWithNewData;
-    VLOG(10) << nodeToString(conn.nodeType) << " sent"
-             << " packetNum=" << packetNum << " space=" << packetNumberSpace
-             << " " << conn;
+    MVVLOG(10) << nodeToString(conn.nodeType) << " sent"
+               << " packetNum=" << packetNum << " space=" << packetNumberSpace
+               << " " << conn;
     return true;
   }
 
@@ -688,8 +689,8 @@ quic::Expected<bool, QuicError> handleStreamWritten(
 
   if (writtenRetx) {
     conn.lossState.totalBytesRetransmitted += frameLen;
-    VLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
-             << " packetNum=" << packetNum << " " << conn;
+    MVVLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
+               << " packetNum=" << packetNum << " " << conn;
     QUIC_STATS(conn.statsCallback, onPacketRetransmission);
     return false;
   }
@@ -718,9 +719,9 @@ quic::Expected<void, QuicError> updateConnection(
   uint32_t newStreamBytesSent = 0;
   OutstandingPacketWrapper::Metadata::DetailsPerStream detailsPerStream;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
-  VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
-           << " in space=" << packetNumberSpace << " size=" << encodedSize
-           << " bodySize: " << encodedBodySize << " " << conn;
+  MVVLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
+             << " in space=" << packetNumberSpace << " size=" << encodedSize
+             << " bodySize: " << encodedBodySize << " " << conn;
   if (conn.qLogger) {
     conn.qLogger->addPacket(packet, encodedSize);
   }
@@ -793,10 +794,10 @@ quic::Expected<void, QuicError> updateConnection(
         DCHECK(!ackFrameCounter++)
             << "Send more than one WriteAckFrame " << conn;
         auto largestAckedPacketWritten = writeAckFrame.ackBlocks.front().end;
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent packet with largestAcked="
-                 << largestAckedPacketWritten << " packetNum=" << packetNum
-                 << " " << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent packet with largestAcked="
+                   << largestAckedPacketWritten << " packetNum=" << packetNum
+                   << " " << conn;
         ++conn.numAckFramesSent;
         updateAckSendStateOnSentPacketWithAcks(
             conn,
@@ -807,9 +808,9 @@ quic::Expected<void, QuicError> updateConnection(
       case QuicWriteFrame::Type::RstStreamFrame: {
         const RstStreamFrame& rstStreamFrame = *frame.asRstStreamFrame();
         retransmittable = true;
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent reset streams in packetNum=" << packetNum << " "
-                 << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent reset streams in packetNum=" << packetNum << " "
+                   << conn;
         auto resetIter =
             conn.pendingEvents.resets.find(rstStreamFrame.streamId);
         // TODO: this can happen because we clone RST_STREAM frames. Should we
@@ -826,21 +827,21 @@ quic::Expected<void, QuicError> updateConnection(
         const MaxDataFrame& maxDataFrame = *frame.asMaxDataFrame();
         CHECK(!connWindowUpdateSent++)
             << "Send more than one connection window update " << conn;
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent conn window update packetNum=" << packetNum << " "
-                 << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent conn window update packetNum=" << packetNum << " "
+                   << conn;
         retransmittable = true;
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent conn window update in packetNum=" << packetNum << " "
-                 << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent conn window update in packetNum=" << packetNum
+                   << " " << conn;
         ++conn.numWindowUpdateFramesSent;
         onConnWindowUpdateSent(conn, maxDataFrame.maximumData, sentTime);
         break;
       }
       case QuicWriteFrame::Type::DataBlockedFrame: {
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent conn data blocked frame=" << packetNum << " "
-                 << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent conn data blocked frame=" << packetNum << " "
+                   << conn;
         retransmittable = true;
         conn.pendingEvents.sendDataBlocked = false;
         break;
@@ -855,9 +856,9 @@ quic::Expected<void, QuicError> updateConnection(
         }
         auto stream = streamResult.value();
         retransmittable = true;
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent packet with window update packetNum=" << packetNum
-                 << " stream=" << maxStreamDataFrame.streamId << " " << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent packet with window update packetNum=" << packetNum
+                   << " stream=" << maxStreamDataFrame.streamId << " " << conn;
         ++conn.numWindowUpdateFramesSent;
         onStreamWindowUpdateSent(
             *stream, maxStreamDataFrame.maximumData, sentTime);
@@ -866,9 +867,9 @@ quic::Expected<void, QuicError> updateConnection(
       case QuicWriteFrame::Type::StreamDataBlockedFrame: {
         const StreamDataBlockedFrame& streamBlockedFrame =
             *frame.asStreamDataBlockedFrame();
-        VLOG(10) << nodeToString(conn.nodeType)
-                 << " sent blocked stream frame packetNum=" << packetNum << " "
-                 << conn;
+        MVVLOG(10) << nodeToString(conn.nodeType)
+                   << " sent blocked stream frame packetNum=" << packetNum
+                   << " " << conn;
         retransmittable = true;
         conn.streamManager->removeBlocked(streamBlockedFrame.streamId);
         break;
@@ -1246,7 +1247,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
     bytesWritten += cloneResult->bytesWritten;
   }
 
-  VLOG_IF(10, packetsWritten || probesWritten)
+  MVVLOG_IF(10, packetsWritten || probesWritten)
       << nodeToString(connection.nodeType)
       << " written crypto and acks data type=" << packetType
       << " packetsWritten=" << packetsWritten
@@ -1349,9 +1350,9 @@ quic::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
   }
 
   auto written = writeResult->packetsWritten;
-  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
-                           << " written zero rtt data, packets=" << written
-                           << " " << connection;
+  MVVLOG_IF(10, written > 0)
+      << nodeToString(connection.nodeType)
+      << " written zero rtt data, packets=" << written << " " << connection;
   DCHECK_GE(packetLimit, written);
   return written;
 }
@@ -1382,8 +1383,8 @@ void writeCloseCommon(
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   auto encodeResult = packetBuilder.encodePacketHeader();
   if (!encodeResult.has_value()) {
-    LOG(ERROR) << "Error encoding packet header: "
-               << encodeResult.error().message;
+    MVLOG_ERROR << "Error encoding packet header: "
+                << encodeResult.error().message;
     return;
   }
   packetBuilder.accountForCipherOverhead(aead.getCipherOverhead());
@@ -1395,7 +1396,7 @@ void writeCloseCommon(
             std::string("No error")),
         packetBuilder);
     if (!writeResult.has_value()) {
-      LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+      MVLOG_ERROR << "Error writing frame: " << writeResult.error().message;
       return;
     }
     written = *writeResult;
@@ -1409,7 +1410,7 @@ void writeCloseCommon(
                 quic::FrameType::CONNECTION_CLOSE_APP_ERR),
             packetBuilder);
         if (!writeResult.has_value()) {
-          LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+          MVLOG_ERROR << "Error writing frame: " << writeResult.error().message;
           return;
         }
         written = *writeResult;
@@ -1423,7 +1424,7 @@ void writeCloseCommon(
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         if (!writeResult.has_value()) {
-          LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+          MVLOG_ERROR << "Error writing frame: " << writeResult.error().message;
           return;
         }
         written = *writeResult;
@@ -1437,7 +1438,7 @@ void writeCloseCommon(
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         if (!writeResult.has_value()) {
-          LOG(ERROR) << "Error writing frame: " << writeResult.error().message;
+          MVLOG_ERROR << "Error writing frame: " << writeResult.error().message;
           return;
         }
         written = *writeResult;
@@ -1450,14 +1451,14 @@ void writeCloseCommon(
     while (packetBuilder.remainingSpaceInPkt() > 0) {
       auto paddingResult = writeFrame(PaddingFrame(), packetBuilder);
       if (!paddingResult.has_value()) {
-        LOG(ERROR) << "Error writing padding frame: "
-                   << paddingResult.error().message;
+        MVLOG_ERROR << "Error writing padding frame: "
+                    << paddingResult.error().message;
         return;
       }
     }
   }
   if (written == 0) {
-    LOG(ERROR) << "Close frame too large " << connection;
+    MVLOG_ERROR << "Close frame too large " << connection;
     return;
   }
   auto packet = std::move(packetBuilder).buildPacket();
@@ -1466,7 +1467,7 @@ void writeCloseCommon(
   auto encryptResult =
       aead.inplaceEncrypt(std::move(bufUniquePtr), &packet.header, packetNum);
   if (!encryptResult.has_value()) {
-    LOG(ERROR) << "Error encrypting packet: " << encryptResult.error().message;
+    MVLOG_ERROR << "Error encrypting packet: " << encryptResult.error().message;
     return;
   }
   bufUniquePtr = std::move(encryptResult.value());
@@ -1479,8 +1480,8 @@ void writeCloseCommon(
       bufUniquePtr->length(),
       headerCipher);
   if (!headerEncryptResult.has_value()) {
-    LOG(ERROR) << "Failed to encrypt packet header: "
-               << headerEncryptResult.error().message;
+    MVLOG_ERROR << "Failed to encrypt packet header: "
+                << headerEncryptResult.error().message;
     return;
   }
   Buf packetBuf(std::move(packet.header));
@@ -1489,9 +1490,9 @@ void writeCloseCommon(
   if (connection.qLogger) {
     connection.qLogger->addPacket(packet.packet, packetSize);
   }
-  VLOG(10) << nodeToString(connection.nodeType)
-           << " sent close packetNum=" << packetNum << " in space=" << pnSpace
-           << " " << connection;
+  MVVLOG(10) << nodeToString(connection.nodeType)
+             << " sent close packetNum=" << packetNum << " in space=" << pnSpace
+             << " " << connection;
   // Increment the sequence number.
   increaseNextPacketNum(connection, pnSpace);
   // best effort writing to the socket, ignore any errors.
@@ -1502,8 +1503,8 @@ void writeCloseCommon(
   auto ret = sock.write(connection.peerAddress, vec, iovec_len);
   connection.lossState.totalBytesSent += packetSize;
   if (ret < 0) {
-    VLOG(4) << "Error writing connection close " << quic::errnoStr(errno) << " "
-            << connection;
+    MVVLOG(4) << "Error writing connection close " << quic::errnoStr(errno)
+              << " " << connection;
   } else {
     QUIC_STATS(connection.statsCallback, onWrite, ret);
   }
@@ -1729,14 +1730,14 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     return WriteQuicDataResult{0, 0, 0};
   }
 
-  VLOG(10) << nodeToString(connection.nodeType)
-           << " writing data using scheduler=" << scheduler.name() << " "
-           << connection;
+  MVVLOG(10) << nodeToString(connection.nodeType)
+             << " writing data using scheduler=" << scheduler.name() << " "
+             << connection;
 
   if (!connection.gsoSupported.has_value()) {
     auto gsoResult = sock.getGSO();
     if (!gsoResult.has_value()) {
-      LOG(ERROR) << "Failed to get GSO: " << gsoResult.error().message;
+      MVLOG_ERROR << "Failed to get GSO: " << gsoResult.error().message;
       return quic::make_unexpected(gsoResult.error());
     }
     connection.gsoSupported = sock.getGSO().value() >= 0;
@@ -2022,7 +2023,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(
     probesWritten += probingResult->packetsWritten;
     bytesWritten += probingResult->bytesWritten;
   }
-  VLOG_IF(10, probesWritten > 0)
+  MVVLOG_IF(10, probesWritten > 0)
       << nodeToString(connection.nodeType)
       << " writing probes using scheduler=CloningScheduler " << connection;
   return WriteQuicDataResult{0, probesWritten, bytesWritten};
@@ -2039,16 +2040,16 @@ WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
       numProbePackets[PacketNumberSpace::AppData] && conn.oneRttWriteCipher;
   if (shouldWriteInitialProbes || shouldWriteHandshakeProbes ||
       shouldWriteAppDataProbes) {
-    VLOG(10) << nodeToString(conn.nodeType) << " needs write because of PTO"
-             << conn;
+    MVVLOG(10) << nodeToString(conn.nodeType) << " needs write because of PTO"
+               << conn;
     return WriteDataReason::PROBES;
   }
   if (hasAlternatePathValidationDataToWrite(conn)) {
     return WriteDataReason::PATH_VALIDATION;
   }
   if (hasAckDataToWrite(conn)) {
-    VLOG(10) << nodeToString(conn.nodeType) << " needs write because of ACKs "
-             << conn;
+    MVVLOG(10) << nodeToString(conn.nodeType) << " needs write because of ACKs "
+               << conn;
     return WriteDataReason::ACK;
   }
 
@@ -2096,13 +2097,14 @@ bool hasAckDataToWrite(const QuicConnectionStateBase& conn) {
   bool writeAcks =
       (toWriteInitialAcks(conn) || toWriteHandshakeAcks(conn) ||
        toWriteAppDataAcks(conn));
-  VLOG_IF(10, writeAcks) << nodeToString(conn.nodeType)
-                         << " needs write because of acks largestAck="
-                         << largestAckToSendToString(conn) << " largestSentAck="
-                         << largestAckScheduledToString(conn)
-                         << " ackTimeoutSet="
-                         << conn.pendingEvents.scheduleAckTimeout << " "
-                         << conn;
+  MVVLOG_IF(10, writeAcks) << nodeToString(conn.nodeType)
+                           << " needs write because of acks largestAck="
+                           << largestAckToSendToString(conn)
+                           << " largestSentAck="
+                           << largestAckScheduledToString(conn)
+                           << " ackTimeoutSet="
+                           << conn.pendingEvents.scheduleAckTimeout << " "
+                           << conn;
   return writeAcks;
 }
 
@@ -2112,8 +2114,8 @@ bool hasBufferedDataToWrite(const QuicConnectionStateBase& conn) {
 
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (cryptoHasWritableData(conn)) {
-    VLOG(10) << nodeToString(conn.nodeType)
-             << " needs write because of crypto stream" << " " << conn;
+    MVVLOG(10) << nodeToString(conn.nodeType)
+               << " needs write because of crypto stream" << " " << conn;
     return WriteDataReason::CRYPTO_STREAM;
   }
   if (!conn.oneRttWriteCipher &&
@@ -2194,8 +2196,8 @@ void implicitAckCryptoStream(
       auto insertResult =
           ackBlocks.tryInsert(op.packet.header.getPacketSequenceNum());
       if (insertResult.hasError()) {
-        LOG(ERROR) << "Failed to insert packet number into ack blocks: "
-                   << static_cast<int>(insertResult.error());
+        MVLOG_ERROR << "Failed to insert packet number into ack blocks: "
+                    << static_cast<int>(insertResult.error());
         // Continue processing other packets - this shouldn't happen in normal
         // operation
         continue;
@@ -2252,7 +2254,7 @@ void implicitAckCryptoStream(
       // We shouldn't mark anything as lost from the implicit ACK, as it should
       // be ACKing the entire rangee.
       [](auto&, auto, auto&, auto) -> quic::Expected<void, QuicError> {
-        LOG(FATAL) << "Got loss from implicit crypto ACK.";
+        MVLOG_FATAL << "Got loss from implicit crypto ACK.";
         return {};
       },
       implicitAckTime);
@@ -2549,7 +2551,7 @@ writePathValidationDataForAlternatePaths(
                                 .pathValidationFrames(pathId);
     auto path = connection.pathManager->getPath(pathId);
     if (!path) {
-      LOG(ERROR) << "Path not found for pathId=" << pathId;
+      MVLOG_ERROR << "Path not found for pathId=" << pathId;
       return quic::make_unexpected(QuicError(
           QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
           "Inconsistent path state"));
@@ -2584,7 +2586,7 @@ writePathValidationDataForAlternatePaths(
     }
     packetsWritten += pathValidationWriteResult->packetsWritten;
     bytesWritten += pathValidationWriteResult->bytesWritten;
-    VLOG_IF(10, packetsWritten || probesWritten)
+    MVVLOG_IF(10, packetsWritten || probesWritten)
         << nodeToString(connection.nodeType)
         << " written path validation packets for " << pathId
         << "to socket packets=" << packetsWritten << " probes=" << probesWritten

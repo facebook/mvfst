@@ -6,6 +6,7 @@
  */
 
 #include <quic/client/handshake/ClientHandshake.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
@@ -95,7 +96,7 @@ quic::Expected<void, QuicError> ClientHandshake::doHandshake(
       appDataReadBuf_.append(std::move(data));
       break;
     default:
-      LOG(FATAL) << "Unhandled EncryptionLevel";
+      MVLOG_FATAL << "Unhandled EncryptionLevel";
   }
   // Get the current buffer type the transport is accepting.
   waitForData_ = false;
@@ -112,7 +113,7 @@ quic::Expected<void, QuicError> ClientHandshake::doHandshake(
         processSocketData(appDataReadBuf_);
         break;
       default:
-        LOG(FATAL) << "Unhandled EncryptionLevel";
+        MVLOG_FATAL << "Unhandled EncryptionLevel";
     }
     if (!error_.has_value()) {
       return std::move(error_);
@@ -218,8 +219,9 @@ ClientHandshake::getNextOneRttWriteCipher() {
   }
 
   CHECK(writeTrafficSecret_);
-  LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
-      << "Client read and write secrets are out of sync";
+  if (trafficSecretSync_ > 1 || trafficSecretSync_ < -1) {
+    MVLOG_WARNING << "Client read and write secrets are out of sync";
+  }
 
   auto nextSecretResult = getNextTrafficSecret(writeTrafficSecret_->coalesce());
   if (!nextSecretResult.has_value()) {
@@ -238,8 +240,9 @@ ClientHandshake::getNextOneRttReadCipher() {
   }
 
   CHECK(readTrafficSecret_);
-  LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
-      << "Client read and write secrets are out of sync";
+  if (trafficSecretSync_ > 1 || trafficSecretSync_ < -1) {
+    MVLOG_WARNING << "Client read and write secrets are out of sync";
+  }
 
   auto nextSecretResult = getNextTrafficSecret(readTrafficSecret_->coalesce());
   if (!nextSecretResult.has_value()) {
@@ -272,7 +275,7 @@ void ClientHandshake::handshakeInitiated() {
 }
 
 void ClientHandshake::computeZeroRttCipher() {
-  VLOG(10) << "Computing Client zero rtt keys";
+  MVVLOG(10) << "Computing Client zero rtt keys";
   earlyDataAttempted_ = true;
 }
 

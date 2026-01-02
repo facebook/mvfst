@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/QuicCubic.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
@@ -246,7 +247,7 @@ void Cubic::updateTimeToOrigin() noexcept {
   auto bytesToOrigin = *steadyState_.lastMaxCwndBytes - cwndBytes_;
   if (bytesToOrigin * 1000 * 1000 / conn_.udpSendPacketLen * 2500 >
       std::numeric_limits<double>::max()) {
-    LOG(WARNING) << "Quic Cubic: timeToOrigin calculation overflow";
+    MVLOG_WARNING << "Quic Cubic: timeToOrigin calculation overflow";
     steadyState_.timeToOrigin = std::numeric_limits<double>::max();
   } else {
     steadyState_.timeToOrigin =
@@ -258,7 +259,7 @@ void Cubic::updateTimeToOrigin() noexcept {
 int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
   // TODO: should we also add a rttMin to timeElapsed?
   if (ackTime < *steadyState_.lastReductionTime) {
-    LOG(WARNING) << "Cubic ackTime earlier than reduction time";
+    MVLOG_WARNING << "Cubic ackTime earlier than reduction time";
     return 0;
   }
   auto timeElapsed = folly::chrono::ceil<std::chrono::milliseconds>(
@@ -269,7 +270,7 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
       std::numeric_limits<double>::max()) {
     // (timeElapsed - timeToOrigin) ^ 3 will overflow/underflow, cut delta
     // to numeric_limit
-    LOG(WARNING) << "Quic Cubic: (t-K) ^ 3 overflows";
+    MVLOG_WARNING << "Quic Cubic: (t-K) ^ 3 overflows";
     delta = timeElapsedCount > steadyState_.timeToOrigin
         ? std::numeric_limits<int64_t>::max()
         : std::numeric_limits<uint64_t>::min();
@@ -279,11 +280,11 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
         std::pow((timeElapsedCount - steadyState_.timeToOrigin), 3.0) / 1000 /
         1000 / 1000));
   }
-  VLOG(15) << "Cubic steady cwnd increase: current cwnd=" << cwndBytes_
-           << ", timeElapsed=" << timeElapsed.count()
-           << ", timeToOrigin=" << steadyState_.timeToOrigin
-           << ", origin=" << *steadyState_.lastMaxCwndBytes
-           << ", cwnd delta=" << delta;
+  MVVLOG(15) << "Cubic steady cwnd increase: current cwnd=" << cwndBytes_
+             << ", timeElapsed=" << timeElapsed.count()
+             << ", timeToOrigin=" << steadyState_.timeToOrigin
+             << ", origin=" << *steadyState_.lastMaxCwndBytes
+             << ", cwnd delta=" << delta;
   if (conn_.qLogger) {
     conn_.qLogger->addMetricUpdate(
         conn_.lossState.lrtt,
@@ -309,13 +310,14 @@ uint64_t Cubic::calculateCubicCwnd(int64_t delta) noexcept {
   if (delta > 0 &&
       (std::numeric_limits<uint64_t>::max() - *steadyState_.lastMaxCwndBytes <
        static_cast<uint64_t>(delta))) {
-    LOG(WARNING) << "Quic Cubic: overflow cwnd cut at uint64_t max";
+    MVLOG_WARNING << "Quic Cubic: overflow cwnd cut at uint64_t max";
     return conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen;
   } else if (
       delta < 0 &&
       (static_cast<uint64_t>(std::abs(delta)) >
        *steadyState_.lastMaxCwndBytes)) {
-    LOG(WARNING) << "Quic Cubic: underflow cwnd cut at minCwndBytes_ " << conn_;
+    MVLOG_WARNING << "Quic Cubic: underflow cwnd cut at minCwndBytes_ "
+                  << conn_;
     return conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   } else {
     return boundedCwnd(
@@ -439,7 +441,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
 }
 
 void Cubic::startHystartRttRound(TimePoint time) noexcept {
-  VLOG(20) << "Cubic Hystart: Start a new RTT round";
+  MVVLOG(20) << "Cubic Hystart: Start a new RTT round";
   hystartState_.roundStart = hystartState_.lastJiffy = time;
   hystartState_.ackCount = 0;
   hystartState_.lastSampledRtt = hystartState_.currSampledRtt;
@@ -488,8 +490,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
     throw QuicInternalException(
         "Cubic Hystart: cwnd overflow", LocalErrorCode::CWND_OVERFLOW);
   }
-  VLOG(15) << "Cubic Hystart increase cwnd=" << cwndBytes_ << ", by "
-           << ack.ackedBytes;
+  MVVLOG(15) << "Cubic Hystart increase cwnd=" << cwndBytes_ << ", by "
+             << ack.ackedBytes;
 
   cwndBytes_ = boundedCwnd(
       cwndBytes_ + ack.ackedBytes,
@@ -504,10 +506,10 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       exitReason = Cubic::ExitReason::EXITPOINT;
     }
     if (exitReason.has_value()) {
-      VLOG(15) << "Cubic exit slow start, reason = "
-               << (*exitReason == Cubic::ExitReason::SSTHRESH
-                       ? "cwnd > ssthresh"
-                       : "found exit point");
+      MVVLOG(15) << "Cubic exit slow start, reason = "
+                 << (*exitReason == Cubic::ExitReason::SSTHRESH
+                         ? "cwnd > ssthresh"
+                         : "found exit point");
       hystartState_.inRttRound = false;
       if (!conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart) {
         ssthresh_ = cwndBytes_;
@@ -523,9 +525,10 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       state_ = CubicStates::Steady;
     } else {
       // No exit yet, but we may still need to end this RTT round
-      VLOG(20) << "Cubic Hystart, mayEndHystartRttRound, largestAckedPacketNum="
-               << *ack.largestNewlyAckedPacket << ", rttRoundEndTarget="
-               << hystartState_.rttRoundEndTarget.time_since_epoch().count();
+      MVVLOG(20)
+          << "Cubic Hystart, mayEndHystartRttRound, largestAckedPacketNum="
+          << *ack.largestNewlyAckedPacket << ", rttRoundEndTarget="
+          << hystartState_.rttRoundEndTarget.time_since_epoch().count();
       if (ack.largestNewlyAckedPacketSentTime >
           hystartState_.rttRoundEndTarget) {
         hystartState_.inRttRound = false;
@@ -570,8 +573,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
           hystartState_.currSampledRtt.value_or(conn_.lossState.lrtt));
       // We can return early if ++ackCount not meeting kAckSampling:
       if (++hystartState_.ackCount < kAckSampling) {
-        VLOG(20) << "Cubic, AckTrain didn't find exit point. ackCount also "
-                 << "smaller than kAckSampling. Return early";
+        MVVLOG(20) << "Cubic, AckTrain didn't find exit point. ackCount also "
+                   << "smaller than kAckSampling. Return early";
         return;
       }
     }
@@ -595,12 +598,12 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       // microseconds::max(), should we just shut down the connection?
       return;
     }
-    VLOG(20) << "Cubic Hystart: looking for DelayIncrease, with eta="
-             << eta.count() << "us, currSampledRtt="
-             << hystartState_.currSampledRtt.value().count()
-             << "us, lastSampledRtt="
-             << hystartState_.lastSampledRtt.value().count()
-             << "us, ackCount=" << (uint32_t)hystartState_.ackCount;
+    MVVLOG(20) << "Cubic Hystart: looking for DelayIncrease, with eta="
+               << eta.count() << "us, currSampledRtt="
+               << hystartState_.currSampledRtt.value().count()
+               << "us, lastSampledRtt="
+               << hystartState_.lastSampledRtt.value().count()
+               << "us, ackCount=" << (uint32_t)hystartState_.ackCount;
     if (hystartState_.ackCount >= kAckSampling &&
         *hystartState_.currSampledRtt >= *hystartState_.lastSampledRtt + eta) {
       hystartState_.found = Cubic::HystartFound::FoundByDelayIncreaseMethod;
@@ -724,8 +727,9 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     }
   }
   if (newCwnd < cwndBytes_) {
-    VLOG(10) << "Cubic steady state calculates a smaller cwnd than last round"
-             << ", new cnwd = " << newCwnd << ", current cwnd = " << cwndBytes_;
+    MVVLOG(10) << "Cubic steady state calculates a smaller cwnd than last round"
+               << ", new cnwd = " << newCwnd
+               << ", current cwnd = " << cwndBytes_;
   } else {
     cwndBytes_ = newCwnd;
   }

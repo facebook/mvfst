@@ -6,7 +6,8 @@
  */
 
 #include <folly/Likely.h>
-#include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
+#include <quic/QuicException.h>
+#include <quic/common/MvfstLogging.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/StringUtils.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocketImpl.h>
 
@@ -159,8 +160,8 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
       timings.maybeSoftwareTs = convertToSocketTimestampExt(*params.ts);
     }
 
-    VLOG(10) << "Got data from socket peer=" << *peerAddress
-             << " len=" << bytesRead;
+    MVVLOG(10) << "Got data from socket peer=" << *peerAddress
+               << " len=" << bytesRead;
     readBuffer->append(bytesRead);
     if (params.gro > 0) {
       size_t len = bytesRead;

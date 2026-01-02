@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/StateData.h>
 
 #include <chrono>
@@ -31,12 +32,12 @@ void addAndCheckOverflow(
     const T2& toAdd,
     const T3& maxValue = std::numeric_limits<T1>::max()) {
   if (std::numeric_limits<T1>::max() - static_cast<T1>(toAdd) < value) {
-    LOG(ERROR) << "Overflow prevented, capping at max value";
+    MVLOG_ERROR << "Overflow prevented, capping at max value";
     value = static_cast<T1>(maxValue);
   } else {
     T1 newValue = value + static_cast<T1>(toAdd);
     if (newValue > static_cast<T1>(maxValue)) {
-      LOG(ERROR) << "Value would exceed max limit, capping at max value";
+      MVLOG_ERROR << "Value would exceed max limit, capping at max value";
       value = static_cast<T1>(maxValue);
     } else {
       value = newValue;
@@ -50,12 +51,12 @@ void subtractAndCheckUnderflow(
     const T2& toSub,
     const T3& minValue = 0) {
   if (value < static_cast<T1>(toSub)) {
-    LOG(ERROR) << "Underflow prevented, capping at min value";
+    MVLOG_ERROR << "Underflow prevented, capping at min value";
     value = static_cast<T1>(minValue);
   } else {
     T1 newValue = value - static_cast<T1>(toSub);
     if (newValue < static_cast<T1>(minValue)) {
-      LOG(ERROR) << "Value would be below min limit, capping at min value";
+      MVLOG_ERROR << "Value would be below min limit, capping at min value";
       value = static_cast<T1>(minValue);
     } else {
       value = newValue;

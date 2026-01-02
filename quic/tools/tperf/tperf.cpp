@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <folly/init/Init.h>
 #include <folly/portability/GFlags.h>
@@ -167,11 +167,11 @@ int main(int argc, char* argv[]) {
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_num_streams != 1) {
-      LOG(ERROR) << "num_streams option is server only";
+      MVLOG_ERROR << "num_streams option is server only";
       return 1;
     }
     if (FLAGS_bytes_per_stream != 0) {
-      LOG(ERROR) << "bytes_per_stream option is server only";
+      MVLOG_ERROR << "bytes_per_stream option is server only";
       return 1;
     }
     TPerfClient client(

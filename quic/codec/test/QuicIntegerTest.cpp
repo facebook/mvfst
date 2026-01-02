@@ -8,6 +8,7 @@
 #include <folly/io/IOBuf.h>
 #include <folly/portability/GTest.h>
 #include <quic/codec/QuicInteger.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/Optional.h>
 #include <quic/common/StringUtils.h>
 
@@ -92,8 +93,8 @@ TEST_P(QuicIntegerEncodeTest, Encode) {
   }
   auto written = encodeQuicInteger(GetParam().decoded, appendOp);
   auto encodedValue = quic::hexlify(queue->toString());
-  LOG(INFO) << "encoded=" << encodedValue;
-  LOG(INFO) << "expected=" << GetParam().hexEncoded;
+  MVLOG_INFO << "encoded=" << encodedValue;
+  MVLOG_INFO << "expected=" << GetParam().hexEncoded;
 
   EXPECT_EQ(encodedValue, GetParam().hexEncoded);
   EXPECT_EQ(*written, encodedValue.size() / 2);

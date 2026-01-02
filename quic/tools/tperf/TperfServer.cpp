@@ -7,6 +7,7 @@
 
 #include <fizz/crypto/Utils.h>
 #include <folly/stats/Histogram.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/logging/FileQLogger.h>
@@ -47,23 +48,23 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "Got bidirectional stream id=" << id;
+    MVLOG_INFO << "Got bidirectional stream id=" << id;
     sock_->setReadCallback(id, this);
   }
 
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "Got unidirectional stream id=" << id;
+    MVLOG_INFO << "Got unidirectional stream id=" << id;
     sock_->setReadCallback(id, this);
   }
 
   void onStopSending(
       quic::StreamId id,
       quic::ApplicationErrorCode error) noexcept override {
-    LOG(INFO) << "Got StopSending stream id=" << id << " error=" << error;
+    MVLOG_INFO << "Got StopSending stream id=" << id << " error=" << error;
   }
 
   void onConnectionEnd() noexcept override {
-    LOG(INFO) << "Socket closed";
+    MVLOG_INFO << "Socket closed";
     auto srtt = sock_->getTransportInfo().srtt.count();
     sock_.reset();
     if (burstDeadlineMs_ > 0) {
@@ -109,7 +110,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       if (doneCallback_) {
         doneCallback_->onDone(resultStr);
       } else {
-        LOG(ERROR) << resultStr;
+        MVLOG_ERROR << resultStr;
       }
     }
   }
@@ -119,15 +120,15 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onConnectionError(QuicError error) noexcept override {
-    LOG(ERROR) << "Conn errorCoded=" << toString(error.code)
-               << ", errorMsg=" << error.message;
+    MVLOG_ERROR << "Conn errorCoded=" << toString(error.code)
+                << ", errorMsg=" << error.message;
   }
 
   void onTransportReady() noexcept override {
     if (maxPacingRate_ != std::numeric_limits<uint64_t>::max()) {
       sock_->setMaxPacingRate(maxPacingRate_);
     }
-    LOG(INFO) << "Starting sends to client.";
+    MVLOG_INFO << "Starting sends to client.";
     if (burstDeadlineMs_ > 0) {
       doBurstSending();
     } else {
@@ -139,11 +140,11 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
   void createNewStream() noexcept {
     if (!sock_) {
-      VLOG(4) << __func__ << ": socket is closed.";
+      MVVLOG(4) << __func__ << ": socket is closed.";
       return;
     }
     auto stream = sock_->createUnidirectionalStream();
-    VLOG(5) << "New Stream with id = " << stream.value();
+    MVVLOG(5) << "New Stream with id = " << stream.value();
     CHECK(stream.has_value());
     bytesPerStream_[stream.value()] = 0;
     notifyDataForStream(stream.value());
@@ -152,23 +153,23 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void notifyDataForStream(quic::StreamId id) {
     evb_->runInEventBaseThread([&, id]() {
       if (!sock_) {
-        VLOG(5) << "notifyDataForStream(" << id << "): socket is closed.";
+        MVVLOG(5) << "notifyDataForStream(" << id << "): socket is closed.";
         return;
       }
       auto res = sock_->notifyPendingWriteOnStream(id, this);
       if (res.hasError()) {
-        LOG(FATAL) << quic::toString(res.error());
+        MVLOG_FATAL << quic::toString(res.error());
       }
     });
   }
 
   void readAvailable(quic::StreamId id) noexcept override {
-    LOG(INFO) << "read available for stream id=" << id;
+    MVLOG_INFO << "read available for stream id=" << id;
   }
 
   void readError(quic::StreamId id, QuicError error) noexcept override {
-    LOG(ERROR) << "Got read error on stream=" << id
-               << " error=" << toString(error);
+    MVLOG_ERROR << "Got read error on stream=" << id
+                << " error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
     // resetStream
@@ -197,8 +198,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
   void onStreamWriteError(quic::StreamId id, QuicError error) noexcept
       override {
-    LOG(ERROR) << "write error with stream=" << id
-               << " error=" << toString(error);
+    MVLOG_ERROR << "write error with stream=" << id
+                << " error=" << toString(error);
   }
 
   folly::EventBase* getEventBase() {
@@ -211,7 +212,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     sendBuffer->append(toSend);
     auto res = sock_->writeChain(id, std::move(sendBuffer), eof, nullptr);
     if (res.hasError()) {
-      LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
+      MVLOG_FATAL << "Got error on write: " << quic::toString(res.error());
     }
   }
 
@@ -220,11 +221,11 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
       return;
     }
 
-    VLOG(4) << "sending batch " << batchN_;
+    MVVLOG(4) << "sending batch " << batchN_;
     ++batchN_;
 
     auto stream = sock_->createUnidirectionalStream();
-    VLOG(5) << "New Stream with id = " << stream.value();
+    MVVLOG(5) << "New Stream with id = " << stream.value();
     CHECK(stream.has_value());
     streamBurstSendResult_.streamId = *stream;
     streamBurstSendResult_.acked = false;
@@ -235,8 +236,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     CHECK_GT(blockSize_, 0);
     auto r = sock_->registerTxCallback(*stream, 0, this);
     if (r.hasError()) {
-      LOG(FATAL) << "Got error on registerTxCallback: "
-                 << quic::toString(r.error());
+      MVLOG_FATAL << "Got error on registerTxCallback: "
+                  << quic::toString(r.error());
     }
     auto res = sock_->writeChain(
         *stream,
@@ -244,7 +245,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
         true /* eof */,
         this /* byte events callback */);
     if (res.hasError()) {
-      LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
+      MVLOG_FATAL << "Got error on write: " << quic::toString(res.error());
     }
 
     // Schedule deadline.
@@ -269,8 +270,9 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
               now - streamBurstSendResult_.trueTxStartTs);
       burstSendTrueAckedLatencyHistogramMicroseconds_.addValue(
           trueAckedLatencyUs.count());
-      VLOG(4) << "got stream " << byteEvent.id << " offset " << byteEvent.offset
-              << " acked (" << trueAckedLatencyUs.count() << "us)";
+      MVVLOG(4) << "got stream " << byteEvent.id << " offset "
+                << byteEvent.offset << " acked (" << trueAckedLatencyUs.count()
+                << "us)";
 
       streamBurstSendResult_.acked = true;
       ++burstSendStats_.delivered;
@@ -278,8 +280,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onByteEventCanceled(ByteEventCancellation cancellation) override {
-    VLOG(4) << "got stream " << cancellation.id << " offset "
-            << cancellation.offset << " cancelled";
+    MVVLOG(4) << "got stream " << cancellation.id << " offset "
+              << cancellation.offset << " cancelled";
   }
 
   void timeoutExpired() noexcept override {
@@ -288,8 +290,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     }
 
     if (!streamBurstSendResult_.acked) {
-      LOG(ERROR) << "resetting stream " << streamBurstSendResult_.streamId
-                 << " on deadline";
+      MVLOG_ERROR << "resetting stream " << streamBurstSendResult_.streamId
+                  << " on deadline";
       ++burstSendStats_.missedDeadline;
       sock_->resetStream(
           streamBurstSendResult_.streamId,
@@ -545,7 +547,7 @@ TPerfServer::TPerfServer(
   settings.canIgnorePathMTU = overridePacketSize;
   settings.copaDeltaParam = latencyFactor_;
   if (useAckReceiveTimestamps_) {
-    LOG(INFO) << " Using ACK receive timestamps on server";
+    MVLOG_INFO << " Using ACK receive timestamps on server";
     settings.maybeAckReceiveTimestampsConfigSentToPeer = {
         .maxReceiveTimestampsPerAck = maxAckReceiveTimestampsToSend_,
         .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
@@ -598,7 +600,7 @@ void TPerfServer::start() {
   for (auto evb : workerEvbs) {
     server_->addAcceptObserver(evb, acceptObserver_.get());
   }
-  LOG(INFO) << "tperf server started at: " << addr1.describe();
+  MVLOG_INFO << "tperf server started at: " << addr1.describe();
   eventBase_.loopForever();
 }
 

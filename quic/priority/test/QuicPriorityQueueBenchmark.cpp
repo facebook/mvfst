@@ -7,6 +7,7 @@
 
 #include <common/init/Init.h>
 #include <folly/Benchmark.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <vector>
 
@@ -41,7 +42,7 @@ static inline void processQueueIncremental(
     }
     for (size_t i = 0; i < (numConcurrentStreams / 8); i++) {
       auto id = pq.getNextScheduledID(std::nullopt);
-      // LOG(INFO) << id.asStreamID();
+      // MVLOG_INFO << id.asStreamID();
       pq.erase(id);
     }
   }
@@ -56,7 +57,7 @@ static inline void processQueueSequential(
     quic::PriorityQueue::Identifier id;
     for (size_t p = 0; p < packetsPerStream; p++) {
       id = pq.getNextScheduledID(std::nullopt);
-      // LOG(INFO) << id.asStreamID();
+      // MVLOG_INFO << id.asStreamID();
     }
     pq.erase(id);
   }

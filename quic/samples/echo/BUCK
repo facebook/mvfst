@@ -32,6 +32,7 @@ mvfst_cpp_library(
         "fbcode//quic/fizz/client/handshake:fizz_client_handshake",
         "fbcode//quic/server:server",
         "fbcode//quic/state:stats_callback",
+        "//quic/common:mvfst_logging",
     ],
     exported_external_deps = [
         "glog",
@@ -48,6 +49,7 @@ mvfst_cpp_binary(
         "//fizz/crypto:utils",
         "//folly/init:init",
         "//folly/portability:gflags",
+        "//quic/common:mvfst_logging",
     ],
     external_deps = [
         "glog",

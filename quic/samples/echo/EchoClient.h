@@ -11,7 +11,7 @@
 #include <string>
 #include <thread>
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <folly/FileUtil.h>
 #include <folly/fibers/Baton.h>
@@ -66,8 +66,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
     if (readData.hasError()) {
-      LOG(ERROR) << "EchoClient failed read from stream=" << streamId
-                 << ", error=" << (uint32_t)readData.error();
+      MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
+                  << ", error=" << (uint32_t)readData.error();
     }
     auto copy = readData->first->clone();
     if (recvOffsets_.find(streamId) == recvOffsets_.end()) {
@@ -75,8 +75,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     } else {
       recvOffsets_[streamId] += copy->length();
     }
-    LOG(INFO) << "Client received data=" << copy->toString()
-              << " on stream=" << streamId;
+    MVLOG_INFO << "Client received data=" << copy->toString()
+               << " on stream=" << streamId;
   }
 
   void readAvailableWithGroup(
@@ -84,9 +84,9 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       quic::StreamGroupId groupId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
     if (readData.hasError()) {
-      LOG(ERROR) << "EchoClient failed read from stream=" << streamId
-                 << ", groupId=" << groupId
-                 << ", error=" << (uint32_t)readData.error();
+      MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
+                  << ", groupId=" << groupId
+                  << ", error=" << (uint32_t)readData.error();
     }
     auto copy = readData->first->clone();
     if (recvOffsets_.find(streamId) == recvOffsets_.end()) {
@@ -94,13 +94,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     } else {
       recvOffsets_[streamId] += copy->length();
     }
-    LOG(INFO) << "Client received data=" << copy->toString()
-              << " on stream=" << streamId << ", groupId=" << groupId;
+    MVLOG_INFO << "Client received data=" << copy->toString()
+               << " on stream=" << streamId << ", groupId=" << groupId;
   }
 
   void readError(quic::StreamId streamId, QuicError error) noexcept override {
-    LOG(ERROR) << "EchoClient failed read from stream=" << streamId
-               << ", error=" << toString(error);
+    MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
+                << ", error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
     // resetStream
@@ -111,55 +111,55 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       quic::StreamId streamId,
       quic::StreamGroupId groupId,
       QuicError error) noexcept override {
-    LOG(ERROR) << "EchoClient failed read from stream=" << streamId
-               << ", groupId=" << groupId << ", error=" << toString(error);
+    MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
+                << ", groupId=" << groupId << ", error=" << toString(error);
     handleError(std::move(error));
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "EchoClient: new bidirectional stream=" << id;
+    MVLOG_INFO << "EchoClient: new bidirectional stream=" << id;
     quicClient_->setReadCallback(id, this);
   }
 
   void onNewBidirectionalStreamGroup(
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "EchoClient: new bidirectional stream group=" << groupId;
+    MVLOG_INFO << "EchoClient: new bidirectional stream group=" << groupId;
   }
 
   void onNewBidirectionalStreamInGroup(
       quic::StreamId id,
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "EchoClient: new bidirectional stream=" << id
-              << " in group=" << groupId;
+    MVLOG_INFO << "EchoClient: new bidirectional stream=" << id
+               << " in group=" << groupId;
     quicClient_->setReadCallback(id, this);
   }
 
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "EchoClient: new unidirectional stream=" << id;
+    MVLOG_INFO << "EchoClient: new unidirectional stream=" << id;
     quicClient_->setReadCallback(id, this);
   }
 
   void onNewUnidirectionalStreamGroup(
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "EchoClient: new unidirectional stream group=" << groupId;
+    MVLOG_INFO << "EchoClient: new unidirectional stream group=" << groupId;
   }
 
   void onNewUnidirectionalStreamInGroup(
       quic::StreamId id,
       quic::StreamGroupId groupId) noexcept override {
-    LOG(INFO) << "EchoClient: new unidirectional stream=" << id
-              << " in group=" << groupId;
+    MVLOG_INFO << "EchoClient: new unidirectional stream=" << id
+               << " in group=" << groupId;
     quicClient_->setReadCallback(id, this);
   }
 
   void onStopSending(
       quic::StreamId id,
       quic::ApplicationErrorCode /*error*/) noexcept override {
-    VLOG(10) << "EchoClient got StopSending stream id=" << id;
+    MVVLOG(10) << "EchoClient got StopSending stream id=" << id;
   }
 
   void onConnectionEnd() noexcept override {
-    LOG(INFO) << "EchoClient connection end";
+    MVLOG_INFO << "EchoClient connection end";
   }
 
   void onConnectionSetupError(QuicError error) noexcept override {
@@ -167,8 +167,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onConnectionError(QuicError error) noexcept override {
-    LOG(ERROR) << "EchoClient error: " << toString(error.code)
-               << "; errStr=" << error.message;
+    MVLOG_ERROR << "EchoClient error: " << toString(error.code)
+                << "; errStr=" << error.message;
     handleError(std::move(error));
   }
 
@@ -180,35 +180,35 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
   void onReplaySafe() noexcept override {
     if (connectOnly_) {
-      VLOG(3) << "Connected successfully";
+      MVVLOG(3) << "Connected successfully";
       connectionBaton_.post();
     }
   }
 
   void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
       override {
-    LOG(INFO) << "EchoClient socket is write ready with maxToSend="
-              << maxToSend;
+    MVLOG_INFO << "EchoClient socket is write ready with maxToSend="
+               << maxToSend;
     sendMessage(id, pendingOutput_[id]);
   }
 
   void onStreamWriteError(quic::StreamId id, QuicError error) noexcept
       override {
-    LOG(ERROR) << "EchoClient write error with stream=" << id
-               << " error=" << toString(error);
+    MVLOG_ERROR << "EchoClient write error with stream=" << id
+                << " error=" << toString(error);
     handleError(std::move(error));
   }
 
   void onDatagramsAvailable() noexcept override {
     auto res = quicClient_->readDatagrams();
     if (res.hasError()) {
-      LOG(ERROR) << "EchoClient failed reading datagrams; error="
-                 << res.error();
+      MVLOG_ERROR << "EchoClient failed reading datagrams; error="
+                  << res.error();
       return;
     }
     for (const auto& datagram : *res) {
-      LOG(INFO) << "Client received datagram ="
-                << datagram.bufQueue().front()->cloneCoalesced()->toString();
+      MVLOG_INFO << "Client received datagram ="
+                 << datagram.bufQueue().front()->cloneCoalesced()->toString();
     }
   }
 
@@ -257,7 +257,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       quicClient_->setTransportStatsCallback(
           std::make_shared<LogQuicStats>("client"));
 
-      LOG(INFO) << "EchoClient connecting to " << addr.describe();
+      MVLOG_INFO << "EchoClient connecting to " << addr.describe();
       quicClient_->start(this, this);
     });
 
@@ -332,7 +332,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
     connectionBaton_.wait();
 
-    LOG(INFO) << "EchoClient stopping client";
+    MVLOG_INFO << "EchoClient stopping client";
 
     return connectionError_.has_value()
         ? quic::make_unexpected(connectionError_.value())
@@ -352,11 +352,11 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
         ? quicClient_->writeDatagram(message->clone())
         : quicClient_->writeChain(id, message->clone(), true);
     if (res.hasError()) {
-      LOG(ERROR) << "EchoClient writeChain error=" << uint32_t(res.error());
+      MVLOG_ERROR << "EchoClient writeChain error=" << uint32_t(res.error());
     } else {
       auto str = message->toString();
-      LOG(INFO) << "EchoClient wrote \"" << str << "\""
-                << ", len=" << str.size() << " on stream=" << id;
+      MVLOG_INFO << "EchoClient wrote \"" << str << "\""
+                 << ", len=" << str.size() << " on stream=" << id;
       // sent whole message
       pendingOutput_.erase(id);
     }

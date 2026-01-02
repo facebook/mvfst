@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/QuicServer.h>
 
 #include <folly/io/async/IoUringBackend.h>
@@ -47,14 +48,14 @@ std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
         options.setInitialProvidedBuffers(2048, 2000);
       }
       auto ret = std::make_unique<folly::IoUringBackend>(options);
-      LOG(INFO) << "Allocating io_uring backend(" << FLAGS_qs_io_uring_capacity
-                << "," << FLAGS_qs_io_uring_max_submit << ","
-                << FLAGS_qs_io_uring_max_get << ","
-                << FLAGS_qs_io_uring_use_registered_fds << "): " << ret.get();
+      MVLOG_INFO << "Allocating io_uring backend(" << FLAGS_qs_io_uring_capacity
+                 << "," << FLAGS_qs_io_uring_max_submit << ","
+                 << FLAGS_qs_io_uring_max_get << ","
+                 << FLAGS_qs_io_uring_use_registered_fds << "): " << ret.get();
 
       return ret;
     } catch (const std::exception& ex) {
-      LOG(INFO) << "Failure creating io_uring backend: " << ex.what();
+      MVLOG_INFO << "Failure creating io_uring backend: " << ex.what();
     }
   }
   return folly::EventBase::getDefaultBackend();

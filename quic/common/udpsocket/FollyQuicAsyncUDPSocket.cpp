@@ -7,8 +7,9 @@
 
 #include <errno.h> // For errno
 #include <folly/io/async/AsyncSocketException.h>
-#include <quic/QuicException.h> // For QuicError, QuicErrorCode, TransportErrorCode
+#include <quic/QuicException.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/StringUtils.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <memory>
@@ -93,7 +94,7 @@ void FollyQuicAsyncUDPSocket::resumeRead(ReadCallback* callback) {
     // TODO: This should return Expected<Unit, QuicError>
   } catch (const folly::AsyncSocketException& ex) {
     // TODO: Convert to QuicError and return quic::make_unexpected
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::resumeRead failed: " << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::resumeRead failed: " << ex.what();
     throw; // Re-throw for now until signature is updated
   }
 }
@@ -139,7 +140,7 @@ ssize_t FollyQuicAsyncUDPSocket::write(
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::write failed: " << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::write failed: " << ex.what();
     return -1;
   }
 }
@@ -154,7 +155,7 @@ int FollyQuicAsyncUDPSocket::writem(
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::writem failed: " << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writem failed: " << ex.what();
     return -1;
   }
 }
@@ -172,7 +173,7 @@ ssize_t FollyQuicAsyncUDPSocket::writeGSO(
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::writeGSO failed: " << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writeGSO failed: " << ex.what();
     return -1;
   }
 }
@@ -193,8 +194,8 @@ int FollyQuicAsyncUDPSocket::writemGSO(
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::writemGSO(IOBuf) failed: "
-               << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writemGSO(IOBuf) failed: "
+                << ex.what();
     return -1;
   }
 }
@@ -217,8 +218,8 @@ int FollyQuicAsyncUDPSocket::writemGSO(
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::writemGSO(iovec) failed: "
-               << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writemGSO(iovec) failed: "
+                << ex.what();
     return -1;
   }
 }
@@ -229,7 +230,7 @@ ssize_t FollyQuicAsyncUDPSocket::recvmsg(struct msghdr* msg, int flags) {
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::recvmsg failed: " << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::recvmsg failed: " << ex.what();
     return -1;
   }
 }
@@ -244,7 +245,7 @@ int FollyQuicAsyncUDPSocket::recvmmsg(
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
-    LOG(ERROR) << "FollyQuicAsyncUDPSocket::recvmmsg failed: " << ex.what();
+    MVLOG_ERROR << "FollyQuicAsyncUDPSocket::recvmmsg failed: " << ex.what();
     return -1;
   }
 }
@@ -257,7 +258,7 @@ quic::Expected<int, QuicError> FollyQuicAsyncUDPSocket::getGSO() {
     if (ex.getErrno() != 0) {
       errorMsg += ": " + quic::errnoStr(ex.getErrno());
     }
-    LOG(ERROR) << "getGSO failed: " << errorMsg;
+    MVLOG_ERROR << "getGSO failed: " << errorMsg;
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::move(errorMsg)));
@@ -376,7 +377,7 @@ FollyQuicAsyncUDPSocket::address() const {
     if (ex.getErrno() != 0) {
       errorMsg += ": " + quic::errnoStr(ex.getErrno());
     }
-    LOG(FATAL) << errorMsg;
+    MVLOG_FATAL << errorMsg;
   }
 }
 

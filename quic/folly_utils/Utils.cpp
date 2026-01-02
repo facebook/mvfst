@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/folly_utils/Utils.h>
 
 namespace quic::follyutils {
@@ -14,8 +15,8 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
     uint64_t atMost) {
   // checks
   if (atMost == 0 || !cursor.canAdvance(1)) {
-    VLOG(10) << "Not enough bytes to decode integer, cursor len="
-             << cursor.totalLength();
+    MVVLOG(10) << "Not enough bytes to decode integer, cursor len="
+               << cursor.totalLength();
     return std::nullopt;
   }
 
@@ -32,7 +33,7 @@ Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
 
   // not enough bytes to decode, undo cursor
   if (!cursor.canAdvance(bytesExpected) || atMost < bytesExpected) {
-    VLOG(10) << "Could not decode integer numBytes=" << bytesExpected;
+    MVVLOG(10) << "Could not decode integer numBytes=" << bytesExpected;
     return std::nullopt;
   }
   // result storage

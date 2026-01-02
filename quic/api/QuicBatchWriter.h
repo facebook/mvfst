@@ -10,8 +10,8 @@
 #include <folly/Portability.h>
 #include <folly/SocketAddress.h>
 #include <folly/io/IOBuf.h>
-#include <glog/logging.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/state/StateData.h>
@@ -35,7 +35,7 @@ class BatchWriter {
   virtual bool needsFlush(size_t /*unused*/);
 
   virtual void setTxTime(std::chrono::microseconds) {
-    LOG(WARNING)
+    MVLOG_WARNING
         << "setTxTime not supported for this batch writer implementation";
   }
 

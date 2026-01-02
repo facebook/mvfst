@@ -10,6 +10,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//folly:glog",
+        "//quic/common:mvfst_logging",
     ],
 )
 
@@ -70,6 +71,7 @@ mvfst_cpp_library(
         ":quic_timer",
         "//folly:glog",
         "//folly:intrusive_list",
+        "//quic/common:mvfst_logging",
     ],
     exported_external_deps = [
         "libev",

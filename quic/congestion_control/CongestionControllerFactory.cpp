@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 
 #include <quic/congestion_control/Bbr.h>
@@ -44,7 +45,7 @@ DefaultCongestionControllerFactory::makeCongestionController(
       congestionController = std::make_unique<Copa2>(conn);
       break;
     case CongestionControlType::BBRTesting:
-      LOG(ERROR)
+      MVLOG_ERROR
           << "Default CC Factory cannot make BbrTesting. Falling back to BBR.";
       [[fallthrough]];
     case CongestionControlType::BBR: {

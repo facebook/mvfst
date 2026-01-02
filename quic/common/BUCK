@@ -3,6 +3,21 @@ load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
 oncall("traffic_protocols")
 
 mvfst_cpp_library(
+    name = "mvfst_logging",
+    headers = select({
+        "DEFAULT": select({
+            "DEFAULT": {"MvfstLogging.h": "MvfstLogging.h"},
+            "ovr_config//os/constraints:android": {"MvfstLogging.h": "facebook/MvfstLogging-mobile.h"},  # @fb-only
+            "ovr_config//os/constraints:iphoneos": {"MvfstLogging.h": "facebook/MvfstLogging-mobile.h"},  # @fb-only
+            "ovr_config//os/constraints:macos": {"MvfstLogging.h": "facebook/MvfstLogging-mobile.h"},  # @fb-only
+        }),
+    }),
+    exported_external_deps = [
+        "glog",
+    ],
+)
+
+mvfst_cpp_library(
     name = "interval_set",
     headers = [
         "IntervalSet.h",
@@ -27,7 +42,7 @@ mvfst_cpp_library(
         "QuicBuffer.h",
         "QuicRange.h",
     ],
-    deps = [],
+    deps = [":mvfst_logging"],
     exported_deps = [
         "//folly/portability:sys_uio",
     ],
@@ -45,6 +60,7 @@ mvfst_cpp_library(
         "FunctionLooper.h",
     ],
     deps = [
+        ":mvfst_logging",
         "//folly:scope_guard",
     ],
     exported_deps = [
@@ -197,6 +213,7 @@ mvfst_cpp_library(
         "TransportKnobs.h",
     ],
     deps = [
+        ":mvfst_logging",
         "//folly:dynamic",
         "//quic:constants",
     ],

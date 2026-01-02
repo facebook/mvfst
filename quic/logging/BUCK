@@ -79,7 +79,10 @@ mvfst_cpp_library(
     headers = [
         "FileQLogger.h",
     ],
-    deps = ["//folly:dynamic"],
+    deps = [
+        "//folly:dynamic",
+        "//quic/common:mvfst_logging",
+    ],
     exported_deps = [
         ":base_qlogger",
         ":qlog_schema",

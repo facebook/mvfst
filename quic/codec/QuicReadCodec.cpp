@@ -6,6 +6,7 @@
  */
 
 #include <quic/codec/QuicReadCodec.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/Decode.h>
@@ -55,7 +56,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
   }
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
   if (!longHeaderInvariant) {
-    VLOG(4) << "Dropping packet, failed to parse invariant";
+    MVVLOG(4) << "Dropping packet, failed to parse invariant";
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
@@ -75,7 +76,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
   auto parsedLongHeader =
       parseLongHeaderVariants(type, *longHeaderInvariant, cursor, nodeType);
   if (!parsedLongHeader) {
-    VLOG(4) << "Dropping due to failed to parse header";
+    MVVLOG(4) << "Dropping due to failed to parse header";
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
@@ -106,7 +107,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
 
   auto res = tryParseLongHeader(cursor, nodeType_);
   if (res.hasError()) {
-    VLOG(4) << "Failed to parse long header " << connIdToHex();
+    MVVLOG(4) << "Failed to parse long header " << connIdToHex();
     queue.move();
     return CodecResult(Nothing());
   }
@@ -141,8 +142,8 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   // Sample starts after the max packet number size. This ensures that we
   // have enough bytes to skip before we can start reading the sample.
   if (!cursor.canAdvance(kMaxPacketNumEncodingSize)) {
-    VLOG(4) << "Dropping packet, not enough for packet number "
-            << connIdToHex();
+    MVVLOG(4) << "Dropping packet, not enough for packet number "
+              << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
     queue.move();
     return CodecResult(Nothing());
@@ -150,7 +151,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   cursor.skip(kMaxPacketNumEncodingSize);
   Sample sample;
   if (!cursor.tryPull(sample.data(), sample.size())) {
-    VLOG(4) << "Dropping packet, sample too small " << connIdToHex();
+    MVVLOG(4) << "Dropping packet, sample too small " << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
     queue.move();
     return CodecResult(Nothing());
@@ -161,9 +162,9 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   switch (protectionType) {
     case ProtectionType::Initial:
       if (!initialHeaderCipher_) {
-        VLOG(4) << nodeToString(nodeType_)
-                << " dropping initial packet after initial keys dropped"
-                << connIdToHex();
+        MVVLOG(4) << nodeToString(nodeType_)
+                  << " dropping initial packet after initial keys dropped"
+                  << connIdToHex();
         return CodecResult(Nothing());
       }
       headerCipher = initialHeaderCipher_.get();
@@ -178,9 +179,9 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
         // TODO actually drop the 0-rtt keys in addition to dropping packets.
         auto timeBetween = Clock::now() - *handshakeDoneTime_;
         if (timeBetween > kTimeToRetainZeroRttKeys) {
-          VLOG(4) << nodeToString(nodeType_)
-                  << " dropping zero rtt packet for exceeding key timeout"
-                  << connIdToHex();
+          MVVLOG(4) << nodeToString(nodeType_)
+                    << " dropping zero rtt packet for exceeding key timeout"
+                    << connIdToHex();
           return CodecResult(Nothing());
         }
       }
@@ -227,7 +228,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
       initialByteRange,
       packetNumberByteRange);
   if (decryptResult.hasError()) {
-    VLOG(4) << "Failed to decrypt long header " << connIdToHex();
+    MVVLOG(4) << "Failed to decrypt long header " << connIdToHex();
     return quic::make_unexpected(decryptResult.error());
   }
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
@@ -252,10 +253,10 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
   auto decryptAttempt = cipher->tryDecrypt(
       std::move(encryptedData), headerData.get(), packetNum.first);
   if (!decryptAttempt) {
-    VLOG(4) << "Unable to decrypt packet=" << packetNum.first
-            << " packetNumLen=" << parsePacketNumberLength(initialByte)
-            << " protectionType=" << toString(protectionType) << " "
-            << connIdToHex();
+    MVVLOG(4) << "Unable to decrypt packet=" << packetNum.first
+              << " packetNumLen=" << parsePacketNumberLength(initialByte)
+              << " protectionType=" << toString(protectionType) << " "
+              << connIdToHex();
     return CodecResult(Nothing(getDecryptErrorReason(protectionType)));
   }
   decrypted = std::move(*decryptAttempt);
@@ -289,7 +290,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
   size_t sampleOffset = packetNumberOffset + kMaxPacketNumEncodingSize;
   Sample sample;
   if (data->computeChainDataLength() < sampleOffset + sample.size()) {
-    VLOG(10) << "Dropping packet, too small for sample " << connIdToHex();
+    MVVLOG(10) << "Dropping packet, too small for sample " << connIdToHex();
     // There's not enough space for the short header packet
     return CodecResult(Nothing());
   }
@@ -302,7 +303,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
   auto decryptResult = oneRttHeaderCipher_->decryptShortHeader(
       sampleByteRange, initialByteRange, packetNumberByteRange);
   if (decryptResult.hasError()) {
-    VLOG(4) << "Failed to decrypt short header " << connIdToHex();
+    MVVLOG(4) << "Failed to decrypt short header " << connIdToHex();
     return quic::make_unexpected(decryptResult.error());
   }
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
@@ -310,7 +311,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
   auto shortHeader =
       parseShortHeader(initialByteRange.data()[0], cursor, dstConnIdSize);
   if (!shortHeader) {
-    VLOG(10) << "Dropping packet, cannot parse " << connIdToHex();
+    MVVLOG(10) << "Dropping packet, cannot parse " << connIdToHex();
     return CodecResult(Nothing());
   }
   shortHeader->setPacketNumber(packetNum.first);
@@ -332,7 +333,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
           return previousOneRttReadCipher_.get();
         } else {
           // There is no previous packet. We can't decrypt this packet
-          VLOG(4)
+          MVVLOG(4)
               << nodeToString(nodeType_)
               << " cannot read packet using previous cipher. Cipher is not available";
           return nullptr;
@@ -345,7 +346,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
           return nextOneRttReadCipher_.get();
         } else {
           // The next cipher is not yet available. We can't decrypt this packet
-          VLOG(4)
+          MVVLOG(4)
               << nodeToString(nodeType_)
               << " unable to process key update. Next cipher is not yet available";
           return nullptr;
@@ -372,9 +373,9 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::tryParseShortHeaderPacket(
       std::move(data), &headerData, packetNum.first);
   if (!decryptAttempt) {
     auto protectionType = shortHeader->getProtectionType();
-    VLOG(10) << "Unable to decrypt packet=" << packetNum.first
-             << " protectionType=" << (int)protectionType << " "
-             << connIdToHex();
+    MVVLOG(10) << "Unable to decrypt packet=" << packetNum.first
+               << " protectionType=" << (int)protectionType << " "
+               << connIdToHex();
     return CodecResult(Nothing(PacketDropReason::DECRYPTION_ERROR));
   }
   decrypted = std::move(*decryptAttempt);
@@ -445,9 +446,11 @@ CodecResult QuicReadCodec::parsePacket(
   }
   // Missing 1-rtt header cipher is the only case we wouldn't consider reset
   if (!currentOneRttReadCipher_ || !oneRttHeaderCipher_) {
-    VLOG(4) << nodeToString(nodeType_) << " cannot read key phase zero packet";
-    VLOG(20) << "cannot read data=" << quic::hexlify(queue.front()->toString())
-             << " " << connIdToHex();
+    MVVLOG(4) << nodeToString(nodeType_)
+              << " cannot read key phase zero packet";
+    MVVLOG(20) << "cannot read data="
+               << quic::hexlify(queue.front()->toString()) << " "
+               << connIdToHex();
     return CodecResult(
         CipherUnavailable(queue.move(), ProtectionType::KeyPhaseZero));
   }
@@ -494,7 +497,7 @@ bool QuicReadCodec::canInitiateKeyUpdate() const {
 
 bool QuicReadCodec::advanceOneRttReadPhase() {
   if (!canInitiateKeyUpdate()) {
-    LOG(WARNING) << "Key update requested before the read codec can allow it";
+    MVLOG_WARNING << "Key update requested before the read codec can allow it";
     return false;
   }
   previousOneRttReadCipher_.reset(currentOneRttReadCipher_.release());

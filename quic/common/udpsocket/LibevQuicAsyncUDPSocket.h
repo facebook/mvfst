@@ -7,8 +7,9 @@
 
 #pragma once
 
-#include <quic/QuicException.h> // For QuicError
+#include <quic/QuicException.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h> // For QuicError
 #include <quic/common/NetworkData.h>
 #include <quic/common/events/LibevQuicEventBase.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocketImpl.h>
@@ -57,7 +58,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       const struct iovec* /* vec */,
       size_t /* iovec_len */,
       WriteOptions /*options*/) override {
-    LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+    MVLOG_FATAL << __func__ << " not supported in LibevQuicAsyncUDPSocket";
   }
 
   /**
@@ -74,7 +75,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       const BufPtr* /*bufs*/,
       size_t /*count*/,
       const WriteOptions* /*options*/) override {
-    LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+    MVLOG_FATAL << __func__ << " not supported in LibevQuicAsyncUDPSocket";
   }
 
   int writemGSO(
@@ -83,7 +84,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       size_t* /* numIovecsInBuffer */,
       size_t /* count */,
       const WriteOptions* /* options */) override {
-    LOG(FATAL) << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+    MVLOG_FATAL << __func__ << " not supported in LibevQuicAsyncUDPSocket";
   }
 
   ssize_t recvmsg(struct msghdr* msg, int flags) override;
@@ -107,7 +108,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   // if true, the IPv6 Traffic Class/IPv4 Type of Service field should be
   // populated in OnDataAvailableParams.
   quic::Expected<void, QuicError> setRecvTos(bool /*recvTos*/) override {
-    LOG(WARNING) << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+    MVLOG_WARNING << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
     return {}; // Or return error if strictness needed
   }
 
@@ -117,7 +118,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   quic::Expected<void, QuicError> setTosOrTrafficClass(
       uint8_t /*tos*/) override {
-    LOG(WARNING) << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+    MVLOG_WARNING << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
     return {}; // Or return error if strictness needed
   }
 
@@ -195,7 +196,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    * Set reuse port mode to call bind() on the same address multiple times
    */
   quic::Expected<void, QuicError> setReusePort(bool) override {
-    LOG(FATAL) << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+    MVLOG_FATAL << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
     // Return success as it's just a warning, or error if strictness needed
     return {};
   }

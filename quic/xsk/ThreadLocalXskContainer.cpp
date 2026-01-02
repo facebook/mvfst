@@ -7,6 +7,7 @@
 
 #if defined(__linux__) && !defined(ANDROID)
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/xsk/ThreadLocalXskContainer.h>
 
 namespace facebook::xdpsocket {
@@ -44,7 +45,7 @@ quic::Expected<void, std::runtime_error> ThreadLocalXskContainer::init(
       xskSenderConfig.ownerId = i;
       auto createResultShared = createXskSender(qid, xskSenderConfig);
       if (createResultShared.hasError()) {
-        LOG(FATAL) << "Failed to create XskContainer";
+        MVLOG_FATAL << "Failed to create XskContainer";
       }
 
       xskSenders_.emplace_back(std::move(*createResultShared));

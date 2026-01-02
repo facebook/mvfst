@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamStateFunctions.h>
@@ -39,8 +40,8 @@ quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
     ReadStreamFrame&& frame) {
   switch (stream.recvState) {
     case StreamRecvState::Open: {
-      VLOG_IF(10, frame.fin) << "Open: Received data with fin"
-                             << " stream=" << stream.id << " " << stream.conn;
+      MVVLOG_IF(10, frame.fin) << "Open: Received data with fin"
+                               << " stream=" << stream.id << " " << stream.conn;
       auto appendResult = appendDataToReadBuffer(
           stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
       if (!appendResult.has_value()) {
@@ -50,8 +51,8 @@ quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
           (*stream.reliableSizeFromPeer == 0 ||
            isAllDataReceivedUntil(stream, *stream.reliableSizeFromPeer - 1));
       if (isAllDataReceived(stream) || allDataTillReliableSizeReceived) {
-        VLOG(10) << "Open: Transition to Closed" << " stream=" << stream.id
-                 << " " << stream.conn;
+        MVVLOG(10) << "Open: Transition to Closed" << " stream=" << stream.id
+                   << " " << stream.conn;
         stream.recvState = StreamRecvState::Closed;
         if (stream.inTerminalStates()) {
           stream.conn.streamManager->addClosed(stream.id);
@@ -64,8 +65,8 @@ quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
     }
     case StreamRecvState::Closed: {
       CHECK(!isSendingStream(stream.conn.nodeType, stream.id));
-      VLOG(10) << "Closed: Received discarding data stream=" << stream.id
-               << " fin=" << frame.fin << " " << stream.conn;
+      MVVLOG(10) << "Closed: Received discarding data stream=" << stream.id
+                 << " fin=" << frame.fin << " " << stream.conn;
       break;
     }
     case StreamRecvState::Invalid: {

@@ -7,6 +7,7 @@
 
 #include <folly/io/IOBuf.h>
 #include <quic/codec/QuicPacketBuilder.h>
+#include <quic/common/MvfstLogging.h>
 #include <algorithm>
 
 #include <folly/Random.h>
@@ -353,8 +354,9 @@ void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
       sizeof(uint8_t) /* SCID length */ +
       sourceConnectionId_.size() /* SCID */ + token_->length() /* Token */;
 
-  LOG_IF(ERROR, packetLength > kDefaultUDPSendPacketLen)
-      << "Retry packet length exceeds default packet length";
+  if (packetLength > kDefaultUDPSendPacketLen) {
+    MVLOG_ERROR << "Retry packet length exceeds default packet length";
+  }
   packetBuf_ = BufHelpers::create(packetLength);
   BufWriter bufWriter(packetBuf_->writableData(), packetLength);
 
@@ -585,7 +587,7 @@ RetryPacketBuilder::RetryPacketBuilder(
       remainingBytes_(kDefaultUDPSendPacketLen) {
   auto result = writeRetryPacket();
   if (result.hasError()) {
-    LOG(ERROR) << "Failed to write retry packet. " << result.error();
+    MVLOG_ERROR << "Failed to write retry packet. " << result.error();
   }
 }
 

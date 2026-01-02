@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/handshake/Aead.h>
 
 namespace quic {
@@ -53,7 +54,7 @@ class Handshake {
       uint16_t keyLength) = 0;
 
   virtual void handshakeConfirmed() {
-    LOG(FATAL) << "Not implemented";
+    MVLOG_FATAL << "Not implemented";
   }
 
   struct TLSSummary {

@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/MvfstLogging.h>
 #include <functional>
 
 #include <folly/GLog.h>
@@ -163,7 +164,7 @@ class QuicEventBase {
     if (evb) {
       return evb;
     } else {
-      LOG(WARNING) << "Failed to cast QuicEventBase to " << typeid(T).name();
+      MVLOG_WARNING << "Failed to cast QuicEventBase to " << typeid(T).name();
       return nullptr;
     }
   }

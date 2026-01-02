@@ -9,6 +9,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicSocket.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/state/StateData.h>
 
@@ -67,7 +68,7 @@ class BucketedPacingObserver : public QuicSocket::ManagedObserver {
           avgPacingRate.normalizedDescribe(),
           actualSendRate.normalizedDescribe(),
           ratio);
-      VLOG(2) << message;
+      MVVLOG(2) << message;
 
       if (logger) {
         logger->addPacingObservation(

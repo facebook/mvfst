@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 
 #include <quic/congestion_control/Copa.h>
@@ -29,9 +30,9 @@ DefaultCongestionControllerFactory::makeCongestionController(
       break;
     default:
       // Mobile builds only support Cubic and Copa
-      LOG(ERROR) << "Unsupported congestion controller for mobile: "
-                 << congestionControlTypeToString(type)
-                 << ". Falling back to Cubic.";
+      MVLOG_ERROR << "Unsupported congestion controller for mobile: "
+                  << congestionControlTypeToString(type)
+                  << ". Falling back to Cubic.";
       congestionController = std::make_unique<Cubic>(conn);
       break;
   }

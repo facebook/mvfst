@@ -40,6 +40,7 @@ mvfst_cpp_test(
         "//quic:constants",
         "//quic/api/test:mocks",
         "//quic/codec:pktbuilder",
+        "//quic/common:mvfst_logging",
         "//quic/common/events:folly_eventbase",
         "//quic/common/events:highres_quic_timer",
         "//quic/common/udpsocket:folly_async_udp_socket",
