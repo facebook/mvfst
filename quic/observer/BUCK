@@ -13,9 +13,20 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "socket_observer_interface",
-    srcs = [
-        "SocketObserverInterface.cpp",
-    ],
+    srcs = select({
+        # Server builds get full implementation
+        "DEFAULT": ["SocketObserverInterface.cpp"],
+        # Mobile apps that opt-in get full implementation (more specific than OS-only)
+        "fbsource//tools/build_defs/config/apps/shared:quic-socket-observer-full-android": [
+            "SocketObserverInterface.cpp",
+        ],
+        "fbsource//tools/build_defs/config/apps/shared:quic-socket-observer-full-iphoneos": [
+            "SocketObserverInterface.cpp",
+        ],
+        # Fallback for mobile platforms without explicit opt-in
+        "ovr_config//os/constraints:android": ["facebook/SocketObserverInterfaceMobile.cpp"],
+        "ovr_config//os/constraints:iphoneos": ["facebook/SocketObserverInterfaceMobile.cpp"],
+    }),
     headers = ["SocketObserverInterface.h"],
     exported_deps = [
         "//quic:exception",
@@ -31,4 +42,35 @@ mvfst_cpp_library(
     exported_deps = [
         ":socket_observer_container",
     ],
+)
+
+mvfst_cpp_library(
+    name = "socket_observer_macros",
+    headers = select({
+        "DEFAULT": {"SocketObserverMacros.h": "SocketObserverMacros.h"},
+        "fbsource//tools/build_defs/config/apps/shared:quic-socket-observer-full-android": {
+            "SocketObserverMacros.h": "SocketObserverMacros.h",
+        },
+        "fbsource//tools/build_defs/config/apps/shared:quic-socket-observer-full-iphoneos": {
+            "SocketObserverMacros.h": "SocketObserverMacros.h",
+        },
+        "ovr_config//os/constraints:android": {"SocketObserverMacros.h": "facebook/SocketObserverMacrosMobile.h"},
+        "ovr_config//os/constraints:iphoneos": {"SocketObserverMacros.h": "facebook/SocketObserverMacrosMobile.h"},
+    }),
+    exported_deps = select({
+        "DEFAULT": [
+            ":socket_observer_container",
+            ":socket_observer_interface",
+        ],
+        "fbsource//tools/build_defs/config/apps/shared:quic-socket-observer-full-android": [
+            ":socket_observer_container",
+            ":socket_observer_interface",
+        ],
+        "fbsource//tools/build_defs/config/apps/shared:quic-socket-observer-full-iphoneos": [
+            ":socket_observer_container",
+            ":socket_observer_interface",
+        ],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+    }),
 )

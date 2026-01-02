@@ -152,6 +152,7 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
         "//quic/congestion_control:congestion_control_functions",
         "//quic/loss:loss",
+        "//quic/observer:socket_observer_macros",
     ],
     exported_deps = [
         ":outstanding_packet",

@@ -15,6 +15,7 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
+#include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -728,10 +729,9 @@ void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
   updatePeekLooper();
   updateWriteLooper(false);
 
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::evbEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::evbEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::evbEvents>(
             [this](auto observer, auto observed) {
@@ -759,10 +759,9 @@ void QuicTransportBase::detachEventBase() {
   writeLooper_->detachEventBase();
 
 #ifndef MVFST_USE_LIBEV
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::evbEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::evbEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::evbEvents>(
             [this](auto observer, auto observed) {

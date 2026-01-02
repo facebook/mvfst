@@ -10,6 +10,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/loss/QuicLossFunctions.h>
+#include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/AckedPacketIterator.h>
 #include <quic/state/QuicStateFunctions.h>
@@ -196,9 +197,9 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   };
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
-    if (socketObserverContainer &&
-        socketObserverContainer->hasObserversForEvent<
-            SocketObserverInterface::Events::spuriousLossEvents>()) {
+    SOCKET_OBSERVER_IF(
+        socketObserverContainer,
+        SocketObserverInterface::Events::spuriousLossEvents) {
       spuriousLossEvent.emplace(ackReceiveTime);
     }
   }
@@ -436,15 +437,16 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   // notify observers
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
-    if (spuriousLossEvent && spuriousLossEvent->hasPackets() &&
-        socketObserverContainer &&
-        socketObserverContainer->hasObserversForEvent<
-            SocketObserverInterface::Events::spuriousLossEvents>()) {
-      socketObserverContainer->invokeInterfaceMethod<
-          SocketObserverInterface::Events::spuriousLossEvents>(
-          [spuriousLossEvent](auto observer, auto observed) {
-            observer->spuriousLossDetected(observed, *spuriousLossEvent);
-          });
+    if (spuriousLossEvent && spuriousLossEvent->hasPackets()) {
+      SOCKET_OBSERVER_IF(
+          socketObserverContainer,
+          SocketObserverInterface::Events::spuriousLossEvents) {
+        socketObserverContainer->invokeInterfaceMethod<
+            SocketObserverInterface::Events::spuriousLossEvents>(
+            [spuriousLossEvent](auto observer, auto observed) {
+              observer->spuriousLossDetected(observed, *spuriousLossEvent);
+            });
+      }
     }
   }
 
@@ -657,9 +659,9 @@ void updateRttForLargestAckedPacket(
     // notify observers
     {
       const auto socketObserverContainer = conn.getSocketObserverContainer();
-      if (socketObserverContainer &&
-          socketObserverContainer->hasObserversForEvent<
-              SocketObserverInterface::Events::rttSamples>()) {
+      SOCKET_OBSERVER_IF(
+          socketObserverContainer,
+          SocketObserverInterface::Events::rttSamples) {
         socketObserverContainer->invokeInterfaceMethod<
             SocketObserverInterface::Events::rttSamples>(
             [event = SocketObserverInterface::PacketRTT(

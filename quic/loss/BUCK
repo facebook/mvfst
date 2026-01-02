@@ -11,6 +11,7 @@ mvfst_cpp_library(
         "QuicLossFunctions.h",
     ],
     deps = [
+        "//quic/observer:socket_observer_macros",
         "//quic/state:stream_functions",
     ],
     exported_deps = [

@@ -7,6 +7,7 @@
 
 #include <quic/common/MvfstLogging.h>
 #include <quic/loss/QuicLossFunctions.h>
+#include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -410,9 +411,8 @@ detectLossPackets(
   Optional<SocketObserverInterface::LossEvent> observerLossEvent;
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
-    if (socketObserverContainer &&
-        socketObserverContainer->hasObserversForEvent<
-            SocketObserverInterface::Events::lossEvents>()) {
+    SOCKET_OBSERVER_IF(
+        socketObserverContainer, SocketObserverInterface::Events::lossEvents) {
       observerLossEvent.emplace(lossTime);
     }
   }
@@ -440,15 +440,16 @@ detectLossPackets(
 
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
-    if (observerLossEvent && observerLossEvent->hasPackets() &&
-        socketObserverContainer &&
-        socketObserverContainer->hasObserversForEvent<
-            SocketObserverInterface::Events::lossEvents>()) {
-      socketObserverContainer
-          ->invokeInterfaceMethod<SocketObserverInterface::Events::lossEvents>(
-              [&](auto observer, auto observed) {
-                observer->packetLossDetected(observed, *observerLossEvent);
-              });
+    if (observerLossEvent && observerLossEvent->hasPackets()) {
+      SOCKET_OBSERVER_IF(
+          socketObserverContainer,
+          SocketObserverInterface::Events::lossEvents) {
+        socketObserverContainer->invokeInterfaceMethod<
+            SocketObserverInterface::Events::lossEvents>(
+            [&](auto observer, auto observed) {
+              observer->packetLossDetected(observed, *observerLossEvent);
+            });
+      }
     }
   }
 

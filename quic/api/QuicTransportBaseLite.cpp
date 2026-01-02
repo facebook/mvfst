@@ -14,6 +14,7 @@
 #include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/loss/QuicLossFunctions.h>
+#include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
@@ -99,10 +100,9 @@ void QuicTransportBaseLite::onNetworkData(
     auto originalAckVersion = currentAckStateVersion(*conn_);
 
     // handle PacketsReceivedEvent if requested by observers
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::packetsReceivedEvents>()) {
+    SOCKET_OBSERVER_IF(
+        getSocketObserverContainer(),
+        SocketObserverInterface::Events::packetsReceivedEvents) {
       auto builder = SocketObserverInterface::PacketsReceivedEvent::Builder()
                          .setReceiveLoopTime(TimePoint::clock::now())
                          .setNumPacketsReceived(networkData.getPackets().size())
@@ -1107,10 +1107,9 @@ void QuicTransportBaseLite::checkForClosedStream() {
   while (itr != conn_->streamManager->closedStreams().end()) {
     const auto& streamId = *itr;
 
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::streamEvents>()) {
+    SOCKET_OBSERVER_IF(
+        getSocketObserverContainer(),
+        SocketObserverInterface::Events::streamEvents) {
       getSocketObserverContainer()
           ->invokeInterfaceMethod<
               SocketObserverInterface::Events::streamEvents>(
@@ -1387,7 +1386,7 @@ void QuicTransportBaseLite::closeImpl(
     return;
   }
 
-  if (getSocketObserverContainer()) {
+  SOCKET_OBSERVER_IF_ANY(getSocketObserverContainer()) {
     SocketObserverInterface::CloseStartedEvent event;
     event.maybeCloseReason = errorCode;
     getSocketObserverContainer()->invokeInterfaceMethodAllObservers(
@@ -1836,10 +1835,9 @@ void QuicTransportBaseLite::handleKnobCallbacks() {
 
   for (auto& knobFrame : conn_->pendingEvents.knobs) {
     if (knobFrame.knobSpace != kDefaultQuicTransportKnobSpace) {
-      if (getSocketObserverContainer() &&
-          getSocketObserverContainer()
-              ->hasObserversForEvent<
-                  SocketObserverInterface::Events::knobFrameEvents>()) {
+      SOCKET_OBSERVER_IF(
+          getSocketObserverContainer(),
+          SocketObserverInterface::Events::knobFrameEvents) {
         getSocketObserverContainer()
             ->invokeInterfaceMethod<
                 SocketObserverInterface::Events::knobFrameEvents>(
@@ -1864,10 +1862,9 @@ void QuicTransportBaseLite::handleAckEventCallbacks() {
     return; // nothing to do
   }
 
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::acksProcessedEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::acksProcessedEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::acksProcessedEvents>(
@@ -2120,7 +2117,7 @@ void QuicTransportBaseLite::closeUdpSocket() {
   if (!socket_) {
     return;
   }
-  if (getSocketObserverContainer()) {
+  SOCKET_OBSERVER_IF_ANY(getSocketObserverContainer()) {
     SocketObserverInterface::ClosingEvent event; // empty for now
     getSocketObserverContainer()->invokeInterfaceMethodAllObservers(
         [&event](auto observer, auto observed) {
@@ -2161,10 +2158,9 @@ QuicTransportBaseLite::createStreamInternal(
   }
 
   const StreamId streamId = streamState->id;
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::streamEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::streamEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::streamEvents>(
             [event = SocketObserverInterface::StreamOpenEvent(
@@ -2651,10 +2647,9 @@ QuicTransportBaseLite::getAdditionalCmsgsForAsyncUDPSocket() {
 }
 
 void QuicTransportBaseLite::notifyStartWritingFromAppRateLimited() {
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::appRateLimitedEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::appRateLimitedEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::appRateLimitedEvents>(
@@ -2684,10 +2679,9 @@ void QuicTransportBaseLite::notifyPacketsWritten(
     const uint64_t numPacketsWritten,
     const uint64_t numAckElicitingPacketsWritten,
     const uint64_t numBytesWritten) {
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::packetsWrittenEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::packetsWrittenEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::packetsWrittenEvents>(
@@ -2718,10 +2712,9 @@ void QuicTransportBaseLite::notifyPacketsWritten(
 }
 
 void QuicTransportBaseLite::notifyAppRateLimited() {
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::appRateLimitedEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::appRateLimitedEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<
             SocketObserverInterface::Events::appRateLimitedEvents>(
@@ -3322,10 +3315,9 @@ void QuicTransportBaseLite::handleNewGroupedStreams(
 }
 
 void QuicTransportBaseLite::logStreamOpenEvent(StreamId streamId) {
-  if (getSocketObserverContainer() &&
-      getSocketObserverContainer()
-          ->hasObserversForEvent<
-              SocketObserverInterface::Events::streamEvents>()) {
+  SOCKET_OBSERVER_IF(
+      getSocketObserverContainer(),
+      SocketObserverInterface::Events::streamEvents) {
     getSocketObserverContainer()
         ->invokeInterfaceMethod<SocketObserverInterface::Events::streamEvents>(
             [event = SocketObserverInterface::StreamOpenEvent(
