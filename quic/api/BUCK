@@ -6,14 +6,22 @@ mvfst_cpp_library(
     name = "quic_batch_writer",
     srcs = [
         "QuicBatchWriter.cpp",
-        "QuicBatchWriterFactory.cpp",
-        "QuicGsoBatchWriters.cpp",
-    ],
+    ] + select({
+        "DEFAULT": [
+            "QuicBatchWriterFactory.cpp",
+            "QuicGsoBatchWriters.cpp",
+        ],
+        "ovr_config//os/constraints:android": ["QuicBatchWriterFactoryMobile.cpp"],
+        "ovr_config//os/constraints:iphoneos": ["QuicBatchWriterFactoryMobile.cpp"],
+    }),
     headers = [
         "QuicBatchWriter.h",
         "QuicBatchWriterFactory.h",
-        "QuicGsoBatchWriters.h",
-    ],
+    ] + select({
+        "DEFAULT": ["QuicGsoBatchWriters.h"],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+    }),
     deps = [
         "//quic/common:buf_accessor",
     ],

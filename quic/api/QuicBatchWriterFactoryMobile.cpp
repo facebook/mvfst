@@ -16,28 +16,44 @@ void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
 }
 
 BatchWriterPtr makeGsoBatchWriter(uint32_t) {
-  MVLOG_FATAL << "not implemented for mobile";
+  MVLOG_FATAL << "GSO batch writer not implemented for mobile";
   return nullptr;
 }
 
 BatchWriterPtr makeGsoInPlaceBatchWriter(uint32_t, QuicConnectionStateBase&) {
-  MVLOG_FATAL << "not implemented for mobile";
+  MVLOG_FATAL << "GSO inplace batch writer not implemented for mobile";
   return nullptr;
 }
 
 BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t) {
-  MVLOG_FATAL << "not implemented for mobile";
+  MVLOG_FATAL << "Sendmmsg GSO batch writer not implemented for mobile";
+  return nullptr;
+}
+
+BatchWriterPtr makeSendmmsgInplaceGsoInplaceBatchWriter(
+    uint32_t,
+    QuicConnectionStateBase&) {
+  MVLOG_FATAL << "Sendmmsg GSO inplace batch writer not implemented for mobile";
   return nullptr;
 }
 
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
+    bool /* enableBackpressure */,
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
-    bool gsoSupported) {
-  return makeBatchWriterHelper(
-      batchingMode, batchSize, dataPathType, conn, gsoSupported);
+    bool /* gsoSupported */) {
+  // Mobile only supports single-packet writers
+  // GSO and sendmmsg batching are not available on mobile platforms
+  switch (batchingMode) {
+    case quic::QuicBatchingMode::BATCHING_MODE_NONE:
+    default:
+      if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
+        return BatchWriterPtr(new SinglePacketInplaceBatchWriter(conn));
+      }
+      return BatchWriterPtr(new SinglePacketBatchWriter());
+  }
 }
 
 } // namespace quic
