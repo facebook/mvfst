@@ -14,6 +14,7 @@
 #include <quic/common/Optional.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -91,9 +92,7 @@ void QuicTransportBase::closeGracefully() {
   resetConnectionCallbacks();
   closeState_ = CloseState::GRACEFUL_CLOSING;
   updatePacingOnClose(*conn_);
-  if (conn_->qLogger) {
-    conn_->qLogger->addConnectionClose(kNoError, kGracefulExit, true, false);
-  }
+  QLOG(*conn_, addConnectionClose, kNoError, kGracefulExit, true, false);
 
   // Stop reads and cancel all the app callbacks.
   MVVLOG(10) << "Stopping read and peek loopers due to graceful close "

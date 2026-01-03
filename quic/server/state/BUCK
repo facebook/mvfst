@@ -28,6 +28,7 @@ mvfst_cpp_library(
         "//quic/fizz/server/handshake:handshake_app_token",
         "//quic/handshake:transport_parameters",
         "//quic/logging:qlogger_constants",
+        "//quic/logging:qlogger_macros",
         "//quic/server/handshake:token_generator",
         "//quic/state:datagram_handler",
         "//quic/state:pacing_functions",

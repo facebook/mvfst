@@ -7,6 +7,7 @@
 
 #include <quic/common/MvfstLogging.h>
 #include <quic/fizz/server/handshake/AppToken.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/state/ServerStateMachine.h>
 
@@ -775,9 +776,7 @@ quic::Expected<void, QuicError> onConnectionMigration(
   bool isNATRebinding =
       maybeNATRebinding(readPath->peerAddress, connPath->peerAddress);
 
-  if (conn.qLogger) {
-    conn.qLogger->addConnectionMigrationUpdate(isIntentional);
-  }
+  QLOG(conn, addConnectionMigrationUpdate, isIntentional);
 
   // Remember the current congestion controller type to recreate it if needed.
   // This could be different from the type the connection started with due to
@@ -843,9 +842,7 @@ static void handleCipherUnavailable(
     ServerEvents::ReadData& readData) {
   if (!originalData->packet || originalData->packet->empty()) {
     MVVLOG(10) << "drop because no data " << conn;
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(packetSize, kNoData);
-    }
+    QLOG(conn, addPacketDrop, packetSize, kNoData);
     QUIC_STATS(
         conn.statsCallback, onPacketDropped, PacketDropReason::EMPTY_DATA);
     return;
@@ -853,9 +850,7 @@ static void handleCipherUnavailable(
   if (originalData->protectionType != ProtectionType::ZeroRtt &&
       originalData->protectionType != ProtectionType::KeyPhaseZero) {
     MVVLOG(10) << "drop because unexpected protection level " << conn;
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(packetSize, kUnexpectedProtectionLevel);
-    }
+    QLOG(conn, addPacketDrop, packetSize, kUnexpectedProtectionLevel);
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -868,9 +863,7 @@ static void handleCipherUnavailable(
       (conn.pendingOneRttData ? conn.pendingOneRttData->size() : 0);
   if (combinedSize >= conn.transportSettings.maxPacketsToBuffer) {
     MVVLOG(10) << "drop because max buffered " << conn;
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
-    }
+    QLOG(conn, addPacketDrop, packetSize, kMaxBuffered);
     QUIC_STATS(
         conn.statsCallback, onPacketDropped, PacketDropReason::MAX_BUFFERED);
     return;
@@ -880,9 +873,7 @@ static void handleCipherUnavailable(
       ? conn.pendingZeroRttData
       : conn.pendingOneRttData;
   if (pendingData) {
-    if (conn.qLogger) {
-      conn.qLogger->addPacketBuffered(originalData->protectionType, packetSize);
-    }
+    QLOG(conn, addPacketBuffered, originalData->protectionType, packetSize);
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -901,9 +892,7 @@ static void handleCipherUnavailable(
   } else {
     MVVLOG(10) << "drop because " << toString(originalData->protectionType)
                << " buffer no longer available " << conn;
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
-    }
+    QLOG(conn, addPacketDrop, packetSize, kBufferUnavailable);
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -932,12 +921,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
       MVVLOG(4) << "Could not parse initial packet header";
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            0,
-            PacketDropReason(PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL)
-                ._to_string());
-      }
+      QLOG(
+          conn,
+          addPacketDrop,
+          0,
+          PacketDropReason(PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL)
+              ._to_string());
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -947,11 +936,11 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     QuicVersion version = parsedLongHeader->invariant.version;
     if (version == QuicVersion::VERSION_NEGOTIATION) {
       MVVLOG(4) << "Server dropping VN packet";
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            0,
-            PacketDropReason(PacketDropReason::INVALID_PACKET_VN)._to_string());
-      }
+      QLOG(
+          conn,
+          addPacketDrop,
+          0,
+          PacketDropReason(PacketDropReason::INVALID_PACKET_VN)._to_string());
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -965,12 +954,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
 
     if (initialDestinationConnectionId.size() < kDefaultConnectionIdSize) {
       MVVLOG(4) << "Initial connectionid too small";
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            0,
-            PacketDropReason(PacketDropReason::INITIAL_CONNID_SMALL)
-                ._to_string());
-      }
+      QLOG(
+          conn,
+          addPacketDrop,
+          0,
+          PacketDropReason(PacketDropReason::INITIAL_CONNID_SMALL)
+              ._to_string());
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -1025,10 +1014,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         std::move(clientInitialCipherResult.value()));
     conn.readCodec->setClientConnectionId(clientConnectionId);
     conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
-    if (conn.qLogger) {
-      conn.qLogger->setScid(conn.serverConnectionId);
-      conn.qLogger->setDcid(initialDestinationConnectionId);
-    }
+    QLOG(conn, setScid, conn.serverConnectionId);
+    QLOG(conn, setDcid, initialDestinationConnectionId);
     conn.readCodec->setCodecParameters(CodecParameters(
         conn.peerAckDelayExponent,
         version,
@@ -1094,9 +1081,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       case CodecResult::Type::RETRY: {
         MVVLOG(10) << "drop because the server is not supposed to "
                    << "receive a retry " << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kRetry);
-        }
+        QLOG(conn, addPacketDrop, packetSize, kRetry);
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
@@ -1105,9 +1090,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       }
       case CodecResult::Type::STATELESS_RESET: {
         MVVLOG(10) << "drop because reset " << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kReset);
-        }
+        QLOG(conn, addPacketDrop, packetSize, kReset);
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
@@ -1118,10 +1101,11 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         MVVLOG(10) << "drop no data, reason: "
                    << parsedPacket.nothing()->reason._to_string() << " "
                    << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(
-              packetSize, parsedPacket.nothing()->reason._to_string());
-        }
+        QLOG(
+            conn,
+            addPacketDrop,
+            packetSize,
+            parsedPacket.nothing()->reason._to_string());
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
@@ -1171,12 +1155,11 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       // but no data. This is a protocol violation so we return an error.
       // This drop has not been recorded in the switch-case block above
       // so we record it here.
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            packetSize,
-            PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)
-                ._to_string());
-      }
+      QLOG(
+          conn,
+          addPacketDrop,
+          packetSize,
+          PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -1219,12 +1202,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
               conn.statsCallback,
               onPacketDropped,
               PacketDropReason::PROTOCOL_VIOLATION);
-          if (conn.qLogger) {
-            conn.qLogger->addPacketDrop(
-                packetSize,
-                PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)
-                    ._to_string());
-          }
+          QLOG(
+              conn,
+              addPacketDrop,
+              packetSize,
+              PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)
+                  ._to_string());
           return quic::make_unexpected(QuicError(
               TransportErrorCode::PROTOCOL_VIOLATION,
               "Invalid frame received"));
@@ -1233,9 +1216,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     }
 
     CHECK(conn.clientConnectionId);
-    if (conn.qLogger) {
-      conn.qLogger->addPacket(regularPacket, packetSize);
-    }
+    QLOG(conn, addPacket, regularPacket, packetSize);
 
     if (!conn.version) {
       LongHeader* longHeader = regularPacket.header.asLong();
@@ -1252,12 +1233,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       auto migrationDenied = (encryptionLevel != EncryptionLevel::AppData) ||
           conn.transportSettings.disableMigration;
       if (migrationDenied) {
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(
-              packetSize,
-              PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)
-                  ._to_string());
-        }
+        QLOG(
+            conn,
+            addPacketDrop,
+            packetSize,
+            PacketDropReason(PacketDropReason::PEER_ADDRESS_CHANGE)
+                ._to_string());
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
@@ -1735,12 +1716,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       }
       auto handshakeStateResult = updateHandshakeState(conn);
       if (handshakeStateResult.hasError()) {
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(
-              packetSize,
-              PacketDropReason(PacketDropReason::TRANSPORT_PARAMETER_ERROR)
-                  ._to_string());
-        }
+        QLOG(
+            conn,
+            addPacketDrop,
+            packetSize,
+            PacketDropReason(PacketDropReason::TRANSPORT_PARAMETER_ERROR)
+                ._to_string());
         QUIC_STATS(
             conn.statsCallback,
             onPacketDropped,
@@ -1797,11 +1778,11 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
   if (!conn.readCodec) {
     // drop data. We closed before we even got the first packet. This is
     // normally not possible but might as well.
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(
-          packetSize,
-          PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
-    }
+    QLOG(
+        conn,
+        addPacketDrop,
+        packetSize,
+        PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -1811,11 +1792,11 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
 
   if (conn.peerConnectionError) {
     // We already got a peer error. We can ignore any further peer errors.
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(
-          packetSize,
-          PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
-    }
+    QLOG(
+        conn,
+        addPacketDrop,
+        packetSize,
+        PacketDropReason(PacketDropReason::SERVER_STATE_CLOSED)._to_string());
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -1827,9 +1808,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
   switch (parsedPacket.type()) {
     case CodecResult::Type::CIPHER_UNAVAILABLE: {
       MVVLOG(10) << "drop cipher unavailable " << conn;
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
-      }
+      QLOG(conn, addPacketDrop, packetSize, kCipherUnavailable);
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -1839,9 +1818,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
     case CodecResult::Type::RETRY: {
       MVVLOG(10) << "drop because the server is not supposed to "
                  << "receive a retry " << conn;
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(packetSize, kRetry);
-      }
+      QLOG(conn, addPacketDrop, packetSize, kRetry);
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -1850,9 +1827,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
     }
     case CodecResult::Type::STATELESS_RESET: {
       MVVLOG(10) << "drop because reset " << conn;
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(packetSize, kReset);
-      }
+      QLOG(conn, addPacketDrop, packetSize, kReset);
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -1862,10 +1837,11 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
     case CodecResult::Type::NOTHING: {
       MVVLOG(10) << "drop no data, reason: "
                  << parsedPacket.nothing()->reason._to_string() << " " << conn;
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            packetSize, parsedPacket.nothing()->reason._to_string());
-      }
+      QLOG(
+          conn,
+          addPacketDrop,
+          packetSize,
+          parsedPacket.nothing()->reason._to_string());
       QUIC_STATS(
           conn.statsCallback, onPacketDropped, parsedPacket.nothing()->reason);
       break;
@@ -1899,11 +1875,11 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
     // but no data. This is a protocol violation so we throw an exception.
     // This drop has not been recorded in the switch-case block above
     // so we record it here.
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(
-          packetSize,
-          PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
-    }
+    QLOG(
+        conn,
+        addPacketDrop,
+        packetSize,
+        PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -1915,9 +1891,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
   auto& regularPacket = *regularOptional;
   auto packetNum = regularPacket.header.getPacketSequenceNum();
   auto pnSpace = regularPacket.header.getPacketNumberSpace();
-  if (conn.qLogger) {
-    conn.qLogger->addPacket(regularPacket, packetSize);
-  }
+  QLOG(conn, addPacket, regularPacket, packetSize);
 
   // TODO: Should we honor a key update from the peer on a closed connection?
 

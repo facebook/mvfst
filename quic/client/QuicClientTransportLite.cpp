@@ -22,6 +22,7 @@
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/DatagramHandlers.h>
@@ -92,9 +93,7 @@ QuicClientTransportLite::QuicClientTransportLite(
       clientConn_->initialDestinationConnectionId;
   MVVLOG(4) << "initial dcid: "
             << clientConn_->initialDestinationConnectionId->hex();
-  if (conn_->qLogger) {
-    conn_->qLogger->setDcid(conn_->clientChosenDestConnectionId);
-  }
+  QLOG(*conn_, setDcid, conn_->clientChosenDestConnectionId);
 
   conn_->readCodec->setCodecParameters(CodecParameters(
       conn_->peerAckDelayExponent,
@@ -251,9 +250,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
   RetryPacket* retryPacket = parsedPacket.retryPacket();
   if (retryPacket) {
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacket(*retryPacket, packetSize, true);
-    }
+    QLOG(*conn_, addPacket, *retryPacket, packetSize, true);
 
     // we reject retry packet if our initial has been processed or we've rx'd a
     // prior retry packet; note that initialAckState is reset to nullptr only
@@ -325,10 +322,11 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
             udpPacket.timings,
             udpPacket.tosValue),
         peerAddress);
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacketBuffered(
-          cipherUnavailable->protectionType, packetSize);
-    }
+    QLOG(
+        *conn_,
+        addPacketBuffered,
+        cipherUnavailable->protectionType,
+        packetSize);
     // Packet buffered, not an error
     return {};
   }
@@ -358,9 +356,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     MVVLOG(4) << "Packet parse error for " << *this;
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_CLIENT);
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(packetSize, kParse);
-    }
+    QLOG(*conn_, addPacketDrop, packetSize, kParse);
     // If this was a protocol violation, we would return a codec error instead.
     // Ignore this case as something that caused a non-codec parse error.
     return {};
@@ -375,11 +371,11 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         conn_->statsCallback,
         onPacketDropped,
         PacketDropReason::PROTOCOL_VIOLATION);
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(
-          packetSize,
-          PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
-    }
+    QLOG(
+        *conn_,
+        addPacketDrop,
+        packetSize,
+        PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
     return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Packet has no frames"));
   }
@@ -399,9 +395,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
       protectionLevel == ProtectionType::KeyPhaseOne;
 
   auto& regularPacket = *regularOptional;
-  if (conn_->qLogger) {
-    conn_->qLogger->addPacket(regularPacket, packetSize);
-  }
+  QLOG(*conn_, addPacket, regularPacket, packetSize);
   if (!isProtectedPacket) {
     for (auto& quicFrame : regularPacket.frames) {
       auto isPadding = quicFrame.asPaddingFrame();
@@ -853,9 +847,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
       clientConn_->zeroRttRejected = handshakeLayer->getZeroRttRejected();
       if (clientConn_->zeroRttRejected.has_value() &&
           *clientConn_->zeroRttRejected) {
-        if (conn_->qLogger) {
-          conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
-        }
+        QLOG(*conn_, addTransportStateUpdate, kZeroRttRejected);
         QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
         handshakeLayer->removePsk(hostname_);
         if (!handshakeLayer->getCanResendZeroRtt().value_or(false)) {
@@ -864,9 +856,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
               "Zero-rtt attempted but the early parameters do not match the handshake parameters"));
         }
       } else if (clientConn_->zeroRttRejected.has_value()) {
-        if (conn_->qLogger) {
-          conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
-        }
+        QLOG(*conn_, addTransportStateUpdate, kZeroRttAccepted);
         QUIC_STATS(conn_->statsCallback, onZeroRttAccepted);
         conn_->usedZeroRtt = true;
       }
@@ -1048,9 +1038,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
     // If we are closed, then we shouldn't process new network data.
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::CLIENT_STATE_CLOSED);
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(0, kAlreadyClosed);
-    }
+    QLOG(*conn_, addPacketDrop, 0, kAlreadyClosed);
     return {};
   }
   bool waitingForFirstPacket = !hasReceivedUdpPackets(*conn_);
@@ -1964,9 +1952,7 @@ void QuicClientTransportLite::start(
 
   CHECK(conn_->peerAddress.isInitialized());
 
-  if (conn_->qLogger) {
-    conn_->qLogger->addTransportStateUpdate(kStart);
-  }
+  QLOG(*conn_, addTransportStateUpdate, kStart);
 
   setConnectionSetupCallback(connSetupCb);
   setConnectionCallback(connCb);
@@ -2267,9 +2253,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
     return quic::make_unexpected(adjustResult.error());
   }
 
-  if (conn_->qLogger) {
-    conn_->qLogger->addConnectionMigrationUpdate(true);
-  }
+  QLOG(*conn_, addConnectionMigrationUpdate, true);
 
   QUIC_STATS(conn_->statsCallback, onConnectionMigration);
 
@@ -2307,9 +2291,7 @@ void QuicClientTransportLite::setTransportStatsCallback(
 }
 
 void QuicClientTransportLite::maybeQlogDatagram(size_t len) {
-  if (conn_->qLogger) {
-    conn_->qLogger->addDatagramReceived(len);
-  }
+  QLOG(*conn_, addDatagramReceived, len);
 }
 
 void QuicClientTransportLite::trackDatagramsReceived(

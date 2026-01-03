@@ -7,6 +7,8 @@
 
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 
+#include <quic/logging/QLoggerMacros.h>
+
 namespace quic {
 
 BbrBandwidthSampler::BbrBandwidthSampler(QuicConnectionStateBase& conn)
@@ -68,9 +70,7 @@ void BbrBandwidthSampler::onPacketAcked(
   if (appLimited_) {
     if (appLimitedExitTarget_ < ackEvent.largestNewlyAckedPacketSentTime) {
       appLimited_ = false;
-      if (conn_.qLogger) {
-        conn_.qLogger->addAppUnlimitedUpdate();
-      }
+      QLOG(conn_, addAppUnlimitedUpdate);
     }
   }
   // TODO: If i'm smart enough, maybe we don't have to loop through the acked
@@ -138,19 +138,20 @@ void BbrBandwidthSampler::onPacketAcked(
       bandwidthUpdated = true;
     }
   }
-  if (bandwidthUpdated && conn_.qLogger) {
+  if (bandwidthUpdated) {
     auto newBandwidth = getBandwidth();
-    conn_.qLogger->addBandwidthEstUpdate(
-        newBandwidth.units, newBandwidth.interval);
+    QLOG(
+        conn_,
+        addBandwidthEstUpdate,
+        newBandwidth.units,
+        newBandwidth.interval);
   }
 }
 
 void BbrBandwidthSampler::onAppLimited() {
   appLimited_ = true;
   appLimitedExitTarget_ = Clock::now();
-  if (conn_.qLogger) {
-    conn_.qLogger->addAppLimitedUpdate();
-  }
+  QLOG(conn_, addAppLimitedUpdate);
 }
 
 bool BbrBandwidthSampler::isAppLimited() const noexcept {

@@ -10,6 +10,7 @@
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/QLoggerMacros.h>
 
 namespace quic {
 
@@ -30,22 +31,22 @@ void NewReno::onRemoveBytesFromInflight(uint64_t /* bytes */) {
   MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
              << " cwnd=" << cwndBytes_
              << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
-  if (conn_.qLogger) {
-    conn_.qLogger->addMetricUpdate(
-        conn_.lossState.lrtt,
-        conn_.lossState.mrtt,
-        conn_.lossState.srtt,
-        conn_.lossState.maybeLrttAckDelay.value_or(0us),
-        conn_.lossState.rttvar,
-        getCongestionWindow(),
-        conn_.lossState.inflightBytes,
-        ssthresh_ == std::numeric_limits<uint32_t>::max()
-            ? std::nullopt
-            : Optional<uint64_t>(ssthresh_),
-        std::nullopt,
-        std::nullopt,
-        conn_.lossState.ptoCount);
-  }
+  QLOG(
+      conn_,
+      addMetricUpdate,
+      conn_.lossState.lrtt,
+      conn_.lossState.mrtt,
+      conn_.lossState.srtt,
+      conn_.lossState.maybeLrttAckDelay.value_or(0us),
+      conn_.lossState.rttvar,
+      getCongestionWindow(),
+      conn_.lossState.inflightBytes,
+      ssthresh_ == std::numeric_limits<uint32_t>::max()
+          ? std::nullopt
+          : Optional<uint64_t>(ssthresh_),
+      std::nullopt,
+      std::nullopt,
+      conn_.lossState.ptoCount);
 }
 
 void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
@@ -54,22 +55,22 @@ void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
              << " inflight=" << conn_.lossState.inflightBytes
              << " packetNum=" << packet.packet.header.getPacketSequenceNum()
              << " " << conn_;
-  if (conn_.qLogger) {
-    conn_.qLogger->addMetricUpdate(
-        conn_.lossState.lrtt,
-        conn_.lossState.mrtt,
-        conn_.lossState.srtt,
-        conn_.lossState.maybeLrttAckDelay.value_or(0us),
-        conn_.lossState.rttvar,
-        getCongestionWindow(),
-        conn_.lossState.inflightBytes,
-        ssthresh_ == std::numeric_limits<uint32_t>::max()
-            ? std::nullopt
-            : Optional<uint64_t>(ssthresh_),
-        std::nullopt,
-        std::nullopt,
-        conn_.lossState.ptoCount);
-  }
+  QLOG(
+      conn_,
+      addMetricUpdate,
+      conn_.lossState.lrtt,
+      conn_.lossState.mrtt,
+      conn_.lossState.srtt,
+      conn_.lossState.maybeLrttAckDelay.value_or(0us),
+      conn_.lossState.rttvar,
+      getCongestionWindow(),
+      conn_.lossState.inflightBytes,
+      ssthresh_ == std::numeric_limits<uint32_t>::max()
+          ? std::nullopt
+          : Optional<uint64_t>(ssthresh_),
+      std::nullopt,
+      std::nullopt,
+      conn_.lossState.ptoCount);
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
@@ -77,22 +78,22 @@ void NewReno::onAckEvent(const AckEvent& ack) {
   MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
              << " cwnd=" << cwndBytes_
              << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
-  if (conn_.qLogger) {
-    conn_.qLogger->addMetricUpdate(
-        conn_.lossState.lrtt,
-        conn_.lossState.mrtt,
-        conn_.lossState.srtt,
-        conn_.lossState.maybeLrttAckDelay.value_or(0us),
-        conn_.lossState.rttvar,
-        getCongestionWindow(),
-        conn_.lossState.inflightBytes,
-        ssthresh_ == std::numeric_limits<uint32_t>::max()
-            ? std::nullopt
-            : Optional<uint64_t>(ssthresh_),
-        std::nullopt,
-        std::nullopt,
-        conn_.lossState.ptoCount);
-  }
+  QLOG(
+      conn_,
+      addMetricUpdate,
+      conn_.lossState.lrtt,
+      conn_.lossState.mrtt,
+      conn_.lossState.srtt,
+      conn_.lossState.maybeLrttAckDelay.value_or(0us),
+      conn_.lossState.rttvar,
+      getCongestionWindow(),
+      conn_.lossState.inflightBytes,
+      ssthresh_ == std::numeric_limits<uint32_t>::max()
+          ? std::nullopt
+          : Optional<uint64_t>(ssthresh_),
+      std::nullopt,
+      std::nullopt,
+      conn_.lossState.ptoCount);
   for (const auto& packet : ack.ackedPackets) {
     onPacketAcked(packet);
   }
@@ -166,8 +167,29 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
                << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   }
 
-  if (conn_.qLogger) {
-    conn_.qLogger->addMetricUpdate(
+  QLOG(
+      conn_,
+      addMetricUpdate,
+      conn_.lossState.lrtt,
+      conn_.lossState.mrtt,
+      conn_.lossState.srtt,
+      conn_.lossState.maybeLrttAckDelay.value_or(0us),
+      conn_.lossState.rttvar,
+      getCongestionWindow(),
+      conn_.lossState.inflightBytes,
+      ssthresh_ == std::numeric_limits<uint32_t>::max()
+          ? std::nullopt
+          : Optional<uint64_t>(ssthresh_),
+      std::nullopt,
+      std::nullopt,
+      conn_.lossState.ptoCount);
+  if (loss.persistentCongestion) {
+    MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
+               << " cwnd=" << cwndBytes_
+               << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
+    QLOG(
+        conn_,
+        addMetricUpdate,
         conn_.lossState.lrtt,
         conn_.lossState.mrtt,
         conn_.lossState.srtt,
@@ -181,27 +203,6 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
-  }
-  if (loss.persistentCongestion) {
-    MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
-               << " cwnd=" << cwndBytes_
-               << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
-    if (conn_.qLogger) {
-      conn_.qLogger->addMetricUpdate(
-          conn_.lossState.lrtt,
-          conn_.lossState.mrtt,
-          conn_.lossState.srtt,
-          conn_.lossState.maybeLrttAckDelay.value_or(0us),
-          conn_.lossState.rttvar,
-          getCongestionWindow(),
-          conn_.lossState.inflightBytes,
-          ssthresh_ == std::numeric_limits<uint32_t>::max()
-              ? std::nullopt
-              : Optional<uint64_t>(ssthresh_),
-          std::nullopt,
-          std::nullopt,
-          conn_.lossState.ptoCount);
-    }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   }
 }

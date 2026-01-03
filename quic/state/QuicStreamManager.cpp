@@ -7,6 +7,7 @@
 
 #include <quic/common/MvfstLogging.h>
 #include <quic/logging/QLogger.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
@@ -270,8 +271,7 @@ quic::Expected<void, LocalErrorCode> QuicStreamManager::setPriorityQueue(
 bool QuicStreamManager::setStreamPriority(
     StreamId id,
     const PriorityQueue::Priority& newPriority,
-    bool connFlowControlOpen,
-    const std::shared_ptr<QLogger>& qLogger) {
+    bool connFlowControlOpen) {
   auto stream = findStream(id);
   if (stream) {
     if (writeQueue().equalPriority(stream->priority, newPriority)) {
@@ -279,10 +279,11 @@ bool QuicStreamManager::setStreamPriority(
     }
     stream->priority = newPriority;
     updateWritableStreams(*stream, connFlowControlOpen);
-    if (qLogger) {
-      qLogger->addPriorityUpdate(
-          id, writeQueue().toLogFields(stream->priority));
-    }
+    QLOG(
+        conn_,
+        addPriorityUpdate,
+        id,
+        writeQueue().toLogFields(stream->priority));
     return true;
   }
   return false;

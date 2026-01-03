@@ -461,8 +461,7 @@ class QuicStreamManager {
   bool setStreamPriority(
       StreamId id,
       const PriorityQueue::Priority& priority,
-      bool connFlowControlOpen = true,
-      const std::shared_ptr<QLogger>& qLogger = nullptr);
+      bool connFlowControlOpen = true);
 
   auto& controlWriteQueue() {
     return controlWriteQueue_;

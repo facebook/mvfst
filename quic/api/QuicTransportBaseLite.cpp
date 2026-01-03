@@ -13,6 +13,7 @@
 #include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -831,10 +832,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setStreamPriority(
   // It's not an error to prioritize a stream after it's sent its FIN - this
   // can reprioritize retransmissions.
   conn_->streamManager->setStreamPriority(
-      id,
-      priority,
-      getSendConnFlowControlBytesWire(*conn_) > 0,
-      conn_->qLogger);
+      id, priority, getSendConnFlowControlBytesWire(*conn_) > 0);
   return {};
 }
 
@@ -1397,8 +1395,8 @@ void QuicTransportBaseLite::closeImpl(
 
   drainConnection = drainConnection & conn_->transportSettings.shouldDrain;
 
-  uint64_t totalCryptoDataWritten = 0;
-  uint64_t totalCryptoDataRecvd = 0;
+  uint64_t totalCryptoDataWritten [[maybe_unused]] = 0;
+  uint64_t totalCryptoDataRecvd [[maybe_unused]] = 0;
   auto timeUntilLastInitialCryptoFrameReceived = std::chrono::milliseconds(0);
   if (conn_->cryptoState) {
     totalCryptoDataWritten +=
@@ -1418,36 +1416,36 @@ void QuicTransportBaseLite::closeImpl(
             conn_->connectionTime);
   }
 
-  if (conn_->qLogger) {
-    auto tlsSummary = conn_->handshakeLayer->getTLSSummary();
-    conn_->qLogger->addTransportSummary(
-        {conn_->lossState.totalBytesSent,
-         conn_->lossState.totalBytesRecvd,
-         conn_->flowControlState.sumCurWriteOffset,
-         conn_->flowControlState.sumMaxObservedOffset,
-         conn_->flowControlState.sumCurStreamBufferLen,
-         conn_->lossState.totalBytesRetransmitted,
-         conn_->lossState.totalStreamBytesCloned,
-         conn_->lossState.totalBytesCloned,
-         totalCryptoDataWritten,
-         totalCryptoDataRecvd,
-         conn_->congestionController
-             ? conn_->congestionController->getWritableBytes()
-             : std::numeric_limits<uint64_t>::max(),
-         getSendConnFlowControlBytesWire(*conn_),
-         conn_->lossState.totalPacketsSpuriouslyMarkedLost,
-         conn_->lossState.reorderingThreshold,
-         uint64_t(conn_->transportSettings.timeReorderingThreshDividend),
-         conn_->usedZeroRtt,
-         conn_->version.value_or(QuicVersion::MVFST_INVALID),
-         conn_->initialPacketsReceived,
-         conn_->uniqueInitialCryptoFramesReceived,
-         timeUntilLastInitialCryptoFrameReceived,
-         tlsSummary.alpn,
-         tlsSummary.namedGroup,
-         tlsSummary.pskType,
-         tlsSummary.echStatus});
-  }
+  [[maybe_unused]] auto tlsSummary = conn_->handshakeLayer->getTLSSummary();
+  QLOG(
+      *conn_,
+      addTransportSummary,
+      {conn_->lossState.totalBytesSent,
+       conn_->lossState.totalBytesRecvd,
+       conn_->flowControlState.sumCurWriteOffset,
+       conn_->flowControlState.sumMaxObservedOffset,
+       conn_->flowControlState.sumCurStreamBufferLen,
+       conn_->lossState.totalBytesRetransmitted,
+       conn_->lossState.totalStreamBytesCloned,
+       conn_->lossState.totalBytesCloned,
+       totalCryptoDataWritten,
+       totalCryptoDataRecvd,
+       conn_->congestionController
+           ? conn_->congestionController->getWritableBytes()
+           : std::numeric_limits<uint64_t>::max(),
+       getSendConnFlowControlBytesWire(*conn_),
+       conn_->lossState.totalPacketsSpuriouslyMarkedLost,
+       conn_->lossState.reorderingThreshold,
+       uint64_t(conn_->transportSettings.timeReorderingThreshDividend),
+       conn_->usedZeroRtt,
+       conn_->version.value_or(QuicVersion::MVFST_INVALID),
+       conn_->initialPacketsReceived,
+       conn_->uniqueInitialCryptoFramesReceived,
+       timeUntilLastInitialCryptoFrameReceived,
+       tlsSummary.alpn,
+       tlsSummary.namedGroup,
+       tlsSummary.pskType,
+       tlsSummary.echStatus});
 
   // TODO: truncate the error code string to be 1MSS only.
   closeState_ = CloseState::CLOSED;
@@ -1483,21 +1481,26 @@ void QuicTransportBaseLite::closeImpl(
                           << *this;
   if (errorCode) {
     conn_->localConnectionError = errorCode;
-    if (conn_->qLogger) {
-      conn_->qLogger->addConnectionClose(
-          conn_->localConnectionError->message,
-          errorCode->message,
-          drainConnection,
-          sendCloseImmediately);
-    }
-  } else if (conn_->qLogger) {
-    auto reason = fmt::format(
+    QLOG(
+        *conn_,
+        addConnectionClose,
+        conn_->localConnectionError->message,
+        errorCode->message,
+        drainConnection,
+        sendCloseImmediately);
+  } else {
+    [[maybe_unused]] auto reason = fmt::format(
         "Server: {}, Peer: isReset: {}, Peer: isAbandon: {}",
         kNoError,
         isReset,
         isAbandon);
-    conn_->qLogger->addConnectionClose(
-        kNoError, std::move(reason), drainConnection, sendCloseImmediately);
+    QLOG(
+        *conn_,
+        addConnectionClose,
+        kNoError,
+        std::move(reason),
+        drainConnection,
+        sendCloseImmediately);
   }
   cancelLossTimeout();
   cancelTimeout(&ackTimeout_);
@@ -2941,11 +2944,9 @@ void QuicTransportBaseLite::setCongestionControl(CongestionControlType type) {
     conn_->congestionController =
         conn_->congestionControllerFactory->makeCongestionController(
             *conn_, type);
-    if (conn_->qLogger) {
-      std::stringstream s;
-      s << "CCA set to " << congestionControlTypeToString(type);
-      conn_->qLogger->addTransportStateUpdate(s.str());
-    }
+    [[maybe_unused]] std::stringstream s;
+    s << "CCA set to " << congestionControlTypeToString(type);
+    QLOG(*conn_, addTransportStateUpdate, s.str());
   }
 }
 

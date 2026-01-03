@@ -49,6 +49,31 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "qlogger_macros",
+    headers = select({
+        # Server/desktop builds get full implementation
+        "DEFAULT": {"QLoggerMacros.h": "QLoggerMacros.h"},
+        # Mobile apps that opt-in get full implementation
+        "fbsource//tools/build_defs/config/apps/shared:quic-qlog-enabled-android": {
+            "QLoggerMacros.h": "QLoggerMacros.h",
+        },
+        "fbsource//tools/build_defs/config/apps/shared:quic-qlog-enabled-iphoneos": {
+            "QLoggerMacros.h": "QLoggerMacros.h",
+        },
+        # Fallback for mobile platforms without explicit opt-in
+        "ovr_config//os/constraints:android": {"QLoggerMacros.h": "facebook/QLoggerMacrosMobile.h"},
+        "ovr_config//os/constraints:iphoneos": {"QLoggerMacros.h": "facebook/QLoggerMacrosMobile.h"},
+    }),
+    exported_deps = select({
+        "DEFAULT": [":qlogger"],
+        "fbsource//tools/build_defs/config/apps/shared:quic-qlog-enabled-android": [":qlogger"],
+        "fbsource//tools/build_defs/config/apps/shared:quic-qlog-enabled-iphoneos": [":qlogger"],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+    }),
+)
+
+mvfst_cpp_library(
     name = "base_qlogger",
     srcs = [
         "BaseQLogger.cpp",

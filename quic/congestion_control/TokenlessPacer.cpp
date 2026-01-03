@@ -8,6 +8,7 @@
 #include <quic/congestion_control/TokenlessPacer.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/observer/SocketObserverMacros.h>
 
 namespace quic {
@@ -44,9 +45,7 @@ void TokenlessPacer::refreshPacingRate(
     batchSize_ = pacingRate.burstSize;
   }
   maybeNotifyObservers(conn_, batchSize_, writeInterval_);
-  if (conn_.qLogger) {
-    conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
-  }
+  QLOG(conn_, addPacingMetricUpdate, batchSize_, writeInterval_);
   if (!experimental_) {
     lastWriteTime_.reset();
   }
@@ -72,9 +71,7 @@ void TokenlessPacer::setPacingRate(uint64_t rateBps) {
 
   maybeNotifyObservers(conn_, batchSize_, writeInterval_);
 
-  if (conn_.qLogger) {
-    conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
-  }
+  QLOG(conn_, addPacingMetricUpdate, batchSize_, writeInterval_);
 
   if (!experimental_) {
     lastWriteTime_.reset();

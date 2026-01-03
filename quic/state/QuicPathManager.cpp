@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/state/QuicPathManager.h>
 #include <quic/state/StateData.h>
 
@@ -290,9 +291,7 @@ const PathInfo* QuicPathManager::onPathResponseReceived(
   // TODO: JBESHAY MIGRATION - Update qlog events to be path
   // specific
 
-  if (conn_.qLogger) {
-    conn_.qLogger->addPathValidationEvent(true);
-  }
+  QLOG(conn_, addPathValidationEvent, true);
 
   if (pathValidationCallback_) {
     pathValidationCallback_->onPathValidationResult(path);
@@ -341,9 +340,7 @@ void QuicPathManager::onPathValidationTimeoutExpired(TimePoint timeNow) {
         // Remove the path from the pending
         it = pathsPendingResponse_.erase(it);
 
-        if (conn_.qLogger) {
-          conn_.qLogger->addPathValidationEvent(false);
-        }
+        QLOG(conn_, addPathValidationEvent, false);
 
         if (pathValidationCallback_) {
           pathValidationCallback_->onPathValidationResult(pathInfo);

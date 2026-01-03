@@ -11,6 +11,7 @@
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -36,9 +37,7 @@ quic::Expected<void, QuicError> ClientHandshake::connect(
   }
 
   if (conn_->zeroRttWriteCipher) {
-    if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted);
-    }
+    QLOG(*conn_, addTransportStateUpdate, kZeroRttAttempted);
 
     // If zero rtt write cipher is derived, it means the cached psk was valid
     DCHECK(cachedServerTransportParams);

@@ -12,6 +12,7 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/state/QuicAckFrequencyFunctions.h>
 #include <chrono>
 
@@ -111,20 +112,20 @@ void BbrCongestionController::onPacketLoss(
 
   if (loss.persistentCongestion) {
     recoveryWindow_ = conn_.udpSendPacketLen * kMinCwndInMssForBbr;
-    if (conn_.qLogger) {
-      conn_.qLogger->addMetricUpdate(
-          conn_.lossState.lrtt,
-          conn_.lossState.mrtt,
-          conn_.lossState.srtt,
-          conn_.lossState.maybeLrttAckDelay.value_or(0us),
-          conn_.lossState.rttvar,
-          getCongestionWindow(),
-          conn_.lossState.inflightBytes,
-          std::nullopt,
-          std::nullopt,
-          std::nullopt,
-          conn_.lossState.ptoCount);
-    }
+    QLOG(
+        conn_,
+        addMetricUpdate,
+        conn_.lossState.lrtt,
+        conn_.lossState.mrtt,
+        conn_.lossState.srtt,
+        conn_.lossState.maybeLrttAckDelay.value_or(0us),
+        conn_.lossState.rttvar,
+        getCongestionWindow(),
+        conn_.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn_.lossState.ptoCount);
   }
 }
 
@@ -197,20 +198,20 @@ void BbrCongestionController::onPacketAcked(
     uint64_t prevInflightBytes,
     bool hasLoss) {
   SCOPE_EXIT {
-    if (conn_.qLogger) {
-      conn_.qLogger->addMetricUpdate(
-          conn_.lossState.lrtt,
-          conn_.lossState.mrtt,
-          conn_.lossState.srtt,
-          conn_.lossState.maybeLrttAckDelay.value_or(0us),
-          conn_.lossState.rttvar,
-          getCongestionWindow(),
-          conn_.lossState.inflightBytes,
-          std::nullopt,
-          std::nullopt,
-          std::nullopt,
-          conn_.lossState.ptoCount);
-    }
+    QLOG(
+        conn_,
+        addMetricUpdate,
+        conn_.lossState.lrtt,
+        conn_.lossState.mrtt,
+        conn_.lossState.srtt,
+        conn_.lossState.maybeLrttAckDelay.value_or(0us),
+        conn_.lossState.rttvar,
+        getCongestionWindow(),
+        conn_.lossState.inflightBytes,
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        conn_.lossState.ptoCount);
   };
   if (ack.implicit) {
     // This is an implicit ACK during the handshake, we can't trust very
@@ -586,9 +587,7 @@ void BbrCongestionController::updateCwnd(
 void BbrCongestionController::setAppIdle(
     bool idle,
     TimePoint /* eventTime */) noexcept {
-  if (conn_.qLogger) {
-    conn_.qLogger->addAppIdleUpdate(kAppIdle, idle);
-  }
+  QLOG(conn_, addAppIdleUpdate, kAppIdle, idle);
   /*
    * No-op for bbr.
    * We are not necessarily app-limite when we are app-idle. For example, the

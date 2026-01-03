@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -54,13 +55,13 @@ quic::Expected<void, QuicError> onPTOAlarm(QuicConnectionStateBase& conn) {
   QUIC_STATS(conn.statsCallback, onPTO);
   conn.lossState.ptoCount++;
   conn.lossState.totalPTOCount++;
-  if (conn.qLogger) {
-    conn.qLogger->addLossAlarm(
-        conn.lossState.largestSent.value_or(0),
-        conn.lossState.ptoCount,
-        conn.outstandings.numOutstanding(),
-        kPtoAlarm);
-  }
+  QLOG(
+      conn,
+      addLossAlarm,
+      conn.lossState.largestSent.value_or(0),
+      conn.lossState.ptoCount,
+      conn.outstandings.numOutstanding(),
+      kPtoAlarm);
   if (conn.lossState.ptoCount >= conn.transportSettings.maxNumPTOs) {
     return quic::make_unexpected(QuicError(
         QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
@@ -477,12 +478,12 @@ detectLossPackets(
 
   if (lossEvent.largestLostPacketNum.has_value()) {
     DCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
-    if (conn.qLogger) {
-      conn.qLogger->addPacketsLost(
-          lossEvent.largestLostPacketNum.value(),
-          lossEvent.lostBytes,
-          lossEvent.lostPackets);
-    }
+    QLOG(
+        conn,
+        addPacketsLost,
+        lossEvent.largestLostPacketNum.value(),
+        lossEvent.lostBytes,
+        lossEvent.lostPackets);
 
     conn.lossState.rtxCount += lossEvent.lostPackets;
     if (conn.congestionController) {

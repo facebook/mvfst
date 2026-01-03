@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <quic/state/QuicStateFunctions.h>
 
 #include <quic/common/TimeUtil.h>
@@ -86,20 +87,20 @@ void updateRtt(
   }
 
   // inform qlog
-  if (conn.qLogger) {
-    conn.qLogger->addMetricUpdate(
-        rttSample,
-        conn.lossState.mrtt,
-        conn.lossState.srtt,
-        ackDelay,
-        conn.lossState.rttvar,
-        std::nullopt,
-        conn.lossState.inflightBytes,
-        std::nullopt,
-        std::nullopt,
-        std::nullopt,
-        conn.lossState.ptoCount);
-  }
+  QLOG(
+      conn,
+      addMetricUpdate,
+      rttSample,
+      conn.lossState.mrtt,
+      conn.lossState.srtt,
+      ackDelay,
+      conn.lossState.rttvar,
+      std::nullopt,
+      conn.lossState.inflightBytes,
+      std::nullopt,
+      std::nullopt,
+      std::nullopt,
+      conn.lossState.ptoCount);
 }
 
 void updateAckSendStateOnRecvPacket(

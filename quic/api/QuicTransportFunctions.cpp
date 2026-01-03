@@ -19,6 +19,7 @@
 #include <quic/common/StringUtils.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
+#include <quic/logging/QLoggerMacros.h>
 
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicAckFrequencyFunctions.h>
@@ -722,9 +723,7 @@ quic::Expected<void, QuicError> updateConnection(
   MVVLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
              << " in space=" << packetNumberSpace << " size=" << encodedSize
              << " bodySize: " << encodedBodySize << " " << conn;
-  if (conn.qLogger) {
-    conn.qLogger->addPacket(packet, encodedSize);
-  }
+  QLOG(conn, addPacket, packet, encodedSize);
   FOLLY_SDT(quic, update_connection_num_frames, packet.frames.size());
   for (const auto& frame : packet.frames) {
     switch (frame.type()) {
@@ -1487,9 +1486,7 @@ void writeCloseCommon(
   Buf packetBuf(std::move(packet.header));
   packetBuf.appendToChain(std::move(bufUniquePtr));
   auto packetSize = packetBuf.computeChainDataLength();
-  if (connection.qLogger) {
-    connection.qLogger->addPacket(packet.packet, packetSize);
-  }
+  QLOG(connection, addPacket, packet.packet, packetSize);
   MVVLOG(10) << nodeToString(connection.nodeType)
              << " sent close packetNum=" << packetNum << " in space=" << pnSpace
              << " " << connection;
