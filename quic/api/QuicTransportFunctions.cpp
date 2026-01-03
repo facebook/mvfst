@@ -1784,7 +1784,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
 
   uint64_t bytesWritten = 0;
   uint64_t shortHeaderPadding = 0;
-  uint64_t shortHeaderPaddingCount = 0;
+  [[maybe_unused]] uint64_t shortHeaderPaddingCount = 0;
   SCOPE_EXIT {
     auto nSent = ioBufBatch.getPktSent();
     if (nSent > 0) {

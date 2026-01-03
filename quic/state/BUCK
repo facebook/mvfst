@@ -211,15 +211,34 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "stats_callback",
-    headers = [
-        "QuicTransportStatsCallback.h",
-    ],
-    exported_deps = [
-        "//folly/functional:invoke",
-        "//quic:constants",
-        "//quic:exception",
-        "//quic/common:optional",
-    ],
+    headers = select({
+        "DEFAULT": {"QuicTransportStatsCallback.h": "QuicTransportStatsCallback.h"},
+        "ovr_config//os/constraints:android": {"QuicTransportStatsCallback.h": "facebook/QuicTransportStatsCallbackMobile.h"},
+        "ovr_config//os/constraints:iphoneos": {"QuicTransportStatsCallback.h": "facebook/QuicTransportStatsCallbackMobile.h"},
+    }),
+    exported_deps = select({
+        "DEFAULT": [
+            "//folly/functional:invoke",
+            "//quic:constants",
+            "//quic:exception",
+            "//quic/common:optional",
+        ],
+        "ovr_config//os/constraints:android": [
+            "//quic:constants",
+            "//quic:exception",
+            "//quic/common:optional",
+        ],
+        "ovr_config//os/constraints:iphoneos": [
+            "//quic:constants",
+            "//quic:exception",
+            "//quic/common:optional",
+        ],
+        "ovr_config//os/constraints:macos": [
+            "//quic:constants",
+            "//quic:exception",
+            "//quic/common:optional",
+        ],
+    }),
 )
 
 mvfst_cpp_library(
