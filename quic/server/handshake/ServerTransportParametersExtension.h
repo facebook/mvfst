@@ -228,9 +228,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     params.parameters.push_back(std::move(activeConnLimitResult.value()));
 
     // stateless reset token
-    params.parameters.push_back(TransportParameter(
+    params.parameters.emplace_back(
         TransportParameterId::stateless_reset_token,
-        BufHelpers::copyBuffer(token_)));
+        BufHelpers::copyBuffer(token_));
 
     if (disableMigration_) {
       params.parameters.push_back(

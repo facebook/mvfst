@@ -22,7 +22,7 @@ namespace quic {
 
 TokenGenerator::TokenGenerator(TokenSecret secret) : cipher_(kCipherContexts) {
   std::vector<ByteRange> secrets;
-  secrets.emplace_back(ByteRange(secret.data(), secret.size()));
+  secrets.emplace_back(secret.data(), secret.size());
   cipher_.setSecrets(secrets);
 }
 
