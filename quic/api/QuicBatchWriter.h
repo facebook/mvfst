@@ -23,10 +23,10 @@ class BatchWriter {
   virtual ~BatchWriter() = default;
 
   // returns true if the batch does not contain any buffers
-  virtual bool empty() const = 0;
+  [[nodiscard]] virtual bool empty() const = 0;
 
   // returns the size in bytes of the batched buffers
-  virtual size_t size() const = 0;
+  [[nodiscard]] virtual size_t size() const = 0;
 
   // reset the internal state after a flush
   virtual void reset() = 0;
@@ -57,11 +57,11 @@ class IOBufBatchWriter : public BatchWriter {
   IOBufBatchWriter() = default;
   ~IOBufBatchWriter() override = default;
 
-  bool empty() const override {
+  [[nodiscard]] bool empty() const override {
     return !buf_;
   }
 
-  size_t size() const override {
+  [[nodiscard]] size_t size() const override {
     return buf_ ? buf_->computeChainDataLength() : 0;
   }
 
@@ -135,9 +135,9 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   explicit SendmmsgPacketBatchWriter(size_t maxBufs);
   ~SendmmsgPacketBatchWriter() override = default;
 
-  bool empty() const override;
+  [[nodiscard]] bool empty() const override;
 
-  size_t size() const override;
+  [[nodiscard]] size_t size() const override;
 
   void reset() override;
   bool append(

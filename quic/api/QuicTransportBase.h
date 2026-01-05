@@ -42,28 +42,29 @@ class QuicTransportBase : public QuicSocket,
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
 
-  Optional<ConnectionId> getClientConnectionId() const override;
+  [[nodiscard]] Optional<ConnectionId> getClientConnectionId() const override;
 
-  Optional<ConnectionId> getServerConnectionId() const override;
+  [[nodiscard]] Optional<ConnectionId> getServerConnectionId() const override;
 
-  Optional<ConnectionId> getClientChosenDestConnectionId() const override;
+  [[nodiscard]] Optional<ConnectionId> getClientChosenDestConnectionId()
+      const override;
 
   // QuicSocket interface
-  bool replaySafe() const override;
+  [[nodiscard]] bool replaySafe() const override;
 
   void closeGracefully() override;
 
-  quic::Expected<size_t, LocalErrorCode> getStreamReadOffset(
+  [[nodiscard]] quic::Expected<size_t, LocalErrorCode> getStreamReadOffset(
       StreamId id) const override;
-  quic::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
+  [[nodiscard]] quic::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
       StreamId id) const override;
-  quic::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
-      StreamId id) const override;
+  [[nodiscard]] quic::Expected<size_t, LocalErrorCode>
+  getStreamWriteBufferedBytes(StreamId id) const override;
 
-  quic::Expected<QuicSocket::FlowControlState, LocalErrorCode>
+  [[nodiscard]] quic::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const override;
 
-  quic::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
+  [[nodiscard]] quic::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
       StreamId id) const override;
 
   quic::Expected<void, LocalErrorCode> setConnectionFlowControlWindow(
@@ -119,7 +120,7 @@ class QuicTransportBase : public QuicSocket,
 
   void sendPing(std::chrono::milliseconds pingTimeout) override;
 
-  const QuicConnectionStateBase* getState() const override {
+  [[nodiscard]] const QuicConnectionStateBase* getState() const override {
     return conn_.get();
   }
 

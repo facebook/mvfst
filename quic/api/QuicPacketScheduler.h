@@ -61,12 +61,12 @@ class QuicPacketScheduler {
   /**
    * Returns whether the scheduler has data to send.
    */
-  virtual bool hasData() const = 0;
+  [[nodiscard]] virtual bool hasData() const = 0;
 
   /**
    * Returns the name of the scheduler.
    */
-  virtual folly::StringPiece name() const = 0;
+  [[nodiscard]] virtual folly::StringPiece name() const = 0;
 };
 
 class StreamFrameScheduler {
@@ -80,7 +80,7 @@ class StreamFrameScheduler {
   [[nodiscard]] quic::Expected<void, QuicError> writeStreams(
       PacketBuilderInterface& builder);
 
-  bool hasPendingData() const;
+  [[nodiscard]] bool hasPendingData() const;
 
  private:
   // Return true if this stream wrote some data
@@ -137,7 +137,7 @@ class RstStreamScheduler {
  public:
   explicit RstStreamScheduler(const QuicConnectionStateBase& conn);
 
-  bool hasPendingRsts() const;
+  [[nodiscard]] bool hasPendingRsts() const;
 
   [[nodiscard]] quic::Expected<bool, QuicError> writeRsts(
       PacketBuilderInterface& builder);
@@ -154,7 +154,7 @@ class SimpleFrameScheduler {
  public:
   explicit SimpleFrameScheduler(const QuicConnectionStateBase& conn);
 
-  bool hasPendingSimpleFrames() const;
+  [[nodiscard]] bool hasPendingSimpleFrames() const;
 
   bool writeSimpleFrames(PacketBuilderInterface& builder);
 
@@ -187,7 +187,7 @@ class PingFrameScheduler {
  public:
   explicit PingFrameScheduler(const QuicConnectionStateBase& conn);
 
-  bool hasPingFrame() const;
+  [[nodiscard]] bool hasPingFrame() const;
 
   bool writePing(PacketBuilderInterface& builder);
 
@@ -212,7 +212,7 @@ class WindowUpdateScheduler {
  public:
   explicit WindowUpdateScheduler(const QuicConnectionStateBase& conn);
 
-  bool hasPendingWindowUpdates() const;
+  [[nodiscard]] bool hasPendingWindowUpdates() const;
 
   [[nodiscard]] quic::Expected<void, QuicError> writeWindowUpdates(
       PacketBuilderInterface& builder);
@@ -225,7 +225,7 @@ class BlockedScheduler {
  public:
   explicit BlockedScheduler(const QuicConnectionStateBase& conn);
 
-  bool hasPendingBlockedFrames() const;
+  [[nodiscard]] bool hasPendingBlockedFrames() const;
 
   [[nodiscard]] quic::Expected<void, QuicError> writeBlockedFrames(
       PacketBuilderInterface& builder);
@@ -246,9 +246,9 @@ class CryptoStreamScheduler {
   [[nodiscard]] quic::Expected<bool, QuicError> writeCryptoData(
       PacketBuilderInterface& builder);
 
-  bool hasData() const;
+  [[nodiscard]] bool hasData() const;
 
-  folly::StringPiece name() const {
+  [[nodiscard]] folly::StringPiece name() const {
     return "CryptoScheduler";
   }
 
@@ -366,7 +366,7 @@ class CloningScheduler : public QuicPacketScheduler {
       const folly::StringPiece name,
       uint64_t cipherOverhead);
 
-  bool hasData() const override;
+  [[nodiscard]] bool hasData() const override;
 
   /**
    * Returns a optional ClonedPacketIdentifier which indicates if the built out
@@ -378,7 +378,7 @@ class CloningScheduler : public QuicPacketScheduler {
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
-  folly::StringPiece name() const override;
+  [[nodiscard]] folly::StringPiece name() const override;
 
  private:
   FrameScheduler& frameScheduler_;

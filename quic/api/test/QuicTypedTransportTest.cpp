@@ -5544,7 +5544,7 @@ class QuicTypedTransportAfterStartTestDatagram
         .WillByDefault(Return(writableBytes));
   }
 
-  MockCongestionController* getMockCongestionController() const {
+  [[nodiscard]] MockCongestionController* getMockCongestionController() const {
     return mockCongestionController_;
   }
 

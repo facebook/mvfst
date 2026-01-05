@@ -82,12 +82,14 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Get the QUIC Client Connection ID
    */
-  virtual Optional<ConnectionId> getClientConnectionId() const = 0;
+  [[nodiscard]] virtual Optional<ConnectionId> getClientConnectionId()
+      const = 0;
 
   /**
    * Get the QUIC Server Connection ID
    */
-  virtual Optional<ConnectionId> getServerConnectionId() const = 0;
+  [[nodiscard]] virtual Optional<ConnectionId> getServerConnectionId()
+      const = 0;
 
   /**
    * Get the original Quic Server Connection ID chosen by client
@@ -95,7 +97,7 @@ class QuicSocket : virtual public QuicSocketLite {
   [[nodiscard]] virtual Optional<ConnectionId> getClientChosenDestConnectionId()
       const = 0;
 
-  virtual bool replaySafe() const = 0;
+  [[nodiscard]] virtual bool replaySafe() const = 0;
 
   /**
    * Close this socket gracefully, by waiting for all the streams to be idle
@@ -107,29 +109,29 @@ class QuicSocket : virtual public QuicSocketLite {
    * Returns the current offset already read or written by the application on
    * the given stream.
    */
-  virtual quic::Expected<size_t, LocalErrorCode> getStreamReadOffset(
-      StreamId id) const = 0;
-  virtual quic::Expected<size_t, LocalErrorCode> getStreamWriteOffset(
-      StreamId id) const = 0;
+  [[nodiscard]] virtual quic::Expected<size_t, LocalErrorCode>
+  getStreamReadOffset(StreamId id) const = 0;
+  [[nodiscard]] virtual quic::Expected<size_t, LocalErrorCode>
+  getStreamWriteOffset(StreamId id) const = 0;
   /**
    * Returns the amount of data buffered by the transport waiting to be written
    */
-  virtual quic::Expected<size_t, LocalErrorCode> getStreamWriteBufferedBytes(
-      StreamId id) const = 0;
+  [[nodiscard]] virtual quic::Expected<size_t, LocalErrorCode>
+  getStreamWriteBufferedBytes(StreamId id) const = 0;
 
   /**
    * Returns the current flow control windows for the connection.
    * Use getStreamFlowControl for stream flow control window.
    */
-  virtual quic::Expected<FlowControlState, LocalErrorCode>
+  [[nodiscard]] virtual quic::Expected<FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const = 0;
 
   /**
    * Returns the minimum of current send flow control window and available
    * buffer space.
    */
-  virtual quic::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
-      StreamId id) const = 0;
+  [[nodiscard]] virtual quic::Expected<uint64_t, LocalErrorCode>
+  getMaxWritableOnStream(StreamId id) const = 0;
 
   /**
    * Sets the flow control window for the connection.

@@ -60,8 +60,8 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
       QuicAsyncUDPSocket* sock) override;
   ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
       override;
-  bool empty() const override;
-  size_t size() const override;
+  [[nodiscard]] bool empty() const override;
+  [[nodiscard]] size_t size() const override;
 
   void setTxTime(std::chrono::microseconds txTime) override {
     txTime_ = txTime;
@@ -90,9 +90,9 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   explicit SendmmsgGSOPacketBatchWriter(size_t maxBufs);
   ~SendmmsgGSOPacketBatchWriter() override = default;
 
-  bool empty() const override;
+  [[nodiscard]] bool empty() const override;
 
-  size_t size() const override;
+  [[nodiscard]] size_t size() const override;
 
   void reset() override;
   bool append(
@@ -126,7 +126,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
       return idx_;
     }
 
-    bool valid() const {
+    [[nodiscard]] bool valid() const {
       return idx_ >= 0;
     }
 

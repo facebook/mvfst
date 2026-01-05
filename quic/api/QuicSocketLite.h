@@ -274,12 +274,13 @@ class QuicSocketLite {
   /**
    * Returns the number of bidirectional streams that can be opened.
    */
-  virtual uint64_t getNumOpenableBidirectionalStreams() const = 0;
+  [[nodiscard]] virtual uint64_t getNumOpenableBidirectionalStreams() const = 0;
 
   /**
    * Returns the number of unidirectional streams that can be opened.
    */
-  virtual uint64_t getNumOpenableUnidirectionalStreams() const = 0;
+  [[nodiscard]] virtual uint64_t getNumOpenableUnidirectionalStreams()
+      const = 0;
 
   /**
    * Returns whether a stream ID represents a unidirectional stream.
@@ -501,12 +502,12 @@ class QuicSocketLite {
    *
    * return true iff the transport is open and ready, false otherwise.
    */
-  virtual bool good() const = 0;
+  [[nodiscard]] virtual bool good() const = 0;
 
   /**
    * Determine if an error has occurred with this transport.
    */
-  virtual bool error() const = 0;
+  [[nodiscard]] virtual bool error() const = 0;
 
   /**
    * Close this socket with a drain period. If closing with an error, it may be
@@ -671,29 +672,30 @@ class QuicSocketLite {
    * Get information on the state of the quic connection. Should only be used
    * for logging.
    */
-  virtual const QuicConnectionStateBase* getState() const = 0;
+  [[nodiscard]] virtual const QuicConnectionStateBase* getState() const = 0;
 
   /**
    * Get internal transport info similar to TCP information.
    * Returns LocalErrorCode::STREAM_NOT_EXISTS if the stream is not found
    */
-  virtual quic::Expected<StreamTransportInfo, LocalErrorCode>
+  [[nodiscard]] virtual quic::Expected<StreamTransportInfo, LocalErrorCode>
   getStreamTransportInfo(StreamId id) const = 0;
 
   /**
    * Get the peer socket address
    */
-  virtual const folly::SocketAddress& getPeerAddress() const = 0;
+  [[nodiscard]] virtual const folly::SocketAddress& getPeerAddress() const = 0;
 
   /**
    * Get the original peer socket address
    */
-  virtual const folly::SocketAddress& getOriginalPeerAddress() const = 0;
+  [[nodiscard]] virtual const folly::SocketAddress& getOriginalPeerAddress()
+      const = 0;
 
   /**
    * Get the local socket address
    */
-  virtual const folly::SocketAddress& getLocalAddress() const = 0;
+  [[nodiscard]] virtual const folly::SocketAddress& getLocalAddress() const = 0;
 
   /**
    * Get the cert presented by peer
@@ -724,7 +726,8 @@ class QuicSocketLite {
    * Derive exported key material (RFC5705) from the transport's TLS layer, if
    * the transport is capable.
    */
-  virtual Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  [[nodiscard]] virtual Optional<std::vector<uint8_t>>
+  getExportedKeyingMaterial(
       const std::string& label,
       const Optional<ByteRange>& context,
       uint16_t keyLength) const = 0;
@@ -733,31 +736,32 @@ class QuicSocketLite {
    * Get the negotiated ALPN. If called before the transport is ready
    * returns std::nullopt
    */
-  virtual Optional<std::string> getAppProtocol() const = 0;
+  [[nodiscard]] virtual Optional<std::string> getAppProtocol() const = 0;
 
   /**
    * Return the amount of transport buffer space available for writing
    */
-  virtual uint64_t getConnectionBufferAvailable() const = 0;
+  [[nodiscard]] virtual uint64_t getConnectionBufferAvailable() const = 0;
 
   // Returns std::nullopt before the handshake is complete, otherwise is always
   // non-empty.
-  virtual Optional<std::vector<TransportParameter>> getPeerTransportParams()
-      const = 0;
+  [[nodiscard]] virtual Optional<std::vector<TransportParameter>>
+  getPeerTransportParams() const = 0;
 
   /**
    * Returns the current flow control windows for the stream, id != 0.
    * Use getConnectionFlowControl for connection flow control window.
    */
-  virtual quic::Expected<FlowControlState, LocalErrorCode> getStreamFlowControl(
-      StreamId id) const = 0;
+  [[nodiscard]] virtual quic::Expected<FlowControlState, LocalErrorCode>
+  getStreamFlowControl(StreamId id) const = 0;
 
-  virtual const TransportSettings& getTransportSettings() const = 0;
+  [[nodiscard]] virtual const TransportSettings& getTransportSettings()
+      const = 0;
 
   /**
    * Get internal transport info similar to TCP information.
    */
-  virtual TransportInfo getTransportInfo() const = 0;
+  [[nodiscard]] virtual TransportInfo getTransportInfo() const = 0;
 
   /**
    * Similar to getMaxWritableOnStream() above, but returns the value for the

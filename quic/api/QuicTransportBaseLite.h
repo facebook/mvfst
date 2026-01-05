@@ -63,8 +63,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool replaySafe = true) override;
   quic::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
       bool replaySafe = true) override;
-  uint64_t getNumOpenableBidirectionalStreams() const override;
-  uint64_t getNumOpenableUnidirectionalStreams() const override;
+  [[nodiscard]] uint64_t getNumOpenableBidirectionalStreams() const override;
+  [[nodiscard]] uint64_t getNumOpenableUnidirectionalStreams() const override;
   bool isUnidirectionalStream(StreamId stream) noexcept override;
   bool isBidirectionalStream(StreamId stream) noexcept override;
 
@@ -137,17 +137,17 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       const uint64_t offset,
       ByteEventCallback* cb) override;
 
-  bool good() const override;
+  [[nodiscard]] bool good() const override;
 
-  bool error() const override;
+  [[nodiscard]] bool error() const override;
 
-  uint64_t bufferSpaceAvailable() const;
+  [[nodiscard]] uint64_t bufferSpaceAvailable() const;
 
   /**
    * Returns whether or not the connection has a write cipher. This will be used
    * to decide to return the onTransportReady() callbacks.
    */
-  virtual bool hasWriteCipher() const = 0;
+  [[nodiscard]] virtual bool hasWriteCipher() const = 0;
 
   void setConnectionSetupCallback(
       folly::MaybeManagedPtr<ConnectionSetupCallback> callback) final;
@@ -228,32 +228,33 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void setThrottlingSignalProvider(
       std::shared_ptr<ThrottlingSignalProvider>) override;
 
-  uint64_t maxWritableOnStream(const QuicStreamState&) const;
+  [[nodiscard]] uint64_t maxWritableOnStream(const QuicStreamState&) const;
 
   [[nodiscard]] std::shared_ptr<QuicEventBase> getEventBase() const override;
 
-  quic::Expected<StreamTransportInfo, LocalErrorCode> getStreamTransportInfo(
-      StreamId id) const override;
+  [[nodiscard]] quic::Expected<StreamTransportInfo, LocalErrorCode>
+  getStreamTransportInfo(StreamId id) const override;
 
-  const QuicConnectionStateBase* getState() const override {
+  [[nodiscard]] const QuicConnectionStateBase* getState() const override {
     return conn_.get();
   }
 
-  const folly::SocketAddress& getPeerAddress() const override;
+  [[nodiscard]] const folly::SocketAddress& getPeerAddress() const override;
 
-  const folly::SocketAddress& getOriginalPeerAddress() const override;
+  [[nodiscard]] const folly::SocketAddress& getOriginalPeerAddress()
+      const override;
 
-  Optional<std::string> getAppProtocol() const override;
+  [[nodiscard]] Optional<std::string> getAppProtocol() const override;
 
-  uint64_t getConnectionBufferAvailable() const override;
+  [[nodiscard]] uint64_t getConnectionBufferAvailable() const override;
 
-  quic::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
+  [[nodiscard]] quic::Expected<QuicSocketLite::FlowControlState, LocalErrorCode>
   getStreamFlowControl(StreamId id) const override;
 
   /**
    * Retrieve the transport settings
    */
-  const TransportSettings& getTransportSettings() const override;
+  [[nodiscard]] const TransportSettings& getTransportSettings() const override;
 
   [[nodiscard]] uint64_t maxWritableOnConn() const override;
 
@@ -468,9 +469,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void createBufAccessor(size_t /* capacity */) {}
 
-  TransportInfo getTransportInfo() const override;
+  [[nodiscard]] TransportInfo getTransportInfo() const override;
 
-  const folly::SocketAddress& getLocalAddress() const override;
+  [[nodiscard]] const folly::SocketAddress& getLocalAddress() const override;
 
  protected:
   void setConnectionCallbackFromCtor(
@@ -808,7 +809,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   void logStreamOpenEvent(StreamId streamId);
 
-  bool hasDeliveryCallbacksToCall(
+  [[nodiscard]] bool hasDeliveryCallbacksToCall(
       StreamId streamId,
       uint64_t maxOffsetToDeliver) const;
 
