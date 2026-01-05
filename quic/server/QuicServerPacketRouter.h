@@ -123,7 +123,7 @@ class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
   TakeoverHandlerCallback(const TakeoverHandlerCallback&) = delete;
   TakeoverHandlerCallback& operator=(const TakeoverHandlerCallback&) = delete;
 
-  virtual ~TakeoverHandlerCallback() override;
+  ~TakeoverHandlerCallback() override;
 
   void bind(const folly::SocketAddress& addr);
 

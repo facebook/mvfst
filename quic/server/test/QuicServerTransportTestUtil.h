@@ -134,9 +134,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     qEvb_ = std::make_shared<FollyQuicEventBase>(&evb);
   }
 
-  virtual ~QuicServerTransportTestBase() = default;
+  ~QuicServerTransportTestBase() override = default;
 
-  void SetUp() {
+  void SetUp() override {
     clientAddr = folly::SocketAddress("127.0.0.1", 1000);
     serverAddr = folly::SocketAddress("1.2.3.4", 8080);
     clientConnectionId = getTestConnectionId();

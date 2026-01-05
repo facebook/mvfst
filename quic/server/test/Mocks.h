@@ -58,7 +58,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
 
 class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
  public:
-  ~MockWorkerCallback() = default;
+  ~MockWorkerCallback() override = default;
   MOCK_METHOD(void, handleWorkerError, (LocalErrorCode));
 
   MOCK_METHOD(
@@ -85,7 +85,7 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
       NetworkData&& networkDataIn,
       Optional<QuicVersion> quicVersion,
       folly::EventBase*,
-      bool isForwardedData = false) {
+      bool isForwardedData = false) override {
     auto routingData = std::make_unique<RoutingData>(std::move(routingDataIn));
     auto networkData = std::make_unique<NetworkData>(std::move(networkDataIn));
     if (routingData->headerForm == HeaderForm::Long) {
@@ -100,7 +100,7 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
 
 class MockQuicUDPSocketFactory : public QuicUDPSocketFactory {
  public:
-  ~MockQuicUDPSocketFactory() = default;
+  ~MockQuicUDPSocketFactory() override = default;
 
   std::unique_ptr<FollyAsyncUDPSocketAlias> make(folly::EventBase* evb, int fd)
       override {

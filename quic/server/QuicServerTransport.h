@@ -215,7 +215,7 @@ class QuicServerTransport
   }
 
   // From ServerHandshake::HandshakeCallback
-  virtual void onCryptoEventAvailable() noexcept override;
+  void onCryptoEventAvailable() noexcept override;
 
   void onTransportKnobs(BufPtr knobBlob) override;
 
