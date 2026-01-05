@@ -30,6 +30,8 @@
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/StateData.h>
 
+#include <memory>
+
 using namespace std;
 using namespace testing;
 
@@ -105,10 +107,10 @@ class ServerHandshakeTest : public Test {
             kDefaultUDPSendPacketLen,
             kDefaultActiveConnectionIdLimit,
             ConnectionId::createZeroLength());
-    fizzClient.reset(new fizz::client::FizzClient<
-                     ServerHandshakeTest,
-                     fizz::client::ClientStateMachine>(
-        clientState, clientReadBuffer, readAeadOptions, *this, dg.get()));
+    fizzClient = std::make_unique<fizz::client::FizzClient<
+        ServerHandshakeTest,
+        fizz::client::ClientStateMachine>>(
+        clientState, clientReadBuffer, readAeadOptions, *this, dg.get());
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto params = std::make_shared<ServerTransportParametersExtension>(
         getVersion(),
