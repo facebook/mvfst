@@ -20,10 +20,6 @@
 #include <quic/server/SlidingWindowRateLimiter.h>
 #include <iterator>
 
-FOLLY_GFLAGS_DEFINE_bool(
-    qs_io_uring_use_async_recv,
-    true,
-    "io_uring backend use async recv");
 FOLLY_GFLAGS_DEFINE_int32(
     qs_conn_id_version,
     0,
@@ -234,16 +230,8 @@ void QuicServer::initializeWorkers(bool useDefaultTransport) {
 }
 
 std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
-  QuicServerWorker::SetEventCallback sec;
-  if (FLAGS_qs_io_uring_use_async_recv) {
-    sec = backendSupportsMultishotCallback_
-        ? QuicServerWorker::SetEventCallback::RECVMSG_MULTISHOT
-        : QuicServerWorker::SetEventCallback::RECVMSG;
-  } else {
-    sec = QuicServerWorker::SetEventCallback::NONE;
-  }
   auto worker = std::make_unique<QuicServerWorker>(
-      this->shared_from_this(), transportSettings_, sec);
+      this->shared_from_this(), transportSettings_);
   worker->setNewConnectionSocketFactory(socketFactory_.get());
   worker->setSupportedVersions(supportedVersions_);
   worker->rejectNewConnections(rejectNewConnections_);

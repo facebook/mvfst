@@ -57,10 +57,8 @@ int QuicServerWorker::getUnfinishedHandshakeCount() {
 
 QuicServerWorker::QuicServerWorker(
     std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
-    TransportSettings transportSettings,
-    SetEventCallback ec)
+    TransportSettings transportSettings)
     : callback_(std::move(callback)),
-      setEventCallback_(ec),
       transportSettings_(std::move(transportSettings)),
       takeoverPktHandler_(this),
       observerList_(this) {
@@ -96,16 +94,6 @@ void QuicServerWorker::bind(
       std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
-  switch (setEventCallback_) {
-    case SetEventCallback::NONE:
-      break;
-    case SetEventCallback::RECVMSG:
-      socket_->setEventCallback(this);
-      break;
-    case SetEventCallback::RECVMSG_MULTISHOT:
-      socket_->setRecvmsgMultishotCallback(this);
-      break;
-  }
   // TODO this totally doesn't work, we can't apply socket options before
   // bind, since bind creates the fd.
   if (socketOptions_) {
@@ -562,75 +550,6 @@ void QuicServerWorker::handleNetworkData(
     MVVLOG(6) << "Failed to parse packet header " << ex.what();
     packetDropReason = PacketDropReason::PARSE_ERROR_EXCEPTION;
   }
-}
-
-void QuicServerWorker::recvmsgMultishotCallback(
-    MultishotHdr* hdr,
-    int res,
-    BufPtr io_buf) {
-  if (res < 0) {
-    return;
-  }
-
-  folly::EventRecvmsgMultishotCallback::ParsedRecvMsgMultishot p;
-  if (!folly::EventRecvmsgMultishotCallback::parseRecvmsgMultishot(
-          io_buf->coalesce(), hdr->data_, p)) {
-    return;
-  }
-
-  auto bytesRead = p.payload.size();
-  if (bytesRead > 0) {
-    OnDataAvailableParams params;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    if (p.control.size()) {
-      // hacky
-      struct msghdr msg;
-      msg.msg_controllen = p.control.size();
-      msg.msg_control = (void*)p.control.data();
-      FollyAsyncUDPSocketAlias::fromMsg(params, msg);
-    }
-#endif
-    bool truncated = false;
-    if ((size_t)bytesRead != p.realPayloadLength) {
-      truncated = true;
-    }
-
-    folly::SocketAddress addr;
-    addr.setFromSockaddr(
-        reinterpret_cast<sockaddr const*>(p.name.data()), p.name.size());
-    io_buf->trimStart(p.payload.data() - io_buf->data());
-    readBuffer_ = std::move(io_buf);
-
-    // onDataAvailable will add bytesRead back
-    readBuffer_->trimEnd(bytesRead);
-    onDataAvailable(addr, bytesRead, truncated, params);
-  }
-}
-
-void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int bytesRead) {
-  auto& msg = msgHdr->data_;
-  if (bytesRead > 0) {
-    OnDataAvailableParams params;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    if (msg.msg_control) {
-      FollyAsyncUDPSocketAlias::fromMsg(params, msg);
-    }
-#endif
-    bool truncated = false;
-    if ((size_t)bytesRead > msgHdr->len_) {
-      truncated = true;
-      bytesRead = ssize_t(msgHdr->len_);
-    }
-
-    readBuffer_ = std::move(msgHdr->ioBuf_);
-
-    folly::SocketAddress addr;
-    addr.setFromSockaddr(
-        reinterpret_cast<sockaddr*>(msg.msg_name), msg.msg_namelen);
-
-    onDataAvailable(addr, bytesRead, truncated, params);
-  }
-  msgHdr_.reset(msgHdr);
 }
 
 bool QuicServerWorker::tryHandlingAsHealthCheck(

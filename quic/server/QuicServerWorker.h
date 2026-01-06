@@ -37,119 +37,10 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
                          public QuicServerTransport::RoutingCallback,
                          public QuicServerTransport::HandshakeFinishedCallback,
                          public ServerConnectionIdRejector,
-                         public folly::EventRecvmsgCallback,
-                         public folly::EventRecvmsgMultishotCallback,
                          public folly::HHWheelTimer::Callback {
  public:
   static int getUnfinishedHandshakeCount();
 
- private:
-  struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
-    static auto constexpr kBuffSize = 1024;
-
-    MsgHdr() = delete;
-    ~MsgHdr() override = default;
-
-    explicit MsgHdr(QuicServerWorker* worker) {
-      arg_ = worker;
-      freeFunc_ = MsgHdr::free;
-      cbFunc_ = MsgHdr::cb;
-    }
-
-    void reset() {
-      len_ = getBuffSize();
-      ioBuf_ = BufHelpers::create(len_);
-      ::memset(&data_, 0, sizeof(data_));
-      iov_.iov_base = ioBuf_->writableData();
-      iov_.iov_len = len_;
-      data_.msg_iov = &iov_;
-      data_.msg_iovlen = 1;
-      ::memset(&addrStorage_, 0, sizeof(addrStorage_));
-      auto* rawAddr = reinterpret_cast<sockaddr*>(&addrStorage_);
-      rawAddr->sa_family =
-          reinterpret_cast<QuicServerWorker*>(arg_)->getAddress().getFamily();
-      data_.msg_name = rawAddr;
-      data_.msg_namelen = sizeof(addrStorage_);
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
-      if (hasGRO() || hasTimestamping()) {
-        ::memset(control_, 0, sizeof(control_));
-        data_.msg_control = control_;
-        data_.msg_controllen = sizeof(control_);
-      }
-#endif
-    }
-
-    static void free(folly::EventRecvmsgCallback::MsgHdr* msgHdr) {
-      delete msgHdr;
-    }
-
-    static void cb(folly::EventRecvmsgCallback::MsgHdr* msgHdr, int res) {
-      reinterpret_cast<QuicServerWorker*>(msgHdr->arg_)
-          ->eventRecvmsgCallback(reinterpret_cast<MsgHdr*>(msgHdr), res);
-    }
-
-    size_t getBuffSize() {
-      auto* worker = reinterpret_cast<QuicServerWorker*>(arg_);
-      return worker->transportSettings_.maxRecvPacketSize *
-          worker->numGROBuffers_;
-    }
-
-    bool hasGRO() {
-      auto* worker = reinterpret_cast<QuicServerWorker*>(arg_);
-      return worker->numGROBuffers_ > 1;
-    }
-
-    bool hasTimestamping() {
-      auto* worker = reinterpret_cast<QuicServerWorker*>(arg_);
-      return worker->hasTimestamping();
-    }
-
-    // data
-    BufPtr ioBuf_;
-    struct iovec iov_;
-    size_t len_{0};
-    // addr
-    struct sockaddr_storage addrStorage_;
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    char control_[FollyAsyncUDPSocketAlias::ReadCallback::
-                      OnDataAvailableParams::kCmsgSpace];
-#endif
-  };
-
-  struct MultishotHdr : public folly::EventRecvmsgMultishotCallback::Hdr {
-    MultishotHdr() = delete;
-    ~MultishotHdr() override = default;
-
-    explicit MultishotHdr(QuicServerWorker* worker) {
-      arg_ = worker;
-      freeFunc_ = MultishotHdr::free;
-      cbFunc_ = MultishotHdr::cb;
-      ::memset(&data_, 0, sizeof(data_));
-      size_t total = 4 + sizeof(struct sockaddr_storage);
-      data_.msg_namelen = sizeof(struct sockaddr_storage);
-#ifdef FOLLY_HAVE_MSG_ERRQUEUE
-      data_.msg_controllen = FollyAsyncUDPSocketAlias::ReadCallback::
-          OnDataAvailableParams::kCmsgSpace;
-      total += FollyAsyncUDPSocketAlias::ReadCallback::OnDataAvailableParams::
-          kCmsgSpace;
-      data_.msg_controllen += total % 16;
-#else
-      data_.msg_namelen += total % 16;
-#endif
-    }
-
-    static void free(folly::EventRecvmsgMultishotCallback::Hdr* m) {
-      delete m;
-    }
-
-    static void
-    cb(folly::EventRecvmsgMultishotCallback::Hdr* h, int res, BufPtr io_buf) {
-      reinterpret_cast<QuicServerWorker*>(h->arg_)->recvmsgMultishotCallback(
-          reinterpret_cast<MultishotHdr*>(h), res, std::move(io_buf));
-    }
-  };
-
- public:
   using TransportSettingsOverrideFn =
       std::function<void(quic::TransportSettings&)>;
 
@@ -171,12 +62,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
         bool isForwardedData) = 0;
   };
 
-  enum class SetEventCallback { NONE, RECVMSG, RECVMSG_MULTISHOT };
-
   explicit QuicServerWorker(
       std::shared_ptr<WorkerCallback> callback,
-      TransportSettings transportSettings = TransportSettings(),
-      SetEventCallback ec = SetEventCallback::NONE);
+      TransportSettings transportSettings = TransportSettings());
 
   ~QuicServerWorker() override;
 
@@ -490,23 +378,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     return statsCallback_.get();
   }
 
-  // from EventRecvmsgCallback
-  EventRecvmsgCallback::MsgHdr* allocateData() noexcept override {
-    auto* ret = msgHdr_.release();
-    if (!ret) {
-      ret = new MsgHdr(this);
-    }
-
-    ret->reset();
-
-    return ret;
-  }
-
-  EventRecvmsgMultishotCallback::Hdr* allocateRecvmsgMultishotData() noexcept
-      override {
-    return new MultishotHdr(this);
-  }
-
   /**
    * Adds observer for accept events.
    *
@@ -596,9 +467,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   [[nodiscard]] std::string logRoutingInfo(const ConnectionId& connId) const;
 
-  void eventRecvmsgCallback(MsgHdr* msgHdr, int res);
-  void recvmsgMultishotCallback(MultishotHdr* msgHdr, int res, BufPtr io_buf);
-
   bool hasTimestamping() {
     return (socket_ && (socket_->getTimestamping() > 0));
   }
@@ -630,7 +498,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   std::unique_ptr<FollyAsyncUDPSocketAlias> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
-  SetEventCallback setEventCallback_{SetEventCallback::NONE};
   folly::Executor::KeepAlive<folly::EventBase> evb_;
 
   // factories are owned by quic server
@@ -700,9 +567,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   std::unique_ptr<RateLimiter> newConnRateLimiter_;
 
   Optional<std::function<int()>> unfinishedHandshakeLimitFn_;
-
-  // EventRecvmsgCallback data
-  std::unique_ptr<MsgHdr> msgHdr_;
 
   // Wrapper around list of AcceptObservers to handle cleanup on destruction
   class AcceptObserverList {
