@@ -47,7 +47,7 @@ quic::Expected<void, QuicError> sendStopSendingSMHandler(
     const StopSendingFrame& frame) {
   switch (stream.sendState) {
     case StreamSendState::Open: {
-      CHECK(
+      MVCHECK(
           isBidirectionalStream(stream.id) ||
           isSendingStream(stream.conn.nodeType, stream.id));
       if (stream.conn.nodeType == QuicNodeType::Server &&
@@ -88,18 +88,23 @@ quic::Expected<void, QuicError> sendRstSMHandler(
       // error checks before calling this function, which is why we're doing
       // CHECKs here.
       if (reliableSize && stream.reliableSizeToPeer) {
-        CHECK_LE(*reliableSize, *stream.reliableSizeToPeer)
-            << "It is illegal to increase the reliable size";
+        MVCHECK_LE(
+            *reliableSize,
+            *stream.reliableSizeToPeer,
+            "It is illegal to increase the reliable size");
       }
       if (stream.appErrorCodeToPeer) {
-        CHECK_EQ(*stream.appErrorCodeToPeer, errorCode)
-            << "Cannot change application error code in a reset";
+        MVCHECK_EQ(
+            *stream.appErrorCodeToPeer,
+            errorCode,
+            "Cannot change application error code in a reset");
       }
       if (!stream.reliableSizeToPeer &&
           stream.sendState == StreamSendState::ResetSent) {
-        CHECK(!reliableSize || *reliableSize == 0)
-            << "RESET_STREAM frame was previously sent, and we "
-            << "are increasing the reliable size";
+        MVCHECK(
+            !reliableSize || *reliableSize == 0,
+            "RESET_STREAM frame was previously sent, and we "
+                << "are increasing the reliable size");
       }
       stream.appErrorCodeToPeer = errorCode;
       auto resetResult = resetQuicStream(stream, errorCode, reliableSize);
@@ -138,9 +143,9 @@ quic::Expected<void, QuicError> sendAckSMHandler(
       // Clean up the acked buffers from the retransmissionBuffer.
       auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
-        CHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
-        CHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
-        CHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
+        MVCHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
+        MVCHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
+        MVCHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
         MVVLOG(10) << "Open: acked stream data stream=" << stream.id
                    << " offset=" << ackedBuffer->second->offset
                    << " len=" << ackedBuffer->second->data.chainLength()
@@ -176,8 +181,8 @@ quic::Expected<void, QuicError> sendAckSMHandler(
       break;
     }
     case StreamSendState::Closed: {
-      DCHECK(stream.retransmissionBuffer.empty());
-      DCHECK(stream.pendingWrites.empty());
+      MVDCHECK(stream.retransmissionBuffer.empty());
+      MVDCHECK(stream.pendingWrites.empty());
       break;
     }
     case StreamSendState::Invalid: {

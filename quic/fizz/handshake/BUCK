@@ -34,6 +34,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/codec:packet_number_cipher",
         "//quic/common:buf_util",
+        "//quic/common:mvfst_logging",
         "//quic/folly_utils:folly_utils",
         "//quic/handshake:aead",
         "//quic/handshake:handshake",

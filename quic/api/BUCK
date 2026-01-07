@@ -139,7 +139,6 @@ mvfst_cpp_library(
     ],
     deps = [
         ":loop_detector_callback",
-        "//quic/common:mvfst_logging",
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/congestion_control:ecn_l4s_tracker",
         "//quic/congestion_control:pacer_factory",
@@ -160,6 +159,7 @@ mvfst_cpp_library(
         "//quic:exception",
         "//quic/codec:types",
         "//quic/common:looper",
+        "//quic/common:mvfst_logging",
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/handshake:handshake",
         "//quic/handshake:transport_parameters",
@@ -247,6 +247,7 @@ mvfst_cpp_library(
         "QuicStreamAsyncTransport.h",
     ],
     deps = [
+        "//quic/common:mvfst_check",
         "//quic/common:mvfst_logging",
         "//quic/common/events:folly_eventbase",
     ],

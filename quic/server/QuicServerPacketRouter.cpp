@@ -37,7 +37,7 @@ TakeoverHandlerCallback::~TakeoverHandlerCallback() {
 }
 
 void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
-  CHECK(socket_);
+  MVCHECK(socket_);
   // first reset existing socket if any
   socket_->bind(addr);
   socket_->resumeRead(this);
@@ -63,12 +63,12 @@ void TakeoverHandlerCallback::pause() {
 }
 
 const folly::SocketAddress& TakeoverHandlerCallback::getAddress() const {
-  CHECK(socket_);
+  MVCHECK(socket_);
   return socket_->address();
 }
 
 int TakeoverHandlerCallback::getSocketFD() {
-  CHECK(socket_);
+  MVCHECK(socket_);
   return socket_->getNetworkSocket().toFd();
 }
 
@@ -166,7 +166,7 @@ void TakeoverPacketHandler::setSocketFactory(QuicUDPSocketFactory* factory) {
 
 void TakeoverPacketHandler::forwardPacket(BufPtr writeBuffer) {
   if (!pktForwardingSocket_) {
-    CHECK(socketFactory_);
+    MVCHECK(socketFactory_);
     pktForwardingSocket_ = socketFactory_->make(worker_->getEventBase(), -1);
     folly::SocketAddress localAddress;
     localAddress.setFromHostPort("::1", 0);
@@ -186,7 +186,7 @@ void TakeoverPacketHandler::processForwardedPacket(
   // The 'client' here is the local server that is taking over the port
   // First we decode the actual client and time from the packet
   // and send it to the worker_ to handle it properly
-  CHECK(!data->isChained());
+  MVCHECK(!data->isChained());
   ContiguousReadCursor cursor(data->data(), data->length());
   uint32_t protocol = 0;
   if (!cursor.tryReadBE(protocol)) {
@@ -220,7 +220,7 @@ void TakeoverPacketHandler::processForwardedPacket(
   }
   folly::SocketAddress peerAddress;
   try {
-    CHECK_NOTNULL(sockaddr);
+    MVCHECK_NOTNULL(sockaddr);
     peerAddress.setFromSockaddr(sockaddr, addrLen);
   } catch (const std::exception& ex) {
     MVLOG_ERROR << "Invalid client address encoded: addrlen=" << addrLen

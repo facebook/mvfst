@@ -69,7 +69,7 @@ QuicPathManager::getOrAddPath(
   }
   auto it = pathTupleToId_.find({localAddress, peerAddress});
   if (it != pathTupleToId_.end()) {
-    return std::cref(*CHECK_NOTNULL(getPath(it->second)));
+    return std::cref(*MVCHECK_NOTNULL(getPath(it->second)));
   }
   auto idRes = addPath(localAddress, peerAddress, nullptr);
   if (idRes.hasError()) {
@@ -159,7 +159,7 @@ const PathInfo* QuicPathManager::getPath(
   if (it == pathTupleToId_.end()) {
     return nullptr;
   }
-  return CHECK_NOTNULL(getPath(it->second));
+  return MVCHECK_NOTNULL(getPath(it->second));
 }
 
 Expected<uint64_t, QuicError> QuicPathManager::getNewPathChallengeData(
@@ -311,7 +311,7 @@ Optional<TimePoint> QuicPathManager::getEarliestChallengeTimeout() const {
     return std::nullopt;
   }
   auto pathInfo = getPath(pathsPendingResponse_.front());
-  CHECK(pathInfo) << "Inconsistent path state";
+  MVCHECK(pathInfo, "Inconsistent path state");
 
   return pathInfo->pathResponseDeadline;
 }
@@ -322,12 +322,12 @@ void QuicPathManager::onPathValidationTimeoutExpired(TimePoint timeNow) {
   while (it != pathsPendingResponse_.end()) {
     auto pathId = *it;
     auto pathInfoIt = pathIdToInfo_.find(pathId);
-    CHECK(pathInfoIt != pathIdToInfo_.end()) << "Inconsistent path state";
+    MVCHECK(pathInfoIt != pathIdToInfo_.end(), "Inconsistent path state");
     auto& pathInfo = pathInfoIt->second;
 
     if (pathInfo.status == PathStatus::Validating) {
-      CHECK(pathInfo.pathResponseDeadline.has_value())
-          << "Inconsistent path state";
+      MVCHECK(
+          pathInfo.pathResponseDeadline.has_value(), "Inconsistent path state");
 
       if (timeNow > *pathInfo.pathResponseDeadline) {
         // The path has timed out and failed validation
@@ -364,7 +364,7 @@ void QuicPathManager::setPathValidationCallback(
 
 void QuicPathManager::cacheCurrentCongestionAndRttState() {
   auto pathInfo = pathIdToInfo_.find(conn_.currentPathId);
-  CHECK(pathInfo != pathIdToInfo_.end()) << "Inconsistent path state";
+  MVCHECK(pathInfo != pathIdToInfo_.end(), "Inconsistent path state");
 
   CachedCongestionControlAndRtt state;
   state.recordTime = Clock::now();
@@ -379,7 +379,7 @@ void QuicPathManager::cacheCurrentCongestionAndRttState() {
 
 bool QuicPathManager::maybeRestoreCongestionControlAndRttStateForCurrentPath() {
   auto pathInfoIt = pathIdToInfo_.find(conn_.currentPathId);
-  CHECK(pathInfoIt != pathIdToInfo_.end()) << "Inconsistent path state";
+  MVCHECK(pathInfoIt != pathIdToInfo_.end(), "Inconsistent path state");
   auto& pathInfo = pathInfoIt->second;
   auto& cachedState = pathInfo.cachedCCAndRttState;
   bool ccaRestored = false;
@@ -475,13 +475,14 @@ QuicPathManager::switchCurrentPath(PathIdType switchToPathId) {
     auto& destinationConnectionId = conn_.nodeType == QuicNodeType::Client
         ? conn_.serverConnectionId
         : conn_.clientConnectionId;
-    CHECK(destinationConnectionId)
-        << "Connection ID not initialized for active connection";
+    MVCHECK(
+        destinationConnectionId,
+        "Connection ID not initialized for active connection");
     // Cache the current destination CID for the path we are switching away
     // from. This will be retired when the path is removed.
     auto setCidRes =
         setDestinationCidForPath(switchFromPathId, *destinationConnectionId);
-    CHECK(!setCidRes.hasError()) << setCidRes.error();
+    MVCHECK(!setCidRes.hasError(), setCidRes.error());
 
     destinationConnectionId = *switchToPath.destinationConnectionId;
     switchToPath.destinationConnectionId.reset();
@@ -531,7 +532,7 @@ void QuicPathManager::maybeReapUnusedPaths(bool force) {
   if (minPathId != nextPathId_) {
     // We found a path to reap
     auto removeResult = removePath(minPathId);
-    CHECK(!removeResult.hasError()) << removeResult.error();
+    MVCHECK(!removeResult.hasError(), removeResult.error());
   }
 }
 

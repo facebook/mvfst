@@ -227,7 +227,7 @@ template <class ClockType = Clock>
   if (conn.lossState.currentAlarmMethod ==
       LossState::AlarmMethod::EarlyRetransmitOrReordering) {
     auto lossTimeAndSpace = earliestLossTimer(conn);
-    CHECK(lossTimeAndSpace.first);
+    MVCHECK(lossTimeAndSpace.first);
     auto lossEventResult = detectLossPackets(
         conn,
         getAckState(conn, lossTimeAndSpace.second),
@@ -239,7 +239,8 @@ template <class ClockType = Clock>
     }
     auto& lossEvent = lossEventResult.value();
     if (conn.congestionController && lossEvent) {
-      DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      MVDCHECK(
+          lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       subtractAndCheckUnderflow(
           conn.lossState.inflightBytes, lossEvent->lostBytes);
       conn.congestionController->onPacketAckOrLoss(
@@ -300,7 +301,7 @@ template <class ClockType = Clock>
 
   auto iter = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   while (iter != conn.outstandings.packets.end()) {
-    DCHECK_EQ(
+    MVDCHECK_EQ(
         iter->packet.header.getPacketNumberSpace(), PacketNumberSpace::AppData);
     auto isZeroRttPacket =
         iter->packet.header.getProtectionType() == ProtectionType::ZeroRtt;
@@ -319,12 +320,13 @@ template <class ClockType = Clock>
       if (pkt.maybeClonedPacketIdentifier) {
         conn.outstandings.clonedPacketIdentifiers.erase(
             *pkt.maybeClonedPacketIdentifier);
-        CHECK(conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
+        MVCHECK(
+            conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
         --conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData];
       }
       lossEvent.addLostPacket(pkt);
       if (!processed) {
-        CHECK(conn.outstandings.packetCount[PacketNumberSpace::AppData]);
+        MVCHECK(conn.outstandings.packetCount[PacketNumberSpace::AppData]);
         --conn.outstandings.packetCount[PacketNumberSpace::AppData];
       }
       iter = conn.outstandings.packets.erase(iter);

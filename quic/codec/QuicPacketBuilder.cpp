@@ -90,7 +90,7 @@ encodeLongHeaderHelper(
 
   if (isRetry) {
     // Write the retry token
-    CHECK(!token.empty()) << "Retry packet must contain a token";
+    MVCHECK(!token.empty(), "Retry packet must contain a token");
     bufop.push((const uint8_t*)token.data(), token.size());
   }
   // defer write of the packet num and length till payload has been computed
@@ -146,8 +146,9 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
 
 uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
   bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
-  CHECK(packetNumberEncoding_)
-      << "packetNumberEncoding_ should be valid after ctor";
+  MVCHECK(
+      packetNumberEncoding_,
+      "packetNumberEncoding_ should be valid after ctor");
   return static_cast<uint32_t>(header_.computeChainDataLength()) +
       (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
 }
@@ -202,7 +203,7 @@ void RegularQuicPacketBuilder::insert(BufPtr buf, size_t limit) {
 }
 
 void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
-  const auto* pBuf = CHECK_NOTNULL(buf.front());
+  const auto* pBuf = MVCHECK_NOTNULL(buf.front());
   limit = std::min(limit, buf.chainLength());
   BufPtr streamData = BufHelpers::create(limit);
   do {
@@ -257,7 +258,7 @@ void RegularQuicPacketBuilder::markNonEmpty() {
 }
 
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
-  CHECK(packetNumberEncoding_.has_value());
+  MVCHECK(packetNumberEncoding_.has_value());
   // at this point everything should been set in the packet_
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
@@ -735,7 +736,7 @@ const PacketHeader& InplaceQuicPacketBuilder::getPacketHeader() const {
 }
 
 PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
-  CHECK(packetNumberEncoding_.has_value());
+  MVCHECK(packetNumberEncoding_.has_value());
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
@@ -755,23 +756,23 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
     pktLen.encode(
         [&](auto val) {
           auto bigEndian = folly::Endian::big(val);
-          CHECK_EQ(sizeof(bigEndian), kMaxPacketLenSize);
+          MVCHECK_EQ(sizeof(bigEndian), kMaxPacketLenSize);
           bufWriter_.backFill(
               (uint8_t*)&bigEndian, kMaxPacketLenSize, packetLenOffset_);
         },
         kMaxPacketLenSize);
     auto bigPacketNum = folly::Endian::big(packetNumberEncoding_->result);
-    CHECK_GE(sizeof(bigPacketNum), packetNumberEncoding_->length);
+    MVCHECK_GE(sizeof(bigPacketNum), packetNumberEncoding_->length);
     bufWriter_.backFill(
         (uint8_t*)&bigPacketNum + sizeof(bigPacketNum) -
             packetNumberEncoding_->length,
         packetNumberEncoding_->length,
         packetNumOffset_);
   }
-  CHECK(
+  MVCHECK(
       headerStart_ && headerStart_ >= iobuf_->data() &&
       headerStart_ < bufWriter_.tail());
-  CHECK(
+  MVCHECK(
       !bodyStart_ ||
       (bodyStart_ > headerStart_ && bodyStart_ <= bufWriter_.tail()));
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
@@ -812,8 +813,9 @@ bool InplaceQuicPacketBuilder::canBuildPacket() const noexcept {
 }
 
 uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
-  CHECK(packetNumberEncoding_)
-      << "packetNumberEncoding_ should be valid after ctor";
+  MVCHECK(
+      packetNumberEncoding_,
+      "packetNumberEncoding_ should be valid after ctor");
   return static_cast<uint32_t>(bodyStart_ - headerStart_);
 }
 
@@ -845,7 +847,7 @@ InplaceQuicPacketBuilder::~InplaceQuicPacketBuilder() {
 }
 
 quic::Expected<void, QuicError> RegularQuicPacketBuilder::encodePacketHeader() {
-  CHECK(!packetNumberEncoding_.has_value());
+  MVCHECK(!packetNumberEncoding_.has_value());
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     auto result = encodeLongHeader(longHeader, largestAckedPacketNum_);
@@ -860,7 +862,7 @@ quic::Expected<void, QuicError> RegularQuicPacketBuilder::encodePacketHeader() {
 }
 
 quic::Expected<void, QuicError> InplaceQuicPacketBuilder::encodePacketHeader() {
-  CHECK(!packetNumberEncoding_.has_value());
+  MVCHECK(!packetNumberEncoding_.has_value());
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     auto encodingResult = encodeLongHeaderHelper(

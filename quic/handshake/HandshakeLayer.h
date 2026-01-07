@@ -54,7 +54,7 @@ class Handshake {
       uint16_t keyLength) = 0;
 
   virtual void handshakeConfirmed() {
-    MVLOG_FATAL << "Not implemented";
+    MVCHECK(false, "Not implemented");
   }
 
   struct TLSSummary {

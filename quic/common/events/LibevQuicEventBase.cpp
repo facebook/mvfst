@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/events/LibevQuicEventBase.h>
 #include <chrono>
 #include <memory>
@@ -17,7 +18,7 @@ void libEvTimeoutCallback(
     int /* revents */) {
   auto wrapper =
       static_cast<quic::LibevQuicEventBase::TimerCallbackWrapper*>(w->data);
-  CHECK(wrapper != nullptr);
+  MVCHECK(wrapper != nullptr);
   wrapper->timeoutExpired();
 }
 
@@ -26,7 +27,7 @@ void libEvPrepareCallback(
     ev_prepare* w,
     int /* revents */) {
   auto self = static_cast<quic::LibevQuicEventBase*>(w->data);
-  CHECK(self != nullptr);
+  MVCHECK(self != nullptr);
   self->checkCallbacks();
 }
 
@@ -58,7 +59,7 @@ LibevQuicEventBase::~LibevQuicEventBase() {
 void LibevQuicEventBase::runInLoop(
     std::function<void()> cb,
     bool thisIteration) {
-  CHECK(isInEventBaseThread());
+  MVCHECK(isInEventBaseThread());
   auto wrapper = new FunctionLoopCallback(std::move(cb));
   functionLoopCallbacks_.push_back(*wrapper);
   runInLoop(wrapper, thisIteration);
@@ -67,7 +68,7 @@ void LibevQuicEventBase::runInLoop(
 void LibevQuicEventBase::runInLoop(
     QuicEventBaseLoopCallback* callback,
     bool thisIteration) {
-  CHECK(isInEventBaseThread());
+  MVCHECK(isInEventBaseThread());
   auto wrapper = static_cast<LoopCallbackWrapper*>(getImplHandle(callback));
   if (!wrapper) {
     wrapper = new LoopCallbackWrapper(callback);
@@ -151,7 +152,7 @@ void LibevQuicEventBase::checkCallbacks() {
 
 bool LibevQuicEventBase::isInEventBaseThread() const {
   auto eventLoopThread = loopWeak_->getEventLoopThread();
-  CHECK(eventLoopThread != std::nullopt);
+  MVCHECK(eventLoopThread != std::nullopt);
   return pthread_self() == eventLoopThread;
 }
 } // namespace quic

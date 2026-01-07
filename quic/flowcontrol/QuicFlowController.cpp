@@ -97,7 +97,7 @@ void maybeIncreaseFlowControlWindow(
   if (!timeOfLastFlowControlUpdate || srtt == 0us) {
     return;
   }
-  CHECK(updateTime > *timeOfLastFlowControlUpdate);
+  MVCHECK(updateTime > *timeOfLastFlowControlUpdate);
   if (std::chrono::duration_cast<decltype(srtt)>(
           updateTime - *timeOfLastFlowControlUpdate) < 2 * srtt) {
     MVVLOG(10) << "doubling flow control window";
@@ -222,8 +222,9 @@ quic::Expected<void, QuicError> updateFlowControlOnRead(
   uint64_t diff = 0;
   if (stream.reliableSizeFromPeer &&
       stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
-    CHECK(stream.finalReadOffset.has_value())
-        << "We got a reset from the peer, but the finalReadOffset is not set.";
+    MVCHECK(
+        stream.finalReadOffset.has_value(),
+        "We got a reset from the peer, but the finalReadOffset is not set.");
     // We've read all reliable bytes, so we can advance the currentReadOffset
     // to the final size.
     diff = *stream.finalReadOffset - lastReadOffset;
@@ -255,12 +256,14 @@ quic::Expected<void, QuicError> updateFlowControlOnRead(
 quic::Expected<void, QuicError> updateFlowControlOnReceiveReset(
     QuicStreamState& stream,
     TimePoint resetTime) {
-  CHECK(stream.reliableSizeFromPeer.has_value())
-      << "updateFlowControlOnReceiveReset has been called, "
-      << "but reliableSizeFromPeer has not been set";
-  CHECK(stream.finalReadOffset.has_value())
-      << "updateFlowControlOnReceiveReset has been called, "
-      << "but finalReadOffset has not been set";
+  MVCHECK(
+      stream.reliableSizeFromPeer.has_value(),
+      "updateFlowControlOnReceiveReset has been called, "
+          << "but reliableSizeFromPeer has not been set");
+  MVCHECK(
+      stream.finalReadOffset.has_value(),
+      "updateFlowControlOnReceiveReset has been called, "
+          << "but finalReadOffset has not been set");
   if (stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
     // We only advance the currentReadOffset to the final size if the
     // application has read all of the reliable bytes. We don't do this

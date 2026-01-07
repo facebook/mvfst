@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicStreamAsyncTransport.h>
+#include <quic/common/MvfstCheck.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 
@@ -37,8 +38,8 @@ void QuicStreamAsyncTransport::setSocket(
 }
 
 void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
-  CHECK(!id_.has_value()) << "stream id can only be set once";
-  CHECK(state_ == CloseState::OPEN) << "Current state: " << (int)state_;
+  MVCHECK(!id_.has_value(), "stream id can only be set once");
+  MVCHECK(state_ == CloseState::OPEN, "Current state: " << (int)state_);
 
   id_ = id;
 
@@ -300,11 +301,11 @@ folly::EventBase* QuicStreamAsyncTransport::getEventBase() const {
 
 void QuicStreamAsyncTransport::attachEventBase(
     folly::EventBase* /*eventBase*/) {
-  MVLOG_FATAL << "Does QUICSocket support this?";
+  MVCHECK(false, "Does QUICSocket support this?");
 }
 
 void QuicStreamAsyncTransport::detachEventBase() {
-  MVLOG_FATAL << "Does QUICSocket support this?";
+  MVCHECK(false, "Does QUICSocket support this?");
 }
 
 bool QuicStreamAsyncTransport::isDetachable() const {
@@ -417,7 +418,7 @@ void QuicStreamAsyncTransport::handleRead() {
         } else {
           size_t readLen = readData->first->computeChainDataLength();
           Cursor c(readData->first.get());
-          CHECK_NOTNULL(buf);
+          MVCHECK_NOTNULL(buf);
           c.pull(buf, readLen);
           readCb_->readDataAvailable(readLen);
         }
@@ -456,7 +457,7 @@ void QuicStreamAsyncTransport::handleRead() {
 
 void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   MVVLOG(4) << __func__ << " " << maxToSend;
-  CHECK(id_);
+  MVCHECK(id_);
   // overkill until there are delivery cbs
   folly::DelayedDestruction::DestructorGuard dg(this);
   uint64_t toSend =
@@ -503,7 +504,7 @@ void QuicStreamAsyncTransport::invokeWriteCallbacks() {
     wcb->writeSuccess();
   }
   if (writeEOF_ == EOFState::DELIVERED) {
-    CHECK(writeCallbacks_.empty());
+    MVCHECK(writeCallbacks_.empty());
   }
 }
 
@@ -523,7 +524,7 @@ void QuicStreamAsyncTransport::failWrites(
 void QuicStreamAsyncTransport::onStreamWriteReady(
     quic::StreamId id,
     uint64_t maxToSend) noexcept {
-  CHECK(id == *id_);
+  MVCHECK(id == *id_);
   if (writeEOF_ == EOFState::DELIVERED && writeBuf_.empty()) {
     // nothing left to write
     return;

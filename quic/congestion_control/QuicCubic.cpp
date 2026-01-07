@@ -120,7 +120,7 @@ void Cubic::onPacketSent(const OutstandingPacketWrapper& /* packet */) {
 
 void Cubic::onPacketLoss(const LossEvent& loss) {
   quiescenceStart_.reset();
-  DCHECK(
+  MVDCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());
   onRemoveBytesFromInflight(loss.lostBytes);
@@ -363,7 +363,7 @@ void Cubic::onPacketAckOrLoss(
     }
   }
   if (ackEvent && ackEvent->largestNewlyAckedPacket.has_value()) {
-    CHECK(!ackEvent->ackedPackets.empty());
+    MVCHECK(!ackEvent->ackedPackets.empty());
     onPacketAcked(*ackEvent);
   }
 }
@@ -453,7 +453,7 @@ void Cubic::startHystartRttRound(TimePoint time) noexcept {
 }
 
 bool Cubic::isRecovered(TimePoint packetSentTime) noexcept {
-  CHECK(recoveryState_.endOfRecovery.has_value());
+  MVCHECK(recoveryState_.endOfRecovery.has_value());
   return packetSentTime > *recoveryState_.endOfRecovery;
 }
 
@@ -546,7 +546,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
     return;
   }
 
-  DCHECK_LE(cwndBytes_, ssthresh_);
+  MVDCHECK_LE(cwndBytes_, ssthresh_);
   if (hystartState_.found != Cubic::HystartFound::No) {
     return;
   }
@@ -768,7 +768,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
 }
 
 void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
-  CHECK_EQ(cwndBytes_, ssthresh_);
+  MVCHECK_EQ(cwndBytes_, ssthresh_);
   if (isRecovered(ack.largestNewlyAckedPacketSentTime)) {
     state_ = CubicStates::Steady;
 
@@ -779,8 +779,8 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
     // lastMaxCwndBytes and lastReductionTime are only cleared when Hystart
     // transits to Steady. For state machine to be in FastRecovery, a Loss
     // should have happened, and set values to them.
-    DCHECK(steadyState_.lastMaxCwndBytes.has_value());
-    DCHECK(steadyState_.lastReductionTime.has_value());
+    MVDCHECK(steadyState_.lastMaxCwndBytes.has_value());
+    MVDCHECK(steadyState_.lastReductionTime.has_value());
     updateTimeToOrigin();
     cwndBytes_ = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
     QLOG(
@@ -797,7 +797,7 @@ void Cubic::onEcnCongestionEvent(const AckEvent& ack) {
       conn_.ecnL4sTracker->getL4sWeight() >
           conn_.transportSettings.ccaConfig.l4sCETarget) {
     if (ack.largestNewlyAckedPacketSentTime > l4sCwndReducedTimestamp_) {
-      CHECK(conn_.ecnL4sTracker);
+      MVCHECK(conn_.ecnL4sTracker);
       auto distanceToTarget = conn_.ecnL4sTracker->getNormalizedL4sWeight() -
           conn_.transportSettings.ccaConfig.l4sCETarget;
       ssthresh_ = (1.0 - distanceToTarget / 2) * cwndBytes_;

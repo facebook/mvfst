@@ -8,6 +8,7 @@
 #pragma once
 
 #include <glog/logging.h>
+#include <quic/common/MvfstCheck.h>
 
 // Desktop/server version - pass through to glog without stripping.
 // Mobile builds use MvfstLogging-mobile.h instead (via BUCK select()).
@@ -21,6 +22,4 @@
 #define MVVLOG(n) VLOG(n)
 #define MVVLOG_IF(n, condition) VLOG_IF(n, condition)
 
-// Pass-through for CHECK macros
-#define MVCHECK(condition) CHECK(condition)
-#define MVDCHECK(condition) DCHECK(condition)
+// MVCHECK and MVDCHECK macros are defined in MvfstCheck.h

@@ -15,6 +15,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/IntervalSet.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/Optional.h>
 #include <quic/common/Variant.h>
@@ -726,14 +727,14 @@ struct DatagramFrame {
 
   explicit DatagramFrame(size_t len, BufPtr buf)
       : length(len), data(std::move(buf)) {
-    CHECK_EQ(length, data.chainLength());
+    MVCHECK_EQ(length, data.chainLength());
   }
 
   // Variant requirement:
   DatagramFrame(const DatagramFrame& other)
       : length(other.length),
         data(other.data.front() ? other.data.front()->clone() : nullptr) {
-    CHECK_EQ(length, data.chainLength());
+    MVCHECK_EQ(length, data.chainLength());
   }
 
   bool operator==(const DatagramFrame& other) const {
@@ -743,7 +744,7 @@ struct DatagramFrame {
     if (data.empty() && other.data.empty()) {
       return true;
     }
-    CHECK(data.front() && other.data.front());
+    MVCHECK(data.front() && other.data.front());
     BufEq eq;
     return eq(*data.front(), *other.data.front());
   }

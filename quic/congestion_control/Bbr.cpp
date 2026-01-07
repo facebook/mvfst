@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/Bbr.h>
 
 #include <folly/Random.h>
@@ -188,7 +189,7 @@ void BbrCongestionController::onPacketAckOrLoss(
     }
   }
   if (ackEvent && ackEvent->largestNewlyAckedPacket.has_value()) {
-    CHECK(!ackEvent->ackedPackets.empty());
+    MVCHECK(!ackEvent->ackedPackets.empty());
     onPacketAcked(*ackEvent, prevInflightBytes, lossEvent != nullptr);
   }
 }
@@ -235,7 +236,7 @@ void BbrCongestionController::onPacketAcked(
     bandwidthSampler_->onPacketAcked(ack, roundTripCounter_);
   }
   if (inRecovery()) {
-    CHECK(endOfRecovery_.has_value());
+    MVCHECK(endOfRecovery_.has_value());
     if (newRoundTrip &&
         recoveryState_ != BbrCongestionController::RecoveryState::GROWTH) {
       recoveryState_ = BbrCongestionController::RecoveryState::GROWTH;
@@ -423,8 +424,8 @@ bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
 void BbrCongestionController::handleAckInProbeRtt(
     bool newRoundTrip,
     TimePoint ackTime) noexcept {
-  DCHECK(state_ == BbrState::ProbeRtt);
-  CHECK(minRttSampler_);
+  MVDCHECK(state_ == BbrState::ProbeRtt);
+  MVCHECK(minRttSampler_);
 
   if (bandwidthSampler_) {
     bandwidthSampler_->onAppLimited();
@@ -488,13 +489,13 @@ void BbrCongestionController::transitToProbeBw(TimePoint congestionEventTime) {
 size_t BbrCongestionController::pickRandomCycle() {
   pacingCycleIndex_ =
       (folly::Random::rand32(numOfCycles_ - 1) + 2) % numOfCycles_;
-  DCHECK_NE(pacingCycleIndex_, 1);
+  MVDCHECK_NE(pacingCycleIndex_, 1);
   return pacingCycleIndex_;
 }
 
 void BbrCongestionController::updateRecoveryWindowWithAck(
     uint64_t bytesAcked) noexcept {
-  DCHECK(inRecovery());
+  MVDCHECK(inRecovery());
   if (recoveryState_ == BbrCongestionController::RecoveryState::GROWTH) {
     recoveryWindow_ += bytesAcked;
   }

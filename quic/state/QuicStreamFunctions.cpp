@@ -230,7 +230,7 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
       }
       current = &(*it);
       currentAlreadyInserted = true;
-      DCHECK(!startOverlap);
+      MVDCHECK(!startOverlap);
       startOverlap = it + 1;
       endOverlap = it + 1;
     }
@@ -238,16 +238,16 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
 
   // Could have also been completely to the right of the last element.
   if (startOverlap && !currentAlreadyInserted) {
-    DCHECK(endOverlap);
-    DCHECK(
+    MVDCHECK(endOverlap);
+    MVDCHECK(
         *startOverlap != readBuffer.end() || *endOverlap == readBuffer.end());
     auto insertIt = readBuffer.erase(*startOverlap, *endOverlap);
     readBuffer.emplace(insertIt, std::move(*current));
     return {};
   } else if (currentAlreadyInserted) {
-    DCHECK(startOverlap);
-    DCHECK(endOverlap);
-    DCHECK(
+    MVDCHECK(startOverlap);
+    MVDCHECK(endOverlap);
+    MVDCHECK(
         *startOverlap != readBuffer.end() || *endOverlap == readBuffer.end());
     readBuffer.erase(*startOverlap, *endOverlap);
     return {};
@@ -308,7 +308,7 @@ std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
     // In the algorithm for the append function, we maintain the invariant that
     // the individual ranges are non-overlapping, thus if we get to this point,
     // we must have an offset which matches the read offset.
-    CHECK_EQ(curr->offset, stream.currentReadOffset);
+    MVCHECK_EQ(curr->offset, stream.currentReadOffset);
 
     uint64_t toRead =
         std::min<uint64_t>(currSize, amount == 0 ? currSize : remaining);
@@ -317,7 +317,7 @@ std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
       curr->data.trimStart(toRead);
     } else {
       splice = curr->data.splitAtMost(toRead);
-      DCHECK_EQ(splice->computeChainDataLength(), toRead);
+      MVDCHECK_EQ(splice->computeChainDataLength(), toRead);
     }
     curr->offset += toRead;
     if (curr->data.chainLength() == 0) {
@@ -524,7 +524,7 @@ QuicCryptoStream* getCryptoStream(
     case EncryptionLevel::AppData:
       return &cryptoState.oneRttStream;
     default:
-      MVLOG_FATAL << "Unhandled EncryptionLevel";
+      MVCHECK(false, "Unhandled EncryptionLevel");
   }
   folly::assume_unreachable();
 }

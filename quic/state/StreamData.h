@@ -157,7 +157,7 @@ struct QuicStreamLike {
       }
     }();
     if (lenAdjustment && len == 0) {
-      MVLOG_FATAL << "ACK for empty stream frame with no fin.";
+      MVCHECK(false, "ACK for empty stream frame with no fin.");
     }
     return ackedIntervals.tryInsert(offset, offset + len - lenAdjustment);
   }
@@ -458,7 +458,7 @@ struct QuicStreamState : public QuicStreamLike {
   // needs to have data in the pendingWrites chain, or it has EOF to send.
   [[nodiscard]] bool hasWritableData(bool connFlowControlOpen = true) const {
     if (!pendingWrites.empty()) {
-      CHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
+      MVCHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
       return connFlowControlOpen &&
           flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
     }

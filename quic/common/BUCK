@@ -3,6 +3,25 @@ load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
 oncall("traffic_protocols")
 
 mvfst_cpp_library(
+    # @autodeps-skip
+    name = "mvfst_check",
+    headers = select({
+        "DEFAULT": {"MvfstCheck.h": "MvfstCheck.h"},
+        "ovr_config//os/constraints:android": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
+        "ovr_config//os/constraints:iphoneos": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
+        "ovr_config//os/constraints:macos": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
+        "ovr_config//os/constraints:windows": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
+    }),
+    exported_external_deps = select({
+        "DEFAULT": ["glog"],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+        "ovr_config//os/constraints:macos": [],
+        "ovr_config//os/constraints:windows": [],
+    }),
+)
+
+mvfst_cpp_library(
     name = "mvfst_logging",
     headers = select({
         "DEFAULT": select({
@@ -12,6 +31,9 @@ mvfst_cpp_library(
             "ovr_config//os/constraints:macos": {"MvfstLogging.h": "facebook/MvfstLogging-mobile.h"},  # @fb-only
         }),
     }),
+    exported_deps = [
+        ":mvfst_check",
+    ],
     exported_external_deps = [
         "glog",
     ],
@@ -25,6 +47,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":expected",
+        ":mvfst_logging",
         ":optional",
         "//folly:likely",
     ],
@@ -91,6 +114,7 @@ mvfst_cpp_library(
     headers = [
         "BufAccessor.h",
     ],
+    deps = [":mvfst_logging"],
     exported_deps = [
         "//folly/io:iobuf",
         "//quic:constants",
@@ -108,6 +132,7 @@ mvfst_cpp_library(
         "ChainedByteRange.h",
     ],
     exported_deps = [
+        ":mvfst_logging",
         "//folly:range",
         "//folly/io:iobuf",
         "//quic:constants",
@@ -159,10 +184,14 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    # @autodeps-skip
     name = "circular_deque",
     headers = [
         "CircularDeque.h",
         "CircularDeque-inl.h",
+    ],
+    exported_deps = [
+        ":mvfst_logging",
     ],
     exported_external_deps = [
         "glog",

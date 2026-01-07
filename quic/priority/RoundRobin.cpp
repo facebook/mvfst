@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/priority/RoundRobin.h>
 
 namespace {
@@ -36,7 +37,7 @@ bool RoundRobin::empty() const {
 
 // The caller needs to verify it never inserts a duplicate
 void RoundRobin::insert(quic::PriorityQueue::Identifier value) {
-  DCHECK(!erase(value)) << "Duplicate value";
+  MVDCHECK(!erase(value), "Duplicate value");
   // Insert new integer at the tail of the list
   if (!useIndexMap_ && list_.size() >= kBuildIndexThreshold) {
     useIndexMap_ = true;
@@ -91,14 +92,14 @@ bool RoundRobin::erase(quic::PriorityQueue::Identifier value) {
 
 quic::PriorityQueue::Identifier RoundRobin::getNext(
     const quic::Optional<uint64_t>& bytes) {
-  CHECK(!list_.empty());
+  MVCHECK(!list_.empty());
   auto ret = *nextIt_;
   consume(bytes);
   return ret;
 }
 
 [[nodiscard]] quic::PriorityQueue::Identifier RoundRobin::peekNext() const {
-  CHECK(!list_.empty());
+  MVCHECK(!list_.empty());
   return *nextIt_;
 }
 
@@ -138,7 +139,7 @@ void RoundRobin::erase(ListType::iterator eraseIt) {
 }
 
 void RoundRobin::maybeAdvance() {
-  CHECK(!list_.empty());
+  MVCHECK(!list_.empty());
   if (current_ >= advanceAfter_) {
     ++nextIt_;
     current_ = 0;

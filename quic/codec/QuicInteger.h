@@ -13,6 +13,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/ContiguousCursor.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/Optional.h>
 
 namespace quic {
@@ -80,16 +81,16 @@ quic::Expected<size_t, TransportErrorCode>
 encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
   switch (outputSize) {
     case 1:
-      CHECK(value <= kOneByteLimit);
+      MVCHECK(value <= kOneByteLimit);
       return encodeOneByte(std::move(bufop), value);
     case 2:
-      CHECK(value <= kTwoByteLimit);
+      MVCHECK(value <= kTwoByteLimit);
       return encodeTwoBytes(std::move(bufop), value);
     case 4:
-      CHECK(value <= kFourByteLimit);
+      MVCHECK(value <= kFourByteLimit);
       return encodeFourBytes(std::move(bufop), value);
     case 8:
-      CHECK(value <= kEightByteLimit);
+      MVCHECK(value <= kEightByteLimit);
       return encodeEightBytes(std::move(bufop), value);
     default:
       return quic::make_unexpected(TransportErrorCode::INTERNAL_ERROR);
@@ -131,14 +132,14 @@ class QuicInteger {
   template <typename BufOp>
   size_t encode(BufOp appender) const {
     auto size = encodeQuicInteger(value_, std::move(appender));
-    CHECK(!size.hasError()) << "Value too large value=" << value_;
+    MVCHECK(!size.hasError(), "Value too large value=" << value_);
     return size.value();
   }
 
   template <typename BufOp>
   size_t encode(BufOp appender, int outputSize) const {
     auto size = encodeQuicInteger(value_, std::move(appender), outputSize);
-    CHECK(!size.hasError()) << "Value too large value=" << value_;
+    MVCHECK(!size.hasError(), "Value too large value=" << value_);
     return size.value();
   }
 

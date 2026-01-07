@@ -59,7 +59,7 @@ uint64_t writeProbingDataToSocketForTest(
       aead,
       headerCipher,
       version);
-  CHECK(!result.hasError());
+  MVCHECK(!result.hasError());
   return result->probesWritten;
 }
 
@@ -79,21 +79,21 @@ void writeCryptoDataProbesToSocketForTest(
           FrameScheduler::Builder(conn, encryptionLevel, pnSpace, "Crypto")
               .cryptoFrames())
           .build();
-  CHECK(!writeProbingDataToSocket(
-             sock,
-             conn,
-             *conn.clientConnectionId,
-             *conn.serverConnectionId,
-             LongHeaderBuilder(type),
-             protectionTypeToEncryptionLevel(
-                 longHeaderTypeToProtectionType(type)),
-             LongHeader::typeToPacketNumberSpace(type),
-             scheduler,
-             probesToSend,
-             aead,
-             headerCipher,
-             version)
-             .hasError());
+  MVCHECK(!writeProbingDataToSocket(
+               sock,
+               conn,
+               *conn.clientConnectionId,
+               *conn.serverConnectionId,
+               LongHeaderBuilder(type),
+               protectionTypeToEncryptionLevel(
+                   longHeaderTypeToProtectionType(type)),
+               LongHeader::typeToPacketNumberSpace(type),
+               scheduler,
+               probesToSend,
+               aead,
+               headerCipher,
+               version)
+               .hasError());
 }
 
 RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
@@ -145,7 +145,7 @@ auto buildEmptyPacket(
       conn.udpSendPacketLen,
       std::move(*header),
       getAckState(conn, pnSpace).largestAckedByPeer.value_or(0));
-  CHECK(!builder.encodePacketHeader().hasError());
+  MVCHECK(!builder.encodePacketHeader().hasError());
   DCHECK(builder.canBuildPacket());
   return std::move(builder).buildPacket();
 }
@@ -174,7 +174,7 @@ uint64_t getEncodedBodySize(const RegularQuicPacketBuilder::Packet& packet) {
 void initializePathManagerState(QuicServerConnectionState& conn) {
   auto pathRes = conn.pathManager->addValidatedPath(
       folly::SocketAddress("::1", 12345), folly::SocketAddress("::1", 54321));
-  CHECK(!pathRes.hasError());
+  MVCHECK(!pathRes.hasError());
   conn.currentPathId = pathRes.value();
 }
 
@@ -203,14 +203,14 @@ class QuicTransportFunctionsTest : public Test {
     conn->statsCallback = quicStats_.get();
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher().value();
-    CHECK(
+    MVCHECK(
         !conn->streamManager
              ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
              .hasError());
-    CHECK(!conn->streamManager
-               ->setMaxLocalUnidirectionalStreams(
-                   kDefaultMaxStreamsUnidirectional)
-               .hasError());
+    MVCHECK(!conn->streamManager
+                 ->setMaxLocalUnidirectionalStreams(
+                     kDefaultMaxStreamsUnidirectional)
+                 .hasError());
 
     // Initialize current path
     initializePathManagerState(*conn);
@@ -576,13 +576,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketRetrans) {
   EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 24); // sum(len)
 
   // check loss state
-  CHECK_EQ(
+  MVCHECK_EQ(
       conn->lossState.totalBytesSent,
       getEncodedSize(packet1) + getEncodedSize(packet2));
-  CHECK_EQ(
+  MVCHECK_EQ(
       conn->lossState.totalBodyBytesSent,
       getEncodedBodySize(packet1) + getEncodedBodySize(packet2));
-  CHECK_EQ(conn->lossState.totalPacketsSent, 2);
+  MVCHECK_EQ(conn->lossState.totalPacketsSent, 2);
 
   // totalStreamBytesSent:
   //   the first packet contained 12 + 12
@@ -775,13 +775,13 @@ TEST_F(
   EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 37); // sum(len)
 
   // check loss state
-  CHECK_EQ(
+  MVCHECK_EQ(
       conn->lossState.totalBytesSent,
       getEncodedSize(packet1) + getEncodedSize(packet2));
-  CHECK_EQ(
+  MVCHECK_EQ(
       conn->lossState.totalBodyBytesSent,
       getEncodedBodySize(packet1) + getEncodedBodySize(packet2));
-  CHECK_EQ(conn->lossState.totalPacketsSent, 2);
+  MVCHECK_EQ(conn->lossState.totalPacketsSent, 2);
 
   // totalStreamBytesSent:
   //   the first packet contained 12 + 5 + 12 stream bytes
@@ -3948,7 +3948,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
   ON_CALL(*rawSocket, getGSO).WillByDefault(testing::Return(0));
 
   // Pure acks without an oneRttCipher
-  CHECK(!conn->oneRttWriteCipher);
+  MVCHECK(!conn->oneRttWriteCipher);
   conn->ackStates.appDataAckState.needsToSendAckImmediately = true;
   addAckStatesWithCurrentTimestamps(conn->ackStates.appDataAckState, 1, 20);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
@@ -4432,7 +4432,7 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
           TimePoint(),
           getEncodedSize(packet),
           getEncodedBodySize(packet)),
-      ".*Send more than one connection window update.*");
+      "");
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {

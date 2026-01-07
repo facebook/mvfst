@@ -53,6 +53,7 @@ mvfst_cpp_library(
         "//quic:exception",
         "//quic/codec:types",
         "//quic/common:expected",
+        "//quic/common:mvfst_logging",
     ],
 )
 

@@ -101,7 +101,7 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     } else {
       // This should never really happen as dataLen is bounded by the remaining
       // space in the packet which should be << kEightByteLimit.
-      MVLOG_FATAL << "Stream frame length too large.";
+      MVCHECK(false, "Stream frame length too large.");
     }
   }
   if (dataLenLen > 0) {
@@ -198,8 +198,9 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
     return quic::make_unexpected(lengthVarIntSizeRes.error());
   }
 
-  CHECK(lengthVarIntSizeRes.value() <= lengthBytes)
-      << "Length bytes representation exceeds allocated space";
+  MVCHECK(
+      lengthVarIntSizeRes.value() <= lengthBytes,
+      "Length bytes representation exceeds allocated space");
   builder.write(intFrameType);
   builder.write(offsetInteger);
   builder.write(lengthVarInt);
@@ -230,7 +231,7 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
        ++blockItr) {
     const auto& currBlock = *blockItr;
     // These must be true because of the properties of the interval set.
-    CHECK_GE(currentSeqNum, currBlock.end + 2);
+    MVCHECK_GE(currentSeqNum, currBlock.end + 2);
     PacketNum gap = currentSeqNum - currBlock.end - 2;
     PacketNum currBlockLen = currBlock.end - currBlock.start;
 
@@ -418,7 +419,7 @@ fillFrameWithPacketReceiveTimestamps(
           nextTimestampRangeUsedSpace + deltasCountSizeResult.value();
       ackFrame.recvdPacketsTimestampRanges.push_back(nextTimestampRange);
       prevPktNum = timestampIntervalsIt->start;
-      DCHECK(cumUsedSpace <= spaceLeft);
+      MVDCHECK(cumUsedSpace <= spaceLeft);
     }
     if (outOfSpace) {
       break;
@@ -429,7 +430,7 @@ fillFrameWithPacketReceiveTimestamps(
   if (computedSizeResult.hasError()) {
     return quic::make_unexpected(computedSizeResult.error());
   }
-  DCHECK(cumUsedSpace == computedSizeResult.value());
+  MVDCHECK(cumUsedSpace == computedSizeResult.value());
   return ackFrame.recvdPacketsTimestampRanges.size();
 }
 
@@ -522,7 +523,7 @@ maybeWriteAckBaseFields(
   for (auto it = ackFrame.ackBlocks.cbegin() + 1;
        it != ackFrame.ackBlocks.cend();
        ++it) {
-    CHECK_GE(currentSeqNum, it->end + 2);
+    MVCHECK_GE(currentSeqNum, it->end + 2);
     PacketNum gap = currentSeqNum - it->end - 2;
     PacketNum currBlockLen = it->end - it->start;
     QuicInteger gapInt(gap);
@@ -978,7 +979,7 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {
       const HandshakeDoneFrame& handshakeDoneFrame =
           *frame.asHandshakeDoneFrame();
-      CHECK(builder.getPacketHeader().asShort());
+      MVCHECK(builder.getPacketHeader().asShort());
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::HANDSHAKE_DONE));
 
       auto intFrameTypeSize = intFrameType.getSize();
@@ -1438,7 +1439,7 @@ quic::Expected<size_t, QuicError> writeFrame(
       return size_t(0);
     }
     default: {
-      MVLOG_FATAL << "Unknown / unsupported frame type received";
+      MVCHECK(false, "Unknown / unsupported frame type received");
     }
   }
 }

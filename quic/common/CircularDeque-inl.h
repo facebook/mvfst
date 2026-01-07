@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <algorithm>
 #include <cstdlib>
 #include <iterator>
@@ -50,7 +51,7 @@ bool CircularDeque<T>::needSpace() const noexcept {
    * size() and capacity can't be eq. Otherwise begin_ and end_ may point to the
    * same position, in which case I don't know if my container is full or empty.
    */
-  DCHECK_LE(size(), max_size());
+  MVDCHECK_LE(size(), max_size());
   return size() == max_size();
 }
 
@@ -96,14 +97,14 @@ void CircularDeque<T>::resize(size_type count) {
 template <typename T>
 typename CircularDeque<T>::const_reference CircularDeque<T>::operator[](
     size_type index) const {
-  CHECK_LT(index, size()) << "CircularDeque index out of bounds";
+  MVCHECK_LT(index, size(), "CircularDeque index out of bounds");
   return *(begin() + index);
 }
 
 template <typename T>
 typename CircularDeque<T>::reference CircularDeque<T>::operator[](
     size_type index) {
-  CHECK_LT(index, size()) << "CircularDeque index out of bounds";
+  MVCHECK_LT(index, size(), "CircularDeque index out of bounds");
   return *(begin() + index);
 }
 
@@ -204,14 +205,14 @@ typename CircularDeque<T>::reference CircularDeque<T>::emplace_front(
     resize(capacity_ == 0 ? kInitCapacity : growCapacity(capacity_));
   }
   if (begin_ == 0) {
-    DCHECK_NE(end_, capacity_ - 1);
+    MVDCHECK_NE(end_, capacity_ - 1);
     begin_ = capacity_ - 1;
   } else {
-    DCHECK_NE(end_, begin_ - 1);
+    MVDCHECK_NE(end_, begin_ - 1);
     --begin_;
   }
   new (&storage_[begin_]) T(std::forward<Args>(args)...);
-  DCHECK_NE(begin_, end_);
+  MVDCHECK_NE(begin_, end_);
   return front();
 }
 
@@ -222,13 +223,13 @@ typename CircularDeque<T>::reference CircularDeque<T>::emplace_back(
   if (needSpace()) {
     resize(capacity_ == 0 ? kInitCapacity : growCapacity(capacity_));
   }
-  DCHECK_GT(capacity_, 0);
+  MVDCHECK_GT(capacity_, 0);
   if (end_ == capacity_) {
     end_ = 0;
-    DCHECK_NE(0, begin_);
+    MVDCHECK_NE(0, begin_);
   }
   new (&storage_[end_++]) T(std::forward<Args>(args)...);
-  DCHECK_NE(begin_, end_);
+  MVDCHECK_NE(begin_, end_);
   return back();
 }
 
@@ -242,12 +243,12 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   auto index = pos.index_;
   if (index == end_) {
     emplace_back(std::forward<Args>(args)...);
-    DCHECK_NE(begin_, end_);
+    MVDCHECK_NE(begin_, end_);
     return CircularDequeIterator<T>(this, end_ == 0 ? capacity_ - 1 : end_ - 1);
   }
   if (index == begin_) {
     emplace_front(std::forward<Args>(args)...);
-    DCHECK_NE(begin_, end_);
+    MVDCHECK_NE(begin_, end_);
     return begin();
   }
 
@@ -285,7 +286,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   }
   // We resized before. They can't be at the same place even if we had to move
   // end_ forward above.
-  DCHECK_NE(begin_, end_);
+  MVDCHECK_NE(begin_, end_);
   return CircularDequeIterator<T>(this, index);
 }
 
@@ -358,12 +359,12 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
     return CircularDequeIterator<T>(this, last.index_);
   }
   if (begin_ < end_) {
-    DCHECK(
+    MVDCHECK(
         begin_ <= first.index_ && first.index_ <= last.index_ &&
         last.index_ <= end_);
   } else {
-    DCHECK(first.index_ <= end_ || first.index_ >= begin_);
-    DCHECK(last.index_ <= end_ || last.index_ >= begin_);
+    MVDCHECK(first.index_ <= end_ || first.index_ >= begin_);
+    MVDCHECK(last.index_ <= end_ || last.index_ >= begin_);
   }
   if (wrappedDistance(first, last) == size()) {
     // if we are erasing everything, just clear()
@@ -390,12 +391,14 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
 
   // Erasing from middle is hard. We will need to move some of the remaining
   // elements to fill up the hole it creates.
-  auto currentSize = size();
+  [[maybe_unused]] auto currentSize = size();
   auto elemsRemoved = std::distance(first, last);
-  DCHECK_GE(elemsRemoved, 0)
-      << "first=" << first.index_ << ", last=" << last.index_
-      << ", distance=" << elemsRemoved << ", maxSize=" << max_size()
-      << ", begin=" << begin_ << ", end=" << end_;
+  MVDCHECK_GE(
+      elemsRemoved,
+      0,
+      "first=" << first.index_ << ", last=" << last.index_
+               << ", distance=" << elemsRemoved << ", maxSize=" << max_size()
+               << ", begin=" << begin_ << ", end=" << end_);
   auto distIfMoveFront = wrappedDistance(cbegin(), first);
   auto distIfMoveBack = wrappedDistance(last, cend());
   if (distIfMoveFront < distIfMoveBack) {
@@ -412,9 +415,11 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
       iter++->~T();
     }
     begin_ = newBegin.index_;
-    DCHECK_EQ(size(), currentSize - elemsRemoved)
-        << "size=" << size() << ", currentSize=" << currentSize
-        << ", elemsRemoved=" << elemsRemoved;
+    MVDCHECK_EQ(
+        size(),
+        currentSize - elemsRemoved,
+        "size=" << size() << ", currentSize=" << currentSize
+                << ", elemsRemoved=" << elemsRemoved);
     return CircularDequeIterator<T>(this, last.index_);
   }
   // Convert const_iterator to iterator for template matching
@@ -427,7 +432,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
     iter++->~T();
   }
   end_ = newEnd.index_;
-  DCHECK(size() == currentSize - elemsRemoved);
+  MVDCHECK(size() == currentSize - elemsRemoved);
   return CircularDequeIterator<T>(this, first.index_);
 }
 

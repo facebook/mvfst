@@ -57,7 +57,7 @@ bool GSOPacketBatchWriter::append(
 
   // see if we've added a different size
   if (size != prevSize_) {
-    CHECK_LT(size, prevSize_);
+    MVCHECK_LT(size, prevSize_);
     return true;
   }
 
@@ -109,17 +109,17 @@ bool GSOInplacePacketBatchWriter::append(
     size_t size,
     const folly::SocketAddress& /* addr */,
     QuicAsyncUDPSocket* /* sock */) {
-  CHECK(!needsFlush(size));
+  MVCHECK(!needsFlush(size));
   auto& buf = conn_.bufAccessor->buf();
   if (!lastPacketEnd_) {
-    CHECK(prevSize_ == 0 && numPackets_ == 0);
+    MVCHECK(prevSize_ == 0 && numPackets_ == 0);
     prevSize_ = size;
     lastPacketEnd_ = buf->tail();
     numPackets_ = 1;
     return false;
   }
 
-  CHECK(prevSize_ && prevSize_ >= size);
+  MVCHECK(prevSize_ && prevSize_ >= size);
   ++numPackets_;
   lastPacketEnd_ = buf->tail();
   if (prevSize_ > size || numPackets_ == maxPackets_) {
@@ -137,19 +137,20 @@ bool GSOInplacePacketBatchWriter::append(
 ssize_t GSOInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  CHECK(lastPacketEnd_);
+  MVCHECK(lastPacketEnd_);
   auto& buf = conn_.bufAccessor->buf();
-  CHECK(!buf->isChained());
-  CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail())
-      << "lastPacketEnd_=" << (uintptr_t)lastPacketEnd_
-      << " data=" << (uintptr_t)buf->data()
-      << " tail=" << (uintptr_t)buf->tail();
+  MVCHECK(!buf->isChained());
+  MVCHECK(
+      lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail(),
+      "lastPacketEnd_=" << (uintptr_t)lastPacketEnd_
+                        << " data=" << (uintptr_t)buf->data()
+                        << " tail=" << (uintptr_t)buf->tail());
   uint64_t diffToEnd = buf->tail() - lastPacketEnd_;
-  CHECK(
+  MVCHECK(
       diffToEnd <= conn_.udpSendPacketLen ||
-      (nextPacketSize_ && diffToEnd == nextPacketSize_))
-      << "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
-      << ", nextPacketSize_=" << nextPacketSize_;
+          (nextPacketSize_ && diffToEnd == nextPacketSize_),
+      "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
+                   << ", nextPacketSize_=" << nextPacketSize_);
   if (diffToEnd >= conn_.udpSendPacketLen + kPacketSizeViolationTolerance) {
     MVLOG_ERROR << "Remaining buffer contents larger than udpSendPacketLen by "
                 << (diffToEnd - conn_.udpSendPacketLen);
@@ -179,14 +180,16 @@ ssize_t GSOInplacePacketBatchWriter::write(
     buf->append(diffToEnd);
     buf->retreat(diffToStart);
     auto bufLength = buf->length();
-    CHECK_EQ(diffToEnd, bufLength)
-        << "diffToEnd=" << diffToEnd << ", bufLength=" << bufLength;
-    CHECK(
+    MVCHECK_EQ(
+        diffToEnd,
+        bufLength,
+        "diffToEnd=" << diffToEnd << ", bufLength=" << bufLength);
+    MVCHECK(
         bufLength <= conn_.udpSendPacketLen ||
-        (nextPacketSize_ && bufLength == nextPacketSize_))
-        << "bufLength=" << bufLength << ", pktLimit=" << conn_.udpSendPacketLen
-        << ", nextPacketSize_=" << nextPacketSize_;
-    CHECK(0 == buf->headroom()) << "headroom=" << buf->headroom();
+            (nextPacketSize_ && bufLength == nextPacketSize_),
+        "bufLength=" << bufLength << ", pktLimit=" << conn_.udpSendPacketLen
+                     << ", nextPacketSize_=" << nextPacketSize_);
+    MVCHECK(0 == buf->headroom(), "headroom=" << buf->headroom());
   } else {
     buf->clear();
   }
@@ -202,8 +205,8 @@ size_t GSOInplacePacketBatchWriter::size() const {
   if (empty()) {
     return 0;
   }
-  CHECK(lastPacketEnd_);
-  CHECK(
+  MVCHECK(lastPacketEnd_);
+  MVCHECK(
       lastPacketEnd_ >= conn_.bufAccessor->data() &&
       lastPacketEnd_ <= conn_.bufAccessor->tail());
   size_t ret = lastPacketEnd_ - conn_.bufAccessor->data();
@@ -284,7 +287,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
 ssize_t SendmmsgGSOPacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& /*unused*/) {
-  CHECK_GT(bufs_.size(), 0);
+  MVCHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
     iovec vec[kNumIovecBufferChains];
     size_t iovec_len = fillIovec(bufs_[0], vec);
@@ -316,7 +319,7 @@ SendmmsgGSOInplacePacketBatchWriter::SendmmsgGSOInplacePacketBatchWriter(
     QuicConnectionStateBase& conn,
     size_t maxBufs)
     : conn_(conn), maxBufs_(maxBufs) {
-  CHECK_LE(maxBufs_, kMaxIovecs) << "maxBufs provided is too high";
+  MVCHECK_LE(maxBufs_, kMaxIovecs, "maxBufs provided is too high");
 }
 
 bool SendmmsgGSOInplacePacketBatchWriter::empty() const {
@@ -396,7 +399,7 @@ bool SendmmsgGSOInplacePacketBatchWriter::append(
 ssize_t SendmmsgGSOInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& /*unused*/) {
-  CHECK_GT(buffers_.size(), 0);
+  MVCHECK_GT(buffers_.size(), 0);
 
   int ret = 0;
 

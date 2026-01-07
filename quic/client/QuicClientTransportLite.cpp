@@ -65,7 +65,7 @@ QuicClientTransportLite::QuicClientTransportLite(
           evb,
           std::move(socket),
           useConnectionEndWithErrorCallback) {
-  DCHECK(handshakeFactory);
+  MVDCHECK(handshakeFactory);
   auto tempConn =
       std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
   clientConn_ = tempConn.get();
@@ -85,7 +85,7 @@ QuicClientTransportLite::QuicClientTransportLite(
       srcConnId, conn_->nextSelfConnectionIdSequence++);
   auto randCidExpected =
       ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
-  CHECK(randCidExpected.has_value());
+  MVCHECK(randCidExpected.has_value());
   clientConn_->initialDestinationConnectionId = randCidExpected.value();
   clientConn_->originalDestinationConnectionId =
       clientConn_->initialDestinationConnectionId;
@@ -512,7 +512,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     switch (packetFrame.type()) {
       case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
-        DCHECK(!frame.ackBlocks.empty());
+        MVDCHECK(!frame.ackBlocks.empty());
         MVVLOG(4) << "Client received ack for largestAcked="
                   << frame.ackBlocks.front().end << " " << *this;
         commonAckVisitorForAckFrame(ackState, frame);
@@ -1106,7 +1106,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
     if (clientConn_->clientHandshakeLayer->getPhase() ==
             ClientHandshake::Phase::Established &&
         conn_->oneRttWriteCipher) {
-      CHECK(conn_->oneRttWriteHeaderCipher);
+      MVCHECK(conn_->oneRttWriteHeaderCipher);
       writeShortClose(
           *socket_,
           *conn_,
@@ -1116,7 +1116,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
           *conn_->oneRttWriteHeaderCipher);
     }
     if (conn_->handshakeWriteCipher) {
-      CHECK(conn_->handshakeWriteHeaderCipher);
+      MVCHECK(conn_->handshakeWriteHeaderCipher);
       writeLongClose(
           *socket_,
           *conn_,
@@ -1129,7 +1129,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
           version);
     }
     if (conn_->initialWriteCipher) {
-      CHECK(conn_->initialHeaderCipher);
+      MVCHECK(conn_->initialHeaderCipher);
       writeLongClose(
           *socket_,
           *conn_,
@@ -1179,7 +1179,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
     }
   }
   if (clientConn_->zeroRttWriteCipher && !conn_->oneRttWriteCipher) {
-    CHECK(clientConn_->zeroRttWriteHeaderCipher);
+    MVCHECK(clientConn_->zeroRttWriteHeaderCipher);
     auto result = writeZeroRttDataToSocket(
         *socket_,
         *conn_,
@@ -1198,7 +1198,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::writeData() {
     return {};
   }
   if (conn_->oneRttWriteCipher) {
-    CHECK(clientConn_->oneRttWriteHeaderCipher);
+    MVCHECK(clientConn_->oneRttWriteHeaderCipher);
     auto result = writeQuicDataExceptCryptoStreamToSocket(
         *socket_,
         *conn_,
@@ -1278,8 +1278,8 @@ QuicClientTransportLite::startCryptoHandshake() {
         TransportParameterId::client_direct_encap,
         conn_->transportSettings.clientDirectEncapConfig.value());
     // The encoding should succeed because *clientDirectEncapConfig is a uint8_t
-    CHECK(maybeEncodedDirectEncapParam)
-        << "Failed to encode direct encap param";
+    MVCHECK(
+        maybeEncodedDirectEncapParam, "Failed to encode direct encap param");
     customTransportParameters_.push_back(*maybeEncodedDirectEncapParam);
   }
 
@@ -1578,7 +1578,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
           // the actual len is len - offset now
           // leave gro bytes
           tmp->trimEnd(len - offset - params.gro);
-          DCHECK_EQ(tmp->length(), params.gro);
+          MVDCHECK_EQ(tmp->length(), params.gro);
 
           offset += params.gro;
           remaining -= params.gro;
@@ -1588,7 +1588,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
-          DCHECK_EQ(readBuffer->length(), remaining);
+          MVDCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
           networkData.addPacket(
               ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
@@ -1671,7 +1671,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
       msg->msg_iov = &iovec;
       msg->msg_iovlen = 1;
     }
-    CHECK(readBuffer != nullptr);
+    MVCHECK(readBuffer != nullptr);
 
     auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
     auto addrResult = sock.address();
@@ -1714,7 +1714,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
             "recvmmsg() failed, errno={} {}", errno, quic::errnoStr(errno))));
   }
 
-  CHECK_LE(numMsgsRecvd, numPackets);
+  MVCHECK_LE(numMsgsRecvd, numPackets);
   for (uint16_t i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
     auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
@@ -1772,7 +1772,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
           // the actual len is len - offset now
           // leave gro bytes
           tmp->trimEnd(len - offset - params.gro);
-          DCHECK_EQ(tmp->length(), params.gro);
+          MVDCHECK_EQ(tmp->length(), params.gro);
 
           offset += params.gro;
           remaining -= params.gro;
@@ -1782,7 +1782,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMmsg(
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
-          DCHECK_EQ(readBuffer->length(), remaining);
+          MVDCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
           networkData.addPacket(
               ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
@@ -1822,8 +1822,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
     }
     return {};
   }
-  DCHECK(localAddress.has_value());
-  DCHECK(peerAddress.has_value());
+  MVDCHECK(localAddress.has_value());
+  MVDCHECK(peerAddress.has_value());
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
@@ -1894,7 +1894,7 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
 void QuicClientTransportLite::onNotifyDataAvailable(
     QuicAsyncUDPSocket& sock) noexcept {
   auto self = this->shared_from_this();
-  CHECK(conn_) << "trying to receive packets without a connection";
+  MVCHECK(conn_, "trying to receive packets without a connection");
   auto readBufferSize = std::max(
                             conn_->transportSettings.maxRecvPacketSize,
                             uint64_t(kDefaultUDPReadBufferSize)) *
@@ -1950,7 +1950,7 @@ void QuicClientTransportLite::start(
     ConnectionCallback* connCb) {
   startHappyEyeballsIfEnabled();
 
-  CHECK(conn_->peerAddress.isInitialized());
+  MVCHECK(conn_->peerAddress.isInitialized());
 
   QLOG(*conn_, addTransportStateUpdate, kStart);
 
@@ -1980,7 +1980,7 @@ void QuicClientTransportLite::start(
     return;
   }
 
-  CHECK(socket_->address().has_value());
+  MVCHECK(socket_->address().has_value());
   auto addPathRes = clientConn_->pathManager->addValidatedPath(
       *socket_->address(), conn_->peerAddress);
   if (addPathRes.hasError()) {
@@ -1998,7 +1998,7 @@ void QuicClientTransportLite::start(
 
 void QuicClientTransportLite::addNewPeerAddress(
     folly::SocketAddress peerAddress) {
-  CHECK(peerAddress.isInitialized());
+  MVCHECK(peerAddress.isInitialized());
 
   if (peerAddress.getIPAddress().isZero()) {
     // Using the wildcard address as the peer address is a special case which is
@@ -2024,7 +2024,7 @@ void QuicClientTransportLite::addNewPeerAddress(
 
 void QuicClientTransportLite::setLocalAddress(
     folly::SocketAddress localAddress) {
-  CHECK(localAddress.isInitialized());
+  MVCHECK(localAddress.isInitialized());
   conn_->localAddress = std::move(localAddress);
 }
 
@@ -2243,7 +2243,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
     // The oldPathId is no longer the current path. So this cannot fail.
     auto addSocketResult =
         conn_->pathManager->addSocketToPath(oldPathId, std::move(socket_));
-    CHECK(!addSocketResult.hasError()) << addSocketResult.error();
+    MVCHECK(!addSocketResult.hasError(), addSocketResult.error());
 
     socket_ = std::move(newSocket);
   }
@@ -2280,7 +2280,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
 
 void QuicClientTransportLite::setTransportStatsCallback(
     std::shared_ptr<QuicTransportStatsCallback> statsCallback) noexcept {
-  CHECK(conn_);
+  MVCHECK(conn_);
   statsCallback_ = std::move(statsCallback);
   if (statsCallback_) {
     conn_->statsCallback = statsCallback_.get();

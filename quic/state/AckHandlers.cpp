@@ -61,7 +61,8 @@ void updateCongestionControllerForAck(
   if (conn.congestionController &&
       (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {
-      CHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      MVCHECK(
+          lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       // TODO it's not clear that we should be using the smallest and largest
       // lost times here. It may perhaps be better to only consider the latest
       // contiguous lost block and determine if that block is larger than the
@@ -246,12 +247,12 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         conn.outstandings.clonedPacketIdentifiers.count(
             *ackedPacketIterator->maybeClonedPacketIdentifier);
     if (needsProcess) {
-      CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
+      MVCHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
       --conn.outstandings.packetCount[currentPacketNumberSpace];
     }
     ack.ackedBytes += ackedPacketIterator->metadata.encodedSize;
     if (ackedPacketIterator->maybeClonedPacketIdentifier) {
-      CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
+      MVCHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
       --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
     }
 
@@ -369,9 +370,10 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         auto ackedWriteFrame = packetFrame.asWriteStreamFrame();
         Optional<uint64_t> maybePostAckIntervalSetVersion =
             getAckIntervalSetVersion(conn, packetFrame);
-        CHECK(maybePostAckIntervalSetVersion.has_value())
-            << "Unable to get post-ack interval set version, even though "
-            << "pre-ack interval set version is available";
+        MVCHECK(
+            maybePostAckIntervalSetVersion.has_value(),
+            "Unable to get post-ack interval set version, even though "
+                << "pre-ack interval set version is available");
 
         if (*maybePreAckIntervalSetVersion != *maybePostAckIntervalSetVersion) {
           // we were able to fill in a hole in the ACK interval
@@ -404,7 +406,7 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
-  CHECK_GE(
+  MVCHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();
   const auto& packetCount = conn.outstandings.packetCount;
@@ -424,7 +426,8 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       << originalPacketCount[PacketNumberSpace::Initial] << ","
       << originalPacketCount[PacketNumberSpace::Handshake] << ","
       << originalPacketCount[PacketNumberSpace::AppData] << "}";
-  CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
+  MVCHECK_GE(
+      updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEventExpected = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (!lossEventExpected.has_value()) {
     return quic::make_unexpected(lossEventExpected.error());
@@ -483,7 +486,7 @@ void clearOldOutstandingPackets(
       auto timeSinceSent = time - opItr->metadata.time;
       if (opItr->declaredLost && timeSinceSent > threshold) {
         opItr++;
-        CHECK_GT(conn.outstandings.declaredLostCount, 0);
+        MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.outstandings.declaredLostCount--;
       } else {
         break;
@@ -512,7 +515,7 @@ void parseAckReceiveTimestamps(
       frame.recvdPacketsTimestampRanges[0].deltas.empty()) {
     return;
   }
-  DCHECK(frame.maybeLatestRecvdPacketNum.has_value());
+  MVDCHECK(frame.maybeLatestRecvdPacketNum.has_value());
 
   auto receivedPacketNum = frame.maybeLatestRecvdPacketNum.value();
 
@@ -640,11 +643,14 @@ void updateRttForLargestAckedPacket(
     OutstandingPacketWrapper& packet,
     const ReadAckFrame& frame,
     const TimePoint& ackReceiveTime) {
-  CHECK_EQ(packet.packet.header.getPacketSequenceNum(), frame.largestAcked)
-      << "An RTT sample is generated using only the largest acknowledged packet "
-      << "in the received ACK frame.";
-  CHECK(!ackEvent.implicit)
-      << "An RTT sample cannot be generated for an implicit ACK.";
+  MVCHECK_EQ(
+      packet.packet.header.getPacketSequenceNum(),
+      frame.largestAcked,
+      "An RTT sample is generated using only the largest acknowledged packet "
+          << "in the received ACK frame.");
+  MVCHECK(
+      !ackEvent.implicit,
+      "An RTT sample cannot be generated for an implicit ACK.");
 
   auto ackReceiveTimeOrNow =
       ackReceiveTime > packet.metadata.time ? ackReceiveTime : Clock::now();
@@ -673,8 +679,8 @@ void updateRttForLargestAckedPacket(
     }
 
     // update AckEvent RTTs, which are used by CCA and other processing
-    CHECK(!ackEvent.rttSample.has_value());
-    CHECK(!ackEvent.rttSampleNoAckDelay.has_value());
+    MVCHECK(!ackEvent.rttSample.has_value());
+    MVCHECK(!ackEvent.rttSampleNoAckDelay.has_value());
     ackEvent.rttSample = rttSample;
     ackEvent.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
         ? OptionalMicros(
@@ -716,7 +722,7 @@ void updateEcnCountEchoed(
 Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
     QuicConnectionStateBase& conn,
     OutstandingPacketWrapper& spuriouslyLostPacket) {
-  CHECK_GT(conn.outstandings.declaredLostCount, 0);
+  MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
   conn.lossState.totalPacketsSpuriouslyMarkedLost++;
   if (conn.transportSettings.useAdaptiveLossReorderingThresholds) {
     if (spuriouslyLostPacket.metadata.lossReorderDistance.has_value() &&
@@ -752,7 +758,7 @@ Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
       }
     }
   }
-  CHECK_GT(conn.outstandings.declaredLostCount, 0);
+  MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
   conn.outstandings.declaredLostCount--;
   return {};
 }

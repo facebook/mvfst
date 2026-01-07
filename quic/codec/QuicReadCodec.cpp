@@ -190,7 +190,7 @@ quic::Expected<CodecResult, QuicError> QuicReadCodec::parseLongHeaderPacket(
       break;
     case ProtectionType::KeyPhaseZero:
     case ProtectionType::KeyPhaseOne:
-      CHECK(false) << "one rtt protection type in long header";
+      MVCHECK(false, "one rtt protection type in long header");
   }
   if (!headerCipher || !cipher) {
     return CodecResult(
@@ -423,7 +423,7 @@ CodecResult QuicReadCodec::parsePacket(
   if (queue.empty()) {
     return CodecResult(Nothing());
   }
-  CHECK(!queue.front()->isChained());
+  MVCHECK(!queue.front()->isChained());
   ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
   uint8_t initialByte = 0;
   if (!cursor.tryReadBE(initialByte)) {
@@ -548,8 +548,9 @@ void QuicReadCodec::setNextOneRttReadCipher(
 
 void QuicReadCodec::setZeroRttReadCipher(
     std::unique_ptr<Aead> zeroRttReadCipher) {
-  CHECK(nodeType_ == QuicNodeType::Server)
-      << "Setting zero rtt read cipher on client.";
+  MVCHECK(
+      nodeType_ == QuicNodeType::Server,
+      "Setting zero rtt read cipher on client.");
   zeroRttReadCipher_ = std::move(zeroRttReadCipher);
 }
 

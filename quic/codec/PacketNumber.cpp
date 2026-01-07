@@ -9,6 +9,7 @@
 #include <glog/logging.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumber.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -26,8 +27,10 @@ PacketNumEncodingResult encodePacketNumber(
   size_t lengthInBits = folly::findLastSet(twiceDistance);
   // Round up to bytes
   size_t lengthInBytes = lengthInBits == 0 ? 1 : (lengthInBits + 7) >> 3;
-  CHECK(lengthInBytes <= 4) << "Impossible to encode PacketNum=" << packetNum
-                            << ", largestAcked=" << largestAckedPacketNum;
+  MVCHECK(
+      lengthInBytes <= 4,
+      "Impossible to encode PacketNum=" << packetNum << ", largestAcked="
+                                        << largestAckedPacketNum);
   // We need a mask that's all 1 for lengthInBytes bytes. Left shift a 1 by that
   // many bits and then -1 will give us that. Or if lengthInBytes is 8, then ~0
   // will just do it.
@@ -40,7 +43,7 @@ PacketNum decodePacketNumber(
     uint64_t encodedPacketNum,
     size_t packetNumBytes,
     PacketNum expectedNextPacketNum) {
-  CHECK(packetNumBytes <= 4);
+  MVCHECK(packetNumBytes <= 4);
   size_t packetNumBits = 8 * packetNumBytes;
   PacketNum packetNumWin = 1ULL << packetNumBits;
   PacketNum packetNumHalfWin = packetNumWin >> 1;

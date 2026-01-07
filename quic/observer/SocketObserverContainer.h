@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/ObserverContainer.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/observer/SocketObserverInterface.h>
 
 namespace quic {
@@ -78,19 +79,19 @@ class SocketObserverContainer : public SocketObserverContainerBaseT {
 
     void addedToObserverContainer(
         ObserverContainerBase* list) noexcept override {
-      CHECK(list->getObject());
+      MVCHECK(list->getObject());
     }
 
     void removedFromObserverContainer(
         ObserverContainerBase* list) noexcept override {
-      CHECK(list->getObject());
+      MVCHECK(list->getObject());
     }
 
     void movedToObserverContainer(
         ObserverContainerBase* oldList,
         ObserverContainerBase* newList) noexcept override {
-      CHECK(oldList->getObject());
-      CHECK(newList->getObject());
+      MVCHECK(oldList->getObject());
+      MVCHECK(newList->getObject());
     }
   };
 };

@@ -64,7 +64,7 @@ quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
       break;
     }
     case StreamRecvState::Closed: {
-      CHECK(!isSendingStream(stream.conn.nodeType, stream.id));
+      MVCHECK(!isSendingStream(stream.conn.nodeType, stream.id));
       MVVLOG(10) << "Closed: Received discarding data stream=" << stream.id
                  << " fin=" << frame.fin << " " << stream.conn;
       break;

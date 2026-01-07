@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/fizz/handshake/FizzPacketNumberCipher.h>
 
 namespace quic {
@@ -32,7 +33,7 @@ static quic::Expected<HeaderProtectionMask, QuicError> maskImpl(
     const folly::ssl::EvpCipherCtxUniquePtr& context,
     ByteRange sample) {
   HeaderProtectionMask outMask;
-  CHECK_EQ(sample.size(), outMask.size());
+  MVCHECK_EQ(sample.size(), outMask.size());
   int outLen = 0;
   if (EVP_EncryptUpdate(
           context.get(),

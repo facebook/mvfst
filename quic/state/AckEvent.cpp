@@ -6,6 +6,7 @@
  */
 
 #include <folly/MapUtil.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/AckEvent.h>
 #include <chrono>
 #include <utility>
@@ -95,9 +96,9 @@ AckEvent::AckPacket::Builder::setReceiveDeltaTimeStamp(
 }
 
 AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
-  CHECK(packetNum.has_value());
-  CHECK(outstandingPacketMetadata);
-  CHECK(detailsPerStream.has_value());
+  MVCHECK(packetNum.has_value());
+  MVCHECK(outstandingPacketMetadata);
+  MVCHECK(detailsPerStream.has_value());
   return AckEvent::AckPacket(
       packetNum.value(),
       *outstandingPacketMetadata,
@@ -111,9 +112,9 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
 
 void AckEvent::AckPacket::Builder::buildInto(
     std::vector<AckPacket>& ackedPacketsVec) && {
-  CHECK(packetNum.has_value());
-  CHECK(outstandingPacketMetadata);
-  CHECK(detailsPerStream.has_value());
+  MVCHECK(packetNum.has_value());
+  MVCHECK(outstandingPacketMetadata);
+  MVCHECK(detailsPerStream.has_value());
   ackedPacketsVec.emplace_back(
       packetNum.value(),
       *outstandingPacketMetadata,
@@ -175,23 +176,23 @@ AckEvent AckEvent::Builder::build() && {
 
 AckEvent::AckEvent(AckEvent::BuilderFields&& builderFields)
     : ackTime([&]() {
-        CHECK(builderFields.maybeAckTime.has_value());
+        MVCHECK(builderFields.maybeAckTime.has_value());
         return builderFields.maybeAckTime.value();
       }()),
       adjustedAckTime([&]() {
-        CHECK(builderFields.maybeAdjustedAckTime.has_value());
+        MVCHECK(builderFields.maybeAdjustedAckTime.has_value());
         return builderFields.maybeAdjustedAckTime.value();
       }()),
       ackDelay([&]() {
-        CHECK(builderFields.maybeAckDelay.has_value());
+        MVCHECK(builderFields.maybeAckDelay.has_value());
         return builderFields.maybeAckDelay.value();
       }()),
       packetNumberSpace([&]() {
-        CHECK(builderFields.maybePacketNumberSpace.has_value());
+        MVCHECK(builderFields.maybePacketNumberSpace.has_value());
         return builderFields.maybePacketNumberSpace.value();
       }()),
       largestAckedPacket([&]() {
-        CHECK(builderFields.maybeLargestAckedPacket.has_value());
+        MVCHECK(builderFields.maybeLargestAckedPacket.has_value());
         return builderFields.maybeLargestAckedPacket.value();
       }()),
       ecnECT0Count(builderFields.ecnECT0Count),

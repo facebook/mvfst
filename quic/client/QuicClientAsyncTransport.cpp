@@ -6,6 +6,7 @@
  */
 
 #include <quic/client/QuicClientAsyncTransport.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <folly/experimental/symbolizer/Symbolizer.h>
 
@@ -26,12 +27,12 @@ QuicClientAsyncTransport::~QuicClientAsyncTransport() {
 
 void QuicClientAsyncTransport::onNewBidirectionalStream(
     StreamId /*id*/) noexcept {
-  CHECK(false);
+  MVCHECK(false);
 }
 
 void QuicClientAsyncTransport::onNewUnidirectionalStream(
     StreamId /*id*/) noexcept {
-  CHECK(false);
+  MVCHECK(false);
 }
 
 void QuicClientAsyncTransport::onStopSending(

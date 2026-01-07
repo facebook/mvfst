@@ -12,7 +12,7 @@ if (NOT DEFINED PACKAGE_VERSION)
 endif()
 
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 20)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   set(CMAKE_CXX_EXTENSIONS OFF)
   message(STATUS "setting C++ standard to C++${CMAKE_CXX_STANDARD}")
@@ -101,6 +101,12 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     -Wnon-virtual-dtor
     -Wtype-limits
     -Wunused-value
+  )
+else()
+  # MSVC: Enable conforming preprocessor for __VA_OPT__ support
+  list(APPEND
+    _QUIC_COMMON_COMPILE_OPTIONS
+    /Zc:preprocessor
   )
 endif()
 

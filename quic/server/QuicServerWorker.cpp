@@ -92,8 +92,8 @@ void QuicServerWorker::bind(
   // TODO get rid of the temporary wrapper
   FollyQuicAsyncUDPSocket tmpSock(
       std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
-  DCHECK(!supportedVersions_.empty());
-  CHECK(socket_);
+  MVDCHECK(!supportedVersions_.empty());
+  MVCHECK(socket_);
   // TODO this totally doesn't work, we can't apply socket options before
   // bind, since bind creates the fd.
   if (socketOptions_) {
@@ -135,7 +135,7 @@ void QuicServerWorker::bind(
 }
 
 void QuicServerWorker::applyAllSocketOptions() {
-  CHECK(socket_);
+  MVCHECK(socket_);
   // TODO get rid of the temporary wrapper
   FollyQuicAsyncUDPSocket tmpSock(
       std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
@@ -165,7 +165,7 @@ void QuicServerWorker::setShouldRegisterKnobParamHandlerFn(
 
 void QuicServerWorker::setTransportStatsCallback(
     std::unique_ptr<QuicTransportStatsCallback> statsCallback) noexcept {
-  CHECK(statsCallback);
+  MVCHECK(statsCallback);
   statsCallback_ = std::move(statsCallback);
 }
 
@@ -176,13 +176,13 @@ QuicTransportStatsCallback* QuicServerWorker::getTransportStatsCallback()
 
 void QuicServerWorker::setConnectionIdAlgo(
     std::unique_ptr<ConnectionIdAlgo> connIdAlgo) noexcept {
-  CHECK(connIdAlgo);
+  MVCHECK(connIdAlgo);
   connIdAlgo_ = std::move(connIdAlgo);
 }
 
 void QuicServerWorker::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  CHECK(ccFactory);
+  MVCHECK(ccFactory);
   ccFactory_ = ccFactory;
 }
 
@@ -197,7 +197,7 @@ void QuicServerWorker::setUnfinishedHandshakeLimit(
 }
 
 void QuicServerWorker::start() {
-  CHECK(socket_);
+  MVCHECK(socket_);
   if (!pacingTimer_) {
     pacingTimer_ = std::make_unique<HighResQuicTimer>(
         evb_.get(), transportSettings_.pacingTimerResolution);
@@ -224,17 +224,17 @@ void QuicServerWorker::logTimeBasedStats() {
 }
 
 void QuicServerWorker::pauseRead() {
-  CHECK(socket_);
+  MVCHECK(socket_);
   socket_->pauseRead();
 }
 
 int QuicServerWorker::getFD() {
-  CHECK(socket_);
+  MVCHECK(socket_);
   return socket_->getNetworkSocket().toFd();
 }
 
 const folly::SocketAddress& QuicServerWorker::getAddress() const {
-  CHECK(socket_);
+  MVCHECK(socket_);
   return socket_->address();
 }
 
@@ -410,7 +410,7 @@ void QuicServerWorker::onDataAvailable(
         // do not clone the last packet
         // start at offset, use all the remaining data
         data->trimStart(offset);
-        DCHECK_EQ(data->length(), remaining);
+        MVDCHECK_EQ(data->length(), remaining);
         ReceivedUdpPacket udpPacket(std::move(data));
         udpPacket.timings.receiveTimePoint = packetReceiveTime;
         udpPacket.tosValue = params.tos;
@@ -424,7 +424,7 @@ void QuicServerWorker::onDataAvailable(
       // the actual len is len - offset now
       // leave params.gro_ bytes
       tmp->trimEnd(len - offset - params.gro);
-      DCHECK_EQ(tmp->length(), params.gro);
+      MVDCHECK_EQ(tmp->length(), params.gro);
       offset += params.gro;
       remaining -= params.gro;
       ReceivedUdpPacket udpPacket(std::move(tmp));
@@ -474,7 +474,7 @@ void QuicServerWorker::handleNetworkData(
 
     uint8_t initialByte = 0;
     // We already checked that we can advance sizeof(uint8_t) bytes
-    CHECK(cursor.tryReadBE(initialByte));
+    MVCHECK(cursor.tryReadBE(initialByte));
     HeaderForm headerForm = getHeaderForm(initialByte);
 
     if (headerForm == HeaderForm::Short) {
@@ -686,7 +686,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->accept(quicVersion);
     auto result = sourceAddressMap_.emplace(
         std::make_pair(std::make_pair(client, dstConnId), trans));
-    CHECK(result.second);
+    MVCHECK(result.second);
     for (const auto& observer : observerList_.getAll()) {
       observer->accept(trans.get());
     }
@@ -745,8 +745,8 @@ void QuicServerWorker::dispatchPacketData(
     NetworkData&& networkData,
     Optional<QuicVersion> quicVersion,
     bool isForwardedData) noexcept {
-  DCHECK(socket_);
-  CHECK(transportFactory_);
+  MVDCHECK(socket_);
+  MVCHECK(transportFactory_);
 
   // if set, log drop reason and do *not* attempt to forward packet
   auto packetDropReason = PacketDropReason::NONE;
@@ -763,7 +763,7 @@ void QuicServerWorker::dispatchPacketData(
       return;
     }
     // should either be marked as dropped or fwd-ed, can't be both
-    CHECK((packetDropReason != PacketDropReason::NONE) ^ shouldFwdPacket);
+    MVCHECK((packetDropReason != PacketDropReason::NONE) ^ shouldFwdPacket);
 
     if (packetDropReason != PacketDropReason::NONE) {
       QUIC_STATS(statsCallback_, onPacketDropped, packetDropReason);
@@ -808,7 +808,7 @@ void QuicServerWorker::dispatchPacketData(
 
   // helper fn to handle fwd-ing data to the transport
   auto fwdNetworkDataToTransport = [&](QuicServerTransport* transport) {
-    DCHECK(transport->getEventBase()->isInEventBaseThread());
+    MVDCHECK(transport->getEventBase()->isInEventBaseThread());
     transport->onNetworkData(
         socket_->address(), std::move(networkData), client);
     // process pending 0rtt data for this DCID if present
@@ -843,7 +843,7 @@ void QuicServerWorker::dispatchPacketData(
   // For LongHeader packets without existing associated connection, try to
   // route with destinationConnId chosen by the peer and IP address of the
   // peer.
-  CHECK(routingData.headerForm == HeaderForm::Long);
+  MVCHECK(routingData.headerForm == HeaderForm::Long);
   auto sit = sourceAddressMap_.find(std::make_pair(client, dstConnId));
   if (sit != sourceAddressMap_.end()) {
     MVVLOG(4) << "Found existing connection for client=" << client << " "
@@ -876,7 +876,7 @@ void QuicServerWorker::dispatchPacketData(
   }
 
   // check that we have a proper quic version before creating transport
-  CHECK(quicVersion.has_value()) << "no QUIC version to create transport";
+  MVCHECK(quicVersion.has_value(), "no QUIC version to create transport");
   MVVLOG(4) << fmt::format(
       "Creating new connection for client={}, routingInfo={}",
       client.describe(),
@@ -936,7 +936,7 @@ void QuicServerWorker::dispatchPacketData(
       quicVersion.value(), client, maybeSrcConnId, dstConnId, isValidNewToken);
   if (!transport) {
     // Act as though we received a junk Initial – don't forward packet.
-    CHECK(maybeSrcConnId.has_value());
+    MVCHECK(maybeSrcConnId.has_value());
     LongHeaderInvariant inv{
         QuicVersion::MVFST_INVALID, maybeSrcConnId.value(), dstConnId};
     packetDropReason = PacketDropReason::CANNOT_MAKE_TRANSPORT;
@@ -969,7 +969,7 @@ void QuicServerWorker::sendResetPacket(
     resetSize = std::max<uint16_t>(
         folly::Random::secureRand32() % resetSize, kMinStatelessPacketSize);
   }
-  CHECK(transportSettings_.statelessResetTokenSecret.has_value());
+  MVCHECK(transportSettings_.statelessResetTokenSecret.has_value());
   StatelessResetGenerator generator(
       *transportSettings_.statelessResetTokenSecret,
       getAddress().getFullyQualified());
@@ -1027,7 +1027,7 @@ bool QuicServerWorker::validRetryToken(
     std::string& encryptedToken,
     const ConnectionId& dstConnId,
     const folly::IPAddress& clientIp) {
-  CHECK(transportSettings_.retryTokenSecret.has_value());
+  MVCHECK(transportSettings_.retryTokenSecret.has_value());
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
@@ -1044,7 +1044,7 @@ bool QuicServerWorker::validRetryToken(
 bool QuicServerWorker::validNewToken(
     std::string& encryptedToken,
     const folly::IPAddress& clientIp) {
-  CHECK(transportSettings_.retryTokenSecret.has_value());
+  MVCHECK(transportSettings_.retryTokenSecret.has_value());
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
@@ -1074,7 +1074,7 @@ void QuicServerWorker::sendRetryPacket(
   RetryToken retryToken(dstConnId, client.getIPAddress(), client.getPort());
   auto encryptedToken = generator.encryptToken(retryToken);
 
-  CHECK(encryptedToken.has_value());
+  MVCHECK(encryptedToken.has_value());
   std::string encryptedTokenStr = encryptedToken.value()->toString();
 
   // Create the integrity tag
@@ -1106,7 +1106,7 @@ void QuicServerWorker::sendRetryPacket(
   // FizzRetryIntegrityTagGenerator creates an AES-GCM-128 AEAD and the tag
   // length for that cipher is 16 bytes, which is the same as the size of the
   // integrityTag variable.
-  CHECK(cursor.tryPull(integrityTag.data(), integrityTag.size()));
+  MVCHECK(cursor.tryPull(integrityTag.data(), integrityTag.size()));
 
   // Create the actual retry packet
   RetryPacketBuilder builder(
@@ -1127,7 +1127,7 @@ void QuicServerWorker::sendRetryPacket(
 void QuicServerWorker::allowBeingTakenOver(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
     const folly::SocketAddress& address) {
-  DCHECK(!takeoverCB_);
+  MVDCHECK(!takeoverCB_);
   // We instantiate and bind the TakeoverHandlerCallback to the given address.
   // It is reset at shutdownAllConnections (i.e. only when the process dies).
   takeoverCB_ = std::make_unique<TakeoverHandlerCallback>(
@@ -1138,7 +1138,7 @@ void QuicServerWorker::allowBeingTakenOver(
 const folly::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
     const folly::SocketAddress& address) {
-  CHECK(takeoverCB_);
+  MVCHECK(takeoverCB_);
   takeoverCB_->rebind(std::move(socket), address);
   return takeoverCB_->getAddress();
 }
@@ -1169,7 +1169,7 @@ void QuicServerWorker::onReadClosed() noexcept {
 }
 
 int QuicServerWorker::getTakeoverHandlerSocketFD() {
-  CHECK(takeoverCB_);
+  MVCHECK(takeoverCB_);
   return takeoverCB_->getSocketFD();
 }
 
@@ -1251,7 +1251,7 @@ void QuicServerWorker::setHealthCheckToken(
 
 std::unique_ptr<FollyAsyncUDPSocketAlias> QuicServerWorker::makeSocket(
     folly::EventBase* evb) const {
-  CHECK(socket_);
+  MVCHECK(socket_);
   auto sock = socketFactory_->make(evb, socket_->getNetworkSocket().toFd());
   if (sock && mvfst_hook_on_socket_create) {
     mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
@@ -1320,7 +1320,7 @@ void QuicServerWorker::onConnectionIdRetired(
 void QuicServerWorker::onConnectionIdBound(
     QuicServerTransport::Ptr transport) noexcept {
   auto clientInitialDestCid = transport->getClientChosenDestConnectionId();
-  CHECK(clientInitialDestCid);
+  MVCHECK(clientInitialDestCid);
   auto source = std::make_pair(
       transport->getOriginalPeerAddress(), *clientInitialDestCid);
   MVVLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
@@ -1392,11 +1392,11 @@ void QuicServerWorker::onConnectionUnbound(
 }
 
 void QuicServerWorker::onHandshakeFinished() noexcept {
-  CHECK_GE(--globalUnfinishedHandshakes, 0);
+  MVCHECK_GE(--globalUnfinishedHandshakes, 0);
 }
 
 void QuicServerWorker::onHandshakeUnfinished() noexcept {
-  CHECK_GE(--globalUnfinishedHandshakes, 0);
+  MVCHECK_GE(--globalUnfinishedHandshakes, 0);
 }
 
 void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
@@ -1497,11 +1497,11 @@ QuicServerWorker::AcceptObserverList::~AcceptObserverList() {
 
 void QuicServerWorker::AcceptObserverList::add(AcceptObserver* observer) {
   // adding the same observer multiple times is not allowed
-  CHECK(
+  MVCHECK(
       std::find(observers_.begin(), observers_.end(), observer) ==
       observers_.end());
 
-  observers_.emplace_back(CHECK_NOTNULL(observer));
+  observers_.emplace_back(MVCHECK_NOTNULL(observer));
   observer->observerAttach(worker_);
 }
 

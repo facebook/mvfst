@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 
 namespace {
@@ -192,7 +193,7 @@ HTTPPriorityQueue::top() const {
   if (lowestRoundRobin_ < topPri && !roundRobins_[lowestRoundRobin_].empty()) {
     return nullptr;
   }
-  CHECK(topElem) << "Empty";
+  MVCHECK(topElem, "Empty");
   return topElem;
 }
 
@@ -274,7 +275,7 @@ void HTTPPriorityQueue::heapifyDown(size_t index) {
 }
 
 void HTTPPriorityQueue::assignIndex(Element& element, size_t index) {
-  CHECK(!element.priority->incremental);
+  MVCHECK(!element.priority->incremental);
   addIndex(element.identifier, {false, index});
 }
 

@@ -61,6 +61,7 @@ mvfst_cpp_library(
         "//folly/container:f14_hash",
         "//folly/io:iobuf",
         "//quic/common:expected",
+        "//quic/common:mvfst_logging",
         "//quic/common:optional",
     ],
 )

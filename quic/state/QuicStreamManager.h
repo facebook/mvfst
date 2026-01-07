@@ -49,7 +49,7 @@ class StreamIdSet {
 
   void remove(StreamId id) {
     id -= base_;
-    CHECK_EQ(id % detail::kStreamIncrement, 0);
+    MVCHECK_EQ(id % detail::kStreamIncrement, 0);
     id /= detail::kStreamIncrement;
     streams_.withdraw(Interval<StreamId>(id, id));
   }
@@ -57,8 +57,8 @@ class StreamIdSet {
   void add(StreamId first, StreamId last) {
     first -= base_;
     last -= base_;
-    CHECK_EQ(first % detail::kStreamIncrement, 0);
-    CHECK_EQ(last % detail::kStreamIncrement, 0);
+    MVCHECK_EQ(first % detail::kStreamIncrement, 0);
+    MVCHECK_EQ(last % detail::kStreamIncrement, 0);
     first /= detail::kStreamIncrement;
     last /= detail::kStreamIncrement;
     streams_.insert(first, last);

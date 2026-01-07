@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/QuicBatchWriter.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 // BatchWriter
@@ -55,7 +56,7 @@ ssize_t SinglePacketInplaceBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
   auto& buf = conn_.bufAccessor->buf();
-  CHECK(!conn_.bufAccessor->isChained());
+  MVCHECK(!conn_.bufAccessor->isChained());
 
   iovec vec[kNumIovecBufferChains];
   size_t iovec_len = fillIovec(buf, vec);
@@ -138,7 +139,7 @@ bool SendmmsgPacketBatchWriter::append(
     size_t size,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
-  CHECK_LT(bufs_.size(), maxBufs_);
+  MVCHECK_LT(bufs_.size(), maxBufs_);
   bufs_.emplace_back(std::move(buf));
   currSize_ += size;
 
@@ -154,7 +155,7 @@ bool SendmmsgPacketBatchWriter::append(
 ssize_t SendmmsgPacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  CHECK_GT(bufs_.size(), 0);
+  MVCHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
     iovec vec[kNumIovecBufferChains];
     size_t iovec_len = fillIovec(bufs_.at(0), vec);
@@ -222,7 +223,7 @@ SendmmsgInplacePacketBatchWriter::SendmmsgInplacePacketBatchWriter(
     QuicConnectionStateBase& conn,
     size_t maxBufs)
     : conn_(conn), maxBufs_(maxBufs) {
-  CHECK_LT(maxBufs, kMaxIovecs) << "maxBufs must be less than " << kMaxIovecs;
+  MVCHECK_LT(maxBufs, kMaxIovecs, "maxBufs must be less than " << kMaxIovecs);
 }
 
 bool SendmmsgInplacePacketBatchWriter::empty() const {
@@ -243,10 +244,10 @@ bool SendmmsgInplacePacketBatchWriter::append(
     size_t size,
     const folly::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
-  CHECK_LT(numPacketsBuffered_, maxBufs_);
+  MVCHECK_LT(numPacketsBuffered_, maxBufs_);
 
   auto& buf = conn_.bufAccessor->buf();
-  CHECK(!buf->isChained() && buf->length() >= size);
+  MVCHECK(!buf->isChained() && buf->length() >= size);
   iovecs_[numPacketsBuffered_].iov_base = (void*)(buf->tail() - size);
   iovecs_[numPacketsBuffered_].iov_len = size;
 
@@ -265,7 +266,7 @@ bool SendmmsgInplacePacketBatchWriter::append(
 ssize_t SendmmsgInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const folly::SocketAddress& address) {
-  CHECK_GT(numPacketsBuffered_, 0);
+  MVCHECK_GT(numPacketsBuffered_, 0);
 
   auto& buf = conn_.bufAccessor->buf();
   buf->clear();

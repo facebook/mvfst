@@ -22,7 +22,7 @@ FunctionLooper::FunctionLooper(
       running_(false),
       inLoopBody_(false),
       fireLoopEarly_(false) {
-  CHECK(func_);
+  MVCHECK(func_);
 }
 
 void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
@@ -31,7 +31,7 @@ void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
 
 void FunctionLooper::setPacingFunction(
     std::function<std::chrono::microseconds()>&& pacingFunc) {
-  CHECK(pacingFunc);
+  MVCHECK(pacingFunc);
   pacingFunc_ = std::move(pacingFunc);
 }
 
@@ -135,14 +135,14 @@ bool FunctionLooper::isLoopCallbackScheduled() {
 
 void FunctionLooper::attachEventBase(std::shared_ptr<QuicEventBase> evb) {
   MVVLOG(10) << __func__ << ": " << type_;
-  DCHECK(!evb_);
-  DCHECK(evb && evb->isInEventBaseThread());
+  MVDCHECK(!evb_);
+  MVDCHECK(evb && evb->isInEventBaseThread());
   evb_ = std::move(evb);
 }
 
 void FunctionLooper::detachEventBase() {
   MVVLOG(10) << __func__ << ": " << type_;
-  DCHECK(evb_ && evb_->isInEventBaseThread());
+  MVDCHECK(evb_ && evb_->isInEventBaseThread());
   stop();
   cancelTimerCallback();
   evb_ = nullptr;

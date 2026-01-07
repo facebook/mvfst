@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/Optional.h>
 
 namespace quic {
@@ -94,7 +95,7 @@ bool IntervalSet<T, Unit, Container>::contains(const T& start, const T& end)
 
 template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(const T& startIt, const T& endIt) {
-  CHECK_LE(startIt, endIt) << "Trying to insert invalid interval";
+  MVCHECK_LE(startIt, endIt, "Trying to insert invalid interval");
   insert(Interval<T, Unit>(startIt, endIt));
 }
 

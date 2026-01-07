@@ -256,19 +256,19 @@ ShortHeader::ShortHeader(
     ConnectionId connId,
     PacketNum packetNum)
     : protectionType_(protectionType), connectionId_(std::move(connId)) {
-  CHECK(
+  MVCHECK(
       protectionType_ == ProtectionType::KeyPhaseZero ||
-      protectionType_ == ProtectionType::KeyPhaseOne)
-      << "bad short header protection type";
+          protectionType_ == ProtectionType::KeyPhaseOne,
+      "bad short header protection type");
   setPacketNumber(packetNum);
 }
 
 ShortHeader::ShortHeader(ProtectionType protectionType, ConnectionId connId)
     : protectionType_(protectionType), connectionId_(std::move(connId)) {
-  CHECK(
+  MVCHECK(
       protectionType_ == ProtectionType::KeyPhaseZero ||
-      protectionType_ == ProtectionType::KeyPhaseOne)
-      << "bad short header protection type";
+          protectionType_ == ProtectionType::KeyPhaseOne,
+      "bad short header protection type");
 }
 
 ProtectionType ShortHeader::getProtectionType() const {
@@ -350,7 +350,7 @@ std::string_view toString(PacketNumberSpace pnSpace) {
     case PacketNumberSpace::AppData:
       return "AppDataSpace";
   }
-  CHECK(false) << "Unknown packet number space";
+  MVCHECK(false, "Unknown packet number space");
   folly::assume_unreachable();
 }
 
@@ -367,7 +367,7 @@ std::string_view toString(ProtectionType protectionType) {
     case ProtectionType::KeyPhaseOne:
       return "KeyPhaseOne";
   }
-  CHECK(false) << "Unknown protection type";
+  MVCHECK(false, "Unknown protection type");
   folly::assume_unreachable();
 }
 

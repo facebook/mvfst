@@ -82,10 +82,10 @@ void BbrBandwidthSampler::onPacketAcked(
     }
     Bandwidth sendRate, ackRate;
     if (ackedPacket.lastAckedPacketInfo) {
-      DCHECK(
+      MVDCHECK(
           ackedPacket.outstandingPacketMetadata.time >
           ackedPacket.lastAckedPacketInfo->sentTime);
-      DCHECK_GE(
+      MVDCHECK_GE(
           ackedPacket.outstandingPacketMetadata.totalBytesSent,
           ackedPacket.lastAckedPacketInfo->totalBytesSent);
       sendRate = Bandwidth(
@@ -95,8 +95,8 @@ void BbrBandwidthSampler::onPacketAcked(
               ackedPacket.outstandingPacketMetadata.time -
               ackedPacket.lastAckedPacketInfo->sentTime));
 
-      DCHECK(ackEvent.ackTime > ackedPacket.lastAckedPacketInfo->ackTime);
-      DCHECK_GE(
+      MVDCHECK(ackEvent.ackTime > ackedPacket.lastAckedPacketInfo->ackTime);
+      MVDCHECK_GE(
           conn_.lossState.totalBytesAcked,
           ackedPacket.lastAckedPacketInfo->totalBytesAcked);
       auto ackDuration = (ackEvent.adjustedAckTime >
@@ -139,7 +139,7 @@ void BbrBandwidthSampler::onPacketAcked(
     }
   }
   if (bandwidthUpdated) {
-    auto newBandwidth = getBandwidth();
+    [[maybe_unused]] auto newBandwidth = getBandwidth();
     QLOG(
         conn_,
         addBandwidthEstUpdate,

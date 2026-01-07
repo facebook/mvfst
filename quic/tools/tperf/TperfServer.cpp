@@ -145,7 +145,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     }
     auto stream = sock_->createUnidirectionalStream();
     MVVLOG(5) << "New Stream with id = " << stream.value();
-    CHECK(stream.has_value());
+    MVCHECK(stream.has_value());
     bytesPerStream_[stream.value()] = 0;
     notifyDataForStream(stream.value());
   }
@@ -226,14 +226,14 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
 
     auto stream = sock_->createUnidirectionalStream();
     MVVLOG(5) << "New Stream with id = " << stream.value();
-    CHECK(stream.has_value());
+    MVCHECK(stream.has_value());
     streamBurstSendResult_.streamId = *stream;
     streamBurstSendResult_.acked = false;
     streamBurstSendResult_.startTs = Clock::now();
 
     auto sendBuffer = buf_->clone();
     sendBuffer->append(blockSize_);
-    CHECK_GT(blockSize_, 0);
+    MVCHECK_GT(blockSize_, 0);
     auto r = sock_->registerTxCallback(*stream, 0, this);
     if (r.hasError()) {
       MVLOG_FATAL << "Got error on registerTxCallback: "
@@ -254,7 +254,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void onByteEvent(ByteEvent byteEvent) override {
-    CHECK_EQ(byteEvent.id, streamBurstSendResult_.streamId);
+    MVCHECK_EQ(byteEvent.id, streamBurstSendResult_.streamId);
     auto now = Clock::now();
     if (byteEvent.type == ByteEvent::Type::TX) {
       streamBurstSendResult_.trueTxStartTs = now;
@@ -415,7 +415,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
-    CHECK_EQ(evb, sock->getEventBase());
+    MVCHECK_EQ(evb, sock->getEventBase());
     auto serverHandler = std::make_unique<ServerStreamHandler>(
         evb,
         blockSize_,

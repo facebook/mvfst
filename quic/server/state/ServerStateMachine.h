@@ -168,7 +168,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
          QuicVersion::QUIC_V1_ALIAS2,
          QuicVersion::MVFST_PRIMING}};
     originalVersion = QuicVersion::MVFST;
-    DCHECK(handshakeFactory);
+    MVDCHECK(handshakeFactory);
     auto tmpServerHandshake =
         std::move(*handshakeFactory).makeServerHandshake(this);
     serverHandshakeLayer = tmpServerHandshake.get();

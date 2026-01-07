@@ -87,7 +87,7 @@ quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::close() {
 void FollyQuicAsyncUDPSocket::resumeRead(ReadCallback* callback) {
   try {
     // TODO: We could skip this check and rely on the one in AsyncUDPSocket
-    CHECK(!readCallbackWrapper_) << "Already registered a read callback";
+    MVCHECK(!readCallbackWrapper_, "Already registered a read callback");
     readCallbackWrapper_ =
         std::make_unique<FollyReadCallbackWrapper>(callback, this);
     follySocket_.resumeRead(readCallbackWrapper_.get());
@@ -385,10 +385,10 @@ void FollyQuicAsyncUDPSocket::attachEventBase( // Keep void, attach/detach
                                                // usually don't throw socket
                                                // errors
     std::shared_ptr<QuicEventBase> evb) {
-  CHECK(evb != nullptr);
+  MVCHECK(evb != nullptr);
   std::shared_ptr<FollyQuicEventBase> follyEvb =
       std::dynamic_pointer_cast<FollyQuicEventBase>(evb);
-  CHECK(follyEvb != nullptr);
+  MVCHECK(follyEvb != nullptr);
   evb_ = follyEvb;
   follySocket_.attachEventBase(follyEvb->getBackingEventBase());
 }
@@ -400,7 +400,7 @@ void FollyQuicAsyncUDPSocket::detachEventBase() { // Keep void
 [[nodiscard]] std::shared_ptr<QuicEventBase>
 FollyQuicAsyncUDPSocket::getEventBase() const {
   if (evb_) {
-    CHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
+    MVCHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
   }
   return evb_;
 }
@@ -632,7 +632,7 @@ void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onDataAvailable(
         params) noexcept {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   // TODO: Can this be moved to a static compile time check?
-  CHECK_EQ(
+  MVCHECK_EQ(
       QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace,
       folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace);
 #endif
@@ -649,7 +649,7 @@ void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onDataAvailable(
 
 void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onNotifyDataAvailable(
     folly::AsyncUDPSocket&) noexcept {
-  CHECK(parentSocket_ != nullptr);
+  MVCHECK(parentSocket_ != nullptr);
   return wrappedReadCallback_->onNotifyDataAvailable(*parentSocket_);
 }
 

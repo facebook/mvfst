@@ -162,7 +162,7 @@ void Copa::onPacketAckOrLoss(
 }
 
 void Copa::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestNewlyAckedPacket.has_value());
+  MVDCHECK(ack.largestNewlyAckedPacket.has_value());
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())
@@ -335,7 +335,7 @@ void Copa::onPacketLoss(const LossEvent& loss) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
-  DCHECK(loss.largestLostPacketNum.has_value());
+  MVDCHECK(loss.largestLostPacketNum.has_value());
   if (loss.persistentCongestion) {
     // TODO See if we should go to slowStart here
     MVVLOG(10) << __func__ << " writable=" << getWritableBytes()

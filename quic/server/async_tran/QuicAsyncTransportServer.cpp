@@ -6,6 +6,7 @@
  */
 
 #include <folly/system/HardwareConcurrency.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/async_tran/QuicAsyncTransportServer.h>
 
 namespace quic {
@@ -15,7 +16,7 @@ QuicAsyncTransportServer::QuicAsyncTransportServer(
     quic::TransportSettings ts)
     : asyncTransportHook_(std::move(asyncTransportHook)),
       quicServer_(quic::QuicServer::createQuicServer(std::move(ts))) {
-  CHECK(asyncTransportHook_);
+  MVCHECK(asyncTransportHook_);
 }
 
 void QuicAsyncTransportServer::setFizzContext(

@@ -6,14 +6,15 @@
  */
 
 #include <quic/QuicConstants.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
 namespace quic {
 void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame) {
-  CHECK(frame.type() != QuicSimpleFrame::Type::PathChallengeFrame);
-  CHECK(frame.type() != QuicSimpleFrame::Type::PathResponseFrame);
+  MVCHECK(frame.type() != QuicSimpleFrame::Type::PathChallengeFrame);
+  MVCHECK(frame.type() != QuicSimpleFrame::Type::PathResponseFrame);
   conn.pendingEvents.frames.emplace_back(std::move(frame));
 }
 
@@ -98,7 +99,7 @@ void updateSimpleFrameOnPacketSent(
     default: {
       auto& frames = conn.pendingEvents.frames;
       auto itr = std::find(frames.begin(), frames.end(), simpleFrame);
-      CHECK(itr != frames.end());
+      MVCHECK(itr != frames.end());
       frames.erase(itr);
       break;
     }
@@ -196,7 +197,7 @@ quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
       // If this is the current path that just got validated, we should update
       // the RTT.
       if (validatedPath && validatedPath->id == conn.currentPathId) {
-        CHECK(validatedPath->rttSample.has_value());
+        MVCHECK(validatedPath->rttSample.has_value());
         updateRtt(conn, validatedPath->rttSample.value(), 0us);
       }
 
@@ -306,7 +307,7 @@ quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
 
       if (conn.nodeType == QuicNodeType::Server) {
         // in the server case, we need to queue unbinding from map
-        CHECK(conn.connIdsRetiringSoon.has_value());
+        MVCHECK(conn.connIdsRetiringSoon.has_value());
         conn.connIdsRetiringSoon->push_back(it->connId);
       }
       selfConnIds.erase(it);

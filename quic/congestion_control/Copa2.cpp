@@ -114,7 +114,7 @@ void Copa2::manageLossyMode(Optional<TimePoint> sentTime) {
             << " num lost=" << numLostInLossCycle_
             << " num acked=" << numAckedInLossCycle_ << " " << conn_;
   // Cycle has ended. Take stock of the situation
-  DCHECK(numPktsInLossCycle > 0);
+  MVDCHECK(numPktsInLossCycle > 0);
   lossyMode_ = numLostInLossCycle_ >= numPktsInLossCycle * lossToleranceParam_;
   numAckedInLossCycle_ = 0;
   numLostInLossCycle_ = 0;
@@ -139,7 +139,7 @@ void Copa2::onPacketLoss(const LossEvent& loss) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
-  DCHECK(loss.largestLostPacketNum.has_value());
+  MVDCHECK(loss.largestLostPacketNum.has_value());
   if (loss.persistentCongestion) {
     MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
                << " cwnd=" << cwndBytes_
@@ -170,7 +170,7 @@ void Copa2::onPacketLoss(const LossEvent& loss) {
 }
 
 void Copa2::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestNewlyAckedPacket.has_value());
+  MVDCHECK(ack.largestNewlyAckedPacket.has_value());
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())

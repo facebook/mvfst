@@ -72,7 +72,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
       msg->msg_iov = &iovec;
       msg->msg_iovlen = 1;
     }
-    CHECK(readBuffer != nullptr);
+    MVCHECK(readBuffer != nullptr);
 
     auto localAddrResult = address();
     if (FOLLY_UNLIKELY(localAddrResult.hasError())) {
@@ -114,7 +114,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
   }
 
   // process msgs (packets) returned by recvmmsg
-  CHECK_LE(numMsgsRecvd, numPackets);
+  MVCHECK_LE(numMsgsRecvd, numPackets);
   for (uint16_t i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
     auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;

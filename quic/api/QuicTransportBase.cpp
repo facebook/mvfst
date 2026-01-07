@@ -561,7 +561,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setDatagramCallback(
 }
 
 uint16_t QuicTransportBase::getDatagramSizeLimit() const {
-  CHECK(conn_);
+  MVCHECK(conn_);
   auto maxDatagramPacketSize = std::min<decltype(conn_->udpSendPacketLen)>(
       conn_->datagramState.maxWriteFrameSize, conn_->udpSendPacketLen);
   return std::max<decltype(maxDatagramPacketSize)>(
@@ -615,7 +615,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
 
 quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>
 QuicTransportBase::readDatagrams(size_t atMost) {
-  CHECK(conn_);
+  MVCHECK(conn_);
   auto datagrams = &conn_->datagramState.readBuffer;
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
@@ -638,7 +638,7 @@ QuicTransportBase::readDatagrams(size_t atMost) {
 
 quic::Expected<std::vector<BufPtr>, LocalErrorCode>
 QuicTransportBase::readDatagramBufs(size_t atMost) {
-  CHECK(conn_);
+  MVCHECK(conn_);
   auto datagrams = &conn_->datagramState.readBuffer;
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
@@ -677,8 +677,8 @@ bool QuicTransportBase::isDetachable() {
 
 void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
   MVVLOG(10) << __func__ << " " << *this;
-  DCHECK(!getEventBase());
-  DCHECK(evbIn && evbIn->isInEventBaseThread());
+  MVDCHECK(!getEventBase());
+  MVDCHECK(evbIn && evbIn->isInEventBaseThread());
   evb_ = std::move(evbIn);
   if (socket_) {
     socket_->attachEventBase(evb_);
@@ -708,7 +708,7 @@ void QuicTransportBase::attachEventBase(std::shared_ptr<QuicEventBase> evbIn) {
 
 void QuicTransportBase::detachEventBase() {
   MVVLOG(10) << __func__ << " " << *this;
-  DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
+  MVDCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   if (socket_) {
     socket_->detachEventBase();
   }
@@ -772,7 +772,7 @@ QuicTransportBase::updateReliableDeliveryCheckpoint(StreamId id) {
     return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream =
-      CHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
+      MVCHECK_NOTNULL(conn_->streamManager->getStream(id).value_or(nullptr));
   if (stream->sendState == StreamSendState::ResetSent) {
     // We already sent a reset, so there's really no reason why we should be
     // doing any more checkpointing, especially since we cannot
@@ -887,7 +887,7 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
       continue;
     }
     auto peekCb = callback->second.peekCb;
-    auto stream = CHECK_NOTNULL(
+    auto stream = MVCHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     if (peekCb && stream->streamReadError) {
       MVVLOG(10) << "invoking peek error callbacks on stream=" << streamId

@@ -55,7 +55,7 @@ quic::Expected<void, QuicError> ServerHandshake::doHandshake(
       appDataReadBuf_.append(std::move(data));
       break;
     default:
-      MVLOG_FATAL << "Unhandled EncryptionLevel";
+      MVCHECK(false, "Unhandled EncryptionLevel");
   }
   processPendingEvents();
   if (error_) {
@@ -104,7 +104,7 @@ ServerHandshake::getNextOneRttWriteCipher() {
     return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
-  CHECK(writeTrafficSecret_);
+  MVCHECK(writeTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
       << "Server read and write secrets are out of sync";
   writeTrafficSecret_ = getNextTrafficSecret(writeTrafficSecret_->coalesce());
@@ -128,7 +128,7 @@ ServerHandshake::getNextOneRttReadCipher() {
     return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
-  CHECK(readTrafficSecret_);
+  MVCHECK(readTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
       << "Server read and write secrets are out of sync";
   readTrafficSecret_ = getNextTrafficSecret(readTrafficSecret_->coalesce());
@@ -254,8 +254,9 @@ void ServerHandshake::onWriteData(fizz::WriteToSocket& write) {
   }
   for (auto& content : write.contents) {
     auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
-    CHECK(encryptionLevel != EncryptionLevel::EarlyData)
-        << "Server cannot write early data";
+    MVCHECK(
+        encryptionLevel != EncryptionLevel::EarlyData,
+        "Server cannot write early data");
     if (content.contentType != fizz::ContentType::handshake) {
       continue;
     }
@@ -322,7 +323,7 @@ void ServerHandshake::processPendingEvents() {
           processSocketData(appDataReadBuf_);
           break;
         default:
-          MVLOG_FATAL << "Unhandled EncryptionLevel";
+          MVCHECK(false, "Unhandled EncryptionLevel");
       }
     } else if (!processPendingCryptoEvent()) {
       actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);
@@ -428,7 +429,7 @@ class ServerHandshake::ActionMoveVisitor {
   }
 
   void operator()(fizz::server::AttemptVersionFallback&) {
-    CHECK(false) << "Fallback Unexpected";
+    MVCHECK(false, "Fallback Unexpected");
   }
 
   void operator()(fizz::EndOfData&) {

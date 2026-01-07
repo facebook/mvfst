@@ -25,8 +25,8 @@ namespace quic {
 LibevQuicAsyncUDPSocket::LibevQuicAsyncUDPSocket(
     std::shared_ptr<LibevQuicEventBase> evb) {
   evb_ = evb;
-  CHECK(evb_) << "EventBase must be QuicLibevEventBase";
-  CHECK(evb_->isInEventBaseThread());
+  MVCHECK(evb_, "EventBase must be QuicLibevEventBase");
+  MVCHECK(evb_->isInEventBaseThread());
 
   ev_init(&readWatcher_, LibevQuicAsyncUDPSocket::sockEventsWatcherCallback);
   readWatcher_.data = this;
@@ -60,10 +60,10 @@ bool LibevQuicAsyncUDPSocket::isReadPaused() const {
 }
 
 void LibevQuicAsyncUDPSocket::resumeRead(ReadCallback* cb) {
-  CHECK(!readCallback_) << "A read callback is already installed";
-  CHECK_NE(fd_, -1)
-      << "Socket must be initialized before a read callback is attached";
-  CHECK(cb) << "A non-null callback is required to resume read";
+  MVCHECK(!readCallback_, "A read callback is already installed");
+  MVCHECK_NE(
+      fd_, -1, "Socket must be initialized before a read callback is attached");
+  MVCHECK(cb, "A non-null callback is required to resume read");
   readCallback_ = cb;
   addEvent(EV_READ);
   // TODO: This should return Expected<Unit, QuicError>
@@ -71,10 +71,12 @@ void LibevQuicAsyncUDPSocket::resumeRead(ReadCallback* cb) {
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::resumeWrite(
     WriteCallback* cob) {
-  CHECK(!writeCallback_) << "A write callback is already installed";
-  CHECK_NE(fd_, -1)
-      << "Socket must be initialized before a write callback is attached";
-  CHECK(cob) << "A non-null callback is required to resume write";
+  MVCHECK(!writeCallback_, "A write callback is already installed");
+  MVCHECK_NE(
+      fd_,
+      -1,
+      "Socket must be initialized before a write callback is attached");
+  MVCHECK(cob, "A non-null callback is required to resume write");
   writeCallback_ = cob;
   addEvent(EV_WRITE);
   return {};
@@ -136,7 +138,7 @@ int LibevQuicAsyncUDPSocket::writem(
     iovec* /*iov*/,
     size_t* /*numIovecsInBuffer*/,
     size_t /*count*/) {
-  MVLOG_FATAL << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
+  MVCHECK(false, __func__ << "is not implemented in LibevQuicAsyncUDPSocket");
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setAdditionalCmsgsFunc(
@@ -170,7 +172,7 @@ const folly::SocketAddress& LibevQuicAsyncUDPSocket::addressRef() const {
 
 void LibevQuicAsyncUDPSocket::attachEventBase(
     std::shared_ptr<QuicEventBase> /* evb */) {
-  MVLOG_FATAL << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
+  MVCHECK(false, __func__ << "is not implemented in LibevQuicAsyncUDPSocket");
 }
 
 [[nodiscard]] std::shared_ptr<QuicEventBase>
@@ -179,7 +181,7 @@ LibevQuicAsyncUDPSocket::getEventBase() const {
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::close() {
-  CHECK(evb_->isInEventBaseThread());
+  MVCHECK(evb_->isInEventBaseThread());
 
   if (readCallback_) {
     auto cob = readCallback_;
@@ -209,7 +211,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::close() {
 }
 
 void LibevQuicAsyncUDPSocket::detachEventBase() {
-  MVLOG_FATAL << __func__ << "is not implemented in LibevQuicAsyncUDPSocket";
+  MVCHECK(false, __func__ << "is not implemented in LibevQuicAsyncUDPSocket");
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::setCmsgs(
@@ -631,8 +633,8 @@ int LibevQuicAsyncUDPSocket::getFD() {
 
 // PRIVATE
 void LibevQuicAsyncUDPSocket::evHandleSocketRead() {
-  CHECK(readCallback_);
-  CHECK(readCallback_->shouldOnlyNotify());
+  MVCHECK(readCallback_);
+  MVCHECK(readCallback_->shouldOnlyNotify());
 
   // Read any errors first. If there are errors, do not notify the read
   // callback.
@@ -653,7 +655,7 @@ void LibevQuicAsyncUDPSocket::evHandleSocketRead() {
 }
 
 void LibevQuicAsyncUDPSocket::evHandleSocketWritable() {
-  CHECK(writeCallback_);
+  MVCHECK(writeCallback_);
   writeCallback_->onSocketWritable();
 }
 
@@ -720,7 +722,7 @@ size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
 }
 
 void LibevQuicAsyncUDPSocket::addEvent(int event) {
-  CHECK(evb_) << "EventBase not initialized";
+  MVCHECK(evb_, "EventBase not initialized");
   if (event & EV_READ) {
     ev_io_start(evb_->getLibevLoop(), &readWatcher_);
   }
@@ -730,7 +732,7 @@ void LibevQuicAsyncUDPSocket::addEvent(int event) {
 }
 
 void LibevQuicAsyncUDPSocket::removeEvent(int event) {
-  CHECK(evb_) << "EventBase not initialized";
+  MVCHECK(evb_, "EventBase not initialized");
 
   if (event & EV_READ) {
     ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
@@ -747,11 +749,13 @@ void LibevQuicAsyncUDPSocket::sockEventsWatcherCallback(
     ev_io* w,
     int events) {
   auto sock = static_cast<LibevQuicAsyncUDPSocket*>(w->data);
-  CHECK(sock)
-      << "Watcher callback does not have a valid LibevQuicAsyncUDPSocket pointer";
-  CHECK(sock->getEventBase()) << "Socket does not have an event base attached";
-  CHECK(sock->getEventBase()->isInEventBaseThread())
-      << "Watcher callback on wrong event base";
+  MVCHECK(
+      sock,
+      "Watcher callback does not have a valid LibevQuicAsyncUDPSocket pointer");
+  MVCHECK(sock->getEventBase(), "Socket does not have an event base attached");
+  MVCHECK(
+      sock->getEventBase()->isInEventBaseThread(),
+      "Watcher callback on wrong event base");
   if (events & EV_READ) {
     sock->evHandleSocketRead();
   }

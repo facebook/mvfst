@@ -30,7 +30,7 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
   // Either the packet has never been cloned before, or it's
   // maybeClonedPacketIdentifier is still in the
   // outstandings.clonedPacketIdentifiers set.
-  DCHECK(
+  MVDCHECK(
       !packet.maybeClonedPacketIdentifier ||
       conn_.outstandings.clonedPacketIdentifiers.count(
           *packet.maybeClonedPacketIdentifier));
@@ -38,7 +38,7 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
     auto packetNum = packet.packet.header.getPacketSequenceNum();
     auto packetNumberSpace = packet.packet.header.getPacketNumberSpace();
     ClonedPacketIdentifier event(packetNumberSpace, packetNum);
-    DCHECK(!conn_.outstandings.clonedPacketIdentifiers.contains(event));
+    MVDCHECK(!conn_.outstandings.clonedPacketIdentifiers.contains(event));
     packet.maybeClonedPacketIdentifier = event;
     conn_.outstandings.clonedPacketIdentifiers.insert(event);
     ++conn_.outstandings
@@ -123,7 +123,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
           if (ret) {
             // Writing 0 byte for stream data is legit if the stream frame has
             // FIN. That's checked in writeStreamFrameHeader.
-            CHECK(streamData || streamFrame.fin);
+            MVCHECK(streamData || streamFrame.fin);
             if (streamData) {
               writeStreamFrameData(builder_, *streamData, *dataLen);
             }
@@ -308,17 +308,19 @@ const ChainedByteRangeHead* PacketRebuilder::cloneCryptoRetransmissionBuffer(
    * They have to be covered by making sure we do not clone an already acked or
    * lost packet.
    */
-  DCHECK(frame.len) << "WriteCryptoFrame cloning: frame is empty. " << conn_;
+  MVDCHECK(frame.len, "WriteCryptoFrame cloning: frame is empty. " << conn_);
   auto iter = stream.retransmissionBuffer.find(frame.offset);
 
   // If the crypto stream is canceled somehow, just skip cloning this frame
   if (iter == stream.retransmissionBuffer.end()) {
     return nullptr;
   }
-  DCHECK(iter->second->offset == frame.offset)
-      << "WriteCryptoFrame cloning: offset mismatch. " << conn_;
-  DCHECK(iter->second->data.chainLength() == frame.len)
-      << "WriteCryptoFrame cloning: Len mismatch. " << conn_;
+  MVDCHECK(
+      iter->second->offset == frame.offset,
+      "WriteCryptoFrame cloning: offset mismatch. " << conn_);
+  MVDCHECK(
+      iter->second->data.chainLength() == frame.len,
+      "WriteCryptoFrame cloning: Len mismatch. " << conn_);
   return &(iter->second->data);
 }
 
@@ -335,13 +337,14 @@ const ChainedByteRangeHead* PacketRebuilder::cloneRetransmissionBuffer(
    * have to be covered by making sure we do not clone an already acked, lost or
    * skipped packet.
    */
-  DCHECK(stream);
-  DCHECK(retransmittable(*stream));
+  MVDCHECK(stream);
+  MVDCHECK(retransmittable(*stream));
   auto iter = stream->retransmissionBuffer.find(frame.offset);
   if (iter != stream->retransmissionBuffer.end()) {
-    DCHECK(!frame.len || !iter->second->data.empty())
-        << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
-        << " empty data. " << conn_;
+    MVDCHECK(
+        !frame.len || !iter->second->data.empty(),
+        "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
+            << " empty data. " << conn_);
     return frame.len ? &(iter->second->data) : nullptr;
   }
   return nullptr;

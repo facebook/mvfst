@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/ChainedByteRange.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -29,7 +30,7 @@ ChainedByteRangeHead::ChainedByteRangeHead(const BufPtr& buf) {
     it++;
   }
 
-  CHECK(it != buf->end());
+  MVCHECK(it != buf->end());
   head_.range_ = *it++;
   chainLength_ += head_.range_.size();
 
@@ -69,7 +70,7 @@ void ChainedByteRangeHead::append(const BufPtr& buf) {
     it++;
   }
 
-  CHECK(it != buf->end());
+  MVCHECK(it != buf->end());
   // We know that *it is non-empty at this point because of the initial
   // check that the chain is non-empty.
   if (head_.range_.empty()) {

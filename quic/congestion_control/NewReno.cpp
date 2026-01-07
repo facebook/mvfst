@@ -74,7 +74,8 @@ void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
-  DCHECK(ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
+  MVDCHECK(
+      ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
   MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
              << " cwnd=" << cwndBytes_
              << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
@@ -144,7 +145,7 @@ void NewReno::onPacketAckOrLoss(
 }
 
 void NewReno::onPacketLoss(const LossEvent& loss) {
-  DCHECK(
+  MVDCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());
   if (!endOfRecovery_ || *endOfRecovery_ < *loss.largestLostSentTime) {

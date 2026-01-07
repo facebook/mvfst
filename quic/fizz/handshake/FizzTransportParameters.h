@@ -9,6 +9,7 @@
 
 #include <fizz/record/Extensions.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/folly_utils/Utils.h>
 #include <quic/handshake/TransportParameters.h>
 
@@ -81,7 +82,7 @@ inline void decodeVarintParams(
       throw std::runtime_error("Not enough bytes to read transport parameter");
     }
     BufPtr val = BufHelpers::create(len.value().first);
-    CHECK(cursor.tryPull(val->writableData(), len.value().first));
+    MVCHECK(cursor.tryPull(val->writableData(), len.value().first));
     val->append(len.value().first);
     parameters.emplace_back(
         static_cast<TransportParameterId>(id.value().first), std::move(val));

@@ -266,6 +266,7 @@ mvfst_cpp_library(
     deps = [
         ":state_functions",
         "//quic:constants",
+        "//quic/common:mvfst_logging",
         "//quic/state/stream:stream",
     ],
     exported_deps = [
@@ -313,6 +314,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:map_util",
+        "//quic/common:mvfst_logging",
     ],
     exported_deps = [
         ":outstanding_packet",
@@ -331,6 +333,7 @@ mvfst_cpp_library(
         "QuicAckFrequencyFunctions.h",
     ],
     deps = [
+        "//quic/common:mvfst_logging",
         "//quic/common:time_util",
     ],
     exported_deps = [

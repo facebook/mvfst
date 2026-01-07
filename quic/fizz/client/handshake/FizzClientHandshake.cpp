@@ -29,7 +29,7 @@ FizzClientHandshake::FizzClientHandshake(
     : ClientHandshake(conn),
       cryptoFactory_(std::move(cryptoFactory)),
       fizzContext_(std::move(fizzContext)) {
-  CHECK(cryptoFactory_->getFizzFactory());
+  MVCHECK(cryptoFactory_->getFizzFactory());
 }
 
 quic::Expected<Optional<CachedServerTransportParameters>, QuicError>
@@ -270,8 +270,8 @@ quic::Expected<BufPtr, QuicError> FizzClientHandshake::getNextTrafficSecret(
 void FizzClientHandshake::onNewCachedPsk(
     fizz::client::NewCachedPsk& newCachedPsk) noexcept {
   QuicClientConnectionState* conn = getClientConn();
-  DCHECK(conn->version.has_value());
-  DCHECK(conn->serverInitialParamsSet_);
+  MVDCHECK(conn->version.has_value());
+  MVDCHECK(conn->serverInitialParamsSet_);
 
   QuicCachedPsk quicCachedPsk;
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);

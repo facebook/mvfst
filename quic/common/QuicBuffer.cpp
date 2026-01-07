@@ -90,7 +90,7 @@ std::unique_ptr<QuicBuffer> QuicBuffer::takeOwnership(
     void* userData) {
   // If userData is provided without a freeFn, match IOBuf semantics by using
   // free(). However, in folly::IOBuf this is DCHECKed; we will DCHECK as well.
-  DCHECK(!userData || (userData && freeFn));
+  MVDCHECK(!userData || (userData && freeFn));
 
   // Build a shared_ptr that owns the buffer and will free it appropriately.
   std::shared_ptr<uint8_t[]> shared{
@@ -180,8 +180,8 @@ void QuicBuffer::appendChain(std::unique_ptr<QuicBuffer>&& quicBuffer) {
 std::unique_ptr<QuicBuffer> QuicBuffer::separateChain(
     QuicBuffer* head,
     QuicBuffer* tail) {
-  CHECK_NE(head, this);
-  CHECK_NE(tail, this);
+  MVCHECK_NE(head, this);
+  MVCHECK_NE(tail, this);
 
   head->prev_->next_ = tail->next_;
   tail->next_->prev_ = head->prev_;
@@ -193,8 +193,8 @@ std::unique_ptr<QuicBuffer> QuicBuffer::separateChain(
 }
 
 void QuicBuffer::advance(std::size_t amount) noexcept {
-  CHECK_LE(amount, tailroom())
-      << "Not enough room to advance data in QuicBuffer";
+  MVCHECK_LE(
+      amount, tailroom(), "Not enough room to advance data in QuicBuffer");
   if (length_ > 0) {
     memmove(data_ + amount, data_, length_);
   }
@@ -202,8 +202,8 @@ void QuicBuffer::advance(std::size_t amount) noexcept {
 }
 
 void QuicBuffer::retreat(std::size_t amount) noexcept {
-  CHECK_LE(amount, headroom())
-      << "Not enough room to retreat data in QuicBuffer";
+  MVCHECK_LE(
+      amount, headroom(), "Not enough room to retreat data in QuicBuffer");
   if (length_ > 0) {
     memmove(data_ - amount, data_, length_);
   }
@@ -211,8 +211,8 @@ void QuicBuffer::retreat(std::size_t amount) noexcept {
 }
 
 void QuicBuffer::prepend(std::size_t amount) noexcept {
-  CHECK_LE(amount, headroom())
-      << "Not enough room to prepend data in QuicBuffer";
+  MVCHECK_LE(
+      amount, headroom(), "Not enough room to prepend data in QuicBuffer");
   data_ -= amount;
   length_ += amount;
 }
@@ -351,13 +351,13 @@ bool QuicBuffer::empty() const noexcept {
 }
 
 void QuicBuffer::trimStart(std::size_t amount) noexcept {
-  DCHECK_LE(amount, length_);
+  MVDCHECK_LE(amount, length_);
   data_ += amount;
   length_ -= amount;
 }
 
 void QuicBuffer::trimEnd(std::size_t amount) noexcept {
-  DCHECK_LE(amount, length_);
+  MVDCHECK_LE(amount, length_);
   length_ -= amount;
 }
 
@@ -379,15 +379,15 @@ void QuicBuffer::coalesceAndReallocate(
   size_t remaining = newLength;
   do {
     if (current->length_ > 0) {
-      CHECK_LE(current->length_, remaining);
-      CHECK(current->data_ != nullptr);
+      MVCHECK_LE(current->length_, remaining);
+      MVCHECK(current->data_ != nullptr);
       remaining -= current->length_;
       memcpy(p, current->data_, current->length_);
       p += current->length_;
     }
     current = current->next_;
   } while (current != end);
-  CHECK_EQ(remaining, 0);
+  MVCHECK_EQ(remaining, 0);
 
   capacity_ = newCapacity;
   buf_ = newSharedBuffer.get();
@@ -444,7 +444,7 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
   while (aCurrent->length() == 0) {
     aCurrent = aCurrent->next();
     if (aCurrent == a) {
-      MVLOG_FATAL << "Unreachable, we checked aLength != 0";
+      MVCHECK(false, "Unreachable, we checked aLength != 0");
     }
   }
 
@@ -452,8 +452,7 @@ bool QuicBufferEqualTo::operator()(const QuicBuffer* a, const QuicBuffer* b)
     bCurrent = bCurrent->next();
     if (bCurrent == b) {
       // All buffers in other chain are empty
-      MVLOG_FATAL << "Unreachable, since aLength == bLength and "
-                  << "aLength != 0";
+      MVCHECK(false, "Unreachable, since aLength == bLength and aLength != 0");
     }
   }
 

@@ -22,7 +22,7 @@ using namespace std;
 
 namespace quic {
 
-QuicConnector::QuicConnector(Callback* cb) : cb_(CHECK_NOTNULL(cb)) {}
+QuicConnector::QuicConnector(Callback* cb) : cb_(MVCHECK_NOTNULL(cb)) {}
 
 void QuicConnector::onConnectionSetupError(QuicError code) noexcept {
   if (cb_) {
@@ -33,7 +33,7 @@ void QuicConnector::onConnectionSetupError(QuicError code) noexcept {
 
 void QuicConnector::onReplaySafe() noexcept {
   if (cb_) {
-    CHECK(quicClient_);
+    MVCHECK(quicClient_);
     cb_->onConnectSuccess(*quicClient_);
   }
   cancelTimerCallback();

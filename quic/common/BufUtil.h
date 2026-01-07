@@ -10,6 +10,7 @@
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/ChainedByteRange.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -144,9 +145,10 @@ class BufWriter {
   // should let BufWriter check the size and return error code if it fails to
   // write.
   void sizeCheck(size_t dataSize) {
-    CHECK(written_ + dataSize <= most_)
-        << "BufWriter overflow: written=" << written_
-        << " attempting=" << dataSize << " limit=" << most_;
+    MVCHECK(
+        written_ + dataSize <= most_,
+        "BufWriter overflow: written=" << written_ << " attempting=" << dataSize
+                                       << " limit=" << most_);
   }
 
   void copy(const Buf* data, size_t limit);

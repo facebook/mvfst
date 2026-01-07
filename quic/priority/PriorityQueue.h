@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <glog/logging.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/Optional.h>
 #include <array>
 #include <vector>
@@ -62,7 +62,7 @@ class PriorityQueue {
     Identifier() = default;
 
     static Identifier fromStreamID(uint64_t streamID) {
-      CHECK_LT(streamID, 1LLU << 62);
+      MVCHECK_LT(streamID, 1LLU << 62);
       return Identifier(streamID);
     }
 
@@ -87,12 +87,12 @@ class PriorityQueue {
     }
 
     [[nodiscard]] uint64_t asStreamID() const {
-      CHECK(isStreamID());
+      MVCHECK(isStreamID());
       return value & ~kTypeMask;
     }
 
     [[nodiscard]] uint32_t asDatagramFlowID() const {
-      CHECK(isDatagramFlowID());
+      MVCHECK(isDatagramFlowID());
       return uint32_t(value); // truncating the top works
     }
 

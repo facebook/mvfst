@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/server/async_tran/QuicAsyncTransportAcceptor.h>
 #include <quic/server/async_tran/QuicServerAsyncTransport.h>
 
@@ -42,7 +43,7 @@ class ServerTransportConnectionSetupCallback
     // create wrapper to set as new ConnectionCallback
     auto asyncWrapper =
         QuicServerAsyncTransport::UniquePtr(new QuicServerAsyncTransport());
-    CHECK(transport_);
+    MVCHECK(transport_);
     transport_->setConnectionCallback(asyncWrapper.get());
     asyncWrapper->setServerSocket(transport_);
     // no longer interested in connection setup callback events
@@ -55,24 +56,24 @@ class ServerTransportConnectionSetupCallback
   // no-op mandatory ConnectionCallback overrides (to be removed when task is
   // fixed) which will never be executed
   void onNewBidirectionalStream(StreamId /*id*/) noexcept override {
-    CHECK(false);
+    MVCHECK(false);
   }
 
   void onNewUnidirectionalStream(StreamId /*id*/) noexcept override {
-    CHECK(false);
+    MVCHECK(false);
   }
 
   void onStopSending(StreamId /*id*/, ApplicationErrorCode /*error*/) noexcept
       override {
-    CHECK(false);
+    MVCHECK(false);
   }
 
   void onConnectionEnd() noexcept override {
-    CHECK(false);
+    MVCHECK(false);
   }
 
   void onConnectionError(QuicError /*code*/) noexcept override {
-    CHECK(false);
+    MVCHECK(false);
   }
 
   AsyncTransportHook* hook_{nullptr};
@@ -93,10 +94,10 @@ quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
     const folly::SocketAddress&,
     QuicVersion,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
-  CHECK_EQ(evb, evb_);
+  MVCHECK_EQ(evb, evb_);
 
   // wait for onTransportReady before invoking asyncTransportHook_
-  auto* connSetupCallback = CHECK_NOTNULL(
+  auto* connSetupCallback = MVCHECK_NOTNULL(
       std::make_unique<ServerTransportConnectionSetupCallback>(
           &asyncTransportHook_)
           .release());

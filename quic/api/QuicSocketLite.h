@@ -13,6 +13,7 @@
 #include <quic/api/QuicCallbacks.h>
 #include <quic/api/TransportInfo.h>
 #include <quic/codec/Types.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/handshake/TransportParameters.h>
@@ -345,13 +346,13 @@ class QuicSocketLite {
     }
 
     void onByteEvent(ByteEvent byteEvent) final {
-      CHECK_EQ((int)ByteEvent::Type::ACK, (int)byteEvent.type); // sanity
+      MVCHECK_EQ((int)ByteEvent::Type::ACK, (int)byteEvent.type); // sanity
       onDeliveryAck(byteEvent.id, byteEvent.offset, byteEvent.srtt);
     }
 
     // Temporary shim during transition to ByteEvent
     void onByteEventCanceled(ByteEventCancellation cancellation) final {
-      CHECK_EQ((int)ByteEvent::Type::ACK, (int)cancellation.type); // sanity
+      MVCHECK_EQ((int)ByteEvent::Type::ACK, (int)cancellation.type); // sanity
       onCanceled(cancellation.id, cancellation.offset);
     }
   };

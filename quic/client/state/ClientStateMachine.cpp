@@ -102,26 +102,25 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   if (currentPath) {
     auto pathIdRes = newConn->pathManager->addValidatedPath(
         currentPath->localAddress, currentPath->peerAddress);
-    if (pathIdRes.hasError()) {
-      MVLOG_FATAL << "error adding validated path to a retry connection. "
-                  << toString(pathIdRes.error());
-    }
+    MVCHECK(
+        !pathIdRes.hasError(),
+        "error adding validated path to a retry connection. "
+            << toString(pathIdRes.error()));
     newConn->currentPathId = pathIdRes.value();
     if (newConn->serverConnectionId.has_value()) {
       auto setCidRes = newConn->pathManager->setDestinationCidForPath(
           newConn->currentPathId, newConn->serverConnectionId.value());
-      if (setCidRes.hasError()) {
-        MVLOG_FATAL
-            << "error setting destination connection id in a retry connection. "
-            << toString(setCidRes.error());
-      }
+      MVCHECK(
+          !setCidRes.hasError(),
+          "error setting destination connection id in a retry connection. "
+              << toString(setCidRes.error()));
     }
   }
 
   auto result = markZeroRttPacketsLost(*newConn, markPacketLoss);
-  if (result.hasError()) {
-    MVLOG_FATAL << "error marking packets lost. " << toString(result.error());
-  }
+  MVCHECK(
+      !result.hasError(),
+      "error marking packets lost. " << toString(result.error()));
 
   return newConn;
 }
@@ -487,7 +486,7 @@ void cacheServerInitialParams(
 
 CachedServerTransportParameters getServerCachedTransportParameters(
     const QuicClientConnectionState& conn) {
-  DCHECK(conn.serverInitialParamsSet_);
+  MVDCHECK(conn.serverInitialParamsSet_);
 
   CachedServerTransportParameters transportParams;
 

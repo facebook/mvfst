@@ -64,8 +64,10 @@ XskSender* ThreadLocalXskContainer::pickXsk(
 }
 
 void ThreadLocalXskContainer::setOwnerForXsk() {
-  CHECK_LT(ownerIdToAssign_, xskSenders_.size())
-      << "Trying to assign more owners than AF_XDP sockets available";
+  MVCHECK_LT(
+      ownerIdToAssign_,
+      xskSenders_.size(),
+      "Trying to assign more owners than AF_XDP sockets available");
   xskSender_.reset(
       xskSenders_.at(ownerIdToAssign_++).get(),
       [](auto /* xskSender */, folly::TLPDestructionMode) {});

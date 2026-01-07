@@ -38,7 +38,7 @@ template <>
 struct Writer<folly::IPAddress> {
   template <class T>
   void write(const folly::IPAddress& ipAddress, folly::io::Appender& out) {
-    DCHECK(!ipAddress.empty());
+    MVDCHECK(!ipAddress.empty());
     auto buf =
         folly::IOBuf::wrapBuffer(ipAddress.bytes(), ipAddress.byteCount());
     writeBuf<uint8_t>(buf, out);

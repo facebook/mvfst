@@ -8,6 +8,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":socket_observer_interface",
         "//folly:observer_container",
+        "//quic/common:mvfst_logging",
     ],
 )
 
@@ -28,6 +29,7 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:iphoneos": ["facebook/SocketObserverInterfaceMobile.cpp"],
     }),
     headers = ["SocketObserverInterface.h"],
+    deps = ["//quic/common:mvfst_logging"],
     exported_deps = [
         "//quic:exception",
         "//quic/state:ack_event",

@@ -6,12 +6,13 @@
  */
 
 #include <quic/common/BufAccessor.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
 BufAccessor::BufAccessor(BufPtr buf)
     : buf_(std::move(buf)), capacity_(buf_->capacity()) {
-  CHECK(!buf_->isShared() && !buf_->isChained());
+  MVCHECK(!buf_->isShared() && !buf_->isChained());
 }
 
 BufAccessor::BufAccessor(size_t capacity)
@@ -28,12 +29,14 @@ BufPtr& BufAccessor::buf() {
 }
 
 void BufAccessor::release(BufPtr buf) {
-  CHECK(!buf_) << "Can't override existing buf";
-  CHECK(buf) << "Invalid BufPtr being released";
-  CHECK_GE(buf->capacity(), capacity_)
-      << "BufPtr has wrong capacity, capacit_=" << capacity_
-      << ", buf capacity=" << buf->capacity();
-  CHECK(!buf->isChained()) << "Reject chained buf";
+  MVCHECK(!buf_, "Can't override existing buf");
+  MVCHECK(buf, "Invalid BufPtr being released");
+  MVCHECK_GE(
+      buf->capacity(),
+      capacity_,
+      "BufPtr has wrong capacity, capacit_=" << capacity_ << ", buf capacity="
+                                             << buf->capacity());
+  MVCHECK(!buf->isChained(), "Reject chained buf");
   buf_ = std::move(buf);
 }
 

@@ -142,6 +142,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly/experimental/symbolizer:symbolizer",
+        "//quic/common:mvfst_logging",
     ],
     exported_deps = [
         "//quic/api:stream_async_transport",

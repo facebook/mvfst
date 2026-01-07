@@ -42,7 +42,7 @@ class EnumArray : public std::array<V, size_t(K::MAX) + 1> {
  private:
   constexpr IntType keyToInt(K key) const {
     auto ik = static_cast<IntType>(key);
-    DCHECK(ik >= 0 && ik < ArraySize);
+    MVDCHECK(ik >= 0 && ik < ArraySize);
     return ik;
   }
 

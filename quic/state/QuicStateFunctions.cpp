@@ -110,7 +110,7 @@ void updateAckSendStateOnRecvPacket(
     bool pktHasRetransmittableData,
     bool pktHasCryptoData,
     bool initPktNumSpace) {
-  DCHECK(!pktHasCryptoData || pktHasRetransmittableData);
+  MVDCHECK(!pktHasCryptoData || pktHasRetransmittableData);
   auto thresh = kNonRtxRxPacketsPendingBeforeAck;
   if (pktHasRetransmittableData || ackState.numRxPacketsRecvd) {
     if (ackState.tolerance.has_value()) {
@@ -206,9 +206,9 @@ AckState& getAckState(
     PacketNumberSpace pnSpace) noexcept {
   switch (pnSpace) {
     case PacketNumberSpace::Initial:
-      return *CHECK_NOTNULL(conn.ackStates.initialAckState.get());
+      return *MVCHECK_NOTNULL(conn.ackStates.initialAckState.get());
     case PacketNumberSpace::Handshake:
-      return *CHECK_NOTNULL(conn.ackStates.handshakeAckState.get());
+      return *MVCHECK_NOTNULL(conn.ackStates.handshakeAckState.get());
     case PacketNumberSpace::AppData:
       return conn.ackStates.appDataAckState;
   }
@@ -220,9 +220,9 @@ const AckState& getAckState(
     PacketNumberSpace pnSpace) noexcept {
   switch (pnSpace) {
     case PacketNumberSpace::Initial:
-      return *CHECK_NOTNULL(conn.ackStates.initialAckState.get());
+      return *MVCHECK_NOTNULL(conn.ackStates.initialAckState.get());
     case PacketNumberSpace::Handshake:
-      return *CHECK_NOTNULL(conn.ackStates.handshakeAckState.get());
+      return *MVCHECK_NOTNULL(conn.ackStates.handshakeAckState.get());
     case PacketNumberSpace::AppData:
       return conn.ackStates.appDataAckState;
   }

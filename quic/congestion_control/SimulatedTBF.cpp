@@ -6,6 +6,7 @@
  */
 
 #include <quic/QuicException.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/SimulatedTBF.h>
 #include <chrono>
 
@@ -31,7 +32,7 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 
   if (config_.trackEmptyIntervals) {
     auto& emptyIntervalState = getEmptyIntervalState();
-    DCHECK(
+    MVDCHECK(
         !emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.has_value() ||
         sendTime >=
             emptyIntervalState.maybeLastSendTimeBucketNotEmpty_.value());
@@ -57,10 +58,10 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
 
   // If the amount of debt is limited, check if we can consume.
   if (config_.maybeMaxDebtQueueSizeBytes.has_value()) {
-    DCHECK(config_.maybeMaxDebtQueueSizeBytes.value() >= 0);
+    MVDCHECK(config_.maybeMaxDebtQueueSizeBytes.value() >= 0);
     auto currDebtQueueSizeBytes = std::max(
         0.0, (zeroTime_ - sendTimeDouble) * config_.rateBytesPerSecond);
-    DCHECK(
+    MVDCHECK(
         currDebtQueueSizeBytes <= config_.maybeMaxDebtQueueSizeBytes.value());
 
     if (toConsume > numTokensAvailable +
@@ -77,7 +78,7 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
       config_.rateBytesPerSecond,
       config_.burstSizeBytes,
       sendTimeDouble);
-  DCHECK(maybeDebtPayOffTimeDouble.has_value());
+  MVDCHECK(maybeDebtPayOffTimeDouble.has_value());
   if (maybeDebtPayOffTimeDouble.value() > 0) {
     // Bucket is in debt now after consuming toConsume tokens
     const auto debtPayOffTimeUs =
@@ -87,8 +88,8 @@ double SimulatedTBF::consumeWithBorrowNonBlockingAndUpdateState(
     // Since we're now in debt, update empty intervals if tracking
     if (config_.trackEmptyIntervals) {
       auto& emptyIntervalState = getEmptyIntervalState();
-      DCHECK(emptyIntervalState.maybeLastSendTimeBucketNotEmpty_
-                 .has_value()); // assuming burst size > 0
+      MVDCHECK(emptyIntervalState.maybeLastSendTimeBucketNotEmpty_
+                   .has_value()); // assuming burst size > 0
       // Check if the previous packets with the same send time were sent when
       // bucket had some tokens. In that case, skip.
       if (sendTime !=
@@ -206,7 +207,7 @@ SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState() {
         "Empty interval tracking not enabled",
         LocalErrorCode::INVALID_OPERATION);
   }
-  CHECK(maybeEmptyIntervalState_.has_value());
+  MVCHECK(maybeEmptyIntervalState_.has_value());
   return maybeEmptyIntervalState_.value();
 }
 
@@ -217,7 +218,7 @@ const SimulatedTBF::EmptyIntervalState& SimulatedTBF::getEmptyIntervalState()
         "Empty interval tracking not enabled",
         LocalErrorCode::INVALID_OPERATION);
   }
-  CHECK(maybeEmptyIntervalState_.has_value());
+  MVCHECK(maybeEmptyIntervalState_.has_value());
   return maybeEmptyIntervalState_.value();
 }
 

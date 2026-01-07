@@ -58,7 +58,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       const struct iovec* /* vec */,
       size_t /* iovec_len */,
       WriteOptions /*options*/) override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+    MVCHECK(false, __func__ << " not supported in LibevQuicAsyncUDPSocket");
   }
 
   /**
@@ -75,7 +75,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       const BufPtr* /*bufs*/,
       size_t /*count*/,
       const WriteOptions* /*options*/) override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+    MVCHECK(false, __func__ << " not supported in LibevQuicAsyncUDPSocket");
   }
 
   int writemGSO(
@@ -84,7 +84,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       size_t* /* numIovecsInBuffer */,
       size_t /* count */,
       const WriteOptions* /* options */) override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicAsyncUDPSocket";
+    MVCHECK(false, __func__ << " not supported in LibevQuicAsyncUDPSocket");
   }
 
   ssize_t recvmsg(struct msghdr* msg, int flags) override;
@@ -196,7 +196,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    * Set reuse port mode to call bind() on the same address multiple times
    */
   quic::Expected<void, QuicError> setReusePort(bool) override {
-    MVLOG_FATAL << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+    MVCHECK(false, __func__ << " not implemented in LibevQuicAsyncUDPSocket");
     // Return success as it's just a warning, or error if strictness needed
     return {};
   }

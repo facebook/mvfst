@@ -6,6 +6,7 @@
  */
 
 #include <quic/codec/QuicHeaderCodec.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/codec/Decode.h>
 
@@ -15,7 +16,7 @@ ParsedHeaderResult::ParsedHeaderResult(
     Optional<PacketHeader> parsedHeaderIn)
     : isVersionNegotiation(isVersionNegotiationIn),
       parsedHeader(std::move(parsedHeaderIn)) {
-  CHECK(isVersionNegotiation || parsedHeader);
+  MVCHECK(isVersionNegotiation || parsedHeader);
 }
 
 quic::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
@@ -35,7 +36,7 @@ quic::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
       return ParsedHeaderResult(true, std::nullopt);
     }
     // We compensate for the type byte length by adding it back.
-    DCHECK(parsedLongHeaderResult.parsedLongHeader);
+    MVDCHECK(parsedLongHeaderResult.parsedLongHeader);
     return ParsedHeaderResult(
         false,
         PacketHeader(

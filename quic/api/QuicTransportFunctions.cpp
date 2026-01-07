@@ -317,13 +317,13 @@ continuousMemoryBuildScheduleEncrypt(
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   pktBuilder.accountForCipherOverhead(cipherOverhead);
-  CHECK(scheduler.hasData());
+  MVCHECK(scheduler.hasData());
   auto result =
       scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
   if (!result.has_value()) {
     return quic::make_unexpected(result.error());
   }
-  CHECK(connection.bufAccessor->ownsBuffer());
+  MVCHECK(connection.bufAccessor->ownsBuffer());
   auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
     rollbackBuf();
@@ -350,12 +350,12 @@ continuousMemoryBuildScheduleEncrypt(
     }
     return DataPathResult::makeBuildFailure();
   }
-  CHECK(!packet->header.isChained());
+  MVCHECK(!packet->header.isChained());
   auto headerLen = packet->header.length();
-  CHECK(
+  MVCHECK(
       packet->body.data() > connection.bufAccessor->data() &&
       packet->body.tail() <= connection.bufAccessor->tail());
-  CHECK(
+  MVCHECK(
       packet->header.data() >= connection.bufAccessor->data() &&
       packet->header.tail() < connection.bufAccessor->tail());
   // Trim off everything before the current packet, and the header length, so
@@ -369,7 +369,7 @@ continuousMemoryBuildScheduleEncrypt(
     return quic::make_unexpected(encryptResult.error());
   }
   auto packetBuf = std::move(encryptResult.value());
-  CHECK(packetBuf->headroom() == headerLen + prevSize);
+  MVCHECK(packetBuf->headroom() == headerLen + prevSize);
   // Include header back.
   packetBuf->prepend(headerLen);
 
@@ -387,7 +387,7 @@ continuousMemoryBuildScheduleEncrypt(
   if (!headerEncryptResult.has_value()) {
     return quic::make_unexpected(headerEncryptResult.error());
   }
-  CHECK(!packetBuf->isChained());
+  MVCHECK(!packetBuf->isChained());
   auto encodedSize = packetBuf->length();
   auto encodedBodySize = encodedSize - headerLen;
   // Include previous packets back.
@@ -447,8 +447,10 @@ iobufChainBasedBuildScheduleEncrypt(
     uint64_t sconeSize = preBuildSconePacket->computeChainDataLength();
 
     // SCONE packets are small; there should always be enough space
-    CHECK_GT(adjustedMaxPacketSize, sconeSize)
-        << "Insufficient space for SCONE packet";
+    MVCHECK_GT(
+        adjustedMaxPacketSize,
+        sconeSize,
+        "Insufficient space for SCONE packet");
     adjustedMaxPacketSize -= sconeSize;
     VLOG(4) << "SCONE: Reserved " << sconeSize
             << " bytes, adjusted max packet size to " << adjustedMaxPacketSize;
@@ -458,7 +460,7 @@ iobufChainBasedBuildScheduleEncrypt(
       adjustedMaxPacketSize,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
-  CHECK_EQ(pktBuilder.remainingSpaceInPkt(), adjustedMaxPacketSize);
+  MVCHECK_EQ(pktBuilder.remainingSpaceInPkt(), adjustedMaxPacketSize);
   // It's the scheduler's job to invoke encode header
   pktBuilder.accountForCipherOverhead(cipherOverhead);
   auto result =
@@ -498,7 +500,7 @@ iobufChainBasedBuildScheduleEncrypt(
       headerLen + bodyLen + aead.getCipherOverhead());
   auto bodyCursor =
       ContiguousReadCursor(packet->body.data(), packet->body.length());
-  CHECK(bodyCursor.tryPull(unencrypted->writableData() + headerLen, bodyLen));
+  MVCHECK(bodyCursor.tryPull(unencrypted->writableData() + headerLen, bodyLen));
   unencrypted->advance(headerLen);
   unencrypted->append(bodyLen);
   auto encryptResult =
@@ -507,11 +509,11 @@ iobufChainBasedBuildScheduleEncrypt(
     return quic::make_unexpected(encryptResult.error());
   }
   auto packetBuf = std::move(encryptResult.value());
-  DCHECK(packetBuf->headroom() == headerLen);
+  MVDCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
   auto headerCursor =
       ContiguousReadCursor(packet->header.data(), packet->header.length());
-  CHECK(headerCursor.tryPull(packetBuf->writableData(), headerLen));
+  MVCHECK(headerCursor.tryPull(packetBuf->writableData(), headerLen));
   packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
 
   HeaderForm headerForm = packet->packet.header.getHeaderForm();
@@ -588,18 +590,18 @@ void handleNewStreamDataWritten(
   stream.currentWriteOffset += frameLen;
   ChainedByteRangeHead bufWritten(
       stream.pendingWrites.splitAtMost(static_cast<size_t>(frameLen)));
-  DCHECK_EQ(bufWritten.chainLength(), frameLen);
+  MVDCHECK_EQ(bufWritten.chainLength(), frameLen);
   // TODO: If we want to be able to write FIN out of order for DSR-ed streams,
   // this needs to be fixed:
   stream.currentWriteOffset += frameFin ? 1 : 0;
-  CHECK(stream.retransmissionBuffer
-            .emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(originalOffset),
-                std::forward_as_tuple(
-                    std::make_unique<WriteStreamBuffer>(
-                        std::move(bufWritten), originalOffset, frameFin)))
-            .second);
+  MVCHECK(stream.retransmissionBuffer
+              .emplace(
+                  std::piecewise_construct,
+                  std::forward_as_tuple(originalOffset),
+                  std::forward_as_tuple(
+                      std::make_unique<WriteStreamBuffer>(
+                          std::move(bufWritten), originalOffset, frameFin)))
+              .second);
 }
 
 void handleRetransmissionWritten(
@@ -613,25 +615,25 @@ void handleRetransmissionWritten(
     // The buffer is entirely retransmitted
     ChainedByteRangeHead bufWritten(std::move(lossBufferIter->data));
     stream.lossBuffer.erase(lossBufferIter);
-    CHECK(stream.retransmissionBuffer
-              .emplace(
-                  std::piecewise_construct,
-                  std::forward_as_tuple(frameOffset),
-                  std::forward_as_tuple(
-                      std::make_unique<WriteStreamBuffer>(
-                          std::move(bufWritten), frameOffset, frameFin)))
-              .second);
+    MVCHECK(stream.retransmissionBuffer
+                .emplace(
+                    std::piecewise_construct,
+                    std::forward_as_tuple(frameOffset),
+                    std::forward_as_tuple(
+                        std::make_unique<WriteStreamBuffer>(
+                            std::move(bufWritten), frameOffset, frameFin)))
+                .second);
   } else {
     lossBufferIter->offset += frameLen;
     ChainedByteRangeHead bufWritten(lossBufferIter->data.splitAtMost(frameLen));
-    CHECK(stream.retransmissionBuffer
-              .emplace(
-                  std::piecewise_construct,
-                  std::forward_as_tuple(frameOffset),
-                  std::forward_as_tuple(
-                      std::make_unique<WriteStreamBuffer>(
-                          std::move(bufWritten), frameOffset, frameFin)))
-              .second);
+    MVCHECK(stream.retransmissionBuffer
+                .emplace(
+                    std::piecewise_construct,
+                    std::forward_as_tuple(frameOffset),
+                    std::forward_as_tuple(
+                        std::make_unique<WriteStreamBuffer>(
+                            std::move(bufWritten), frameOffset, frameFin)))
+                .second);
   }
 }
 
@@ -715,7 +717,7 @@ quic::Expected<void, QuicError> updateConnection(
   bool isPing = false;
   bool hasDatagram = false;
   uint32_t connWindowUpdateSent = 0;
-  uint32_t ackFrameCounter = 0;
+  [[maybe_unused]] uint32_t ackFrameCounter = 0;
   uint32_t streamBytesSent = 0;
   uint32_t newStreamBytesSent = 0;
   OutstandingPacketWrapper::Metadata::DetailsPerStream detailsPerStream;
@@ -790,8 +792,8 @@ quic::Expected<void, QuicError> updateConnection(
       }
       case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& writeAckFrame = *frame.asWriteAckFrame();
-        DCHECK(!ackFrameCounter++)
-            << "Send more than one WriteAckFrame " << conn;
+        MVDCHECK(
+            !ackFrameCounter++, "Send more than one WriteAckFrame " << conn);
         auto largestAckedPacketWritten = writeAckFrame.ackBlocks.front().end;
         MVVLOG(10) << nodeToString(conn.nodeType)
                    << " sent packet with largestAcked="
@@ -817,15 +819,17 @@ quic::Expected<void, QuicError> updateConnection(
         if (resetIter != conn.pendingEvents.resets.end()) {
           conn.pendingEvents.resets.erase(resetIter);
         } else {
-          DCHECK(clonedPacketIdentifier.has_value())
-              << " reset missing from pendingEvents for non-clone packet";
+          MVDCHECK(
+              clonedPacketIdentifier.has_value(),
+              " reset missing from pendingEvents for non-clone packet");
         }
         break;
       }
       case QuicWriteFrame::Type::MaxDataFrame: {
         const MaxDataFrame& maxDataFrame = *frame.asMaxDataFrame();
-        CHECK(!connWindowUpdateSent++)
-            << "Send more than one connection window update " << conn;
+        MVCHECK(
+            !connWindowUpdateSent++,
+            "Send more than one connection window update " << conn);
         MVVLOG(10) << nodeToString(conn.nodeType)
                    << " sent conn window update packetNum=" << packetNum << " "
                    << conn;
@@ -956,7 +960,7 @@ quic::Expected<void, QuicError> updateConnection(
           DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
 
   if (!retransmittable && !isPing && !hasDatagramAndShouldTrack) {
-    DCHECK(!clonedPacketIdentifier);
+    MVDCHECK(!clonedPacketIdentifier);
     return {};
   }
   conn.lossState.totalAckElicitingPacketsSent++;
@@ -1011,7 +1015,7 @@ quic::Expected<void, QuicError> updateConnection(
         conn.lossState.totalBytesAckedAtLastAck);
   }
   if (clonedPacketIdentifier) {
-    DCHECK(conn.outstandings.clonedPacketIdentifiers.count(
+    MVDCHECK(conn.outstandings.clonedPacketIdentifiers.count(
         *clonedPacketIdentifier));
     pkt.maybeClonedPacketIdentifier = std::move(clonedPacketIdentifier);
     conn.lossState.totalBytesCloned += encodedSize;
@@ -1251,7 +1255,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
       << " written crypto and acks data type=" << packetType
       << " packetsWritten=" << packetsWritten
       << " probesWritten=" << probesWritten << connection;
-  CHECK_GE(packetLimit, packetsWritten);
+  MVCHECK_GE(packetLimit, packetsWritten);
   return result;
 }
 
@@ -1352,7 +1356,7 @@ quic::Expected<uint64_t, QuicError> writeZeroRttDataToSocket(
   MVVLOG_IF(10, written > 0)
       << nodeToString(connection.nodeType)
       << " written zero rtt data, packets=" << written << " " << connection;
-  DCHECK_GE(packetLimit, written);
+  MVDCHECK_GE(packetLimit, written);
   return written;
 }
 
@@ -1461,7 +1465,7 @@ void writeCloseCommon(
     return;
   }
   auto packet = std::move(packetBuilder).buildPacket();
-  CHECK_GE(packet.body.tailroom(), aead.getCipherOverhead());
+  MVCHECK_GE(packet.body.tailroom(), aead.getCipherOverhead());
   auto bufUniquePtr = packet.body.clone();
   auto encryptResult =
       aead.inplaceEncrypt(std::move(bufUniquePtr), &packet.header, packetNum);
@@ -1571,7 +1575,7 @@ quic::Expected<void, QuicError> encryptPacketHeader(
   size_t sampleBytesToUse = kMaxPacketNumEncodingSize - packetNumberLength;
   // If there were less than 4 bytes in the packet number, some of the payload
   // bytes will also be skipped during sampling.
-  CHECK_GE(bodyLen, sampleBytesToUse + sample.size());
+  MVCHECK_GE(bodyLen, sampleBytesToUse + sample.size());
   encryptedBody += sampleBytesToUse;
   memcpy(sample.data(), encryptedBody, sample.size());
 
@@ -1705,9 +1709,9 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     return WriteQuicDataResult{0, 0, 0};
   }
 
-  CHECK(connection.pathManager);
+  MVCHECK(connection.pathManager);
   auto pathInfo = connection.pathManager->getPath(pathId);
-  CHECK(pathInfo);
+  MVCHECK(pathInfo);
   auto peerAddress = pathInfo->peerAddress;
 
   if (connection.loopDetectorCallback) {
@@ -1922,8 +1926,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
 
   if (connection.transportSettings.dataPathType ==
       DataPathType::ContinuousMemory) {
-    CHECK(connection.bufAccessor->ownsBuffer());
-    CHECK(
+    MVCHECK(connection.bufAccessor->ownsBuffer());
+    MVCHECK(
         connection.bufAccessor->length() == 0 &&
         connection.bufAccessor->headroom() == 0);
   }
@@ -2251,28 +2255,28 @@ void implicitAckCryptoStream(
       // We shouldn't mark anything as lost from the implicit ACK, as it should
       // be ACKing the entire rangee.
       [](auto&, auto, auto&, auto) -> quic::Expected<void, QuicError> {
-        MVLOG_FATAL << "Got loss from implicit crypto ACK.";
+        MVCHECK(false, "Got loss from implicit crypto ACK.");
         return {};
       },
       implicitAckTime);
   // TODO handle error
-  CHECK(result.has_value()) << result.error().message;
+  MVCHECK(result.has_value(), result.error().message);
   // Clear our the loss buffer explicitly. The implicit ACK itself will not
   // remove data already in the loss buffer.
   auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
   cryptoStream->lossBuffer.clear();
-  CHECK(cryptoStream->retransmissionBuffer.empty());
+  MVCHECK(cryptoStream->retransmissionBuffer.empty());
   // The write buffer should be empty, there's no optional crypto data.
-  CHECK(cryptoStream->pendingWrites.empty());
+  MVCHECK(cryptoStream->pendingWrites.empty());
 }
 
 void handshakeConfirmed(QuicConnectionStateBase& conn) {
   // If we've supposedly confirmed the handshake and don't have the 1RTT
   // ciphers installed, we are going to have problems.
-  CHECK(conn.oneRttWriteCipher);
-  CHECK(conn.oneRttWriteHeaderCipher);
-  CHECK(conn.readCodec->getOneRttReadCipher());
-  CHECK(conn.readCodec->getOneRttHeaderCipher());
+  MVCHECK(conn.oneRttWriteCipher);
+  MVCHECK(conn.oneRttWriteHeaderCipher);
+  MVCHECK(conn.readCodec->getOneRttReadCipher());
+  MVCHECK(conn.readCodec->getOneRttHeaderCipher());
   conn.readCodec->onHandshakeDone(Clock::now());
   conn.initialWriteCipher.reset();
   conn.initialHeaderCipher.reset();
@@ -2319,11 +2323,12 @@ void updateOneRttWriteCipher(
     quic::QuicConnectionStateBase& conn,
     std::unique_ptr<Aead> aead,
     ProtectionType oneRttPhase) {
-  CHECK(
+  MVCHECK(
       oneRttPhase == ProtectionType::KeyPhaseZero ||
       oneRttPhase == ProtectionType::KeyPhaseOne);
-  CHECK(oneRttPhase != conn.oneRttWritePhase)
-      << "Cannot replace cipher for current write phase";
+  MVCHECK(
+      oneRttPhase != conn.oneRttWritePhase,
+      "Cannot replace cipher for current write phase");
   conn.oneRttWriteCipher = std::move(aead);
   conn.oneRttWritePhase = oneRttPhase;
   conn.oneRttWritePacketsSentInCurrentPhase = 0;

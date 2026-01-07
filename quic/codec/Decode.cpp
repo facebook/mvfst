@@ -1243,7 +1243,7 @@ ParsedLongHeaderResult::ParsedLongHeaderResult(
     Optional<ParsedLongHeader> parsedLongHeaderIn)
     : isVersionNegotiation(isVersionNegotiationIn),
       parsedLongHeader(std::move(parsedLongHeaderIn)) {
-  CHECK(isVersionNegotiation || parsedLongHeader);
+  MVCHECK(isVersionNegotiation || parsedLongHeader);
 }
 
 ParsedLongHeaderInvariant::ParsedLongHeaderInvariant(
@@ -1393,7 +1393,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 
     size_t retryTokenLen = cursor.remaining() - kRetryIntegrityTagLen;
     BufPtr token = BufHelpers::create(retryTokenLen);
-    CHECK(cursor.tryPull(token->writableData(), retryTokenLen));
+    MVCHECK(cursor.tryPull(token->writableData(), retryTokenLen));
     token->append(retryTokenLen);
 
     return ParsedLongHeader(
@@ -1428,7 +1428,7 @@ quic::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 
     if (tokenLen->first > 0) {
       BufPtr tokenBuf = BufHelpers::create(tokenLen->first);
-      CHECK(cursor.tryPull(tokenBuf->writableData(), tokenLen->first));
+      MVCHECK(cursor.tryPull(tokenBuf->writableData(), tokenLen->first));
       tokenBuf->append(tokenLen->first);
       token = std::move(tokenBuf);
     }

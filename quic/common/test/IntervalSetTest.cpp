@@ -159,8 +159,7 @@ TEST(IntervalSet, insertWithMergeAtEdge) {
 TEST(IntervalSet, insertBoundTooLarge) {
   IntervalSet<uint32_t, 10> set;
   // This should CHECK-fail since end - start > 10
-  EXPECT_DEATH(
-      set.insert(0, std::numeric_limits<uint32_t>::max() - 9), "Check failed");
+  EXPECT_DEATH(set.insert(0, std::numeric_limits<uint32_t>::max() - 9), "");
   // This should work fine since end - start == 10
   set.insert(0, std::numeric_limits<uint32_t>::max() - 10);
 }

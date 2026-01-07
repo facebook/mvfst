@@ -19,7 +19,7 @@ namespace quic {
 
 struct GetBetterWindowsTimers {
   GetBetterWindowsTimers() {
-    CHECK_EQ(timeBeginPeriod(1), TIMERR_NOERROR);
+    MVCHECK_EQ(timeBeginPeriod(1), TIMERR_NOERROR);
   }
 
   ~GetBetterWindowsTimers() {

@@ -15,6 +15,7 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
 #include <quic/congestion_control/ThrottlingSignalProvider.h>
@@ -71,7 +72,8 @@ struct OutstandingsInfo {
 
   // Number of packets outstanding and not declared lost.
   uint64_t numOutstanding() {
-    CHECK_GE(packets.size(), declaredLostCount + scheduledForDestructionCount);
+    MVCHECK_GE(
+        packets.size(), declaredLostCount + scheduledForDestructionCount);
     return packets.size() - declaredLostCount - scheduledForDestructionCount;
   }
 
@@ -98,7 +100,7 @@ class AppLimitedTracker {
    * Mark the connection as application limited.
    */
   void setAppLimited() {
-    DCHECK(!isAppLimited_);
+    MVDCHECK(!isAppLimited_);
     isAppLimited_ = true;
     appLimitedStartTime_ = Clock::now();
   }
@@ -107,7 +109,7 @@ class AppLimitedTracker {
    * Mark the connection as not being application limited.
    */
   void setNotAppLimited() {
-    DCHECK(isAppLimited_);
+    MVDCHECK(isAppLimited_);
     isAppLimited_ = false;
     totalAppLimitedTime_ +=
         std::chrono::duration_cast<std::chrono::microseconds>(

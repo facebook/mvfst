@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 
 #include <quic/QuicConstants.h>
@@ -49,7 +50,7 @@ FizzServerHandshake::FizzServerHandshake(
   } else {
     cryptoFactory_.reset(fizzCryptoFactoryPtr);
   }
-  CHECK(cryptoFactory_ && cryptoFactory_->getFizzFactory());
+  MVCHECK(cryptoFactory_ && cryptoFactory_->getFizzFactory());
 }
 
 void FizzServerHandshake::initializeImpl(

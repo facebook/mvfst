@@ -7,6 +7,7 @@
 
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/ContiguousCursor.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <folly/Random.h>
 #include <quic/QuicConstants.h>
@@ -35,7 +36,7 @@ ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {
   static_assert(
       std::numeric_limits<uint8_t>::max() > kMaxConnectionIdSize,
       "Max connection size is too big");
-  CHECK(connidIn.size() <= kMaxConnectionIdSize) << "ConnectionId invalid size";
+  MVCHECK(connidIn.size() <= kMaxConnectionIdSize, "ConnectionId invalid size");
   connidLen = connidIn.size();
   if (connidLen != 0) {
     memcpy(connid.data(), connidIn.data(), connidLen);

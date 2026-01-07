@@ -11,7 +11,7 @@
 #include <initializer_list>
 #include <iterator>
 
-#include <glog/logging.h>
+#include <quic/common/MvfstCheck.h>
 
 namespace quic {
 
@@ -104,7 +104,7 @@ struct CircularDeque {
 
   ~CircularDeque() {
     if (capacity_ == 0) {
-      DCHECK(!storage_);
+      MVDCHECK(!storage_);
       return;
     }
     clear();
@@ -174,7 +174,7 @@ struct CircularDeque {
 
     template <typename V>
     [[nodiscard]] bool operator<(const CircularDequeIterator<V>& other) const {
-      DCHECK_EQ(deque_, other.deque_);
+      MVDCHECK_EQ(deque_, other.deque_);
       return distance_to(other) > 0;
     }
 
@@ -242,7 +242,7 @@ struct CircularDeque {
     template <typename V>
     [[nodiscard]] difference_type operator-(
         const CircularDequeIterator<V>& other) const {
-      DCHECK_EQ(deque_, other.deque_);
+      MVDCHECK_EQ(deque_, other.deque_);
       return -distance_to(other);
     }
 
@@ -516,11 +516,11 @@ struct CircularDeque {
     return capacity_ - first.index_ + last.index_;
   }
 
-  void indexSanityCheck(const_iterator iter) noexcept {
+  void indexSanityCheck([[maybe_unused]] const_iterator iter) noexcept {
     if (begin_ <= end_) {
-      DCHECK(begin_ <= iter.index_ && iter.index_ <= end_);
+      MVDCHECK(begin_ <= iter.index_ && iter.index_ <= end_);
     } else {
-      DCHECK(iter.index_ >= begin_ || iter.index_ <= end_);
+      MVDCHECK(iter.index_ >= begin_ || iter.index_ <= end_);
     }
   }
 

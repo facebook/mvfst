@@ -44,8 +44,9 @@ quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
       : conn_.transportSettings.ackDelayExponent;
   auto largestAckedPacketNum = *largestAckToSend(ackState_);
   auto ackingTime = Clock::now();
-  DCHECK(ackState_.largestRecvdPacketTime.has_value())
-      << "Missing received time for the largest acked packet";
+  MVDCHECK(
+      ackState_.largestRecvdPacketTime.has_value(),
+      "Missing received time for the largest acked packet");
   // assuming that we're going to ack the largest received with highest pri
   auto receivedTime = *ackState_.largestRecvdPacketTime;
   std::chrono::microseconds ackDelay =

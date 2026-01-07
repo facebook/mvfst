@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/MvfstLogging.h>
 #include <algorithm>
 #include <cstdint>
 #include <limits>
@@ -38,9 +39,11 @@ struct Interval {
   }
 
   Interval(const T& s, const T& e) : start(s), end(e) {
-    CHECK_LE(start, end) << "Trying to construct invalid interval";
-    CHECK_LE(end, std::numeric_limits<T>::max() - unitValue())
-        << "Interval bound too large";
+    MVCHECK_LE(start, end, "Trying to construct invalid interval");
+    MVCHECK_LE(
+        end,
+        std::numeric_limits<T>::max() - unitValue(),
+        "Interval bound too large");
   }
 
   // Safe constructor that returns Expected instead of CHECKing

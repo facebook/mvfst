@@ -40,7 +40,7 @@ quic::Expected<void, QuicError> ClientHandshake::connect(
     QLOG(*conn_, addTransportStateUpdate, kZeroRttAttempted);
 
     // If zero rtt write cipher is derived, it means the cached psk was valid
-    DCHECK(cachedServerTransportParams);
+    MVDCHECK(cachedServerTransportParams);
     cacheServerInitialParams(
         *conn_,
         cachedServerTransportParams->initialMaxData,
@@ -95,7 +95,7 @@ quic::Expected<void, QuicError> ClientHandshake::doHandshake(
       appDataReadBuf_.append(std::move(data));
       break;
     default:
-      MVLOG_FATAL << "Unhandled EncryptionLevel";
+      MVCHECK(false, "Unhandled EncryptionLevel");
   }
   // Get the current buffer type the transport is accepting.
   waitForData_ = false;
@@ -112,7 +112,7 @@ quic::Expected<void, QuicError> ClientHandshake::doHandshake(
         processSocketData(appDataReadBuf_);
         break;
       default:
-        MVLOG_FATAL << "Unhandled EncryptionLevel";
+        MVCHECK(false, "Unhandled EncryptionLevel");
     }
     if (!error_.has_value()) {
       return std::move(error_);
@@ -217,7 +217,7 @@ ClientHandshake::getNextOneRttWriteCipher() {
     return quic::make_unexpected(std::move(error_.error()));
   }
 
-  CHECK(writeTrafficSecret_);
+  MVCHECK(writeTrafficSecret_);
   if (trafficSecretSync_ > 1 || trafficSecretSync_ < -1) {
     MVLOG_WARNING << "Client read and write secrets are out of sync";
   }
@@ -238,7 +238,7 @@ ClientHandshake::getNextOneRttReadCipher() {
     return quic::make_unexpected(std::move(error_.error()));
   }
 
-  CHECK(readTrafficSecret_);
+  MVCHECK(readTrafficSecret_);
   if (trafficSecretSync_ > 1 || trafficSecretSync_ < -1) {
     MVLOG_WARNING << "Client read and write secrets are out of sync";
   }
@@ -269,7 +269,7 @@ void ClientHandshake::writeDataToStream(
 }
 
 void ClientHandshake::handshakeInitiated() {
-  CHECK(phase_ == Phase::Initial);
+  MVCHECK(phase_ == Phase::Initial);
   phase_ = Phase::Handshake;
 }
 
@@ -295,7 +295,7 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // After a successful handshake we should send packets with the type of
   // ClientCleartext. We assume that by the time we get the data for the QUIC
   // stream, the server would have also acked all the client initial packets.
-  CHECK(phase_ == Phase::Handshake);
+  MVCHECK(phase_ == Phase::Handshake);
   phase_ = Phase::OneRttKeysDerived;
 }
 

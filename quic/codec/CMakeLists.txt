@@ -137,6 +137,7 @@ add_dependencies(
   mvfst_codec_types
   mvfst_handshake
   mvfst_folly_utils
+  mvfst_buf_accessor
 )
 
 target_link_libraries(
@@ -145,6 +146,7 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_handshake
   mvfst_folly_utils
+  mvfst_buf_accessor
 )
 
 add_library(

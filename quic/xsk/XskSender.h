@@ -18,6 +18,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/Optional.h>
 #include <quic/xsk/xsk_lib.h>
 #include <queue>
@@ -91,16 +92,18 @@ class XskSender {
  public:
   explicit XskSender(const XskSenderConfig& xskSenderConfig)
       : xskSenderConfig_(xskSenderConfig) {
-    CHECK(xskSenderConfig_.sharedState)
-        << "You must provide a shared state to the XskSender.";
-    CHECK(
+    MVCHECK(
+        xskSenderConfig_.sharedState,
+        "You must provide a shared state to the XskSender.");
+    MVCHECK(
         xskSenderConfig_.sharedState->allInitialized() ||
-        xskSenderConfig_.sharedState->allUninitialized())
-        << "All elements must either be initialized or uninitialized.";
+            xskSenderConfig_.sharedState->allUninitialized(),
+        "All elements must either be initialized or uninitialized.");
     if (xskSenderConfig_.sharedState->allUninitialized()) {
-      CHECK(isPrimaryOwner())
-          << "The shared state must be initialized by the primary XskSender "
-          << "(the one with an ownerId of 0)";
+      MVCHECK(
+          isPrimaryOwner(),
+          "The shared state must be initialized by the primary XskSender "
+              << "(the one with an ownerId of 0)");
     }
     uint32_t startingFrameIndex =
         getNumFramesPerOwner() * xskSenderConfig_.ownerId;

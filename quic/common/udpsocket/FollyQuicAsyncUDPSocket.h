@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocketImpl.h>
@@ -33,7 +34,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       std::shared_ptr<FollyQuicEventBase> qEvb,
       folly::AsyncUDPSocket& socketToWrap)
       : evb_(std::move(qEvb)), follySocket_(socketToWrap) {
-    CHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
+    MVCHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
   }
 
   FollyQuicAsyncUDPSocket(
@@ -42,7 +43,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       : evb_(std::move(qEvb)),
         follySocketPtr(std::move(socketToWrap)),
         follySocket_(*follySocketPtr) {
-    CHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
+    MVCHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
   }
 
   explicit FollyQuicAsyncUDPSocket(std::shared_ptr<FollyQuicEventBase> qEvb)
@@ -52,7 +53,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
                 evb_ ? evb_->getBackingEventBase() : nullptr)),
         follySocket_(*follySocketPtr) {
     if (evb_) {
-      CHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
+      MVCHECK_EQ(evb_->getBackingEventBase(), follySocket_.getEventBase());
     }
   }
 
@@ -231,8 +232,8 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
     FollyReadCallbackWrapper(
         QuicAsyncUDPSocket::ReadCallback* readCallback,
         FollyQuicAsyncUDPSocket* parentSocket) {
-      CHECK(readCallback != nullptr);
-      CHECK(parentSocket != nullptr);
+      MVCHECK(readCallback != nullptr);
+      MVCHECK(parentSocket != nullptr);
       wrappedReadCallback_ = readCallback;
       parentSocket_ = parentSocket;
     }
@@ -264,7 +265,7 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    public:
     explicit FollyErrCallbackWrapper(
         QuicAsyncUDPSocket::ErrMessageCallback* errorCallback) {
-      CHECK(errorCallback != nullptr);
+      MVCHECK(errorCallback != nullptr);
       wrappedErrorCallback_ = errorCallback;
     }
 

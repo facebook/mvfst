@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/observer/SocketObserverInterface.h>
 
 #include <utility>
@@ -61,11 +62,11 @@ SocketObserverInterface::WriteEvent::Builder::build() && {
 SocketObserverInterface::WriteEvent::WriteEvent(
     const WriteEvent::BuilderFields& builderFields)
     : outstandingPackets([&]() {
-        CHECK(builderFields.maybeOutstandingPacketsRef.has_value());
+        MVCHECK(builderFields.maybeOutstandingPacketsRef.has_value());
         return builderFields.maybeOutstandingPacketsRef.value();
       }()),
       writeCount([&]() {
-        CHECK(builderFields.maybeWriteCount.has_value());
+        MVCHECK(builderFields.maybeWriteCount.has_value());
         return builderFields.maybeWriteCount.value();
       }()),
       maybeLastPacketSentTime(builderFields.maybeLastPacketSentTime),
@@ -175,7 +176,7 @@ void SocketObserverInterface::PacketsWrittenEvent::
         continue;
       }
 
-      CHECK_NE(
+      MVCHECK_NE(
           maybePrevNumAckElicitingPacketsSent.value(),
           it->metadata.totalAckElicitingPacketsSent);
       if (maybePrevNumAckElicitingPacketsSent.value() >
@@ -300,15 +301,15 @@ SocketObserverInterface::PacketsWrittenEvent::PacketsWrittenEvent(
     SocketObserverInterface::PacketsWrittenEvent::BuilderFields&& builderFields)
     : WriteEvent(builderFields),
       numPacketsWritten([&]() {
-        CHECK(builderFields.maybeNumPacketsWritten.has_value());
+        MVCHECK(builderFields.maybeNumPacketsWritten.has_value());
         return builderFields.maybeNumPacketsWritten.value();
       }()),
       numAckElicitingPacketsWritten([&]() {
-        CHECK(builderFields.maybeNumAckElicitingPacketsWritten.has_value());
+        MVCHECK(builderFields.maybeNumAckElicitingPacketsWritten.has_value());
         return builderFields.maybeNumAckElicitingPacketsWritten.value();
       }()),
       numBytesWritten([&]() {
-        CHECK(builderFields.maybeNumBytesWritten.has_value());
+        MVCHECK(builderFields.maybeNumBytesWritten.has_value());
         return builderFields.maybeNumBytesWritten.value();
       }()) {}
 
@@ -353,15 +354,15 @@ SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
         SocketObserverInterface::PacketsReceivedEvent::ReceivedUdpPacket::
             BuilderFields&& builderFields)
     : packetReceiveTime([&]() {
-        CHECK(builderFields.maybePacketReceiveTime.has_value());
+        MVCHECK(builderFields.maybePacketReceiveTime.has_value());
         return builderFields.maybePacketReceiveTime.value();
       }()),
       packetNumBytes([&]() {
-        CHECK(builderFields.maybePacketNumBytes.has_value());
+        MVCHECK(builderFields.maybePacketNumBytes.has_value());
         return builderFields.maybePacketNumBytes.value();
       }()),
       packetTos([&]() {
-        CHECK(builderFields.maybePacketTos.has_value());
+        MVCHECK(builderFields.maybePacketTos.has_value());
         return builderFields.maybePacketTos.value();
       }()),
       maybePacketSoftwareRxTimestamp(
@@ -404,19 +405,19 @@ SocketObserverInterface::PacketsReceivedEvent::PacketsReceivedEvent(
     SocketObserverInterface::PacketsReceivedEvent::BuilderFields&&
         builderFields)
     : receiveLoopTime([&]() {
-        CHECK(builderFields.maybeReceiveLoopTime.has_value());
+        MVCHECK(builderFields.maybeReceiveLoopTime.has_value());
         return builderFields.maybeReceiveLoopTime.value();
       }()),
       numPacketsReceived([&]() {
-        CHECK(builderFields.maybeNumPacketsReceived.has_value());
+        MVCHECK(builderFields.maybeNumPacketsReceived.has_value());
         return builderFields.maybeNumPacketsReceived.value();
       }()),
       numBytesReceived([&]() {
-        CHECK(builderFields.maybeNumBytesReceived.has_value());
+        MVCHECK(builderFields.maybeNumBytesReceived.has_value());
         return builderFields.maybeNumBytesReceived.value();
       }()),
       receivedPackets(std::move(builderFields.receivedPackets)) {
-  CHECK_EQ(numPacketsReceived, receivedPackets.size());
+  MVCHECK_EQ(numPacketsReceived, receivedPackets.size());
 }
 
 SocketObserverInterface::AcksProcessedEvent::Builder&&
@@ -434,7 +435,7 @@ SocketObserverInterface::AcksProcessedEvent::Builder::build() && {
 SocketObserverInterface::AcksProcessedEvent::AcksProcessedEvent(
     SocketObserverInterface::AcksProcessedEvent::BuilderFields builderFields)
     : ackEvents([&]() {
-        CHECK(builderFields.maybeAckEventsRef.has_value());
+        MVCHECK(builderFields.maybeAckEventsRef.has_value());
         return builderFields.maybeAckEventsRef.value();
       }()) {}
 

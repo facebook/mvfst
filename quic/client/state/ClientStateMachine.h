@@ -130,7 +130,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     congestionController = std::make_unique<Cubic>(*this);
     connectionTime = Clock::now();
     originalVersion = QuicVersion::MVFST;
-    DCHECK(handshakeFactory);
+    MVDCHECK(handshakeFactory);
     auto tmpClientHandshake =
         std::move(*handshakeFactory).makeClientHandshake(this);
     clientHandshakeLayer = tmpClientHandshake.get();

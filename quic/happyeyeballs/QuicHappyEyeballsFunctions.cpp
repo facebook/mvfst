@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
 #include <quic/common/SocketUtil.h>
@@ -45,10 +46,10 @@ void happyEyeballsAddPeerAddress(
   // TODO: Support multiple addresses
 
   if (peerAddress.getFamily() == AF_INET) {
-    DCHECK(!connection.happyEyeballsState.v4PeerAddress.isInitialized());
+    MVDCHECK(!connection.happyEyeballsState.v4PeerAddress.isInitialized());
     connection.happyEyeballsState.v4PeerAddress = peerAddress;
   } else {
-    DCHECK(!connection.happyEyeballsState.v6PeerAddress.isInitialized());
+    MVDCHECK(!connection.happyEyeballsState.v6PeerAddress.isInitialized());
     connection.happyEyeballsState.v6PeerAddress = peerAddress;
   }
 }
@@ -71,7 +72,7 @@ void startHappyEyeballs(
   if (connection.happyEyeballsState.v6PeerAddress.isInitialized() &&
       connection.happyEyeballsState.v4PeerAddress.isInitialized()) {
     // A second socket has to be added before happy eyeballs starts
-    DCHECK(connection.happyEyeballsState.secondSocket);
+    MVDCHECK(connection.happyEyeballsState.secondSocket);
 
     if (cachedFamily == AF_INET) {
       connection.originalPeerAddress =
@@ -236,7 +237,7 @@ quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
 
 void happyEyeballsStartSecondSocket(
     QuicClientConnectionState::HappyEyeballsState& happyEyeballsState) {
-  CHECK(!happyEyeballsState.finished);
+  MVCHECK(!happyEyeballsState.finished);
 
   happyEyeballsState.shouldWriteToSecondSocket = true;
 }
@@ -256,7 +257,7 @@ void happyEyeballsOnDataReceived(
 
   // If second socket won, update main socket, peer address and pathId
   if (connection.peerAddress.getFamily() != peerAddress.getFamily()) {
-    CHECK(connection.happyEyeballsState.secondSocket);
+    MVCHECK(connection.happyEyeballsState.secondSocket);
     socket.swap(connection.happyEyeballsState.secondSocket);
     connection.originalPeerAddress = peerAddress;
     connection.peerAddress = peerAddress;
@@ -265,15 +266,15 @@ void happyEyeballsOnDataReceived(
     // Add the path for the second socket. The first socket is handled below
     // where it is setup.
     auto localAddr = socket->address();
-    CHECK(localAddr.has_value());
+    MVCHECK(localAddr.has_value());
     auto& remoteAddr = peerAddress;
     auto addPathRes =
         connection.pathManager->addValidatedPath(localAddr.value(), remoteAddr);
-    CHECK(!addPathRes.hasError()) << addPathRes.error();
+    MVCHECK(!addPathRes.hasError(), addPathRes.error());
     connection.currentPathId = addPathRes.value();
 
     auto removePathRes = connection.pathManager->removePath(oldPathId);
-    CHECK(!removePathRes.hasError()) << removePathRes.error();
+    MVCHECK(!removePathRes.hasError(), removePathRes.error());
   }
   connection.happyEyeballsState.secondSocket->pauseRead();
   (void)connection.happyEyeballsState.secondSocket->close();

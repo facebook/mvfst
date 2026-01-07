@@ -405,8 +405,7 @@ TEST(BufWriterTest, DeathOnOverflow) {
   BufWriter writer(rawBuf, kSmallCapacity);
   std::array<uint8_t, kSmallCapacity + 1> bigData;
   bigData.fill(0xAA);
-  EXPECT_DEATH(
-      writer.push(bigData.data(), bigData.size()), "BufWriter overflow");
+  EXPECT_DEATH(writer.push(bigData.data(), bigData.size()), "");
 }
 
 #endif

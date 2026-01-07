@@ -6,6 +6,7 @@
  */
 
 #include <quic/codec/PacketNumberCipher.h>
+#include <quic/common/MvfstLogging.h>
 
 #include <quic/codec/Decode.h>
 
@@ -19,7 +20,7 @@ quic::Expected<void, QuicError> PacketNumberCipher::decipherHeader(
     MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
     uint8_t /* packetNumLengthMask */) const {
-  CHECK_EQ(packetNumberBytes.size(), kMaxPacketNumEncodingSize);
+  MVCHECK_EQ(packetNumberBytes.size(), kMaxPacketNumEncodingSize);
   auto maskResult = mask(sample);
   if (maskResult.hasError()) {
     return quic::make_unexpected(maskResult.error());

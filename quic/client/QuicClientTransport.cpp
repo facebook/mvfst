@@ -32,7 +32,7 @@ QuicClientTransport::~QuicClientTransport() {
 void QuicClientTransport::onNotifyDataAvailable(
     QuicAsyncUDPSocket& sock) noexcept {
   auto self = this->shared_from_this();
-  CHECK(conn_) << "trying to receive packets without a connection";
+  MVCHECK(conn_, "trying to receive packets without a connection");
   auto readBufferSize = std::max(
                             conn_->transportSettings.maxRecvPacketSize,
                             uint64_t(kDefaultUDPReadBufferSize)) *
@@ -234,7 +234,7 @@ void QuicClientTransport::startHappyEyeballsIfEnabled() {
 void QuicClientTransport::happyEyeballsOnDataReceivedIfEnabled(
     const folly::SocketAddress& peerAddress) {
   if (happyEyeballsEnabled_) {
-    CHECK(socket_);
+    MVCHECK(socket_);
     happyEyeballsOnDataReceived(
         *clientConn_,
         happyEyeballsConnAttemptDelayTimeout_,

@@ -79,8 +79,8 @@ QuicTransportBaseLite::~QuicTransportBaseLite() {
 
   // closeImpl and closeUdpSocket should have been triggered by destructor of
   // derived class to ensure that observers are properly notified
-  DCHECK_NE(CloseState::OPEN, closeState_);
-  DCHECK(!socket_.get()); // should be no socket
+  MVDCHECK_NE(CloseState::OPEN, closeState_);
+  MVDCHECK(!socket_.get()); // should be no socket
 }
 
 void QuicTransportBaseLite::onNetworkData(
@@ -232,7 +232,7 @@ void QuicTransportBaseLite::close(Optional<QuicError> errorCode) {
 }
 
 void QuicTransportBaseLite::closeNow(Optional<QuicError> errorCode) {
-  DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
+  MVDCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   [[maybe_unused]] auto self = sharedGuard();
   MVVLOG(4) << __func__ << " " << *this;
   errorCode = maybeSetGenericAppError(std::move(errorCode));
@@ -783,9 +783,9 @@ void QuicTransportBaseLite::setQLogger(std::shared_ptr<QLogger> qLogger) {
   // of times it gets reset, and only stop qlog collection when the number of
   // resets equals the number of times the logger was set
   if (!conn_->qLogger) {
-    CHECK_EQ(qlogRefcnt_, 0);
+    MVCHECK_EQ(qlogRefcnt_, 0);
   } else {
-    CHECK_GT(qlogRefcnt_, 0);
+    MVCHECK_GT(qlogRefcnt_, 0);
   }
 
   if (qLogger) {
@@ -851,7 +851,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setMaxPacingRate(
 
 void QuicTransportBaseLite::setThrottlingSignalProvider(
     std::shared_ptr<ThrottlingSignalProvider> throttlingSignalProvider) {
-  DCHECK(conn_);
+  MVDCHECK(conn_);
   conn_->throttlingSignalProvider = throttlingSignalProvider;
 }
 
@@ -898,7 +898,6 @@ QuicTransportBaseLite::ByteEventMap& QuicTransportBaseLite::getByteEventMap(
     case ByteEvent::Type::TX:
       return txCallbacks_;
   }
-  MVLOG_FATAL << "Unhandled case in getByteEventMap";
   folly::assume_unreachable();
 }
 
@@ -910,7 +909,6 @@ QuicTransportBaseLite::getByteEventMapConst(const ByteEvent::Type type) const {
     case ByteEvent::Type::TX:
       return txCallbacks_;
   }
-  MVLOG_FATAL << "Unhandled case in getByteEventMapConst";
   folly::assume_unreachable();
 }
 
@@ -1299,12 +1297,12 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
           conn_->lossState.totalAckElicitingPacketsSent;
       const auto afterNumOutstandingPackets =
           conn_->outstandings.numOutstanding();
-      CHECK_LE(beforeTotalPacketsSent, afterTotalPacketsSent);
-      CHECK_LE(
+      MVCHECK_LE(beforeTotalPacketsSent, afterTotalPacketsSent);
+      MVCHECK_LE(
           beforeTotalAckElicitingPacketsSent,
           afterTotalAckElicitingPacketsSent);
-      CHECK_LE(beforeNumOutstandingPackets, afterNumOutstandingPackets);
-      CHECK_EQ(
+      MVCHECK_LE(beforeNumOutstandingPackets, afterNumOutstandingPackets);
+      MVCHECK_EQ(
           afterNumOutstandingPackets - beforeNumOutstandingPackets,
           afterTotalAckElicitingPacketsSent -
               beforeTotalAckElicitingPacketsSent);
@@ -1573,7 +1571,7 @@ void QuicTransportBaseLite::closeImpl(
       drainConnection && !isReset && !isAbandon && !isInvalidMigration;
   if (drainConnection) {
     // We ever drain once, and the object ever gets created once.
-    DCHECK(!isTimeoutScheduled(&drainTimeout_));
+    MVDCHECK(!isTimeoutScheduled(&drainTimeout_));
     scheduleTimeout(
         &drainTimeout_,
         folly::chrono::ceil<std::chrono::milliseconds>(
@@ -1897,7 +1895,7 @@ void QuicTransportBaseLite::handleDeliveryCallbacks() {
   auto deliverableStreamId = conn_->streamManager->popDeliverable();
   while (deliverableStreamId.has_value()) {
     auto streamId = *deliverableStreamId;
-    auto stream = CHECK_NOTNULL(
+    auto stream = MVCHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
 
@@ -1945,7 +1943,7 @@ void QuicTransportBaseLite::handleStreamFlowControlUpdatedCallbacks(
   streamStorage = conn_->streamManager->consumeFlowControlUpdated();
   const auto& flowControlUpdated = streamStorage;
   for (auto streamId : flowControlUpdated) {
-    auto stream = CHECK_NOTNULL(
+    auto stream = MVCHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     if (!stream->writable()) {
       pendingWriteCallbacks_.erase(streamId);
@@ -1956,7 +1954,7 @@ void QuicTransportBaseLite::handleStreamFlowControlUpdatedCallbacks(
       return;
     }
     // In case the callback modified the stream map, get it again.
-    stream = CHECK_NOTNULL(
+    stream = MVCHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     auto maxStreamWritable = maxWritableOnStream(*stream);
     if (maxStreamWritable != 0 && !pendingWriteCallbacks_.empty()) {
@@ -2005,7 +2003,7 @@ void QuicTransportBaseLite::handleConnWritable() {
       auto streamId = writeCallbackIt->first;
       auto wcb = writeCallbackIt->second;
       ++writeCallbackIt;
-      auto stream = CHECK_NOTNULL(
+      auto stream = MVCHECK_NOTNULL(
           conn_->streamManager->getStream(streamId).value_or(nullptr));
       if (!stream->writable()) {
         pendingWriteCallbacks_.erase(streamId);
@@ -2037,7 +2035,7 @@ QuicTransportBaseLite::handleInitialWriteDataCommon(
     const ConnectionId& dstConnId,
     uint64_t packetLimit,
     const std::string& token) {
-  CHECK(conn_->initialWriteCipher);
+  MVCHECK(conn_->initialWriteCipher);
   auto version = conn_->version.value_or(*(conn_->originalVersion));
   auto& initialCryptoStream =
       *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
@@ -2049,7 +2047,7 @@ QuicTransportBaseLite::handleInitialWriteDataCommon(
        numProbePackets) ||
       initialScheduler.hasData() || toWriteInitialAcks(*conn_) ||
       hasBufferedDataToWrite(*conn_)) {
-    CHECK(conn_->initialHeaderCipher);
+    MVCHECK(conn_->initialHeaderCipher);
     return writeCryptoAndAckDataToSocket(
         *socket_,
         *conn_,
@@ -2071,7 +2069,7 @@ QuicTransportBaseLite::handleHandshakeWriteDataCommon(
     const ConnectionId& dstConnId,
     uint64_t packetLimit) {
   auto version = conn_->version.value_or(*(conn_->originalVersion));
-  CHECK(conn_->handshakeWriteCipher);
+  MVCHECK(conn_->handshakeWriteCipher);
   auto& handshakeCryptoStream =
       *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
   CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
@@ -2081,7 +2079,7 @@ QuicTransportBaseLite::handleHandshakeWriteDataCommon(
        handshakeCryptoStream.retransmissionBuffer.size() && numProbePackets) ||
       handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_) ||
       hasBufferedDataToWrite(*conn_)) {
-    CHECK(conn_->handshakeWriteHeaderCipher);
+    MVCHECK(conn_->handshakeWriteHeaderCipher);
     return writeCryptoAndAckDataToSocket(
         *socket_,
         *conn_,
@@ -2166,7 +2164,7 @@ void QuicTransportBaseLite::excessWriteTimeoutExpired() noexcept {
 }
 
 void QuicTransportBaseLite::lossTimeoutExpired() noexcept {
-  CHECK_NE(closeState_, CloseState::CLOSED);
+  MVCHECK_NE(closeState_, CloseState::CLOSED);
   // onLossDetectionAlarm will set packetToSend in pending events
   [[maybe_unused]] auto self = sharedGuard();
   try {
@@ -2204,7 +2202,7 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   // idle timeout is expired, just close the connection and drain or
   // send connection close immediately depending on 'drain'
-  DCHECK_NE(closeState_, CloseState::CLOSED);
+  MVDCHECK_NE(closeState_, CloseState::CLOSED);
   auto localError =
       drain ? LocalErrorCode::IDLE_TIMEOUT : LocalErrorCode::SHUTTING_DOWN;
   auto sendCloseImmediately =
@@ -2232,7 +2230,7 @@ void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {
 }
 
 void QuicTransportBaseLite::ackTimeoutExpired() noexcept {
-  CHECK_NE(closeState_, CloseState::CLOSED);
+  MVCHECK_NE(closeState_, CloseState::CLOSED);
   MVVLOG(10) << __func__ << " " << *this;
   [[maybe_unused]] auto self = sharedGuard();
   updateAckStateOnAckTimeout(*conn_);
@@ -2520,7 +2518,7 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
       continue;
     }
     auto readCb = callback->second.readCb;
-    auto stream = CHECK_NOTNULL(
+    auto stream = MVCHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     if (readCb && stream->streamReadError &&
         (!stream->reliableSizeFromPeer ||
@@ -2604,7 +2602,7 @@ Optional<folly::SocketCmsgMap>
 QuicTransportBaseLite::getAdditionalCmsgsForAsyncUDPSocket() {
   if (conn_->socketCmsgsState.additionalCmsgs) {
     // This callback should be happening for the target write
-    DCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
+    MVDCHECK(conn_->writeCount == conn_->socketCmsgsState.targetWriteCount);
     return conn_->socketCmsgsState.additionalCmsgs;
   }
   return std::nullopt;
@@ -2720,11 +2718,11 @@ void QuicTransportBaseLite::processCallbacksAfterWriteData() {
   auto txStreamId = conn_->streamManager->popTx();
   while (txStreamId.has_value()) {
     auto streamId = *txStreamId;
-    auto stream = CHECK_NOTNULL(
+    auto stream = MVCHECK_NOTNULL(
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     auto largestOffsetTxed = getLargestWriteOffsetTxed(*stream);
     // if it's in the set of streams with TX, we should have a valid offset
-    CHECK(largestOffsetTxed.has_value());
+    MVCHECK(largestOffsetTxed.has_value());
 
     // lambda to help get the next callback to call for this stream
     auto getNextTxCallbackForStreamAndCleanup =
@@ -2821,7 +2819,7 @@ void QuicTransportBaseLite::setTransportSettings(
   } else {
     // TODO: We should let chain based GSO to use bufAccessor in the future as
     // well.
-    CHECK(
+    MVCHECK(
         conn_->bufAccessor ||
         transportSettings.dataPathType != DataPathType::ContinuousMemory);
     conn_->transportSettings = std::move(transportSettings);
@@ -2897,10 +2895,10 @@ void QuicTransportBaseLite::setTransportSettings(
 }
 
 void QuicTransportBaseLite::setCongestionControl(CongestionControlType type) {
-  DCHECK(conn_);
+  MVDCHECK(conn_);
   if (!conn_->congestionController ||
       type != conn_->congestionController->type()) {
-    CHECK(conn_->congestionControllerFactory);
+    MVCHECK(conn_->congestionControllerFactory);
     validateCongestionAndPacing(type);
     conn_->congestionController =
         conn_->congestionControllerFactory->makeCongestionController(
@@ -2919,15 +2917,15 @@ void QuicTransportBaseLite::setSupportedVersions(
 
 void QuicTransportBaseLite::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  CHECK(ccFactory);
-  CHECK(conn_);
+  MVCHECK(ccFactory);
+  MVCHECK(conn_);
   conn_->congestionControllerFactory = ccFactory;
   conn_->congestionController.reset();
 }
 
 void QuicTransportBaseLite::addPacketProcessor(
     std::shared_ptr<PacketProcessor> packetProcessor) {
-  DCHECK(conn_);
+  MVDCHECK(conn_);
   conn_->packetProcessors.push_back(std::move(packetProcessor));
 }
 
@@ -3077,7 +3075,7 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::validateECNState() {
 
   if (conn_->ecnState == ECNState::FailedValidation) {
     conn_->socketTos.fields.ecn = 0;
-    CHECK(socket_ && socket_->isBound());
+    MVCHECK(socket_ && socket_->isBound());
     auto result = socket_->setTosOrTrafficClass(conn_->socketTos.value);
     if (!result.has_value()) {
       return result;
@@ -3237,7 +3235,7 @@ void QuicTransportBaseLite::handleNewStreams(
     std::vector<StreamId>& streamStorage) {
   const auto& newPeerStreamIds = streamStorage;
   for (const auto& streamId : newPeerStreamIds) {
-    CHECK_NOTNULL(connCallback_.get());
+    MVCHECK_NOTNULL(connCallback_.get());
     if (isBidirectionalStream(streamId)) {
       connCallback_->onNewBidirectionalStream(streamId);
     } else {
@@ -3318,7 +3316,7 @@ void QuicTransportBaseLite::updateCongestionControlSettings(
 }
 
 void QuicTransportBaseLite::describe(std::ostream& os) const {
-  CHECK(conn_);
+  MVCHECK(conn_);
   os << *conn_;
 }
 

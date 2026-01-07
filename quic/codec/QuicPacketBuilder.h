@@ -13,6 +13,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/MvfstLogging.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 namespace quic {
@@ -139,7 +140,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   void appendBytes(PacketNum value, uint8_t byteNumber) override;
 
   void appendBytes(BufAppender&, PacketNum, uint8_t) override {
-    CHECK(false) << "Invalid appender";
+    MVCHECK(false, "Invalid appender");
   }
 
   void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
@@ -222,7 +223,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
       override;
 
   void appendBytes(BufWriter&, PacketNum, uint8_t) override {
-    CHECK(false) << "Invalid BufWriter";
+    MVCHECK(false, "Invalid BufWriter");
   }
 
   void insert(BufPtr buf) override;
@@ -480,8 +481,9 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
   }
 
   [[nodiscard]] quic::Expected<void, QuicError> encodePacketHeader() override {
-    CHECK(false)
-        << "We only support wrapping builder that has already encoded header";
+    MVCHECK(
+        false,
+        "We only support wrapping builder that has already encoded header");
   }
 
   void write(const QuicInteger& quicInteger) override {

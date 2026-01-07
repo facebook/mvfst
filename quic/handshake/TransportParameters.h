@@ -12,6 +12,7 @@
 #include <quic/codec/QuicInteger.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -98,10 +99,10 @@ struct TransportParameter {
     // write parameter; need to improve QuicInteger encoding methods
     BufWriter writer(res->writableData(), res->capacity());
     auto appenderOp = [&](auto val) { writer.writeBE(val); };
-    CHECK(encodeQuicInteger(u64_tp(parameter), appenderOp));
+    MVCHECK(encodeQuicInteger(u64_tp(parameter), appenderOp));
 
     // write size of value
-    CHECK(encodeQuicInteger(value->computeChainDataLength(), appenderOp));
+    MVCHECK(encodeQuicInteger(value->computeChainDataLength(), appenderOp));
 
     // write value if present
     if (value) {

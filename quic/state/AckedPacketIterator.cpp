@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/common/MvfstLogging.h>
 #include <quic/state/AckedPacketIterator.h>
 #include <quic/state/QuicStateFunctions.h>
 
@@ -43,8 +44,8 @@ void AckedPacketIterator::eraseAckedOutstandings() {
               ackBlockIter_->startPacket) &&
              (outstandingsIter_->packet.header.getPacketNumberSpace() ==
               pnSpace_)) {
-        CHECK(outstandingsIter_->metadata.scheduledForDestruction);
-        CHECK_GT(conn_.outstandings.scheduledForDestructionCount, 0);
+        MVCHECK(outstandingsIter_->metadata.scheduledForDestruction);
+        MVCHECK_GT(conn_.outstandings.scheduledForDestructionCount, 0);
         conn_.outstandings.scheduledForDestructionCount--;
         outstandingsIter_++;
       }

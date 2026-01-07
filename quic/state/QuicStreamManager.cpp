@@ -239,7 +239,7 @@ QuicStreamManager::QuicStreamManager(
 }
 
 uint64_t QuicStreamManager::openableLocalBidirectionalStreams() {
-  CHECK_GE(
+  MVCHECK_GE(
       maxLocalBidirectionalStreamId_,
       nextAcceptableLocalBidirectionalStreamId_);
   return (maxLocalBidirectionalStreamId_ -
@@ -248,7 +248,7 @@ uint64_t QuicStreamManager::openableLocalBidirectionalStreams() {
 }
 
 uint64_t QuicStreamManager::openableLocalUnidirectionalStreams() {
-  CHECK_GE(
+  MVCHECK_GE(
       maxLocalUnidirectionalStreamId_,
       nextAcceptableLocalUnidirectionalStreamId_);
   return (maxLocalUnidirectionalStreamId_ -
@@ -257,7 +257,7 @@ uint64_t QuicStreamManager::openableLocalUnidirectionalStreams() {
 }
 
 uint64_t QuicStreamManager::openableRemoteBidirectionalStreams() {
-  CHECK_GE(
+  MVCHECK_GE(
       maxRemoteBidirectionalStreamId_,
       nextAcceptablePeerBidirectionalStreamId_);
   return (maxRemoteBidirectionalStreamId_ -
@@ -266,7 +266,7 @@ uint64_t QuicStreamManager::openableRemoteBidirectionalStreams() {
 }
 
 uint64_t QuicStreamManager::openableRemoteUnidirectionalStreams() {
-  CHECK_GE(
+  MVCHECK_GE(
       maxRemoteUnidirectionalStreamId_,
       nextAcceptablePeerUnidirectionalStreamId_);
   return (maxRemoteUnidirectionalStreamId_ -
@@ -278,7 +278,7 @@ Optional<StreamId>
 QuicStreamManager::nextAcceptablePeerBidirectionalStreamId() {
   const auto max = maxRemoteBidirectionalStreamId_;
   const auto next = nextAcceptablePeerBidirectionalStreamId_;
-  CHECK_GE(max, next);
+  MVCHECK_GE(max, next);
   if (max == next) {
     return std::nullopt;
   }
@@ -289,7 +289,7 @@ Optional<StreamId>
 QuicStreamManager::nextAcceptablePeerUnidirectionalStreamId() {
   const auto max = maxRemoteUnidirectionalStreamId_;
   const auto next = nextAcceptablePeerUnidirectionalStreamId_;
-  CHECK_GE(max, next);
+  MVCHECK_GE(max, next);
   if (max == next) {
     return std::nullopt;
   }
@@ -300,7 +300,7 @@ Optional<StreamId>
 QuicStreamManager::nextAcceptableLocalBidirectionalStreamId() {
   const auto max = maxLocalBidirectionalStreamId_;
   const auto next = nextAcceptableLocalBidirectionalStreamId_;
-  CHECK_GE(max, next);
+  MVCHECK_GE(max, next);
   if (max == next) {
     return std::nullopt;
   }
@@ -311,7 +311,7 @@ Optional<StreamId>
 QuicStreamManager::nextAcceptableLocalUnidirectionalStreamId() {
   const auto max = maxLocalUnidirectionalStreamId_;
   const auto next = nextAcceptableLocalUnidirectionalStreamId_;
-  CHECK_GE(max, next);
+  MVCHECK_GE(max, next);
   if (max == next) {
     return std::nullopt;
   }
@@ -329,7 +329,7 @@ void QuicStreamManager::removeLoss(StreamId id) {
   auto* stream = findStream(id);
   if (stream && stream->inLossSet_) {
     stream->inLossSet_ = false;
-    CHECK_GT(numStreamsWithLoss_, 0);
+    MVCHECK_GT(numStreamsWithLoss_, 0);
     numStreamsWithLoss_--;
   }
 }
@@ -507,7 +507,7 @@ QuicStreamState* QuicStreamManager::getStreamIfExists(StreamId streamId) {
   // - We verified streamExists() is true (stream is in open set)
   // - getStream() only returns nullptr for closed streams
   // - Closed streams are removed from open sets
-  DCHECK(result.value() != nullptr);
+  MVDCHECK(result.value() != nullptr);
   return result.value();
 }
 
@@ -877,7 +877,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
   }
 
   // If we reached here, openedResult must be NO_ERROR.
-  DCHECK(openedResult == LocalErrorCode::NO_ERROR);
+  MVDCHECK(openedResult == LocalErrorCode::NO_ERROR);
 
   // Check if peer saturated the limit *after* opening this stream
   if (nextAcceptableStreamId >= maxStreamId && conn_.statsCallback) {
@@ -950,7 +950,7 @@ quic::Expected<QuicStreamState*, QuicError> QuicStreamManager::createStream(
         TransportErrorCode::STREAM_STATE_ERROR,
         "Cannot create stream: already exists or closed"));
   }
-  DCHECK(openedResultCode == LocalErrorCode::NO_ERROR);
+  MVDCHECK(openedResultCode == LocalErrorCode::NO_ERROR);
 
   // Stream is now officially open, instantiate its state in the map.
   auto [it, inserted] = streams_.try_emplace(streamId, streamId, conn_);
@@ -977,7 +977,7 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
     return {};
   }
   MVVLOG(10) << "Removing closed stream=" << streamId;
-  DCHECK(it->second.inTerminalStates());
+  MVDCHECK(it->second.inTerminalStates());
 
   // Clear from various tracking sets
   if (conn_.pendingEvents.resets.contains(streamId)) {
@@ -994,7 +994,7 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
   // Handle loss counter - we have mutable access to the stream here
   if (it->second.inLossSet_) {
     it->second.inLossSet_ = false;
-    CHECK_GT(numStreamsWithLoss_, 0);
+    MVCHECK_GT(numStreamsWithLoss_, 0);
     numStreamsWithLoss_--;
   }
   blockedStreams_.erase(streamId);
@@ -1006,7 +1006,7 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
   connFlowControlBlocked_.erase(streamId);
   // Adjust control stream count if needed
   if (it->second.isControl) {
-    DCHECK_GT(numControlStreams_, 0);
+    MVDCHECK_GT(numControlStreams_, 0);
     numControlStreams_--;
   }
 
@@ -1104,7 +1104,7 @@ void QuicStreamManager::updateWritableStreams(
     bool connFlowControlOpen) {
   // Check for terminal write errors first
   if (stream.streamWriteError.has_value() && !stream.reliableSizeToPeer) {
-    CHECK(stream.lossBuffer.empty());
+    MVCHECK(stream.lossBuffer.empty());
     removeWritable(stream);
     return;
   }
@@ -1116,7 +1116,7 @@ void QuicStreamManager::updateWritableStreams(
     numStreamsWithLoss_++;
   } else if (stream.inLossSet_ && !newHasLoss) {
     stream.inLossSet_ = false;
-    CHECK_GT(numStreamsWithLoss_, 0);
+    MVCHECK_GT(numStreamsWithLoss_, 0);
     numStreamsWithLoss_--;
   }
 

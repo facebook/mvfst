@@ -76,27 +76,27 @@ class LibevQuicEventBase
   }
 
   void runInEventBaseThread(std::function<void()> /*fn*/) noexcept override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicEventBase";
+    MVCHECK(false, __func__ << " not supported in LibevQuicEventBase");
   }
 
   void runInEventBaseThreadAndWait(
       std::function<void()> /*fn*/) noexcept override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicEventBase";
+    MVCHECK(false, __func__ << " not supported in LibevQuicEventBase");
   }
 
   void runImmediatelyOrRunInEventBaseThreadAndWait(
       std::function<void()> /*fn*/) noexcept override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicEventBase";
+    MVCHECK(false, __func__ << " not supported in LibevQuicEventBase");
   }
 
   void runImmediatelyOrRunInEventBaseThread(
       std::function<void()> /*fn*/) noexcept override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicEventBase";
+    MVCHECK(false, __func__ << " not supported in LibevQuicEventBase");
   }
 
   void runAfterDelay(std::function<void()> /*cb*/, uint32_t /*milliseconds*/)
       override {
-    MVLOG_FATAL << __func__ << " not supported in LibevQuicEventBase";
+    MVCHECK(false, __func__ << " not supported in LibevQuicEventBase");
   }
 
   bool loopOnce(int /*flags*/) override {
@@ -159,7 +159,7 @@ class LibevQuicEventBase
 
     [[nodiscard]] std::chrono::milliseconds getTimeRemainingImpl()
         const noexcept override {
-      MVLOG_FATAL << __func__ << " not implemented in LibevQuicEventBase";
+      MVCHECK(false, __func__ << " not implemented in LibevQuicEventBase");
     }
 
    private:

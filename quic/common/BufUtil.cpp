@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/BufUtil.h>
+#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 
@@ -134,7 +135,7 @@ void BufQueue::appendToChain(BufPtr& dst, BufPtr&& src) {
 }
 
 BufAppender::BufAppender(Buf* data, size_t appendLen)
-    : crtBuf_(CHECK_NOTNULL(data)), head_(data), appendLen_(appendLen) {}
+    : crtBuf_(MVCHECK_NOTNULL(data)), head_(data), appendLen_(appendLen) {}
 
 void BufAppender::push(const uint8_t* data, size_t len) {
   if (crtBuf_->tailroom() < len || lastBufShared_) {
@@ -209,7 +210,7 @@ void BufWriter::copy(const Buf* data, size_t limit) {
     }
     curBuf = curBuf->next();
   } while (remaining && curBuf != data);
-  CHECK_GE(limit, totalInserted);
+  MVCHECK_GE(limit, totalInserted);
 }
 
 void BufWriter::copy(const ChainedByteRangeHead* data, size_t limit) {
@@ -230,13 +231,13 @@ void BufWriter::copy(const ChainedByteRangeHead* data, size_t limit) {
     }
     curBuf = curBuf->getNext();
   } while (remaining && curBuf);
-  CHECK_GE(limit, totalInserted);
+  MVCHECK_GE(limit, totalInserted);
 }
 
 void BufWriter::backFill(const uint8_t* data, size_t len, size_t destOffset) {
-  CHECK_GE(appendCount_, len);
+  MVCHECK_GE(appendCount_, len);
   appendCount_ -= len;
-  CHECK_LE(destOffset + len, most_);
+  MVCHECK_LE(destOffset + len, most_);
   memcpy(buffer_ + destOffset, data, len);
 }
 } // namespace quic
