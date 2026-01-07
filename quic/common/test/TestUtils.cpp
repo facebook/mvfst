@@ -25,6 +25,8 @@
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
+#include <memory>
+
 using namespace testing;
 
 namespace quic::test {
@@ -305,16 +307,16 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
         dstConnId,
         packetNum,
         longHeaderOverride->second);
-    builder.reset(new RegularQuicPacketBuilder(
-        packetSizeLimit, std::move(header), largestAcked));
+    builder = std::make_unique<RegularQuicPacketBuilder>(
+        packetSizeLimit, std::move(header), largestAcked);
   } else {
     ProtectionType protectionType = ProtectionType::KeyPhaseZero;
     if (shortHeaderOverride) {
       protectionType = *shortHeaderOverride;
     }
     ShortHeader header(protectionType, dstConnId, packetNum);
-    builder.reset(new RegularQuicPacketBuilder(
-        packetSizeLimit, std::move(header), largestAcked));
+    builder = std::make_unique<RegularQuicPacketBuilder>(
+        packetSizeLimit, std::move(header), largestAcked);
   }
   CHECK(!builder->encodePacketHeader().hasError());
   builder->accountForCipherOverhead(cipherOverhead);
