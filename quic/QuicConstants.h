@@ -514,7 +514,7 @@ enum class CongestionControlType : uint8_t {
   // NOTE: MAX should always be at the end
   MAX
 };
-std::string_view congestionControlTypeToString(CongestionControlType type);
+std::string congestionControlTypeToString(CongestionControlType type);
 std::optional<CongestionControlType> congestionControlStrToType(
     std::string_view str);
 
@@ -801,9 +801,9 @@ enum class NoReadReason {
   STALE_DATA,
 };
 
-std::string_view writeDataReasonString(WriteDataReason reason);
-std::string_view writeNoWriteReasonString(NoWriteReason reason);
-std::string_view readNoReadReasonString(NoReadReason reason);
+std::string writeDataReasonString(WriteDataReason reason);
+std::string writeNoWriteReasonString(NoWriteReason reason);
+std::string readNoReadReasonString(NoReadReason reason);
 
 /**
  * Filter the versions that are currently supported.

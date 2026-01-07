@@ -239,7 +239,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
       MVVLOG(4) << "Received Stateless Reset " << *this;
       conn_->peerConnectionError = QuicError(
           QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
-          toString(LocalErrorCode::CONNECTION_RESET).str());
+          toString(LocalErrorCode::CONNECTION_RESET));
       return quic::make_unexpected(
           QuicError(LocalErrorCode::NO_ERROR, "Stateless Reset Received"));
     }

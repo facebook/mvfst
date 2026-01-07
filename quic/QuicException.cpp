@@ -56,7 +56,7 @@ bool isCryptoError(TransportErrorCode code) {
       static_cast<std::underlying_type<TransportErrorCode>::type>(code);
 }
 
-folly::StringPiece toString(LocalErrorCode code) {
+std::string toString(LocalErrorCode code) {
   switch (code) {
     case LocalErrorCode::NO_ERROR:
       return "No Error";
@@ -240,7 +240,7 @@ std::string toString(QuicErrorCode code) {
       }
       return fmt::format("{}", *code.asApplicationErrorCode());
     case QuicErrorCode::Type::LocalErrorCode:
-      return toString(*code.asLocalErrorCode()).str();
+      return toString(*code.asLocalErrorCode());
     case QuicErrorCode::Type::TransportErrorCode:
       return toString(*code.asTransportErrorCode());
   }

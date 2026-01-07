@@ -88,7 +88,7 @@ TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
 TEST_F(QLoggerTest, ConnectionCloseEvent) {
   FileQLogger q(VantagePoint::Client);
   auto error = toString(LocalErrorCode::CONNECTION_RESET);
-  q.addConnectionClose(error.str(), "Connection close", true, false);
+  q.addConnectionClose(error, "Connection close", true, false);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogConnectionCloseEvent*>(p.get());
@@ -830,7 +830,7 @@ TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
 
   FileQLogger q(VantagePoint::Client);
   auto error = toString(LocalErrorCode::CONNECTION_RESET);
-  q.addConnectionClose(error.str(), "Connection changed", true, false);
+  q.addConnectionClose(error, "Connection changed", true, false);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0]["time"] = 0; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

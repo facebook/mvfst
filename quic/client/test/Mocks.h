@@ -209,7 +209,7 @@ class MockQuicClientTransport : public quic::QuicClientTransport {
       override {
     auto cancelCode = QuicError(
         QuicErrorCode(LocalErrorCode::NO_ERROR),
-        toString(LocalErrorCode::NO_ERROR).str());
+        toString(LocalErrorCode::NO_ERROR));
 
     switch (testType_) {
       case TestType::Success:

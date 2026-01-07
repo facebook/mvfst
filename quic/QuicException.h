@@ -100,11 +100,8 @@ bool isCryptoError(TransportErrorCode code);
 /**
  * Convert the error code to a string.
  */
-folly::StringPiece toString(LocalErrorCode code);
+std::string toString(LocalErrorCode code);
 
-// TODO: There's some dynamic string construction happening in this (related to
-// CryptoError toString). We should eventually figure out a way to avoid the
-// copy on return here as well.
 std::string toString(TransportErrorCode code);
 std::string toString(QuicErrorCode code);
 std::string toString(const QuicError& error);

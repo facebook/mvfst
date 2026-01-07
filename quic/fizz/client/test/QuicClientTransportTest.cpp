@@ -4904,7 +4904,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
   // Drain first with no active streams
   auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR).str());
+      toString(LocalErrorCode::INTERNAL_ERROR));
   client->close(err);
   EXPECT_TRUE(client->isDraining());
   client->closeNow(err);
@@ -4916,7 +4916,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
 TEST_F(QuicClientTransportAfterStartTest, ExpiredDrainTimeout) {
   auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR).str());
+      toString(LocalErrorCode::INTERNAL_ERROR));
   client->close(err);
   EXPECT_TRUE(client->isDraining());
   EXPECT_FALSE(destructionCallback->isDestroyed());
@@ -4929,7 +4929,7 @@ TEST_F(QuicClientTransportAfterStartTest, WriteThrowsExceptionWhileDraining) {
   // Drain first with no active streams
   auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR).str());
+      toString(LocalErrorCode::INTERNAL_ERROR));
   EXPECT_CALL(*sock, write(_, _, _))
       .WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
   client->close(err);
@@ -5168,7 +5168,7 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
       .WillRepeatedly(Return(10));
   client->close(QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR).str()));
+      toString(LocalErrorCode::INTERNAL_ERROR)));
   EXPECT_TRUE(conn.lastCloseSentTime.has_value());
   Mock::VerifyAndClearExpectations(sock);
 

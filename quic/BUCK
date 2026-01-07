@@ -29,9 +29,12 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "constants",
-    srcs = [
-        "QuicConstants.cpp",
-    ],
+    srcs = select({
+        "DEFAULT": ["QuicConstants.cpp"],
+        "ovr_config//os/constraints:android": ["facebook/QuicConstantsMobile.cpp"],
+        "ovr_config//os/constraints:iphoneos": ["facebook/QuicConstantsMobile.cpp"],
+        "ovr_config//os/constraints:macos": ["facebook/QuicConstantsMobile.cpp"],
+    }),
     headers = [
         "QuicConstants.h",
         "QuicTypealiases.h",
@@ -48,13 +51,21 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "exception",
-    srcs = [
-        "QuicException.cpp",
-    ],
+    srcs = select({
+        "DEFAULT": ["QuicException.cpp"],
+        "ovr_config//os/constraints:android": ["facebook/QuicExceptionMobile.cpp"],
+        "ovr_config//os/constraints:iphoneos": ["facebook/QuicExceptionMobile.cpp"],
+        "ovr_config//os/constraints:macos": ["facebook/QuicExceptionMobile.cpp"],
+    }),
     headers = [
         "QuicException.h",
     ],
-    deps = ["//quic/common:mvfst_logging"],
+    deps = select({
+        "DEFAULT": ["//quic/common:mvfst_logging"],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+        "ovr_config//os/constraints:macos": [],
+    }),
     exported_deps = [
         ":constants",
         ":tls_exception",

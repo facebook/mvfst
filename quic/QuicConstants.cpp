@@ -12,28 +12,28 @@
 
 namespace quic {
 
-std::string_view congestionControlTypeToString(CongestionControlType type) {
+std::string congestionControlTypeToString(CongestionControlType type) {
   switch (type) {
     case CongestionControlType::Cubic:
-      return kCongestionControlCubicStr;
+      return std::string(kCongestionControlCubicStr);
     case CongestionControlType::BBR:
-      return kCongestionControlBbrStr;
+      return std::string(kCongestionControlBbrStr);
     case CongestionControlType::BBR2:
-      return kCongestionControlBbr2Str;
+      return std::string(kCongestionControlBbr2Str);
     case CongestionControlType::BBRTesting:
-      return kCongestionControlBbrTestingStr;
+      return std::string(kCongestionControlBbrTestingStr);
     case CongestionControlType::Copa:
-      return kCongestionControlCopaStr;
+      return std::string(kCongestionControlCopaStr);
     case CongestionControlType::Copa2:
-      return kCongestionControlCopa2Str;
+      return std::string(kCongestionControlCopa2Str);
     case CongestionControlType::NewReno:
-      return kCongestionControlNewRenoStr;
+      return std::string(kCongestionControlNewRenoStr);
     case CongestionControlType::StaticCwnd:
-      return kCongestionControlStaticCwndStr;
+      return std::string(kCongestionControlStaticCwndStr);
     case CongestionControlType::Custom:
-      return kCongestionControlCustomStr;
+      return std::string(kCongestionControlCustomStr);
     case CongestionControlType::None:
-      return kCongestionControlNoneStr;
+      return std::string(kCongestionControlNoneStr);
     case CongestionControlType::MAX:
       return "MAX";
     default:
@@ -105,7 +105,7 @@ std::vector<QuicVersion> filterSupportedVersions(
   return filteredVersions;
 }
 
-std::string_view writeDataReasonString(WriteDataReason reason) {
+std::string writeDataReasonString(WriteDataReason reason) {
   switch (reason) {
     case WriteDataReason::PROBES:
       return "Probes";
@@ -139,7 +139,7 @@ std::string_view writeDataReasonString(WriteDataReason reason) {
   folly::assume_unreachable();
 }
 
-std::string_view writeNoWriteReasonString(NoWriteReason reason) {
+std::string writeNoWriteReasonString(NoWriteReason reason) {
   switch (reason) {
     case NoWriteReason::WRITE_OK:
       return "WriteOk";
@@ -155,7 +155,7 @@ std::string_view writeNoWriteReasonString(NoWriteReason reason) {
   folly::assume_unreachable();
 }
 
-std::string_view readNoReadReasonString(NoReadReason reason) {
+std::string readNoReadReasonString(NoReadReason reason) {
   switch (reason) {
     case NoReadReason::READ_OK:
       return "ReadOK";

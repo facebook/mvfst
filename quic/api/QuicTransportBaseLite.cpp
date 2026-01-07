@@ -1452,7 +1452,7 @@ void QuicTransportBaseLite::closeImpl(
   updatePacingOnClose(*conn_);
   auto cancelCode = QuicError(
       QuicErrorCode(LocalErrorCode::NO_ERROR),
-      toString(LocalErrorCode::NO_ERROR).str());
+      toString(LocalErrorCode::NO_ERROR));
   if (conn_->peerConnectionError) {
     cancelCode = *conn_->peerConnectionError;
   } else if (errorCode) {
