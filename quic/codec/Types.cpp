@@ -299,11 +299,6 @@ uint8_t StreamTypeField::fieldValue() const {
   return field_;
 }
 
-StreamTypeField::Builder& StreamTypeField::Builder::switchToStreamGroups() {
-  field_ = static_cast<uint8_t>(FrameType::GROUP_STREAM);
-  return *this;
-}
-
 StreamTypeField::Builder& StreamTypeField::Builder::setFin() {
   field_ |= StreamTypeField::kFinBit;
   return *this;
@@ -444,15 +439,6 @@ std::string_view toString(FrameType frame) {
       return "ACK_FREQUENCY";
     case FrameType::IMMEDIATE_ACK:
       return "IMMEDIATE_ACK";
-    case FrameType::GROUP_STREAM:
-    case FrameType::GROUP_STREAM_FIN:
-    case FrameType::GROUP_STREAM_LEN:
-    case FrameType::GROUP_STREAM_LEN_FIN:
-    case FrameType::GROUP_STREAM_OFF:
-    case FrameType::GROUP_STREAM_OFF_FIN:
-    case FrameType::GROUP_STREAM_OFF_LEN:
-    case FrameType::GROUP_STREAM_OFF_LEN_FIN:
-      return "GROUP_STREAM";
     case FrameType::ACK_RECEIVE_TIMESTAMPS:
       return "ACK_RECEIVE_TIMESTAMPS";
     case quic::FrameType::ACK_EXTENDED:

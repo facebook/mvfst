@@ -430,8 +430,7 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
         bufferLen, // writeBufferLen -- only the len of the single buffer.
         bufferLen, // flowControlLen -- not relevant, already flow controlled.
         buffer->eof,
-        std::nullopt /* skipLenHint */,
-        stream.groupId);
+        std::nullopt /* skipLenHint */);
     if (!res.has_value()) {
       return quic::make_unexpected(res.error());
     }
@@ -682,8 +681,7 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
       bufferLen,
       flowControlLen,
       canWriteFin,
-      std::nullopt /* skipLenHint */,
-      stream.groupId);
+      std::nullopt /* skipLenHint */);
   if (!res.has_value()) {
     return quic::make_unexpected(res.error());
   }
@@ -905,7 +903,9 @@ quic::Expected<void, QuicError> BlockedScheduler::writeBlockedFrames(
     }
   }
   for (const auto& blockedStream : conn_.streamManager->blockedStreams()) {
-    auto bytesWrittenResult = writeFrame(blockedStream.second, builder);
+    // Reconstruct frame from streamId (key) and offset (value)
+    StreamDataBlockedFrame frame(blockedStream.first, blockedStream.second);
+    auto bytesWrittenResult = writeFrame(frame, builder);
     if (!bytesWrittenResult.has_value()) {
       return quic::make_unexpected(bytesWrittenResult.error());
     }

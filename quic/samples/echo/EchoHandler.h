@@ -21,11 +21,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
  public:
   using StreamData = std::pair<BufQueue, bool>;
 
-  explicit EchoHandler(
-      folly::EventBase* evbIn,
-      bool useDatagrams = false,
-      bool disableRtx = false)
-      : evb(evbIn), useDatagrams_(useDatagrams), disableRtx_(disableRtx) {}
+  explicit EchoHandler(folly::EventBase* evbIn, bool useDatagrams = false)
+      : evb(evbIn), useDatagrams_(useDatagrams) {}
 
   void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
     sock = socket;
@@ -40,44 +37,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     CHECK(sock->setReadCallback(id, this).has_value());
   }
 
-  void onNewBidirectionalStreamGroup(
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "Got bidirectional stream group id=" << groupId;
-    CHECK(streamGroupsData_.find(groupId) == streamGroupsData_.cend());
-    streamGroupsData_.emplace(groupId, PerStreamData{});
-    if (disableRtx_) {
-      QuicStreamGroupRetransmissionPolicy policy;
-      policy.disableRetransmission = true;
-      CHECK(sock->setStreamGroupRetransmissionPolicy(groupId, policy)
-                .has_value());
-    }
-  }
-
-  void onNewBidirectionalStreamInGroup(
-      quic::StreamId id,
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "Got bidirectional stream id=" << id
-               << " in group=" << groupId;
-    CHECK(sock->setReadCallback(id, this).has_value());
-  }
-
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
     MVLOG_INFO << "Got unidirectional stream id=" << id;
-    CHECK(sock->setReadCallback(id, this).has_value());
-  }
-
-  void onNewUnidirectionalStreamGroup(
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "Got unidirectional stream group id=" << groupId;
-    CHECK(streamGroupsData_.find(groupId) == streamGroupsData_.cend());
-    streamGroupsData_.emplace(groupId, PerStreamData{});
-  }
-
-  void onNewUnidirectionalStreamInGroup(
-      quic::StreamId id,
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "Got unidirectional stream id=" << id
-               << " in group=" << groupId;
     CHECK(sock->setReadCallback(id, this).has_value());
   }
 
@@ -128,55 +89,12 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     }
   }
 
-  void readAvailableWithGroup(
-      quic::StreamId id,
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "read available for stream id=" << id
-               << "; groupId=" << groupId;
-
-    auto it = streamGroupsData_.find(groupId);
-    CHECK(it != streamGroupsData_.end());
-
-    auto res = sock->read(id, 0);
-    if (res.hasError()) {
-      MVLOG_ERROR << "Got error=" << toString(res.error());
-      return;
-    }
-
-    auto& streamData = it->second;
-    if (streamData.find(id) == streamData.end()) {
-      streamData.emplace(id, std::make_pair(BufQueue(), false));
-    }
-
-    quic::BufPtr data = std::move(res.value().first);
-    bool eof = res.value().second;
-    auto dataLen = (data ? data->computeChainDataLength() : 0);
-    MVLOG_INFO << "Got len=" << dataLen << " eof=" << uint32_t(eof)
-               << " total=" << input_[id].first.chainLength() + dataLen
-               << " data="
-               << ((data) ? data->clone()->toString() : std::string());
-
-    streamData[id].first.append(std::move(data));
-    streamData[id].second = eof;
-    if (eof) {
-      echo(id, streamData[id]);
-    }
-  }
-
   void readError(quic::StreamId id, QuicError error) noexcept override {
     MVLOG_ERROR << "Got read error on stream=" << id
                 << " error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
     // resetStream
-  }
-
-  void readErrorWithGroup(
-      quic::StreamId id,
-      quic::StreamGroupId groupId,
-      QuicError error) noexcept override {
-    MVLOG_ERROR << "Got read error on stream=" << id << "; group=" << groupId
-                << " error=" << toString(error);
   }
 
   void onDatagramsAvailable() noexcept override {
@@ -240,7 +158,5 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   bool useDatagrams_;
   using PerStreamData = std::map<quic::StreamId, StreamData>;
   PerStreamData input_;
-  std::map<quic::StreamGroupId, PerStreamData> streamGroupsData_;
-  bool disableRtx_{false};
 };
 } // namespace quic::samples

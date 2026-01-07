@@ -35,7 +35,6 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     uint64_t flowControlLen,
     bool fin,
     Optional<bool> skipLenHint,
-    OptionalIntegral<StreamGroupId> streamGroupId,
     bool appendFrame) {
   if (builder.remainingSpaceInPkt() == 0) {
     return std::nullopt;
@@ -46,29 +45,14 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
         "No data or fin supplied when writing stream."));
   }
   StreamTypeField::Builder streamTypeBuilder;
-  if (streamGroupId) {
-    streamTypeBuilder.switchToStreamGroups();
-  }
   QuicInteger idInt(id);
-  Optional<QuicInteger> groupIdInt;
-  if (streamGroupId) {
-    groupIdInt = QuicInteger(*streamGroupId);
-  }
 
-  // First account for the things that are non-optional: frame type, stream id
-  // and (optional) group id.
+  // First account for the things that are non-optional: frame type, stream id.
   auto idIntSize = idInt.getSize();
   if (idIntSize.hasError()) {
     return quic::make_unexpected(idIntSize.error());
   }
   uint64_t headerSize = sizeof(uint8_t) + idIntSize.value();
-  if (groupIdInt) {
-    auto groupIdIntSize = groupIdInt->getSize();
-    if (groupIdIntSize.hasError()) {
-      return quic::make_unexpected(groupIdIntSize.error());
-    }
-    headerSize += groupIdIntSize.value();
-  }
   if (builder.remainingSpaceInPkt() < headerSize) {
     MVVLOG(4) << "No space in packet for stream header. stream=" << id
               << " remaining=" << builder.remainingSpaceInPkt();
@@ -154,9 +138,6 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   auto streamType = streamTypeBuilder.build();
   builder.writeBE(streamType.fieldValue());
   builder.write(idInt);
-  if (groupIdInt) {
-    builder.write(*groupIdInt);
-  }
   if (offset != 0) {
     builder.write(offsetInt);
   }
@@ -164,8 +145,8 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     builder.write(QuicInteger(dataLen));
   }
   if (appendFrame) {
-    builder.appendFrame(WriteStreamFrame(
-        id, offset, dataLen, streamType.hasFin(), streamGroupId));
+    builder.appendFrame(
+        WriteStreamFrame(id, offset, dataLen, streamType.hasFin()));
   } else {
     builder.markNonEmpty();
   }

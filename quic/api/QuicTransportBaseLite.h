@@ -527,7 +527,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void onSocketWritable() noexcept override;
 
   void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
-  void handleNewGroupedStreamCallbacks(std::vector<StreamId>& newPeerStreams);
   void handleKnobCallbacks();
   void handleAckEventCallbacks();
   void handleCancelByteEventCallbacks();
@@ -555,8 +554,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void closeUdpSocket();
 
   quic::Expected<StreamId, LocalErrorCode> createStreamInternal(
-      bool bidirectional,
-      const OptionalIntegral<StreamGroupId>& streamGroupId = std::nullopt);
+      bool bidirectional);
 
   void runOnEvbAsync(
       std::function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
@@ -802,7 +800,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * Helper functions to handle new streams.
    */
   void handleNewStreams(std::vector<StreamId>& newPeerStreams);
-  void handleNewGroupedStreams(std::vector<StreamId>& newPeerStreams);
 
   /**
    * Helper to log new stream event to observer.

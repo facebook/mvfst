@@ -31,11 +31,6 @@ DEFINE_int64(
     10,
     "Maximum number of active connection IDs a peer supports");
 DEFINE_bool(enable_migration, true, "Enable/disable migration");
-DEFINE_bool(use_stream_groups, false, "Enable/disable stream groups");
-DEFINE_bool(
-    disable_rtx,
-    false,
-    "Enable/disable retransmission for stream groups");
 DEFINE_string(alpns, "echo", "Comma separated ALPN list");
 DEFINE_bool(
     connect_only,
@@ -70,9 +65,7 @@ int main(int argc, char* argv[]) {
         FLAGS_port,
         FLAGS_use_datagrams,
         FLAGS_active_conn_id_limit,
-        FLAGS_enable_migration,
-        FLAGS_use_stream_groups,
-        FLAGS_disable_rtx);
+        FLAGS_enable_migration);
     server.start();
   } else if (FLAGS_mode == "transport-server") {
     EchoTransportServer server(FLAGS_host, FLAGS_port);
@@ -88,7 +81,6 @@ int main(int argc, char* argv[]) {
         FLAGS_use_datagrams,
         FLAGS_active_conn_id_limit,
         FLAGS_enable_migration,
-        FLAGS_use_stream_groups,
         std::move(alpns),
         FLAGS_connect_only,
         FLAGS_client_cert_path,

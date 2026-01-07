@@ -440,32 +440,6 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
   }
 }
 
-quic::Expected<StreamGroupId, LocalErrorCode>
-QuicTransportBase::createBidirectionalStreamGroup() {
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  return conn_->streamManager->createNextBidirectionalStreamGroup();
-}
-
-quic::Expected<StreamGroupId, LocalErrorCode>
-QuicTransportBase::createUnidirectionalStreamGroup() {
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  return conn_->streamManager->createNextUnidirectionalStreamGroup();
-}
-
-quic::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createBidirectionalStreamInGroup(StreamGroupId groupId) {
-  return createStreamInternal(true, groupId);
-}
-
-quic::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createUnidirectionalStreamInGroup(StreamGroupId groupId) {
-  return createStreamInternal(false, groupId);
-}
-
 bool QuicTransportBase::isClientStream(StreamId stream) noexcept {
   return quic::isClientStream(stream);
 }
@@ -565,15 +539,8 @@ void QuicTransportBase::resetNonControlStreams(
       auto readCallbackIt = readCallbacks_.find(id);
       if (readCallbackIt != readCallbacks_.end() &&
           readCallbackIt->second.readCb) {
-        auto stream = CHECK_NOTNULL(
-            conn_->streamManager->getStream(id).value_or(nullptr));
-        if (!stream->groupId) {
-          readCallbackIt->second.readCb->readError(
-              id, QuicError(error, errorMsg.str()));
-        } else {
-          readCallbackIt->second.readCb->readErrorWithGroup(
-              id, *stream->groupId, QuicError(error, errorMsg.str()));
-        }
+        readCallbackIt->second.readCb->readError(
+            id, QuicError(error, errorMsg.str()));
       }
       peekCallbacks_.erase(id);
       (void)stopSending(id, error);
@@ -837,30 +804,15 @@ void QuicTransportBase::appendCmsgs(const folly::SocketCmsgMap& options) {
   (void)socket_->appendCmsgs(options);
 }
 
-bool QuicTransportBase::checkCustomRetransmissionProfilesEnabled() const {
-  return quic::checkCustomRetransmissionProfilesEnabled(*conn_);
-}
-
 quic::Expected<void, LocalErrorCode>
-QuicTransportBase::setStreamGroupRetransmissionPolicy(
-    StreamGroupId groupId,
-    std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept {
-  // Reset the policy to default one.
-  if (policy == std::nullopt) {
-    conn_->retransmissionPolicies.erase(groupId);
-    return {};
+QuicTransportBase::setStreamRetransmissionDisabled(
+    StreamId id,
+    bool disabled) noexcept {
+  auto stream = conn_->streamManager->findStream(id);
+  if (!stream) {
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-
-  if (!checkCustomRetransmissionProfilesEnabled()) {
-    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-
-  if (conn_->retransmissionPolicies.size() >=
-      conn_->transportSettings.advertisedMaxStreamGroups) {
-    return quic::make_unexpected(LocalErrorCode::RTX_POLICIES_LIMIT_EXCEEDED);
-  }
-
-  conn_->retransmissionPolicies.emplace(groupId, *policy);
+  stream->retransmissionDisabled_ = disabled;
   return {};
 }
 
@@ -998,13 +950,7 @@ void QuicTransportBase::cancelPeekPingDatagramCallbacks(const QuicError& err) {
   auto peekCallbacksCopy = peekCallbacks_;
   for (auto& [streamId, peekCbData] : peekCallbacksCopy) {
     if (peekCbData.peekCb) {
-      auto stream = CHECK_NOTNULL(
-          conn_->streamManager->getStream(streamId).value_or(nullptr));
-      if (!stream->groupId) {
-        peekCbData.peekCb->peekError(streamId, err);
-      } else {
-        peekCbData.peekCb->peekError(streamId, err);
-      }
+      peekCbData.peekCb->peekError(streamId, err);
     }
   }
   peekCallbacks_.clear();

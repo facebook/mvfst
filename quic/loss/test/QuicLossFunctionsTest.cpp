@@ -2632,21 +2632,22 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionDisabled) {
   ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
   auto conn = createConn();
 
-  conn->transportSettings.advertisedMaxStreamGroups = 16;
-
-  const auto groupId =
-      conn->streamManager->createNextBidirectionalStreamGroup();
-  QuicStreamGroupRetransmissionPolicy policy;
-  policy.disableRetransmission = true;
-  conn->retransmissionPolicies.emplace(*groupId, policy);
-
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
-  auto stream1Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
-  auto stream2Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
-  auto stream1 = conn->streamManager->findStream(stream1Id);
-  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto streamId1 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto streamId2 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+
+  // Get fresh pointers after both streams are created
+  auto stream1 = conn->streamManager->getStream(streamId1).value();
+  auto stream2 = conn->streamManager->getStream(streamId2).value();
+  ASSERT_NE(stream1, nullptr);
+  ASSERT_NE(stream2, nullptr);
+
+  // Disable retransmission for both streams
+  stream1->retransmissionDisabled_ = true;
+  stream2->retransmissionDisabled_ = true;
+
   auto buf = buildRandomInputData(20);
   ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
   ASSERT_FALSE(writeDataToQuicStream(*stream2, buf->clone(), true).hasError());
@@ -2679,30 +2680,27 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionDisabled) {
   EXPECT_EQ(stream2->lossBuffer.size(), 0);
 }
 
-TEST_F(
-    QuicLossFunctionsTest,
-    TestMarkPacketLossRetransmissionPolicyPresentButNotDisabled) {
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionNotDisabled) {
   folly::EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   MockAsyncUDPSocket socket(qEvb);
   ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
   auto conn = createConn();
 
-  conn->transportSettings.advertisedMaxStreamGroups = 16;
-
-  const auto groupId =
-      conn->streamManager->createNextBidirectionalStreamGroup();
-  QuicStreamGroupRetransmissionPolicy policy;
-  policy.disableRetransmission = false;
-  conn->retransmissionPolicies.emplace(*groupId, policy);
-
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
-  auto stream1Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
-  auto stream2Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId).value()->id;
-  auto stream1 = conn->streamManager->findStream(stream1Id);
-  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto streamId1 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto streamId2 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+
+  // Get fresh pointers after both streams are created
+  auto stream1 = conn->streamManager->getStream(streamId1).value();
+  auto stream2 = conn->streamManager->getStream(streamId2).value();
+  ASSERT_NE(stream1, nullptr);
+  ASSERT_NE(stream2, nullptr);
+
+  // retransmissionDisabled_ defaults to false, so retransmission is enabled
+
   auto buf = buildRandomInputData(20);
   ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
   ASSERT_FALSE(writeDataToQuicStream(*stream2, buf->clone(), true).hasError());
@@ -2728,42 +2726,36 @@ TEST_F(
       markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
 
   // The data from the lost packet should be transferred to the loss buffer of
-  // both streams because disableRetransmission = false on the policy.
+  // both streams because retransmissionDisabled_ = false.
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream1->lossBuffer.size(), 1);
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
 }
 
-TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionPolicyTwoGroups) {
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionMixed) {
   folly::EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   MockAsyncUDPSocket socket(qEvb);
   ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
   auto conn = createConn();
 
-  conn->transportSettings.advertisedMaxStreamGroups = 16;
-
-  const auto groupId1 =
-      conn->streamManager->createNextBidirectionalStreamGroup();
-  const auto groupId2 =
-      conn->streamManager->createNextBidirectionalStreamGroup();
-
-  QuicStreamGroupRetransmissionPolicy policy1;
-  policy1.disableRetransmission = true;
-  conn->retransmissionPolicies.emplace(*groupId1, policy1);
-
-  QuicStreamGroupRetransmissionPolicy policy2;
-  policy2.disableRetransmission = false;
-  conn->retransmissionPolicies.emplace(*groupId2, policy2);
-
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
-  auto stream1Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId1).value()->id;
-  auto stream2Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId2).value()->id;
-  auto stream1 = conn->streamManager->findStream(stream1Id);
-  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto streamId1 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto streamId2 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+
+  // Get fresh pointers after both streams are created
+  auto stream1 = conn->streamManager->getStream(streamId1).value();
+  auto stream2 = conn->streamManager->getStream(streamId2).value();
+  ASSERT_NE(stream1, nullptr);
+  ASSERT_NE(stream2, nullptr);
+
+  // Disable retransmission only for stream1
+  stream1->retransmissionDisabled_ = true;
+  // stream2 keeps default (retransmission enabled)
+
   auto buf = buildRandomInputData(20);
   ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
   ASSERT_FALSE(writeDataToQuicStream(*stream2, buf->clone(), true).hasError());
@@ -2796,35 +2788,20 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionPolicyTwoGroups) {
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
 }
 
-TEST_F(
-    QuicLossFunctionsTest,
-    TestMarkPacketLossRetransmissionPolicyTwoGroupsTwoPackets) {
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionMixedTwoPackets) {
   folly::EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
   MockAsyncUDPSocket socket(qEvb);
   ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
   auto conn = createConn();
 
-  conn->transportSettings.advertisedMaxStreamGroups = 16;
-
-  const auto groupId1 =
-      conn->streamManager->createNextBidirectionalStreamGroup();
-  const auto groupId2 =
-      conn->streamManager->createNextBidirectionalStreamGroup();
-
-  QuicStreamGroupRetransmissionPolicy policy1;
-  policy1.disableRetransmission = true;
-  conn->retransmissionPolicies.emplace(*groupId1, policy1);
-
-  QuicStreamGroupRetransmissionPolicy policy2;
-  policy2.disableRetransmission = false;
-  conn->retransmissionPolicies.emplace(*groupId2, policy2);
-
   // Generate packet 1.
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
-  auto stream1Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId1).value()->id;
-  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto streamId1 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream1 = conn->streamManager->getStream(streamId1).value();
+  ASSERT_NE(stream1, nullptr);
+  stream1->retransmissionDisabled_ = true;
   auto buf = buildRandomInputData(20);
   ASSERT_FALSE(writeDataToQuicStream(*stream1, buf->clone(), true).hasError());
 
@@ -2841,9 +2818,11 @@ TEST_F(
 
   // Generate packet 2.
   EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
-  auto stream2Id =
-      conn->streamManager->createNextBidirectionalStream(*groupId2).value()->id;
-  auto stream2 = conn->streamManager->findStream(stream2Id);
+  auto streamId2 =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2 = conn->streamManager->getStream(streamId2).value();
+  ASSERT_NE(stream2, nullptr);
+  // stream2 retransmission enabled (default)
   ASSERT_FALSE(writeDataToQuicStream(*stream2, buf->clone(), true).hasError());
 
   ASSERT_FALSE(writeQuicDataToSocket(
@@ -2860,6 +2839,12 @@ TEST_F(
   // Two packets in outstandings.
   EXPECT_EQ(2, conn->outstandings.packets.size());
 
+  // Refresh pointers after all stream creation is done
+  stream1 = conn->streamManager->getStream(streamId1).value();
+  stream2 = conn->streamManager->getStream(streamId2).value();
+  ASSERT_NE(stream1, nullptr);
+  ASSERT_NE(stream2, nullptr);
+
   // Lose the first packet.
   auto& packet =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
@@ -2873,10 +2858,8 @@ TEST_F(
 
   // The data from the lost packet should not be transferred to the loss buffer
   // of stream1, but should be transferred to the loss buffer of stream2.
-  stream1 = conn->streamManager->findStream(stream1Id);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream1->lossBuffer.size(), 0);
-  stream2 = conn->streamManager->findStream(stream2Id);
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
 }

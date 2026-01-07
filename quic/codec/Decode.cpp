@@ -546,25 +546,13 @@ quic::Expected<ReadNewTokenFrame, QuicError> decodeNewTokenFrame(
 
 quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     BufQueue& queue,
-    StreamTypeField frameTypeField,
-    bool isGroupFrame) {
+    StreamTypeField frameTypeField) {
   ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
 
   auto streamId = quic::decodeQuicInteger(cursor);
   if (!streamId) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Invalid stream id"));
-  }
-
-  OptionalIntegral<StreamGroupId> groupId;
-  if (isGroupFrame) {
-    auto gId = quic::decodeQuicInteger(cursor);
-    if (!gId) {
-      return quic::make_unexpected(QuicError(
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          "Invalid group stream id"));
-    }
-    groupId = gId->first;
   }
 
   uint64_t offset = 0;
@@ -619,8 +607,7 @@ quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
           "Failed to extract data"));
     }
   }
-  return ReadStreamFrame(
-      streamId->first, offset, std::move(data), fin, groupId);
+  return ReadStreamFrame(streamId->first, offset, std::move(data), fin);
 }
 
 quic::Expected<MaxDataFrame, QuicError> decodeMaxDataFrame(
@@ -1001,25 +988,8 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     case FrameType::STREAM_OFF_FIN:
     case FrameType::STREAM_OFF_LEN:
     case FrameType::STREAM_OFF_LEN_FIN: {
-      auto streamRes = decodeStreamFrame(
-          queue,
-          StreamTypeField(frameTypeInt->first),
-          false /* isGroupFrame */);
-      if (!streamRes.has_value()) {
-        return quic::make_unexpected(streamRes.error());
-      }
-      return QuicFrame(*streamRes);
-    }
-    case FrameType::GROUP_STREAM:
-    case FrameType::GROUP_STREAM_FIN:
-    case FrameType::GROUP_STREAM_LEN:
-    case FrameType::GROUP_STREAM_LEN_FIN:
-    case FrameType::GROUP_STREAM_OFF:
-    case FrameType::GROUP_STREAM_OFF_FIN:
-    case FrameType::GROUP_STREAM_OFF_LEN:
-    case FrameType::GROUP_STREAM_OFF_LEN_FIN: {
-      auto streamRes = decodeStreamFrame(
-          queue, StreamTypeField(frameTypeInt->first), true /* isGroupFrame */);
+      auto streamRes =
+          decodeStreamFrame(queue, StreamTypeField(frameTypeInt->first));
       if (!streamRes.has_value()) {
         return quic::make_unexpected(streamRes.error());
       }

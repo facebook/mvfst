@@ -218,16 +218,6 @@ quic::Expected<void, QuicError> processServerInitialParams(
   }
   auto maxDatagramFrameSize = maxDatagramFrameSizeResult.value();
 
-  auto peerAdvertisedMaxStreamGroupsResult = getIntegerParameter(
-      static_cast<TransportParameterId>(
-          TransportParameterId::stream_groups_enabled),
-      serverParams.parameters);
-  if (peerAdvertisedMaxStreamGroupsResult.hasError()) {
-    return quic::make_unexpected(peerAdvertisedMaxStreamGroupsResult.error());
-  }
-  auto peerAdvertisedMaxStreamGroups =
-      peerAdvertisedMaxStreamGroupsResult.value();
-
   auto minAckDelayResult = getIntegerParameter(
       TransportParameterId::min_ack_delay, serverParams.parameters);
   if (minAckDelayResult.hasError()) {
@@ -428,10 +418,6 @@ quic::Expected<void, QuicError> processServerInitialParams(
           "max_datagram_frame_size too small"));
     }
     conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
-  }
-
-  if (peerAdvertisedMaxStreamGroups) {
-    conn.peerAdvertisedMaxStreamGroups = *peerAdvertisedMaxStreamGroups;
   }
 
   if (isAckReceiveTimestampsEnabled.has_value() &&

@@ -260,16 +260,6 @@ quic::Expected<void, QuicError> processClientInitialParams(
   }
   auto maxDatagramFrameSize = maxDatagramFrameSizeResult.value();
 
-  auto peerAdvertisedMaxStreamGroupsResult = getIntegerParameter(
-      static_cast<TransportParameterId>(
-          TransportParameterId::stream_groups_enabled),
-      clientParams.parameters);
-  if (peerAdvertisedMaxStreamGroupsResult.hasError()) {
-    return quic::make_unexpected(peerAdvertisedMaxStreamGroupsResult.error());
-  }
-  auto peerAdvertisedMaxStreamGroups =
-      peerAdvertisedMaxStreamGroupsResult.value();
-
   auto isAckReceiveTimestampsEnabledResult = getIntegerParameter(
       TransportParameterId::ack_receive_timestamps_enabled,
       clientParams.parameters);
@@ -466,9 +456,6 @@ quic::Expected<void, QuicError> processClientInitialParams(
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 
-  if (peerAdvertisedMaxStreamGroups) {
-    conn.peerAdvertisedMaxStreamGroups = *peerAdvertisedMaxStreamGroups;
-  }
   if (isAckReceiveTimestampsEnabled.has_value() &&
       isAckReceiveTimestampsEnabled.value() == 1) {
     if (maxReceiveTimestampsPerAck.has_value() &&
@@ -1476,8 +1463,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
                      << " fin=" << frame.fin << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
-          auto streamResult = conn.streamManager->getStream(
-              frame.streamId, frame.streamGroupId);
+          auto streamResult = conn.streamManager->getStream(frame.streamId);
           if (streamResult.hasError()) {
             return quic::make_unexpected(streamResult.error());
           }

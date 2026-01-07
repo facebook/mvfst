@@ -464,28 +464,13 @@ Expected<uint64_t, IntervalSetError> addPacketToAckState(
   }
 }
 
-bool checkCustomRetransmissionProfilesEnabled(
-    const QuicConnectionStateBase& conn) {
-  return conn.transportSettings.advertisedMaxStreamGroups > 0;
-}
-
 /**
- * Checks if the retransmission policy on the stream group prohibits
- * retransmissions.
+ * Checks if retransmissions are disabled for this stream.
  */
 bool streamRetransmissionDisabled(
-    QuicConnectionStateBase& conn,
+    QuicConnectionStateBase& /* conn */,
     const QuicStreamState& stream) {
-  bool noRetransmissions = false;
-  if (checkCustomRetransmissionProfilesEnabled(conn) && stream.groupId) {
-    // Check stream group retransmission policy.
-    const auto it = conn.retransmissionPolicies.find(*stream.groupId);
-    if (it != conn.retransmissionPolicies.cend()) {
-      const auto& retransmissionPolicy = it->second;
-      noRetransmissions = retransmissionPolicy.disableRetransmission;
-    }
-  }
-  return noRetransmissions;
+  return stream.retransmissionDisabled_;
 }
 
 } // namespace quic

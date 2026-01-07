@@ -94,36 +94,10 @@ class QuicSocketLite {
     virtual void onNewBidirectionalStream(StreamId id) noexcept = 0;
 
     /**
-     * Invoked when the peer creates a new bidirectional stream group.
-     */
-    virtual void onNewBidirectionalStreamGroup(StreamGroupId) noexcept {}
-
-    /**
-     * Invoked when the peer creates a new bidirectional stream in a specific
-     * group.
-     */
-    virtual void onNewBidirectionalStreamInGroup(
-        StreamId,
-        StreamGroupId) noexcept {}
-
-    /**
      * Invoked when the peer creates a new unidirectional stream.  The most
      * common flow would be to set the ReadCallback from here
      */
     virtual void onNewUnidirectionalStream(StreamId id) noexcept = 0;
-
-    /**
-     * Invoked when the peer creates a new unidirectional stream group.
-     */
-    virtual void onNewUnidirectionalStreamGroup(StreamGroupId) noexcept {}
-
-    /**
-     * Invoked when the peer creates a new unidirectional stream in a specific
-     * group.
-     */
-    virtual void onNewUnidirectionalStreamInGroup(
-        StreamId,
-        StreamGroupId) noexcept {}
 
     /**
      * Invoked when a given stream has been closed and its state is about to

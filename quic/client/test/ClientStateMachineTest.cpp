@@ -363,45 +363,4 @@ TEST_F(
               testing::Eq(TransportParameterId::reliable_stream_reset)))));
 }
 
-struct maxStreamGroupsAdvertizedtestStruct {
-  uint64_t peerMaxGroupsIn;
-  OptionalIntegral<uint64_t> expectedTransportSettingVal;
-};
-
-class ClientStateMachineMaxStreamGroupsAdvertizedParamTest
-    : public ClientStateMachineTest,
-      public ::testing::WithParamInterface<
-          maxStreamGroupsAdvertizedtestStruct> {};
-
-TEST_P(
-    ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
-    TestMaxStreamGroupsAdvertizedParam) {
-  QuicClientConnectionState clientConn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  std::vector<TransportParameter> transportParams;
-
-  if (GetParam().peerMaxGroupsIn > 0) {
-    auto paramResult = encodeIntegerParameter(
-        TransportParameterId::stream_groups_enabled,
-        GetParam().peerMaxGroupsIn);
-    ASSERT_FALSE(paramResult.hasError());
-    transportParams.push_back(std::move(paramResult.value()));
-  }
-  ServerTransportParameters serverTransportParams = {
-      std::move(transportParams)};
-  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
-                   .hasError());
-
-  EXPECT_EQ(
-      clientConn.peerAdvertisedMaxStreamGroups,
-      GetParam().expectedTransportSettingVal);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
-    ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
-    ::testing::Values(
-        maxStreamGroupsAdvertizedtestStruct{0, std::nullopt},
-        maxStreamGroupsAdvertizedtestStruct{16, 16}));
-
 } // namespace quic::test

@@ -83,15 +83,6 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "ack_frequency";
     case FrameType::IMMEDIATE_ACK:
       return "immediate_ack";
-    case FrameType::GROUP_STREAM:
-    case FrameType::GROUP_STREAM_FIN:
-    case FrameType::GROUP_STREAM_LEN:
-    case FrameType::GROUP_STREAM_LEN_FIN:
-    case FrameType::GROUP_STREAM_OFF:
-    case FrameType::GROUP_STREAM_OFF_FIN:
-    case FrameType::GROUP_STREAM_OFF_LEN:
-    case FrameType::GROUP_STREAM_OFF_LEN_FIN:
-      return "group_stream";
     case FrameType::ACK_RECEIVE_TIMESTAMPS:
       return "ack_receive_timestamps";
     case FrameType::ACK_EXTENDED:

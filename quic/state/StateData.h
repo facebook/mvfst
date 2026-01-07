@@ -29,7 +29,6 @@
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicPathManager.h>
-#include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StreamData.h>
@@ -698,9 +697,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   DatagramState datagramState;
 
-  // Peer max stream groups advertised.
-  OptionalIntegral<uint64_t> peerAdvertisedMaxStreamGroups;
-
   // Sequence number to use for the next ACK_FREQUENCY frame
   uint64_t nextAckFrequencyFrameSequenceNumber{0};
 
@@ -719,10 +715,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // so cache them once we've receive the relevant transport parameters.
   bool negotiatedAckReceiveTimestampSupport{false};
   ExtendedAckFeatureMaskType negotiatedExtendedAckFeatures{0};
-
-  // Retransmission policies map.
-  UnorderedMap<StreamGroupId, QuicStreamGroupRetransmissionPolicy>
-      retransmissionPolicies;
 
   struct SocketCmsgsState {
     Optional<folly::SocketCmsgMap> additionalCmsgs;

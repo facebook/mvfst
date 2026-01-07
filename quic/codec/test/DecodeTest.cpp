@@ -1080,38 +1080,6 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   EXPECT_EQ(parseResult.value(), timestampInMs);
 }
 
-TEST_F(DecodeTest, StreamGroupDecodeSuccess) {
-  QuicInteger streamId(10);
-  QuicInteger groupId(20);
-  QuicInteger offset(10);
-  QuicInteger length(1);
-  auto streamType = StreamTypeField::Builder()
-                        .switchToStreamGroups()
-                        .setFin()
-                        .setOffset()
-                        .setLength()
-                        .build();
-
-  auto streamFrame = createStreamFrame(
-      streamId,
-      offset,
-      length,
-      folly::IOBuf::copyBuffer("a"),
-      false /* useRealValuesForStreamId */,
-      groupId);
-  BufQueue queue;
-  queue.append(streamFrame->clone());
-  auto decodedFrameRes =
-      decodeStreamFrame(queue, streamType, true /* isGroupFrame */);
-  ASSERT_TRUE(decodedFrameRes.has_value());
-  auto decodedFrame = decodedFrameRes.value();
-  EXPECT_EQ(decodedFrame.offset, 10);
-  EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
-  EXPECT_EQ(decodedFrame.streamId, 10);
-  EXPECT_EQ(*decodedFrame.streamGroupId, 20);
-  EXPECT_TRUE(decodedFrame.fin);
-}
-
 TEST_F(DecodeTest, AckFrequencyFrameDecodeValid) {
   QuicInteger sequenceNumber(1);
   QuicInteger packetTolerance(100);

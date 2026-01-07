@@ -45,14 +45,6 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
   priority = connIn.transportSettings.defaultPriority;
 }
 
-QuicStreamState::QuicStreamState(
-    StreamId idIn,
-    const OptionalIntegral<StreamGroupId>& groupIdIn,
-    QuicConnectionStateBase& connIn)
-    : QuicStreamState(idIn, connIn) {
-  groupId = groupIdIn;
-}
-
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st) {
   if (st.clientConnectionId) {
     os << "client CID=" << *st.clientConnectionId;

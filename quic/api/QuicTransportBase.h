@@ -98,14 +98,6 @@ class QuicTransportBase : public QuicSocket,
   quic::Expected<void, std::pair<LocalErrorCode, Optional<uint64_t>>>
   consume(StreamId id, uint64_t offset, size_t amount) override;
 
-  quic::Expected<StreamGroupId, LocalErrorCode> createBidirectionalStreamGroup()
-      override;
-  quic::Expected<StreamGroupId, LocalErrorCode>
-  createUnidirectionalStreamGroup() override;
-  quic::Expected<StreamId, LocalErrorCode> createBidirectionalStreamInGroup(
-      StreamGroupId groupId) override;
-  quic::Expected<StreamId, LocalErrorCode> createUnidirectionalStreamInGroup(
-      StreamGroupId groupId) override;
   bool isClientStream(StreamId stream) noexcept override;
   bool isServerStream(StreamId stream) noexcept override;
   StreamDirectionality getStreamDirectionality(
@@ -229,21 +221,11 @@ class QuicTransportBase : public QuicSocket,
   void appendCmsgs(const folly::SocketCmsgMap& options);
 
   /**
-   * Sets the policy per stream group id.
-   * If policy == std::nullopt, the policy is removed for corresponding stream
-   * group id (reset to the default rtx policy).
+   * Sets whether retransmissions are disabled for a specific stream.
    */
-  quic::Expected<void, LocalErrorCode> setStreamGroupRetransmissionPolicy(
-      StreamGroupId groupId,
-      std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept
-      override;
-
-  [[nodiscard]] const UnorderedMap<
-      StreamGroupId,
-      QuicStreamGroupRetransmissionPolicy>&
-  getStreamGroupRetransmissionPolicies() const {
-    return conn_->retransmissionPolicies;
-  }
+  quic::Expected<void, LocalErrorCode> setStreamRetransmissionDisabled(
+      StreamId id,
+      bool disabled) noexcept override;
 
   [[nodiscard]] QuicAsyncUDPSocket* getUdpSocket() const {
     return socket_.get();
@@ -307,14 +289,6 @@ class QuicTransportBase : public QuicSocket,
   FunctionLooper::Ptr peekLooper_;
 
   bool handshakeDoneNotified_{false};
-
- private:
-  /**
-   * Helper to check if using custom retransmission profiles is feasible.
-   * Custom retransmission profiles are only applicable when stream groups are
-   * enabled, i.e. advertisedMaxStreamGroups in transport settings is > 0.
-   */
-  [[nodiscard]] bool checkCustomRetransmissionProfilesEnabled() const;
 };
 
 } // namespace quic

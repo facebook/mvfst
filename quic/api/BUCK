@@ -111,7 +111,6 @@ mvfst_cpp_library(
         "//quic/observer:socket_observer_container",
         "//quic/priority:priority_queue",
         "//quic/state:quic_state_machine",
-        "//quic/state:retransmission_policy",
     ] + select({
         "DEFAULT": [
             "//quic/congestion_control:copa",

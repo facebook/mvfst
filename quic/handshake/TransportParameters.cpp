@@ -116,14 +116,6 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     }
   }
 
-  if (ts.advertisedMaxStreamGroups > 0) {
-    auto result = encodeIntegerParameter(
-        TpId::stream_groups_enabled, ts.advertisedMaxStreamGroups);
-    if (result.has_value()) {
-      customTps.push_back(result.value());
-    }
-  }
-
   auto ackTimestampsResult = encodeIntegerParameter(
       TpId::ack_receive_timestamps_enabled,
       ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);

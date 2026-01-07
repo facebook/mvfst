@@ -348,9 +348,6 @@ struct TransportSettings {
   // If set to true, the users won't get new stream notification until an
   // actual stream frame with the new stream id arrives.
   bool notifyOnNewStreamsExplicitly{false};
-  // Both peers must support stream groups; negotiated during handshake.
-  // 0 means stream groups are disabled.
-  uint64_t advertisedMaxStreamGroups{0};
   bool experimentalPacer{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};

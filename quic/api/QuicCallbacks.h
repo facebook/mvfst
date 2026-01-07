@@ -12,7 +12,6 @@
 namespace quic {
 
 using StreamId = uint64_t;
-using StreamGroupId = uint64_t;
 
 /**
  * Callback class for receiving data on a stream
@@ -27,21 +26,10 @@ class StreamReadCallback {
    */
   virtual void readAvailable(StreamId id) noexcept = 0;
 
-  /*
-   * Same as above, but called on streams within a group.
-   */
-  virtual void readAvailableWithGroup(StreamId, StreamGroupId) noexcept {}
-
   /**
    * Called from the transport layer when there is an error on the stream.
    */
   virtual void readError(StreamId id, QuicError error) noexcept = 0;
-
-  /**
-   * Same as above, but called on streams within a group.
-   */
-  virtual void readErrorWithGroup(StreamId, StreamGroupId, QuicError) noexcept {
-  }
 };
 
 /**

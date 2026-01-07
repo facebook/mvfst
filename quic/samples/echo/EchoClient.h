@@ -33,8 +33,6 @@
 
 namespace quic::samples {
 
-constexpr size_t kNumTestStreamGroups = 2;
-
 class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
                    public quic::QuicSocket::ConnectionCallback,
                    public quic::QuicSocket::ReadCallback,
@@ -47,7 +45,6 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       bool useDatagrams,
       uint64_t activeConnIdLimit,
       bool enableMigration,
-      bool enableStreamGroups,
       std::vector<std::string> alpns,
       bool connectOnly,
       const std::string& clientCertPath,
@@ -57,7 +54,6 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
         useDatagrams_(useDatagrams),
         activeConnIdLimit_(activeConnIdLimit),
         enableMigration_(enableMigration),
-        enableStreamGroups_(enableStreamGroups),
         alpns_(std::move(alpns)),
         connectOnly_(connectOnly),
         clientCertPath_(clientCertPath),
@@ -79,25 +75,6 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
                << " on stream=" << streamId;
   }
 
-  void readAvailableWithGroup(
-      quic::StreamId streamId,
-      quic::StreamGroupId groupId) noexcept override {
-    auto readData = quicClient_->read(streamId, 0);
-    if (readData.hasError()) {
-      MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
-                  << ", groupId=" << groupId
-                  << ", error=" << (uint32_t)readData.error();
-    }
-    auto copy = readData->first->clone();
-    if (recvOffsets_.find(streamId) == recvOffsets_.end()) {
-      recvOffsets_[streamId] = copy->length();
-    } else {
-      recvOffsets_[streamId] += copy->length();
-    }
-    MVLOG_INFO << "Client received data=" << copy->toString()
-               << " on stream=" << streamId << ", groupId=" << groupId;
-  }
-
   void readError(quic::StreamId streamId, QuicError error) noexcept override {
     MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
                 << ", error=" << toString(error);
@@ -107,48 +84,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     handleError(std::move(error));
   }
 
-  void readErrorWithGroup(
-      quic::StreamId streamId,
-      quic::StreamGroupId groupId,
-      QuicError error) noexcept override {
-    MVLOG_ERROR << "EchoClient failed read from stream=" << streamId
-                << ", groupId=" << groupId << ", error=" << toString(error);
-    handleError(std::move(error));
-  }
-
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
     MVLOG_INFO << "EchoClient: new bidirectional stream=" << id;
     quicClient_->setReadCallback(id, this);
   }
 
-  void onNewBidirectionalStreamGroup(
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "EchoClient: new bidirectional stream group=" << groupId;
-  }
-
-  void onNewBidirectionalStreamInGroup(
-      quic::StreamId id,
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "EchoClient: new bidirectional stream=" << id
-               << " in group=" << groupId;
-    quicClient_->setReadCallback(id, this);
-  }
-
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
     MVLOG_INFO << "EchoClient: new unidirectional stream=" << id;
-    quicClient_->setReadCallback(id, this);
-  }
-
-  void onNewUnidirectionalStreamGroup(
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "EchoClient: new unidirectional stream group=" << groupId;
-  }
-
-  void onNewUnidirectionalStreamInGroup(
-      quic::StreamId id,
-      quic::StreamGroupId groupId) noexcept override {
-    MVLOG_INFO << "EchoClient: new unidirectional stream=" << id
-               << " in group=" << groupId;
     quicClient_->setReadCallback(id, this);
   }
 
@@ -248,10 +190,6 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       settings.datagramConfig.enabled = useDatagrams_;
       settings.selfActiveConnectionIdLimit = activeConnIdLimit_;
       settings.disableMigration = !enableMigration_;
-      if (enableStreamGroups_) {
-        settings.notifyOnNewStreamsExplicitly = true;
-        settings.advertisedMaxStreamGroups = kNumTestStreamGroups;
-      }
       quicClient_->setTransportSettings(settings);
 
       quicClient_->setTransportStatsCallback(
@@ -278,16 +216,6 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     bool closed = false;
     auto client = quicClient_;
 
-    if (enableStreamGroups_) {
-      // Generate two groups.
-      for (size_t i = 0; i < kNumTestStreamGroups; ++i) {
-        auto groupId = quicClient_->createBidirectionalStreamGroup();
-        CHECK(groupId.has_value())
-            << "Failed to generate a stream group: " << groupId.error();
-        streamGroups_[i] = *groupId;
-      }
-    }
-
     auto sendMessageInStream = [&]() {
       if (message == "/close") {
         quicClient_->close(std::nullopt);
@@ -302,30 +230,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       sendMessage(streamId, pendingOutput_[streamId]);
     };
 
-    auto sendMessageInStreamGroup = [&]() {
-      // create new stream for each message
-      auto streamId =
-          client->createBidirectionalStreamInGroup(getNextGroupId());
-      CHECK(streamId.has_value())
-          << "Failed to generate stream id in group: " << streamId.error();
-      client->setReadCallback(*streamId, this);
-      pendingOutput_[*streamId].append(BufHelpers::copyBuffer(message));
-      sendMessage(*streamId, pendingOutput_[*streamId]);
-    };
-
     std::thread input_thread([&]() {
       // loop until Ctrl+D
       while (!closed && std::getline(std::cin, message)) {
         if (message.empty()) {
           continue;
         }
-        evb->runInEventBaseThreadAndWait([=, this] {
-          if (enableStreamGroups_) {
-            sendMessageInStreamGroup();
-          } else {
-            sendMessageInStream();
-          }
-        });
+        evb->runInEventBaseThreadAndWait([&] { sendMessageInStream(); });
       };
     });
     input_thread.detach();
@@ -342,10 +253,6 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   ~EchoClient() override = default;
 
  private:
-  [[nodiscard]] quic::StreamGroupId getNextGroupId() {
-    return streamGroups_[(curGroupIdIdx_++) % kNumTestStreamGroups];
-  }
-
   void sendMessage(quic::StreamId id, BufQueue& data) {
     auto message = data.move();
     auto res = useDatagrams_
@@ -396,14 +303,11 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   bool useDatagrams_;
   uint64_t activeConnIdLimit_;
   bool enableMigration_;
-  bool enableStreamGroups_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;
   folly::fibers::Baton connectionBaton_;
   std::optional<QuicError> connectionError_;
-  std::array<StreamGroupId, kNumTestStreamGroups> streamGroups_;
-  size_t curGroupIdIdx_{0};
   std::vector<std::string> alpns_;
   bool connectOnly_{false};
   std::string clientCertPath_;

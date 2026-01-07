@@ -491,47 +491,6 @@ TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitSet) {
       serverConn.peerActiveConnectionIdLimit, kMaxActiveConnectionIdLimit + 1);
 }
 
-struct advertisedMaxStreamGroupstestStruct {
-  uint64_t peerMaxGroupsIn;
-  OptionalIntegral<uint64_t> expectedTransportSettingVal;
-};
-
-class ServerStateMachineAdvertisedMaxStreamGroupsParamTest
-    : public Test,
-      public ::testing::WithParamInterface<
-          advertisedMaxStreamGroupstestStruct> {};
-
-TEST_P(
-    ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
-    TestAdvertisedMaxStreamGroupsParam) {
-  QuicServerConnectionState serverConn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  std::vector<TransportParameter> transportParams;
-
-  if (GetParam().peerMaxGroupsIn > 0) {
-    auto encodeResult = encodeIntegerParameter(
-        TransportParameterId::stream_groups_enabled,
-        GetParam().peerMaxGroupsIn);
-    ASSERT_FALSE(encodeResult.hasError());
-    transportParams.push_back(encodeResult.value());
-  }
-  ClientTransportParameters clientTransportParams = {
-      std::move(transportParams)};
-  auto result = processClientInitialParams(serverConn, clientTransportParams);
-  ASSERT_FALSE(result.hasError());
-
-  EXPECT_EQ(
-      serverConn.peerAdvertisedMaxStreamGroups,
-      GetParam().expectedTransportSettingVal);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
-    ServerStateMachineAdvertisedMaxStreamGroupsParamTest,
-    ::testing::Values(
-        advertisedMaxStreamGroupstestStruct{0, std::nullopt},
-        advertisedMaxStreamGroupstestStruct{16, 16}));
-
 TEST(ServerStateMachineTest, ServerEmitsRateSignal) {
   // Create ServerStateMachine, set enableScone=true
   QuicServerConnectionState serverConn(

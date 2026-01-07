@@ -1544,9 +1544,9 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
   auto stream3 = createStream(conn);
 
   auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
-  auto f1 = writeDataToStream(conn, stream1, std::move(largeBuf));
-  auto f2 = writeDataToStream(conn, stream2, "some data");
-  auto f3 = writeDataToStream(conn, stream3, "some data");
+  (void)writeDataToStream(conn, stream1, std::move(largeBuf));
+  (void)writeDataToStream(conn, stream2, "some data");
+  (void)writeDataToStream(conn, stream3, "some data");
 
   // Should write frames for stream1, stream1, stream2, stream3, followed >
   // stream1 again.

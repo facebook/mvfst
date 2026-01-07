@@ -364,25 +364,9 @@ class MockQuicSocket : public QuicSocket {
       (),
       (const));
   MOCK_METHOD(
-      (quic::Expected<StreamGroupId, LocalErrorCode>),
-      createBidirectionalStreamGroup,
-      ());
-  MOCK_METHOD(
-      (quic::Expected<StreamGroupId, LocalErrorCode>),
-      createUnidirectionalStreamGroup,
-      ());
-  MOCK_METHOD(
-      (quic::Expected<StreamId, LocalErrorCode>),
-      createBidirectionalStreamInGroup,
-      (StreamGroupId));
-  MOCK_METHOD(
-      (quic::Expected<StreamId, LocalErrorCode>),
-      createUnidirectionalStreamInGroup,
-      (StreamGroupId));
-  MOCK_METHOD(
       (quic::Expected<void, LocalErrorCode>),
-      setStreamGroupRetransmissionPolicy,
-      (StreamGroupId, std::optional<QuicStreamGroupRetransmissionPolicy>),
+      setStreamRetransmissionDisabled,
+      (StreamId, bool),
       (noexcept));
   MOCK_METHOD(
       (const std::shared_ptr<const folly::AsyncTransportCertificate>),

@@ -48,17 +48,7 @@ class MockReadCallback : public QuicSocket::ReadCallback {
  public:
   ~MockReadCallback() override = default;
   MOCK_METHOD((void), readAvailable, (StreamId), (noexcept));
-  MOCK_METHOD(
-      (void),
-      readAvailableWithGroup,
-      (StreamId, StreamGroupId),
-      (noexcept));
   MOCK_METHOD((void), readError, (StreamId, QuicError), (noexcept));
-  MOCK_METHOD(
-      (void),
-      readErrorWithGroup,
-      (StreamId, StreamGroupId, QuicError),
-      (noexcept));
 };
 
 class MockPeekCallback : public QuicSocket::PeekCallback {
@@ -108,27 +98,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
 
   MOCK_METHOD((void), onFlowControlUpdate, (StreamId), (noexcept));
   MOCK_METHOD((void), onNewBidirectionalStream, (StreamId), (noexcept));
-  MOCK_METHOD(
-      (void),
-      onNewBidirectionalStreamGroup,
-      (StreamGroupId),
-      (noexcept));
-  MOCK_METHOD(
-      (void),
-      onNewBidirectionalStreamInGroup,
-      (StreamId, StreamGroupId),
-      (noexcept));
   MOCK_METHOD((void), onNewUnidirectionalStream, (StreamId), (noexcept));
-  MOCK_METHOD(
-      (void),
-      onNewUnidirectionalStreamGroup,
-      (StreamGroupId),
-      (noexcept));
-  MOCK_METHOD(
-      (void),
-      onNewUnidirectionalStreamInGroup,
-      (StreamId, StreamGroupId),
-      (noexcept));
   MOCK_METHOD((void), onStreamPreReaped, (StreamId), (noexcept));
   MOCK_METHOD(
       (void),

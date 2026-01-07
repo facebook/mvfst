@@ -111,8 +111,7 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
               // It's safe to skip the length if it was the last frame in the
               // original packet and there's no ACK frame. Since we put the ACK
               // frame last we need to end the stream frame in that case.
-              lastFrame && bufferLen && !hasAckFrame,
-              streamFrame.streamGroupId);
+              lastFrame && bufferLen && !hasAckFrame);
           if (res.hasError()) {
             MVVLOG(4) << "Failed to write stream frame header for cloning: "
                       << res.error().message;

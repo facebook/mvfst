@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/MaybeManagedPtr.h>
+#include <folly/Portability.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicSocketLite.h>
@@ -15,9 +16,6 @@
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/priority/PriorityQueue.h>
-#include <quic/state/QuicStreamGroupRetransmissionPolicy.h>
-
-#include <folly/Portability.h>
 #include <chrono>
 
 namespace quic {
@@ -292,30 +290,6 @@ class QuicSocket : virtual public QuicSocketLite {
       size_t amount) = 0;
 
   /**
-   *  Create a bidirectional stream group.
-   */
-  virtual quic::Expected<StreamGroupId, LocalErrorCode>
-  createBidirectionalStreamGroup() = 0;
-
-  /**
-   *  Create a unidirectional stream group.
-   */
-  virtual quic::Expected<StreamGroupId, LocalErrorCode>
-  createUnidirectionalStreamGroup() = 0;
-
-  /**
-   *  Same as createBidirectionalStream(), but creates a stream in a group.
-   */
-  virtual quic::Expected<StreamId, LocalErrorCode>
-  createBidirectionalStreamInGroup(StreamGroupId groupId) = 0;
-
-  /**
-   *  Same as createBidirectionalStream(), but creates a stream in a group.
-   */
-  virtual quic::Expected<StreamId, LocalErrorCode>
-  createUnidirectionalStreamInGroup(StreamGroupId groupId) = 0;
-
-  /**
    * Returns whether a stream ID represents a client-initiated stream.
    */
   virtual bool isClientStream(StreamId stream) noexcept = 0;
@@ -465,12 +439,14 @@ class QuicSocket : virtual public QuicSocketLite {
       size_t atMost = 0) = 0;
 
   /**
-   *  Sets a retransmission policy on a stream group.
+   * Sets whether retransmissions are disabled for a specific stream.
+   *
+   * @param id The stream ID
+   * @param disabled If true, retransmissions are disabled for this stream
    */
-  virtual quic::Expected<void, LocalErrorCode>
-  setStreamGroupRetransmissionPolicy(
-      StreamGroupId groupId,
-      std::optional<QuicStreamGroupRetransmissionPolicy> policy) noexcept = 0;
+  virtual quic::Expected<void, LocalErrorCode> setStreamRetransmissionDisabled(
+      StreamId id,
+      bool disabled) noexcept = 0;
 
   using Observer = SocketObserverContainer::Observer;
   using ManagedObserver = SocketObserverContainer::ManagedObserver;

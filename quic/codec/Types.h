@@ -29,7 +29,6 @@
 namespace quic {
 
 using StreamId = uint64_t;
-using StreamGroupId = StreamId;
 
 enum class PacketNumberSpace : uint8_t {
   Initial,
@@ -461,7 +460,6 @@ struct ReadNewTokenFrame {
 */
 struct WriteStreamFrame {
   StreamId streamId;
-  OptionalIntegral<StreamGroupId> streamGroupId;
   uint64_t offset;
   uint64_t len;
   bool fin;
@@ -470,17 +468,12 @@ struct WriteStreamFrame {
       StreamId streamIdIn,
       uint64_t offsetIn,
       uint64_t lenIn,
-      bool finIn,
-      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
-      : streamId(streamIdIn),
-        streamGroupId(streamGroupIdIn),
-        offset(offsetIn),
-        len(lenIn),
-        fin(finIn) {}
+      bool finIn)
+      : streamId(streamIdIn), offset(offsetIn), len(lenIn), fin(finIn) {}
 
   bool operator==(const WriteStreamFrame& rhs) const {
     return streamId == rhs.streamId && offset == rhs.offset && len == rhs.len &&
-        fin == rhs.fin && streamGroupId == rhs.streamGroupId;
+        fin == rhs.fin;
   }
 };
 
@@ -489,7 +482,6 @@ struct WriteStreamFrame {
  */
 struct ReadStreamFrame {
   StreamId streamId;
-  OptionalIntegral<StreamGroupId> streamGroupId;
   uint64_t offset;
   BufPtr data;
   bool fin;
@@ -498,21 +490,14 @@ struct ReadStreamFrame {
       StreamId streamIdIn,
       uint64_t offsetIn,
       BufPtr dataIn,
-      bool finIn,
-      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
+      bool finIn)
       : streamId(streamIdIn),
-        streamGroupId(streamGroupIdIn),
         offset(offsetIn),
         data(std::move(dataIn)),
         fin(finIn) {}
 
-  ReadStreamFrame(
-      StreamId streamIdIn,
-      uint64_t offsetIn,
-      bool finIn,
-      OptionalIntegral<StreamGroupId> streamGroupIdIn = std::nullopt)
+  ReadStreamFrame(StreamId streamIdIn, uint64_t offsetIn, bool finIn)
       : streamId(streamIdIn),
-        streamGroupId(streamGroupIdIn),
         offset(offsetIn),
         data(BufHelpers::create(0)),
         fin(finIn) {}
@@ -525,7 +510,6 @@ struct ReadStreamFrame {
       data = other.data->clone();
     }
     fin = other.fin;
-    streamGroupId = other.streamGroupId;
   }
 
   ReadStreamFrame(ReadStreamFrame&& other) noexcept {
@@ -533,7 +517,6 @@ struct ReadStreamFrame {
     offset = other.offset;
     data = std::move(other.data);
     fin = other.fin;
-    streamGroupId = other.streamGroupId;
   }
 
   ReadStreamFrame& operator=(const ReadStreamFrame& other) {
@@ -543,7 +526,6 @@ struct ReadStreamFrame {
       data = other.data->clone();
     }
     fin = other.fin;
-    streamGroupId = other.streamGroupId;
     return *this;
   }
 
@@ -552,15 +534,13 @@ struct ReadStreamFrame {
     offset = other.offset;
     data = std::move(other.data);
     fin = other.fin;
-    streamGroupId = other.streamGroupId;
     return *this;
   }
 
   bool operator==(const ReadStreamFrame& other) const {
     BufEq eq;
     return streamId == other.streamId && offset == other.offset &&
-        fin == other.fin && eq(data, other.data) &&
-        streamGroupId == other.streamGroupId;
+        fin == other.fin && eq(data, other.data);
   }
 };
 
@@ -1150,7 +1130,6 @@ struct StreamTypeField {
    public:
     Builder() : field_(static_cast<uint8_t>(FrameType::STREAM)) {}
 
-    Builder& switchToStreamGroups();
     Builder& setFin();
     Builder& setOffset();
     Builder& setLength();

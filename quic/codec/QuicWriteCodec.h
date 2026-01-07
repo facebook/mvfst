@@ -58,7 +58,6 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     uint64_t flowControlLen,
     bool fin,
     Optional<bool> skipLenHint,
-    OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt,
     bool appendFrame = true);
 
 void writeStreamFrameData(

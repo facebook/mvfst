@@ -177,8 +177,7 @@ decodeAckFrameWithReceivedTimestamps(
 
 [[nodiscard]] quic::Expected<ReadStreamFrame, QuicError> decodeStreamFrame(
     BufQueue& queue,
-    StreamTypeField frameTypeField,
-    bool isGroupFrame = false);
+    StreamTypeField frameTypeField);
 
 [[nodiscard]] quic::Expected<ReadCryptoFrame, QuicError> decodeCryptoFrame(
     ContiguousReadCursor& cursor);

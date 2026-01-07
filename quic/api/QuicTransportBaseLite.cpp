@@ -1599,11 +1599,6 @@ void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
     return;
   }
 
-  handleNewGroupedStreamCallbacks(tempStorage);
-  if (closeState_ != CloseState::OPEN) {
-    return;
-  }
-
   handlePingCallbacks();
   if (closeState_ != CloseState::OPEN) {
     return;
@@ -1898,21 +1893,6 @@ void QuicTransportBaseLite::handleNewStreamCallbacks(
   handleNewStreams(streamStorage);
 }
 
-void QuicTransportBaseLite::handleNewGroupedStreamCallbacks(
-    std::vector<StreamId>& streamStorage) {
-  auto newStreamGroups = conn_->streamManager->consumeNewPeerStreamGroups();
-  for (auto newStreamGroupId : newStreamGroups) {
-    if (isBidirectionalStream(newStreamGroupId)) {
-      connCallback_->onNewBidirectionalStreamGroup(newStreamGroupId);
-    } else {
-      connCallback_->onNewUnidirectionalStreamGroup(newStreamGroupId);
-    }
-  }
-
-  streamStorage = conn_->streamManager->consumeNewGroupedPeerStreams();
-  handleNewGroupedStreams(streamStorage);
-}
-
 void QuicTransportBaseLite::handleDeliveryCallbacks() {
   auto deliverableStreamId = conn_->streamManager->popDeliverable();
   while (deliverableStreamId.has_value()) {
@@ -2137,19 +2117,15 @@ void QuicTransportBaseLite::closeUdpSocket() {
 }
 
 quic::Expected<StreamId, LocalErrorCode>
-QuicTransportBaseLite::createStreamInternal(
-    bool bidirectional,
-    const OptionalIntegral<StreamGroupId>& streamGroupId) {
+QuicTransportBaseLite::createStreamInternal(bool bidirectional) {
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   quic::Expected<QuicStreamState*, LocalErrorCode> streamResult;
   if (bidirectional) {
-    streamResult =
-        conn_->streamManager->createNextBidirectionalStream(streamGroupId);
+    streamResult = conn_->streamManager->createNextBidirectionalStream();
   } else {
-    streamResult =
-        conn_->streamManager->createNextUnidirectionalStream(streamGroupId);
+    streamResult = conn_->streamManager->createNextUnidirectionalStream();
   }
   if (!streamResult.has_value()) {
     return quic::make_unexpected(streamResult.error());
@@ -2356,13 +2332,7 @@ void QuicTransportBaseLite::cancelAllAppCallbacks(
       continue;
     }
     if (it->second.readCb) {
-      auto stream = CHECK_NOTNULL(
-          conn_->streamManager->getStream(streamId).value_or(nullptr));
-      if (!stream->groupId) {
-        it->second.readCb->readError(streamId, err);
-      } else {
-        it->second.readCb->readErrorWithGroup(streamId, *stream->groupId, err);
-      }
+      it->second.readCb->readError(streamId, err);
     }
     readCallbacks_.erase(it);
   }
@@ -2571,21 +2541,12 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
       self->conn_->streamManager->peekableStreams().erase(streamId);
       MVVLOG(10) << "invoking read error callbacks on stream=" << streamId
                  << " " << *this;
-      if (!stream->groupId) {
-        readCb->readError(streamId, QuicError(*stream->streamReadError));
-      } else {
-        readCb->readErrorWithGroup(
-            streamId, *stream->groupId, QuicError(*stream->streamReadError));
-      }
+      readCb->readError(streamId, QuicError(*stream->streamReadError));
     } else if (
         readCb && callback->second.resumed && stream->hasReadableData()) {
       MVVLOG(10) << "invoking read callbacks on stream=" << streamId << " "
                  << *this;
-      if (!stream->groupId) {
-        readCb->readAvailable(streamId);
-      } else {
-        readCb->readAvailableWithGroup(streamId, *stream->groupId);
-      }
+      readCb->readAvailable(streamId);
     }
   }
 
@@ -3281,30 +3242,6 @@ void QuicTransportBaseLite::handleNewStreams(
       connCallback_->onNewBidirectionalStream(streamId);
     } else {
       connCallback_->onNewUnidirectionalStream(streamId);
-    }
-
-    logStreamOpenEvent(streamId);
-    if (closeState_ != CloseState::OPEN) {
-      return;
-    }
-  }
-  streamStorage.clear();
-}
-
-void QuicTransportBaseLite::handleNewGroupedStreams(
-    std::vector<StreamId>& streamStorage) {
-  const auto& newPeerStreamIds = streamStorage;
-  for (const auto& streamId : newPeerStreamIds) {
-    CHECK_NOTNULL(connCallback_.get());
-    auto stream = CHECK_NOTNULL(
-        conn_->streamManager->getStream(streamId).value_or(nullptr));
-    CHECK(stream->groupId);
-    if (isBidirectionalStream(streamId)) {
-      connCallback_->onNewBidirectionalStreamInGroup(
-          streamId, *stream->groupId);
-    } else {
-      connCallback_->onNewUnidirectionalStreamInGroup(
-          streamId, *stream->groupId);
     }
 
     logStreamOpenEvent(streamId);

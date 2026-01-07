@@ -37,10 +37,8 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     });
   }
 
-  explicit EchoServerTransportFactory(
-      bool useDatagrams = false,
-      bool disableRtx = false)
-      : useDatagrams_(useDatagrams), disableRtx_(disableRtx) {}
+  explicit EchoServerTransportFactory(bool useDatagrams = false)
+      : useDatagrams_(useDatagrams) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -53,8 +51,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     if (draining_) {
       return nullptr;
     }
-    auto echoHandler =
-        std::make_unique<EchoHandler>(evb, useDatagrams_, disableRtx_);
+    auto echoHandler = std::make_unique<EchoHandler>(evb, useDatagrams_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx);
     echoHandler->setQuicSocket(transport);
@@ -68,7 +65,6 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
   bool useDatagrams_;
   folly::Synchronized<std::vector<std::unique_ptr<EchoHandler>>> echoHandlers_;
   bool draining_{false};
-  bool disableRtx_{false};
 };
 
 class EchoServer {
@@ -79,27 +75,16 @@ class EchoServer {
       uint16_t port = 6666,
       bool useDatagrams = false,
       uint64_t activeConnIdLimit = 10,
-      bool enableMigration = true,
-      bool enableStreamGroups = false,
-      bool disableRtx = false)
+      bool enableMigration = true)
       : host_(host), port_(port), alpns_(std::move(alpns)) {
     TransportSettings settings;
     settings.datagramConfig.enabled = useDatagrams;
     settings.selfActiveConnectionIdLimit = activeConnIdLimit;
     settings.disableMigration = !enableMigration;
-    if (enableStreamGroups) {
-      settings.notifyOnNewStreamsExplicitly = true;
-      settings.advertisedMaxStreamGroups = 1024;
-    }
-    if (disableRtx) {
-      if (!enableStreamGroups) {
-        MVLOG_FATAL << "disable_rtx requires use_stream_groups to be enabled";
-      }
-    }
     server_ = QuicServer::createQuicServer(std::move(settings));
 
     server_->setQuicServerTransportFactory(
-        std::make_unique<EchoServerTransportFactory>(useDatagrams, disableRtx));
+        std::make_unique<EchoServerTransportFactory>(useDatagrams));
     server_->setTransportStatsCallbackFactory(
         std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();

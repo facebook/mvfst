@@ -28,8 +28,6 @@ extern const PriorityQueue::Priority kDefaultDatagramPriority;
 namespace detail {
 
 constexpr uint8_t kStreamIncrement = 0x04;
-constexpr uint8_t kStreamGroupIncrement = 0x04;
-constexpr uint64_t kMaxStreamGroupId = 128 * kStreamGroupIncrement;
 
 } // namespace detail
 
@@ -94,62 +92,7 @@ class QuicStreamManager {
   QuicStreamManager(
       QuicConnectionStateBase& conn,
       QuicNodeType nodeType,
-      const TransportSettings& transportSettings)
-      : conn_(conn),
-        nodeType_(nodeType),
-        transportSettings_(&transportSettings) {
-    if (nodeType == QuicNodeType::Server) {
-      nextAcceptablePeerBidirectionalStreamId_ = 0x00;
-      nextAcceptablePeerUnidirectionalStreamId_ = 0x02;
-      nextAcceptableLocalBidirectionalStreamId_ = 0x01;
-      nextAcceptableLocalUnidirectionalStreamId_ = 0x03;
-      nextBidirectionalStreamId_ = 0x01;
-      nextUnidirectionalStreamId_ = 0x03;
-      initialLocalBidirectionalStreamId_ = 0x01;
-      initialLocalUnidirectionalStreamId_ = 0x03;
-      initialRemoteBidirectionalStreamId_ = 0x00;
-      initialRemoteUnidirectionalStreamId_ = 0x02;
-      peerUnidirectionalStreamGroupsSeen_ = StreamIdSet(0x02);
-      peerBidirectionalStreamGroupsSeen_ = StreamIdSet(0x00);
-    } else {
-      nextAcceptablePeerBidirectionalStreamId_ = 0x01;
-      nextAcceptablePeerUnidirectionalStreamId_ = 0x03;
-      nextAcceptableLocalBidirectionalStreamId_ = 0x00;
-      nextAcceptableLocalUnidirectionalStreamId_ = 0x02;
-      nextBidirectionalStreamId_ = 0x00;
-      nextUnidirectionalStreamId_ = 0x02;
-      initialLocalBidirectionalStreamId_ = 0x00;
-      initialLocalUnidirectionalStreamId_ = 0x02;
-      initialRemoteBidirectionalStreamId_ = 0x01;
-      initialRemoteUnidirectionalStreamId_ = 0x03;
-      peerUnidirectionalStreamGroupsSeen_ = StreamIdSet(0x03);
-      peerBidirectionalStreamGroupsSeen_ = StreamIdSet(0x01);
-    }
-    nextBidirectionalStreamGroupId_ = nextBidirectionalStreamId_;
-    nextUnidirectionalStreamGroupId_ = nextUnidirectionalStreamId_;
-    openBidirectionalLocalStreams_ =
-        StreamIdSet(initialLocalBidirectionalStreamId_);
-    openUnidirectionalLocalStreams_ =
-        StreamIdSet(initialLocalUnidirectionalStreamId_);
-    openBidirectionalPeerStreams_ =
-        StreamIdSet(initialRemoteBidirectionalStreamId_);
-    openUnidirectionalPeerStreams_ =
-        StreamIdSet(initialRemoteUnidirectionalStreamId_);
-    openBidirectionalLocalStreamGroups_ =
-        StreamIdSet(nextBidirectionalStreamGroupId_);
-    openUnidirectionalLocalStreamGroups_ =
-        StreamIdSet(nextUnidirectionalStreamGroupId_);
-
-    // Call refreshTransportSettings which now returns Expected
-    auto refreshResult = refreshTransportSettings(transportSettings);
-    if (refreshResult.hasError()) {
-      // Constructor cannot return error easily. Log or handle internally.
-      MVLOG_ERROR << "Failed initial transport settings refresh: "
-                  << refreshResult.error().message;
-      // Consider throwing here if construction must fail, or setting an error
-      // state. For now, logging is consistent with previous changes.
-    }
-  }
+      const TransportSettings& transportSettings);
 
   /**
    * Constructor to facilitate migration of a QuicStreamManager to another
@@ -159,139 +102,31 @@ class QuicStreamManager {
       QuicConnectionStateBase& conn,
       QuicNodeType nodeType,
       const TransportSettings& transportSettings,
-      QuicStreamManager&& other)
-      : conn_(conn),
-        nodeType_(nodeType),
-        transportSettings_(&transportSettings) {
-    nextAcceptablePeerBidirectionalStreamId_ =
-        other.nextAcceptablePeerBidirectionalStreamId_;
-    nextAcceptablePeerUnidirectionalStreamId_ =
-        other.nextAcceptablePeerUnidirectionalStreamId_;
-    nextAcceptableLocalBidirectionalStreamId_ =
-        other.nextAcceptableLocalBidirectionalStreamId_;
-    nextAcceptableLocalUnidirectionalStreamId_ =
-        other.nextAcceptableLocalUnidirectionalStreamId_;
-    nextBidirectionalStreamId_ = other.nextBidirectionalStreamId_;
-    nextUnidirectionalStreamId_ = other.nextUnidirectionalStreamId_;
-    nextBidirectionalStreamGroupId_ = other.nextBidirectionalStreamGroupId_;
-    nextUnidirectionalStreamGroupId_ = other.nextUnidirectionalStreamGroupId_;
-    maxLocalBidirectionalStreamId_ = other.maxLocalBidirectionalStreamId_;
-    maxLocalUnidirectionalStreamId_ = other.maxLocalUnidirectionalStreamId_;
-    maxRemoteBidirectionalStreamId_ = other.maxRemoteBidirectionalStreamId_;
-    maxRemoteUnidirectionalStreamId_ = other.maxRemoteUnidirectionalStreamId_;
-    initialLocalBidirectionalStreamId_ =
-        other.initialLocalBidirectionalStreamId_;
-    initialLocalUnidirectionalStreamId_ =
-        other.initialLocalUnidirectionalStreamId_;
-    initialRemoteBidirectionalStreamId_ =
-        other.initialRemoteBidirectionalStreamId_;
-    initialRemoteUnidirectionalStreamId_ =
-        other.initialRemoteUnidirectionalStreamId_;
-
-    streamLimitWindowingFraction_ = other.streamLimitWindowingFraction_;
-    remoteBidirectionalStreamLimitUpdate_ =
-        other.remoteBidirectionalStreamLimitUpdate_;
-    remoteUnidirectionalStreamLimitUpdate_ =
-        other.remoteUnidirectionalStreamLimitUpdate_;
-    numControlStreams_ = other.numControlStreams_;
-    openBidirectionalPeerStreams_ =
-        std::move(other.openBidirectionalPeerStreams_);
-    openUnidirectionalPeerStreams_ =
-        std::move(other.openUnidirectionalPeerStreams_);
-    openBidirectionalLocalStreams_ =
-        std::move(other.openBidirectionalLocalStreams_);
-    openUnidirectionalLocalStreams_ =
-        std::move(other.openUnidirectionalLocalStreams_);
-    openBidirectionalLocalStreamGroups_ =
-        std::move(other.openBidirectionalLocalStreamGroups_);
-    openUnidirectionalLocalStreamGroups_ =
-        std::move(other.openUnidirectionalLocalStreamGroups_);
-    newPeerStreams_ = std::move(other.newPeerStreams_);
-    newPeerStreamGroups_ = std::move(other.newPeerStreamGroups_);
-    peerUnidirectionalStreamGroupsSeen_ =
-        std::move(other.peerUnidirectionalStreamGroupsSeen_);
-    peerBidirectionalStreamGroupsSeen_ = // Added missing move
-        std::move(other.peerBidirectionalStreamGroupsSeen_);
-    newGroupedPeerStreams_ = std::move(other.newGroupedPeerStreams_);
-    blockedStreams_ = std::move(other.blockedStreams_);
-    stopSendingStreams_ = std::move(other.stopSendingStreams_);
-    windowUpdates_ = std::move(other.windowUpdates_);
-    flowControlUpdated_ = std::move(other.flowControlUpdated_);
-    lossStreams_ = std::move(other.lossStreams_);
-    readableStreams_ = std::move(other.readableStreams_);
-    unidirectionalReadableStreams_ =
-        std::move(other.unidirectionalReadableStreams_);
-    peekableStreams_ = std::move(other.peekableStreams_);
-    writeQueue_ = std::move(other.writeQueue_);
-    controlWriteQueue_ = std::move(other.controlWriteQueue_);
-    writableStreams_ = std::move(other.writableStreams_);
-    txStreams_ = std::move(other.txStreams_);
-    deliverableStreams_ = std::move(other.deliverableStreams_);
-    closedStreams_ = std::move(other.closedStreams_);
-    isAppIdle_ = other.isAppIdle_;
-    maxLocalBidirectionalStreamIdIncreased_ =
-        other.maxLocalBidirectionalStreamIdIncreased_;
-    maxLocalUnidirectionalStreamIdIncreased_ =
-        other.maxLocalUnidirectionalStreamIdIncreased_;
-
-    for (auto& pair : other.streams_) {
-      streams_.emplace(
-          std::piecewise_construct,
-          std::forward_as_tuple(pair.first),
-          std::forward_as_tuple(
-              conn_, // Use the new conn ref
-              std::move(pair.second)));
-    }
-    // Call refreshTransportSettings which now returns Expected
-    auto refreshResult = refreshTransportSettings(transportSettings);
-    if (refreshResult.hasError()) {
-      // Constructor cannot return error easily. Log or handle internally.
-      MVLOG_ERROR << "Failed initial transport settings refresh: "
-                  << refreshResult.error().message;
-      // Consider throwing here if construction must fail, or setting an error
-      // state. For now, logging is consistent with previous changes.
-    }
-  }
+      QuicStreamManager&& other);
 
   /*
    * Create the state for a stream if it does not exist and return it.
    */
   [[nodiscard]] quic::Expected<QuicStreamState*, QuicError> createStream(
-      StreamId streamId,
-      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
-
-  /*
-   * Create a new bidirectional stream group.
-   */
-  [[nodiscard]] quic::Expected<StreamGroupId, LocalErrorCode>
-  createNextBidirectionalStreamGroup();
+      StreamId streamId);
 
   /*
    * Create and return the state for the next available bidirectional stream.
    */
   [[nodiscard]] quic::Expected<QuicStreamState*, LocalErrorCode>
-  createNextBidirectionalStream(
-      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
-
-  /*
-   * Create a new unidirectional stream group.
-   */
-  [[nodiscard]] quic::Expected<StreamGroupId, LocalErrorCode>
-  createNextUnidirectionalStreamGroup();
+  createNextBidirectionalStream();
 
   /*
    * Create and return the state for the next available unidirectional stream.
    */
   [[nodiscard]] quic::Expected<QuicStreamState*, LocalErrorCode>
-  createNextUnidirectionalStream(
-      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
+  createNextUnidirectionalStream();
 
   /*
    * Return the stream state or create it if the state has not yet been created.
    */
   [[nodiscard]] quic::Expected<QuicStreamState*, QuicError> getStream(
-      StreamId streamId,
-      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
+      StreamId streamId);
 
   /*
    * Remove all the state for a stream that is being closed.
@@ -342,81 +177,15 @@ class QuicStreamManager {
    */
   QuicStreamState* FOLLY_NULLABLE getStreamIfExists(StreamId streamId);
 
-  uint64_t openableLocalBidirectionalStreams() {
-    CHECK_GE(
-        maxLocalBidirectionalStreamId_,
-        nextAcceptableLocalBidirectionalStreamId_);
-    return (maxLocalBidirectionalStreamId_ -
-            nextAcceptableLocalBidirectionalStreamId_) /
-        detail::kStreamIncrement;
-  }
+  uint64_t openableLocalBidirectionalStreams();
+  uint64_t openableLocalUnidirectionalStreams();
+  uint64_t openableRemoteBidirectionalStreams();
+  uint64_t openableRemoteUnidirectionalStreams();
 
-  uint64_t openableLocalUnidirectionalStreams() {
-    CHECK_GE(
-        maxLocalUnidirectionalStreamId_,
-        nextAcceptableLocalUnidirectionalStreamId_);
-    return (maxLocalUnidirectionalStreamId_ -
-            nextAcceptableLocalUnidirectionalStreamId_) /
-        detail::kStreamIncrement;
-  }
-
-  uint64_t openableRemoteBidirectionalStreams() {
-    CHECK_GE(
-        maxRemoteBidirectionalStreamId_,
-        nextAcceptablePeerBidirectionalStreamId_);
-    return (maxRemoteBidirectionalStreamId_ -
-            nextAcceptablePeerBidirectionalStreamId_) /
-        detail::kStreamIncrement;
-  }
-
-  uint64_t openableRemoteUnidirectionalStreams() {
-    CHECK_GE(
-        maxRemoteUnidirectionalStreamId_,
-        nextAcceptablePeerUnidirectionalStreamId_);
-    return (maxRemoteUnidirectionalStreamId_ -
-            nextAcceptablePeerUnidirectionalStreamId_) /
-        detail::kStreamIncrement;
-  }
-
-  Optional<StreamId> nextAcceptablePeerBidirectionalStreamId() {
-    const auto max = maxRemoteBidirectionalStreamId_;
-    const auto next = nextAcceptablePeerBidirectionalStreamId_;
-    CHECK_GE(max, next);
-    if (max == next) {
-      return std::nullopt;
-    }
-    return next;
-  }
-
-  Optional<StreamId> nextAcceptablePeerUnidirectionalStreamId() {
-    const auto max = maxRemoteUnidirectionalStreamId_;
-    const auto next = nextAcceptablePeerUnidirectionalStreamId_;
-    CHECK_GE(max, next);
-    if (max == next) {
-      return std::nullopt;
-    }
-    return next;
-  }
-
-  Optional<StreamId> nextAcceptableLocalBidirectionalStreamId() {
-    const auto max = maxLocalBidirectionalStreamId_;
-    const auto next = nextAcceptableLocalBidirectionalStreamId_;
-    CHECK_GE(max, next);
-    if (max == next) {
-      return std::nullopt;
-    }
-    return next;
-  }
-
-  Optional<StreamId> nextAcceptableLocalUnidirectionalStreamId() {
-    const auto max = maxLocalUnidirectionalStreamId_;
-    const auto next = nextAcceptableLocalUnidirectionalStreamId_;
-    CHECK_GE(max, next);
-    if (max == next) {
-      return std::nullopt;
-    }
-    return next;
-  }
+  Optional<StreamId> nextAcceptablePeerBidirectionalStreamId();
+  Optional<StreamId> nextAcceptablePeerUnidirectionalStreamId();
+  Optional<StreamId> nextAcceptableLocalBidirectionalStreamId();
+  Optional<StreamId> nextAcceptableLocalUnidirectionalStreamId();
 
   /*
    * Clear all the currently open streams.
@@ -434,23 +203,14 @@ class QuicStreamManager {
   /*
    * Call the given function on every currently open stream's state.
    */
-  void streamStateForEach(const std::function<void(QuicStreamState&)>& f) {
-    for (auto& s : streams_) {
-      f(s.second);
-    }
-  }
+  void streamStateForEach(const std::function<void(QuicStreamState&)>& f);
 
   [[nodiscard]] bool hasLoss() const {
-    return !lossStreams_.empty();
+    return numStreamsWithLoss_ > 0;
   }
 
-  void removeLoss(StreamId id) {
-    lossStreams_.erase(id);
-  }
-
-  void addLoss(StreamId id) {
-    lossStreams_.insert(id);
-  }
+  void removeLoss(StreamId id);
+  void addLoss(StreamId id);
 
   quic::Expected<void, LocalErrorCode> setPriorityQueue(
       std::unique_ptr<PriorityQueue> queue);
@@ -475,29 +235,15 @@ class QuicStreamManager {
     return !writeQueue_->empty() || !controlWriteQueue_.empty();
   }
 
-  void removeWritable(const QuicStreamState& stream) {
-    if (stream.isControl) {
-      controlWriteQueue_.erase(stream.id);
-    } else {
-      writeQueue().erase(PriorityQueue::Identifier::fromStreamID(stream.id));
-      connFlowControlBlocked_.erase(stream.id);
-    }
-    writableStreams_.erase(stream.id);
-    lossStreams_.erase(stream.id);
-  }
-
-  void clearWritable() {
-    writableStreams_.clear();
-    writeQueue().clear();
-    controlWriteQueue_.clear();
-  }
+  void removeWritable(const QuicStreamState& stream);
+  void clearWritable();
 
   [[nodiscard]] const auto& blockedStreams() const {
     return blockedStreams_;
   }
 
   void queueBlocked(StreamId streamId, uint64_t offset) {
-    blockedStreams_.emplace(streamId, StreamDataBlockedFrame(streamId, offset));
+    blockedStreams_.emplace(streamId, offset);
   }
 
   void removeBlocked(StreamId streamId) {
@@ -541,23 +287,10 @@ class QuicStreamManager {
   [[nodiscard]] quic::Expected<void, QuicError> refreshTransportSettings(
       const TransportSettings& settings);
 
-  void setStreamLimitWindowingFraction(uint64_t fraction) {
-    if (fraction > 0) {
-      streamLimitWindowingFraction_ = fraction;
-    }
-  }
+  void setStreamLimitWindowingFraction(uint64_t fraction);
 
-  Optional<uint64_t> remoteBidirectionalStreamLimitUpdate() {
-    auto ret = remoteBidirectionalStreamLimitUpdate_;
-    remoteBidirectionalStreamLimitUpdate_.reset();
-    return ret;
-  }
-
-  Optional<uint64_t> remoteUnidirectionalStreamLimitUpdate() {
-    auto ret = remoteUnidirectionalStreamLimitUpdate_;
-    remoteUnidirectionalStreamLimitUpdate_.reset();
-    return ret;
-  }
+  Optional<uint64_t> remoteBidirectionalStreamLimitUpdate();
+  Optional<uint64_t> remoteUnidirectionalStreamLimitUpdate();
 
   [[nodiscard]] const auto& windowUpdates() const {
     return windowUpdates_;
@@ -599,15 +332,7 @@ class QuicStreamManager {
     deliverableStreams_.erase(streamId);
   }
 
-  Optional<StreamId> popDeliverable() {
-    auto itr = deliverableStreams_.begin();
-    if (itr == deliverableStreams_.end()) {
-      return std::nullopt;
-    }
-    StreamId ret = *itr;
-    deliverableStreams_.erase(itr);
-    return ret;
-  }
+  Optional<StreamId> popDeliverable();
 
   [[nodiscard]] bool hasDeliverable() const {
     return !deliverableStreams_.empty();
@@ -629,16 +354,7 @@ class QuicStreamManager {
     txStreams_.erase(streamId);
   }
 
-  Optional<StreamId> popTx() {
-    auto itr = txStreams_.begin();
-    if (itr == txStreams_.end()) {
-      return std::nullopt;
-    } else {
-      StreamId ret = *itr;
-      txStreams_.erase(itr);
-      return ret;
-    }
-  }
+  Optional<StreamId> popTx();
 
   [[nodiscard]] bool hasTx() const {
     return !txStreams_.empty();
@@ -664,27 +380,13 @@ class QuicStreamManager {
     return flowControlUpdated_;
   }
 
-  std::vector<StreamId> consumeFlowControlUpdated() {
-    std::vector<StreamId> result(
-        flowControlUpdated_.begin(), flowControlUpdated_.end());
-    flowControlUpdated_.clear();
-    return result;
-  }
+  std::vector<StreamId> consumeFlowControlUpdated();
 
   void queueFlowControlUpdated(StreamId streamId) {
     flowControlUpdated_.emplace(streamId);
   }
 
-  Optional<StreamId> popFlowControlUpdated() {
-    auto itr = flowControlUpdated_.begin();
-    if (itr == flowControlUpdated_.end()) {
-      return std::nullopt;
-    } else {
-      StreamId ret = *itr;
-      flowControlUpdated_.erase(itr);
-      return ret;
-    }
-  }
+  Optional<StreamId> popFlowControlUpdated();
 
   void removeFlowControlUpdated(StreamId streamId) {
     flowControlUpdated_.erase(streamId);
@@ -718,20 +420,7 @@ class QuicStreamManager {
     return newPeerStreams_;
   }
 
-  std::vector<StreamId> consumeNewPeerStreams() {
-    std::vector<StreamId> res{std::move(newPeerStreams_)};
-    return res;
-  }
-
-  std::vector<StreamId> consumeNewGroupedPeerStreams() {
-    std::vector<StreamId> res{std::move(newGroupedPeerStreams_)};
-    return res;
-  }
-
-  auto consumeNewPeerStreamGroups() {
-    decltype(newPeerStreamGroups_) result{std::move(newPeerStreamGroups_)};
-    return result;
-  }
+  std::vector<StreamId> consumeNewPeerStreams();
 
   size_t streamCount() {
     return streams_.size();
@@ -741,12 +430,8 @@ class QuicStreamManager {
     return stopSendingStreams_;
   }
 
-  auto consumeStopSending() {
-    std::vector<std::pair<const StreamId, const ApplicationErrorCode>> result(
-        stopSendingStreams_.begin(), stopSendingStreams_.end());
-    stopSendingStreams_.clear();
-    return result;
-  }
+  std::vector<std::pair<const StreamId, const ApplicationErrorCode>>
+  consumeStopSending();
 
   void clearStopSending() {
     stopSendingStreams_.clear();
@@ -766,50 +451,15 @@ class QuicStreamManager {
 
   void setStreamAsControl(QuicStreamState& stream);
 
-  void clearActionable() {
-    deliverableStreams_.clear();
-    txStreams_.clear();
-    readableStreams_.clear();
-    unidirectionalReadableStreams_.clear();
-    peekableStreams_.clear();
-    flowControlUpdated_.clear();
-  }
+  void clearActionable();
 
   [[nodiscard]] bool isAppIdle() const;
 
-  [[nodiscard]] bool getNumBidirectionalGroups() const {
-    return openBidirectionalLocalStreamGroups_.size();
-  }
-
-  [[nodiscard]] bool getNumUnidirectionalGroups() const {
-    return openUnidirectionalLocalStreamGroups_.size();
-  }
-
-  [[nodiscard]] size_t getNumNewPeerStreamGroups() const {
-    return newPeerStreamGroups_.size();
-  }
-
-  [[nodiscard]] size_t getNumPeerStreamGroupsSeen() const {
-    return peerUnidirectionalStreamGroupsSeen_.size() +
-        peerBidirectionalStreamGroupsSeen_.size();
-  }
-
   void setWriteQueueMaxNextsPerStream(uint64_t maxNextsPerStream);
 
-  void addConnFCBlockedStream(StreamId id) {
-    connFlowControlBlocked_.insert(id);
-  }
+  void addConnFCBlockedStream(StreamId id);
 
-  void onMaxData() {
-    for (auto id : connFlowControlBlocked_) {
-      auto stream = findStream(id);
-      if (stream) {
-        writeQueue().insertOrUpdate(
-            PriorityQueue::Identifier::fromStreamID(id), stream->priority);
-      }
-    }
-    connFlowControlBlocked_.clear();
-  }
+  void onMaxData();
 
  private:
   void updateAppIdleState();
@@ -818,21 +468,14 @@ class QuicStreamManager {
   getOrCreateOpenedLocalStream(StreamId streamId);
 
   [[nodiscard]] quic::Expected<QuicStreamState*, QuicError>
-  getOrCreatePeerStream(
-      StreamId streamId,
-      OptionalIntegral<StreamGroupId> streamGroupId = std::nullopt);
+  getOrCreatePeerStream(StreamId streamId);
 
   [[nodiscard]] quic::Expected<void, QuicError>
   setMaxRemoteBidirectionalStreamsInternal(uint64_t maxStreams, bool force);
   [[nodiscard]] quic::Expected<void, QuicError>
   setMaxRemoteUnidirectionalStreamsInternal(uint64_t maxStreams, bool force);
 
-  QuicStreamState* FOLLY_NULLABLE instantiatePeerStream(
-      StreamId streamId,
-      OptionalIntegral<StreamGroupId> groupId);
-
-  [[nodiscard]] quic::Expected<StreamGroupId, LocalErrorCode>
-  createNextStreamGroup(StreamGroupId& groupId, StreamIdSet& streamGroups);
+  QuicStreamState* FOLLY_NULLABLE instantiatePeerStream(StreamId streamId);
 
   void addToReadableStreams(const QuicStreamState& stream);
   void removeFromReadableStreams(const QuicStreamState& stream);
@@ -845,9 +488,7 @@ class QuicStreamManager {
   StreamId nextAcceptableLocalBidirectionalStreamId_{0};
   StreamId nextAcceptableLocalUnidirectionalStreamId_{0};
   StreamId nextBidirectionalStreamId_{0};
-  StreamGroupId nextBidirectionalStreamGroupId_{0};
   StreamId nextUnidirectionalStreamId_{0};
-  StreamGroupId nextUnidirectionalStreamGroupId_{0};
 
   StreamId maxLocalBidirectionalStreamId_{0};
   StreamId maxLocalUnidirectionalStreamId_{0};
@@ -869,18 +510,12 @@ class QuicStreamManager {
   StreamIdSet openUnidirectionalPeerStreams_;
   StreamIdSet openBidirectionalLocalStreams_;
   StreamIdSet openUnidirectionalLocalStreams_;
-  StreamIdSet openBidirectionalLocalStreamGroups_;
-  StreamIdSet openUnidirectionalLocalStreamGroups_;
 
   UnorderedMap<StreamId, QuicStreamState> streams_;
 
   std::vector<StreamId> newPeerStreams_;
-  std::vector<StreamId> newGroupedPeerStreams_;
-  UnorderedSet<StreamGroupId> newPeerStreamGroups_;
-  StreamIdSet peerUnidirectionalStreamGroupsSeen_;
-  StreamIdSet peerBidirectionalStreamGroupsSeen_;
 
-  UnorderedMap<StreamId, StreamDataBlockedFrame> blockedStreams_;
+  UnorderedMap<StreamId, uint64_t> blockedStreams_; // StreamId -> offset
   UnorderedMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
   UnorderedSet<StreamId> windowUpdates_;
   UnorderedSet<StreamId> flowControlUpdated_;
@@ -889,15 +524,14 @@ class QuicStreamManager {
   // on connection flow control.
   UnorderedSet<StreamId> connFlowControlBlocked_;
 
-  // Streams that have bytes in loss buffer
-  UnorderedSet<StreamId> lossStreams_;
+  // Counter of streams that have bytes in loss buffer
+  size_t numStreamsWithLoss_{0};
   UnorderedSet<StreamId> readableStreams_;
   UnorderedSet<StreamId> unidirectionalReadableStreams_;
   UnorderedSet<StreamId> peekableStreams_;
 
   std::unique_ptr<PriorityQueue> writeQueue_;
   std::set<StreamId> controlWriteQueue_;
-  UnorderedSet<StreamId> writableStreams_;
   UnorderedSet<StreamId> txStreams_;
   UnorderedSet<StreamId> deliverableStreams_;
   UnorderedSet<StreamId> closedStreams_;

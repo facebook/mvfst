@@ -107,7 +107,6 @@ mvfst_cpp_library(
         ":loss_state",
         ":outstanding_packet",
         ":quic_connection_stats",
-        ":retransmission_policy",
         ":stats_callback",
         ":transport_settings",
         "//folly:network_address",
@@ -336,16 +335,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//quic/state:quic_state_machine",
-    ],
-)
-
-mvfst_cpp_library(
-    name = "retransmission_policy",
-    headers = [
-        "QuicStreamGroupRetransmissionPolicy.h",
-    ],
-    exported_deps = [
-        "//quic:constants",
     ],
 )
 

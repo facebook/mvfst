@@ -44,26 +44,15 @@ enum class TestFrameType : uint8_t {
   EXPIRED_DATA,
   REJECTED_DATA,
   MAX_STREAMS,
-  DATAGRAM,
-  STREAM_GROUP
+  DATAGRAM
 };
 
 // A made up encoding decoding of a stream.
-BufPtr encodeStreamBuffer(
-    StreamId id,
-    StreamBuffer data,
-    OptionalIntegral<StreamGroupId> groupId = std::nullopt) {
+BufPtr encodeStreamBuffer(StreamId id, StreamBuffer data) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
-  if (!groupId) {
-    appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM));
-  } else {
-    appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM_GROUP));
-  }
+  appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM));
   appender.writeBE(id);
-  if (groupId) {
-    appender.writeBE(*groupId);
-  }
   auto dataBuf = data.data.move();
   dataBuf->coalesce();
   appender.writeBE<uint32_t>(dataBuf->length());
@@ -140,27 +129,6 @@ std::pair<StreamId, StreamBuffer> decodeStreamBuffer(
   return std::make_pair(
       streamId,
       StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, (bool)eof));
-}
-
-struct StreamGroupIdBuf {
-  StreamId id;
-  StreamGroupId groupId;
-  StreamBuffer buf;
-};
-
-StreamGroupIdBuf decodeStreamGroupBuffer(ContiguousReadCursor& cursor) {
-  StreamId streamId = 0;
-  cursor.tryReadBE(streamId);
-  StreamGroupId groupId = 0;
-  cursor.tryReadBE(groupId);
-  auto dataBuffer = decodeDataBuffer(cursor);
-  uint8_t eof = 0;
-  cursor.tryReadBE(eof);
-  return StreamGroupIdBuf{
-      .id = streamId,
-      .groupId = groupId,
-      .buf = StreamBuffer(
-          std::move(dataBuffer.first), dataBuffer.second, (bool)eof)};
 }
 
 StreamBuffer decodeCryptoBuffer(ContiguousReadCursor& cursor) {
@@ -335,24 +303,6 @@ class TestQuicTransport
         auto buffer = decodeDatagramFrame(cursor);
         auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
         handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
-      } else if (type == TestFrameType::STREAM_GROUP) {
-        auto res = decodeStreamGroupBuffer(cursor);
-        auto streamResult =
-            conn_->streamManager->getStream(res.id, res.groupId);
-        if (streamResult.hasError()) {
-          return quic::make_unexpected(streamResult.error());
-        }
-        QuicStreamState* stream = streamResult.value();
-        if (!stream) {
-          continue;
-        }
-        auto streamGroupResult =
-            appendDataToReadBuffer(*stream, std::move(res.buf));
-        if (streamGroupResult.hasError()) {
-          return quic::make_unexpected(streamGroupResult.error());
-        }
-        conn_->streamManager->updateReadableStreams(*stream);
-        conn_->streamManager->updatePeekableStreams(*stream);
       } else {
         auto buffer = decodeStreamBuffer(cursor);
         auto streamResult = conn_->streamManager->getStream(buffer.first);
@@ -459,11 +409,8 @@ class TestQuicTransport
 
   void onReadError(const folly::AsyncSocketException&) noexcept {}
 
-  void addDataToStream(
-      StreamId id,
-      StreamBuffer data,
-      OptionalIntegral<StreamGroupId> groupId = std::nullopt) {
-    auto buf = encodeStreamBuffer(id, std::move(data), std::move(groupId));
+  void addDataToStream(StreamId id, StreamBuffer data) {
+    auto buf = encodeStreamBuffer(id, std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
     onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
   }
@@ -4657,296 +4604,6 @@ TEST_F(QuicTransportImplTestCounters, TransportResetClosesStreams) {
   EXPECT_EQ(stream1, 1);
   EXPECT_EQ(stream2, 5);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  transport.reset();
-}
-
-class QuicTransportImplTestWithGroups : public QuicTransportImplTestBase {};
-
-INSTANTIATE_TEST_SUITE_P(
-    QuicTransportImplTestWithGroups,
-    QuicTransportImplTestWithGroups,
-    ::testing::Values(DelayedStreamNotifsTestParam{true}));
-
-TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  auto groupId = transport->createBidirectionalStreamGroup();
-  EXPECT_TRUE(groupId.has_value());
-  auto stream1 = transport->createBidirectionalStreamInGroup(*groupId).value();
-  auto stream2 = transport->createBidirectionalStreamInGroup(*groupId).value();
-
-  NiceMock<MockReadCallback> readCb1;
-  NiceMock<MockReadCallback> readCb2;
-
-  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
-  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
-
-  transport->addDataToStream(
-      stream1,
-      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
-      *groupId);
-
-  transport->addDataToStream(
-      stream2,
-      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 10),
-      *groupId);
-
-  EXPECT_CALL(readCb1, readAvailableWithGroup(stream1, *groupId));
-  transport->driveReadCallbacks();
-
-  transport->addDataToStream(
-      stream2,
-      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
-      *groupId);
-
-  EXPECT_CALL(readCb1, readAvailableWithGroup(stream1, *groupId));
-  EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
-  transport->driveReadCallbacks();
-
-  EXPECT_CALL(readCb1, readAvailableWithGroup(stream1, *groupId));
-  EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
-  transport->driveReadCallbacks();
-
-  EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
-  ASSERT_FALSE(transport->setReadCallback(stream1, nullptr).hasError());
-  transport->driveReadCallbacks();
-  transport.reset();
-}
-
-TEST_P(QuicTransportImplTestWithGroups, ReadErrorCallbackWithGroups) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  auto groupId = transport->createBidirectionalStreamGroup();
-  EXPECT_TRUE(groupId.has_value());
-  auto stream1 = transport->createBidirectionalStreamInGroup(*groupId).value();
-
-  NiceMock<MockReadCallback> readCb1;
-
-  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
-
-  transport->addStreamReadError(stream1, LocalErrorCode::NO_ERROR);
-  transport->addDataToStream(
-      stream1,
-      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
-      *groupId);
-
-  EXPECT_CALL(readCb1, readErrorWithGroup(stream1, *groupId, _));
-  transport->driveReadCallbacks();
-
-  transport.reset();
-}
-
-TEST_P(
-    QuicTransportImplTestWithGroups,
-    ReadCallbackWithGroupsCancellCallbacks) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  auto groupId = transport->createBidirectionalStreamGroup();
-  EXPECT_TRUE(groupId.has_value());
-  auto stream1 = transport->createBidirectionalStreamInGroup(*groupId).value();
-  auto stream2 = transport->createBidirectionalStreamInGroup(*groupId).value();
-
-  NiceMock<MockReadCallback> readCb1;
-  NiceMock<MockReadCallback> readCb2;
-
-  ASSERT_FALSE(transport->setReadCallback(stream1, &readCb1).hasError());
-  ASSERT_FALSE(transport->setReadCallback(stream2, &readCb2).hasError());
-
-  transport->addDataToStream(
-      stream1,
-      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
-      *groupId);
-
-  transport->addDataToStream(
-      stream2,
-      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 10),
-      *groupId);
-
-  EXPECT_CALL(readCb1, readErrorWithGroup(stream1, *groupId, _));
-  EXPECT_CALL(readCb2, readErrorWithGroup(stream2, *groupId, _));
-  QuicError error =
-      QuicError(TransportErrorCode::PROTOCOL_VIOLATION, "test error");
-  transport->cancelAllAppCallbacks(error);
-  transport.reset();
-}
-
-TEST_P(QuicTransportImplTestWithGroups, onNewStreamsAndGroupsCallbacks) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  auto readData = folly::IOBuf::copyBuffer("actual stream data");
-
-  StreamGroupId groupId = 0x00;
-  StreamId stream1 = 0x00;
-  EXPECT_CALL(connCallback, onNewBidirectionalStreamGroup(groupId));
-  EXPECT_CALL(connCallback, onNewBidirectionalStreamInGroup(stream1, groupId));
-  transport->addDataToStream(
-      stream1, StreamBuffer(readData->clone(), 0, true), groupId);
-
-  StreamId stream2 = 0x04;
-  EXPECT_CALL(connCallback, onNewBidirectionalStreamInGroup(stream2, groupId));
-  transport->addDataToStream(
-      stream2, StreamBuffer(readData->clone(), 0, true), groupId);
-
-  StreamGroupId groupIdUni = 0x02;
-  StreamId uniStream3 = 0xa;
-  EXPECT_CALL(connCallback, onNewUnidirectionalStreamGroup(groupIdUni));
-  EXPECT_CALL(
-      connCallback, onNewUnidirectionalStreamInGroup(uniStream3, groupIdUni));
-  transport->addDataToStream(
-      uniStream3, StreamBuffer(readData->clone(), 0, true), groupIdUni);
-
-  transport.reset();
-}
-
-TEST_P(
-    QuicTransportImplTestWithGroups,
-    TestSetStreamGroupRetransmissionPolicyAllowed) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  const StreamGroupId groupId = 0x00;
-  const QuicStreamGroupRetransmissionPolicy policy;
-
-  // Test policy set allowed
-  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
-  EXPECT_TRUE(res.has_value());
-
-  // Test policy set not allowed.
-  transportSettings.advertisedMaxStreamGroups = 0;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-  res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
-  EXPECT_TRUE(res.hasError());
-  EXPECT_EQ(res.error(), LocalErrorCode::INVALID_OPERATION);
-  EXPECT_EQ(1, transport->getStreamGroupRetransmissionPolicies().size());
-
-  transport.reset();
-}
-
-TEST_P(
-    QuicTransportImplTestWithGroups,
-    TestStreamGroupRetransmissionPolicyReset) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  const StreamGroupId groupId = 0x00;
-  QuicStreamGroupRetransmissionPolicy policy;
-
-  // Add the policy.
-  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
-
-  // Reset allowed.
-  res = transport->setStreamGroupRetransmissionPolicy(groupId, std::nullopt);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 0);
-
-  // Add the policy back.
-  res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
-
-  // Reset allowed even if custom policies are disabled.
-  transportSettings.advertisedMaxStreamGroups = 0;
-  res = transport->setStreamGroupRetransmissionPolicy(groupId, std::nullopt);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 0);
-
-  transport.reset();
-}
-
-TEST_P(
-    QuicTransportImplTestWithGroups,
-    TestStreamGroupRetransmissionPolicyAddRemove) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 16;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  // Add a policy.
-  const StreamGroupId groupId = 0x00;
-  const QuicStreamGroupRetransmissionPolicy policy;
-  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
-
-  // Add another one.
-  const StreamGroupId groupId2 = 0x04;
-  const QuicStreamGroupRetransmissionPolicy policy2;
-  res = transport->setStreamGroupRetransmissionPolicy(groupId2, policy2);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 2);
-
-  // Remove second policy.
-  res = transport->setStreamGroupRetransmissionPolicy(groupId2, std::nullopt);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
-
-  // Remove first policy.
-  res = transport->setStreamGroupRetransmissionPolicy(groupId, std::nullopt);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 0);
-
-  transport.reset();
-}
-
-TEST_P(
-    QuicTransportImplTestWithGroups,
-    TestStreamGroupRetransmissionPolicyMaxLimit) {
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.advertisedMaxStreamGroups = 1;
-  transport->setTransportSettings(transportSettings);
-  ASSERT_FALSE(transport->getConnectionState()
-                   .streamManager->refreshTransportSettings(transportSettings)
-                   .hasError());
-
-  // Add a policy.
-  const StreamGroupId groupId = 0x00;
-  const QuicStreamGroupRetransmissionPolicy policy;
-  auto res = transport->setStreamGroupRetransmissionPolicy(groupId, policy);
-  EXPECT_TRUE(res.has_value());
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
-
-  // Try adding another one; should be over the limit.
-  const StreamGroupId groupId2 = 0x04;
-  res = transport->setStreamGroupRetransmissionPolicy(groupId2, policy);
-  EXPECT_TRUE(res.hasError());
-  EXPECT_EQ(res.error(), LocalErrorCode::RTX_POLICIES_LIMIT_EXCEEDED);
-  EXPECT_EQ(transport->getStreamGroupRetransmissionPolicies().size(), 1);
-
   transport.reset();
 }
 
