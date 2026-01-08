@@ -237,9 +237,14 @@ struct OutstandingPacket {
   OutstandingPacket() = delete;
 };
 
+// Forward declare for the callback type
+struct OutstandingPacketWrapper;
+using PacketDestroyFn =
+    void (*)(void* context, const OutstandingPacketWrapper& pkt);
+
 struct OutstandingPacketWrapper : OutstandingPacket {
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn_{
-      nullptr};
+  void* destroyContext_{nullptr};
+  PacketDestroyFn destroyFn_{nullptr};
 
   OutstandingPacketWrapper(
       RegularQuicWritePacket packetIn,
@@ -253,8 +258,8 @@ struct OutstandingPacketWrapper : OutstandingPacket {
       uint64_t writeCount,
       Metadata::DetailsPerStream&& detailsPerStream,
       std::chrono::microseconds totalAppLimitedTimeUsecs = 0us,
-      std::function<void(const quic::OutstandingPacketWrapper&)>
-          packetDestroyFn = nullptr)
+      void* destroyContext = nullptr,
+      PacketDestroyFn destroyFn = nullptr)
       : OutstandingPacket(
             std::move(packetIn),
             timeIn,
@@ -267,33 +272,36 @@ struct OutstandingPacketWrapper : OutstandingPacket {
             writeCount,
             std::move(detailsPerStream),
             totalAppLimitedTimeUsecs),
-        packetDestroyFn_(std::move(packetDestroyFn)) {}
+        destroyContext_(destroyContext),
+        destroyFn_(destroyFn) {}
 
   OutstandingPacketWrapper(const OutstandingPacketWrapper& source) = delete;
   OutstandingPacketWrapper& operator=(const OutstandingPacketWrapper&) = delete;
 
   // TODO: bring noexcept back after retiring gcc 9: T202935929
   OutstandingPacketWrapper(OutstandingPacketWrapper&& rhs)
-      : OutstandingPacket(std::move(rhs)) {
-    packetDestroyFn_ = std::exchange(rhs.packetDestroyFn_, nullptr);
-  }
+      : OutstandingPacket(std::move(rhs)),
+        destroyContext_(std::exchange(rhs.destroyContext_, nullptr)), // NOLINT
+        destroyFn_(std::exchange(rhs.destroyFn_, nullptr)) {} // NOLINT
 
+ public:
   OutstandingPacketWrapper& operator=(OutstandingPacketWrapper&& rhs) noexcept {
-    // If this->packetDestroyFn_ is populated, then this OutstandingPacket is
-    // populated. We must call packetDestroyFn_(this) first, before moving the
+    // If this->destroyFn_ is populated, then this OutstandingPacket is
+    // populated. We must call destroyFn_(this) first, before moving the
     // rest of the fields from the source packet (rhs).
-    if (this != &rhs && packetDestroyFn_) {
-      packetDestroyFn_(*this);
+    if (this != &rhs && destroyFn_) {
+      destroyFn_(destroyContext_, *this);
     }
 
-    packetDestroyFn_ = std::exchange(rhs.packetDestroyFn_, nullptr);
+    destroyContext_ = std::exchange(rhs.destroyContext_, nullptr);
+    destroyFn_ = std::exchange(rhs.destroyFn_, nullptr);
     OutstandingPacket::operator=(std::move(rhs));
     return *this;
   }
 
   ~OutstandingPacketWrapper() {
-    if (packetDestroyFn_) {
-      packetDestroyFn_(*this);
+    if (destroyFn_) {
+      destroyFn_(destroyContext_, *this);
     }
   }
 };

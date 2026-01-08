@@ -83,6 +83,15 @@ std::string largestAckToSendToString(
 
 using namespace quic;
 
+void notifyPacketProcessorsOnDestroy(
+    void* context,
+    const OutstandingPacketWrapper& pkt) {
+  auto* conn = static_cast<QuicConnectionStateBase*>(context);
+  for (auto& packetProcessor : conn->packetProcessors) {
+    packetProcessor->onPacketDestroyed(pkt);
+  }
+}
+
 /**
  * This function returns the number of write bytes that are available until we
  * reach the writableBytesLimit. It may or may not be the limiting factor on the
@@ -975,13 +984,6 @@ quic::Expected<void, QuicError> updateConnection(
           })
           .base();
 
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&conn](const quic::OutstandingPacketWrapper& pkt) {
-        for (auto& packetProcessor : conn.packetProcessors) {
-          packetProcessor->onPacketDestroyed(pkt);
-        }
-      };
-
   auto& pkt = *conn.outstandings.packets.emplace(
       packetIt,
       std::move(packet),
@@ -998,7 +1000,8 @@ quic::Expected<void, QuicError> updateConnection(
       conn.writeCount,
       std::move(detailsPerStream),
       conn.appLimitedTracker.getTotalAppLimitedTime(),
-      std::move(packetDestroyFn));
+      &conn,
+      &notifyPacketProcessorsOnDestroy);
 
   maybeAddPacketMark(conn, pkt);
 

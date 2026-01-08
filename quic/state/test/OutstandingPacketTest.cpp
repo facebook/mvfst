@@ -20,14 +20,29 @@ using namespace testing;
 
 namespace quic::test {
 
+namespace {
+void testPacketDestroyFn(void* ctx, const OutstandingPacketWrapper& pkt) {
+  static_cast<MockPacketProcessor*>(ctx)->onPacketDestroyed(pkt);
+}
+
+struct DestroyCallbackWithCounter {
+  MockPacketProcessor* processor;
+  int* counter;
+};
+
+void testPacketDestroyFnWithCounter(
+    void* ctx,
+    const OutstandingPacketWrapper& pkt) {
+  auto* context = static_cast<DestroyCallbackWithCounter*>(ctx);
+  context->processor->onPacketDestroyed(pkt);
+  (*context->counter)++;
+}
+} // namespace
+
 TEST(OutstandingPacketTest, BasicPacketDestructionCallback) {
   // Mock packet processor to test packet callbacks.
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&](const quic::OutstandingPacketWrapper& pkt) {
-        rawPacketProcessor->onPacketDestroyed(pkt);
-      };
   std::deque<OutstandingPacketWrapper> packets;
 
   StreamId currentStreamId = 10;
@@ -52,7 +67,8 @@ TEST(OutstandingPacketTest, BasicPacketDestructionCallback) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        rawPacketProcessor,
+        &testPacketDestroyFn);
     packets.emplace_back(std::move(testPacket));
   }
   EXPECT_EQ(maxPackets, packets.size());
@@ -73,10 +89,6 @@ TEST(OutstandingPacketTest, BasicPacketDestructionDequeDestroy) {
   // Mock packet processor to test packet callbacks.
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&](const quic::OutstandingPacketWrapper& pkt) {
-        rawPacketProcessor->onPacketDestroyed(pkt);
-      };
 
   {
     std::deque<OutstandingPacketWrapper> packets;
@@ -103,7 +115,8 @@ TEST(OutstandingPacketTest, BasicPacketDestructionDequeDestroy) {
           0,
           OutstandingPacketMetadata::DetailsPerStream(),
           0us,
-          packetDestroyFn);
+          rawPacketProcessor,
+          &testPacketDestroyFn);
       packets.emplace_back(std::move(testPacket));
     }
     EXPECT_EQ(maxPackets, packets.size());
@@ -156,10 +169,6 @@ TEST(OutstandingPacketTest, PacketMoveConstuctorCallback) {
   // Mock packet processor to test packet callbacks.
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&](const quic::OutstandingPacketWrapper& pkt) {
-        rawPacketProcessor->onPacketDestroyed(pkt);
-      };
   {
     StreamId currentStreamId = 10;
     auto sentTime = Clock::now();
@@ -180,7 +189,8 @@ TEST(OutstandingPacketTest, PacketMoveConstuctorCallback) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        rawPacketProcessor,
+        &testPacketDestroyFn);
 
     // Move the packet - packet destructor shouldn't be called.
     EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_)).Times(0);
@@ -198,10 +208,6 @@ TEST(OutstandingPacketTest, PacketMoveConstuctorCallback) {
 TEST(OutstandingPacketTest, PacketMoveAssignCallback) {
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&](const quic::OutstandingPacketWrapper& pkt) {
-        rawPacketProcessor->onPacketDestroyed(pkt);
-      };
   {
     StreamId currentStreamId = 1;
     auto sentTime = Clock::now();
@@ -223,7 +229,8 @@ TEST(OutstandingPacketTest, PacketMoveAssignCallback) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        rawPacketProcessor,
+        &testPacketDestroyFn);
 
     // Move the packet - packet destructor shouldn't be called.
     EXPECT_CALL(*rawPacketProcessor, onPacketDestroyed(_)).Times(0);
@@ -241,10 +248,6 @@ TEST(OutstandingPacketTest, PacketMoveAssignCallback) {
 TEST(OutstandingPacketTest, PacketMoveAssignExistingPacketCallback) {
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&](const quic::OutstandingPacketWrapper& pkt) {
-        rawPacketProcessor->onPacketDestroyed(pkt);
-      };
   {
     StreamId currentStreamId = 10;
     auto sentTime = Clock::now();
@@ -266,7 +269,8 @@ TEST(OutstandingPacketTest, PacketMoveAssignExistingPacketCallback) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        rawPacketProcessor,
+        &testPacketDestroyFn);
 
     sentTime = Clock::now();
     packetNum = 2;
@@ -286,7 +290,8 @@ TEST(OutstandingPacketTest, PacketMoveAssignExistingPacketCallback) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        rawPacketProcessor,
+        &testPacketDestroyFn);
 
     // Move the packet 1 into packet 2. Packet 2 destructor should be called
     // from move assign operator.
@@ -311,11 +316,8 @@ TEST(OutstandingPacketTest, DequeMoveAssignPacketDestructionCallback) {
   int maxPackets = 10;
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&](const quic::OutstandingPacketWrapper& pkt) {
-        rawPacketProcessor->onPacketDestroyed(pkt);
-        numDestroyCallbacks++;
-      };
+  DestroyCallbackWithCounter callbackContext{
+      rawPacketProcessor, &numDestroyCallbacks};
   {
     std::deque<OutstandingPacketWrapper> packets;
     StreamId currentStreamId = 10;
@@ -339,7 +341,8 @@ TEST(OutstandingPacketTest, DequeMoveAssignPacketDestructionCallback) {
           0,
           OutstandingPacketMetadata::DetailsPerStream(),
           0us,
-          packetDestroyFn);
+          &callbackContext,
+          &testPacketDestroyFnWithCounter);
       packets.emplace_back(std::move(testPacket));
     }
     EXPECT_EQ(maxPackets, packets.size());

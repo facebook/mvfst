@@ -32,6 +32,15 @@ using namespace testing;
 
 namespace quic::test {
 
+namespace {
+void connPacketDestroyFn(void* ctx, const OutstandingPacketWrapper& pkt) {
+  auto* conn = static_cast<QuicConnectionStateBase*>(ctx);
+  for (auto& packetProcessor : conn->packetProcessors) {
+    packetProcessor->onPacketDestroyed(pkt);
+  }
+}
+} // namespace
+
 struct AckHandlersTestParam {
   PacketNumberSpace pnSpace;
   FrameType frameType;
@@ -693,12 +702,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
   StreamId currentStreamId = 10;
   auto sentTime = Clock::now();
   conn.lossState.reorderingThreshold = 15;
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&conn](const quic::OutstandingPacketWrapper& pkt) {
-        for (auto& packetProcessor : conn.packetProcessors) {
-          packetProcessor->onPacketDestroyed(pkt);
-        }
-      };
 
   for (PacketNum packetNum = 1; packetNum <= 3; packetNum++) {
     RegularQuicWritePacket regularPacket =
@@ -719,7 +722,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionAcks) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        &conn,
+        &connPacketDestroyFn);
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 3);
 
@@ -775,12 +779,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
 
   StreamId currentStreamId = 10;
   //   conn.lossState.reorderingThreshold = 1;
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&conn](const quic::OutstandingPacketWrapper& pkt) {
-        for (auto& packetProcessor : conn.packetProcessors) {
-          packetProcessor->onPacketDestroyed(pkt);
-        }
-      };
 
   for (PacketNum packetNum = 1; packetNum <= 3; packetNum++) {
     RegularQuicWritePacket regularPacket =
@@ -801,7 +799,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        &conn,
+        &connPacketDestroyFn);
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 3);
   // Update the ackState
@@ -868,7 +867,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionSpuriousLoss) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        &conn,
+        &connPacketDestroyFn);
   }
 
   // Send ACK for #4, which should clear # 1 as well.
@@ -921,12 +921,6 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
   StreamId currentStreamId = 10;
   auto sentTime = Clock::now();
   conn.lossState.reorderingThreshold = 15;
-  std::function<void(const quic::OutstandingPacketWrapper&)> packetDestroyFn =
-      [&conn](const quic::OutstandingPacketWrapper& pkt) {
-        for (auto& packetProcessor : conn.packetProcessors) {
-          packetProcessor->onPacketDestroyed(pkt);
-        }
-      };
 
   // send 1000 packets, starting at packet 1
   for (PacketNum packetNum = 1; packetNum <= 1000; packetNum++) {
@@ -948,7 +942,8 @@ TEST_P(AckHandlersTest, TestPacketDestructionBigDeque) {
         0,
         OutstandingPacketMetadata::DetailsPerStream(),
         0us,
-        packetDestroyFn);
+        &conn,
+        &connPacketDestroyFn);
   }
   EXPECT_EQ(conn.outstandings.packets.size(), 1000);
 
