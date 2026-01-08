@@ -740,24 +740,6 @@ Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
           spuriouslyLostPacket.metadata.lossTimeoutDividend.value();
     }
   }
-  if (conn.transportSettings.removeFromLossBufferOnSpurious) {
-    for (auto& f : spuriouslyLostPacket.packet.frames) {
-      auto streamFrame = f.asWriteStreamFrame();
-      if (streamFrame) {
-        auto stream = conn.streamManager->findStream(streamFrame->streamId);
-        if (stream) {
-          stream->removeFromLossBuffer(
-              streamFrame->offset, streamFrame->len, streamFrame->fin);
-          auto updateResult = stream->updateAckedIntervals(
-              streamFrame->offset, streamFrame->len, streamFrame->fin);
-          if (!updateResult.has_value()) {
-            return quic::make_unexpected(updateResult.error());
-          }
-          conn.streamManager->updateWritableStreams(*stream);
-        }
-      }
-    }
-  }
   MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
   conn.outstandings.declaredLostCount--;
   return {};
