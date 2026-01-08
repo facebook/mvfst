@@ -33,6 +33,11 @@ constexpr auto APP_NO_ERROR = quic::GenericApplicationErrorCode::NO_ERROR;
 
 namespace quic {
 
+// Static callback for FunctionLooper
+void QuicTransportBase::peekLooperCallback(void* ctx) {
+  static_cast<QuicTransportBase*>(ctx)->invokePeekDataAndCallbacks();
+}
+
 QuicTransportBase::QuicTransportBase(
     std::shared_ptr<QuicEventBase> evb,
     std::unique_ptr<QuicAsyncUDPSocket> socket,
@@ -44,7 +49,8 @@ QuicTransportBase::QuicTransportBase(
       pingTimeout_(this),
       peekLooper_(new FunctionLooper(
           evb_,
-          [this]() { invokePeekDataAndCallbacks(); },
+          this,
+          &peekLooperCallback,
           LooperType::PeekLooper)) {
   if (socket_) {
     std::function<Optional<folly::SocketCmsgMap>()> func = [&]() {

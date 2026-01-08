@@ -14,25 +14,27 @@ using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
     std::shared_ptr<QuicEventBase> evb,
-    std::function<void()>&& func,
+    void* callbackContext,
+    LoopCallbackFn loopCallback,
     LooperType type)
     : evb_(std::move(evb)),
-      func_(std::move(func)),
+      callbackContext_(callbackContext),
+      loopCallback_(loopCallback),
       type_(type),
       running_(false),
       inLoopBody_(false),
       fireLoopEarly_(false) {
-  MVCHECK(func_);
+  MVCHECK(loopCallback_);
 }
 
 void FunctionLooper::setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept {
   pacingTimer_ = std::move(pacingTimer);
 }
 
-void FunctionLooper::setPacingFunction(
-    std::function<std::chrono::microseconds()>&& pacingFunc) {
-  MVCHECK(pacingFunc);
-  pacingFunc_ = std::move(pacingFunc);
+void FunctionLooper::setPacingCallback(
+    PacingCallbackFn pacingCallback) noexcept {
+  MVCHECK(pacingCallback);
+  pacingCallback_ = pacingCallback;
 }
 
 void FunctionLooper::commonLoopBody() noexcept {
@@ -41,7 +43,7 @@ void FunctionLooper::commonLoopBody() noexcept {
     inLoopBody_ = false;
   };
   auto hasBeenRunning = running_;
-  func_();
+  loopCallback_(callbackContext_);
   // callback could cause us to stop ourselves.
   // Someone could have also called run() in the callback.
   MVVLOG(10) << __func__ << ": " << type_
@@ -56,8 +58,9 @@ void FunctionLooper::commonLoopBody() noexcept {
 }
 
 bool FunctionLooper::schedulePacingTimeout() noexcept {
-  if (pacingFunc_ && (pacingTimer_ || evb_) && !isTimerCallbackScheduled()) {
-    auto timeUntilWrite = pacingFunc_();
+  if (pacingCallback_ && (pacingTimer_ || evb_) &&
+      !isTimerCallbackScheduled()) {
+    auto timeUntilWrite = pacingCallback_(callbackContext_);
     if (timeUntilWrite != 0us) {
       nextPacingTime_ = Clock::now() + timeUntilWrite;
       if (pacingTimer_) {
@@ -89,13 +92,13 @@ void FunctionLooper::run(bool thisIteration) noexcept {
     return;
   }
   if (isLoopCallbackScheduled() ||
-      (!fireLoopEarly_ && pacingFunc_ && isTimerCallbackScheduled())) {
+      (!fireLoopEarly_ && pacingCallback_ && isTimerCallbackScheduled())) {
     MVVLOG(10) << __func__ << ": " << type_ << " already scheduled";
     return;
   }
   // If we are pacing, we're about to write again, if it's close, just write
   // now.
-  if (pacingFunc_ && isTimerCallbackScheduled()) {
+  if (pacingCallback_ && isTimerCallbackScheduled()) {
     auto n = Clock::now();
     auto timeUntilWrite = nextPacingTime_ < n
         ? 0us
@@ -126,7 +129,7 @@ bool FunctionLooper::isRunning() const {
 }
 
 bool FunctionLooper::isPacingScheduled() {
-  return pacingFunc_ && isTimerCallbackScheduled();
+  return pacingCallback_ && isTimerCallbackScheduled();
 }
 
 bool FunctionLooper::isLoopCallbackScheduled() {

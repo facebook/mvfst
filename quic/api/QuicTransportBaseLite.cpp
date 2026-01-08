@@ -66,11 +66,13 @@ QuicTransportBaseLite::QuicTransportBaseLite(
       drainTimeout_(this),
       writeLooper_(new FunctionLooper(
           evb_,
-          [this]() { pacedWriteDataToSocket(); },
+          this,
+          &writeLooperCallback,
           LooperType::WriteLooper)),
       readLooper_(new FunctionLooper(
           evb_,
-          [this]() { invokeReadDataAndCallbacks(true); },
+          this,
+          &readLooperCallback,
           LooperType::ReadLooper)) {}
 
 QuicTransportBaseLite::~QuicTransportBaseLite() {
@@ -81,6 +83,22 @@ QuicTransportBaseLite::~QuicTransportBaseLite() {
   // derived class to ensure that observers are properly notified
   MVDCHECK_NE(CloseState::OPEN, closeState_);
   MVDCHECK(!socket_.get()); // should be no socket
+}
+
+void QuicTransportBaseLite::writeLooperCallback(void* ctx) {
+  static_cast<QuicTransportBaseLite*>(ctx)->pacedWriteDataToSocket();
+}
+
+void QuicTransportBaseLite::readLooperCallback(void* ctx) {
+  static_cast<QuicTransportBaseLite*>(ctx)->invokeReadDataAndCallbacks(true);
+}
+
+std::chrono::microseconds QuicTransportBaseLite::pacingCallback(void* ctx) {
+  auto* self = static_cast<QuicTransportBaseLite*>(ctx);
+  if (isConnectionPaced(*self->conn_)) {
+    return self->conn_->pacer->getTimeUntilNextWrite();
+  }
+  return std::chrono::microseconds::zero();
 }
 
 void QuicTransportBaseLite::onNetworkData(
@@ -2851,12 +2869,7 @@ void QuicTransportBaseLite::setTransportSettings(
   validateCongestionAndPacing(
       conn_->transportSettings.defaultCongestionController);
   if (conn_->transportSettings.pacingEnabled) {
-    writeLooper_->setPacingFunction([this]() -> auto {
-      if (isConnectionPaced(*conn_)) {
-        return conn_->pacer->getTimeUntilNextWrite();
-      }
-      return 0us;
-    });
+    writeLooper_->setPacingCallback(&pacingCallback);
     bool usingBbr =
         (conn_->transportSettings.defaultCongestionController ==
              CongestionControlType::BBR ||

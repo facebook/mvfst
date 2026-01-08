@@ -23,6 +23,10 @@ enum class LooperType : uint8_t {
 
 std::ostream& operator<<(std::ostream& /* out */, const LooperType& /*rhs*/);
 
+// Function pointer types for looper callbacks
+using LoopCallbackFn = void (*)(void* context);
+using PacingCallbackFn = std::chrono::microseconds (*)(void* context);
+
 /**
  * A loop callback that provides convenience functions for calling a functions
  * in multiple evb loops. Calling run() will cause the loop to start and stop()
@@ -37,7 +41,8 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
 
   explicit FunctionLooper(
       std::shared_ptr<QuicEventBase> evb,
-      std::function<void()>&& func,
+      void* callbackContext,
+      LoopCallbackFn loopCallback,
       LooperType type);
 
   void setPacingTimer(QuicTimer::SharedPtr pacingTimer) noexcept;
@@ -50,8 +55,7 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
    */
   void run(bool thisIteration = false) noexcept;
 
-  void setPacingFunction(
-      std::function<std::chrono::microseconds()>&& pacingFunc);
+  void setPacingCallback(PacingCallbackFn pacingCallback) noexcept;
 
   /**
    * Stops running the loop in each loop iteration.
@@ -108,8 +112,9 @@ class FunctionLooper : public QuicEventBaseLoopCallback,
   bool schedulePacingTimeout() noexcept;
 
   std::shared_ptr<QuicEventBase> evb_;
-  std::function<void()> func_;
-  std::function<std::chrono::microseconds()> pacingFunc_{nullptr};
+  void* callbackContext_{nullptr};
+  LoopCallbackFn loopCallback_{nullptr};
+  PacingCallbackFn pacingCallback_{nullptr};
   QuicTimer::SharedPtr pacingTimer_;
   TimePoint nextPacingTime_;
   const LooperType type_;

@@ -285,6 +285,9 @@ class QuicTransportBase : public QuicSocket,
   UnorderedMap<StreamId, PeekCallbackData> peekCallbacks_;
   FunctionLooper::Ptr peekLooper_;
 
+  // Static callback for FunctionLooper
+  static void peekLooperCallback(void* ctx);
+
   bool handshakeDoneNotified_{false};
 };
 

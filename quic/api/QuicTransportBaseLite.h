@@ -818,6 +818,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   void updatePacketProcessorsPrewriteRequests();
 
+  // Static callbacks for FunctionLooper
+  static void writeLooperCallback(void* ctx);
+  static void readLooperCallback(void* ctx);
+  static std::chrono::microseconds pacingCallback(void* ctx);
+
   uint64_t qlogRefcnt_{0};
 };
 
