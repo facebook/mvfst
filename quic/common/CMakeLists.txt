@@ -29,7 +29,6 @@ target_link_libraries(
 
 add_library(
   mvfst_looper
-  FunctionLooper.cpp
   events/HighResQuicTimer.cpp
 )
 

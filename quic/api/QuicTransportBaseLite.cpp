@@ -19,6 +19,9 @@
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+
+#include <folly/ScopeGuard.h>
+
 #include <sstream>
 
 namespace {
@@ -50,6 +53,183 @@ inline std::ostream& operator<<(
   return os;
 }
 
+std::ostream& operator<<(std::ostream& out, const LooperType& rhs) {
+  switch (rhs) {
+    case LooperType::ReadLooper:
+      out << "ReadLooper";
+      break;
+    case LooperType::PeekLooper:
+      out << "PeekLooper";
+      break;
+    case LooperType::WriteLooper:
+      out << "WriteLooper";
+      break;
+    default:
+      out << "unknown";
+      break;
+  }
+  return out;
+}
+
+using namespace std::chrono_literals;
+
+// TransportLooper implementation
+
+QuicTransportBaseLite::TransportLooper::TransportLooper(
+    std::shared_ptr<QuicEventBase> evb,
+    QuicTransportBaseLite* transport,
+    LooperType type)
+    : evb_(std::move(evb)),
+      transport_(transport),
+      type_(type),
+      running_(false),
+      inLoopBody_(false),
+      fireLoopEarly_(false),
+      hasPacingCallback_(false) {
+  DCHECK(transport_);
+}
+
+void QuicTransportBaseLite::TransportLooper::setPacingTimer(
+    QuicTimer::SharedPtr pacingTimer) noexcept {
+  pacingTimer_ = std::move(pacingTimer);
+}
+
+void QuicTransportBaseLite::TransportLooper::enablePacingCallback() noexcept {
+  hasPacingCallback_ = true;
+}
+
+void QuicTransportBaseLite::TransportLooper::commonLoopBody() noexcept {
+  inLoopBody_ = true;
+  SCOPE_EXIT {
+    inLoopBody_ = false;
+  };
+  auto hasBeenRunning = running_;
+  transport_->onLooperCallback(type_);
+  // callback could cause us to stop ourselves.
+  // Someone could have also called run() in the callback.
+  MVVLOG(10) << __func__ << ": " << type_
+             << " hasBeenRunning=" << hasBeenRunning
+             << " running_=" << running_;
+  if (!running_) {
+    return;
+  }
+  if (!schedulePacingTimeout()) {
+    evb_->runInLoop(this);
+  }
+}
+
+bool QuicTransportBaseLite::TransportLooper::schedulePacingTimeout() noexcept {
+  if (hasPacingCallback_ && (pacingTimer_ || evb_) &&
+      !isTimerCallbackScheduled()) {
+    auto timeUntilWrite = transport_->getLooperPacingDelay();
+    if (timeUntilWrite != 0us) {
+      nextPacingTime_ = Clock::now() + timeUntilWrite;
+      if (pacingTimer_) {
+        pacingTimer_->scheduleTimeout(this, timeUntilWrite);
+        return true;
+      }
+      if (evb_) {
+        evb_->scheduleTimeoutHighRes(this, timeUntilWrite);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+void QuicTransportBaseLite::TransportLooper::runLoopCallback() noexcept {
+  folly::DelayedDestruction::DestructorGuard dg(this);
+  commonLoopBody();
+}
+
+void QuicTransportBaseLite::TransportLooper::run(bool thisIteration) noexcept {
+  MVVLOG(10) << __func__ << ": " << type_;
+  running_ = true;
+  // Caller can call run() in the callback. But if we are in pacing mode, we
+  // should prevent such loop.
+  if (pacingTimer_ && inLoopBody_) {
+    MVVLOG(4) << __func__ << ": " << type_
+              << " in loop body and using pacing - not rescheduling";
+    return;
+  }
+  if (isLoopCallbackScheduled() ||
+      (!fireLoopEarly_ && hasPacingCallback_ && isTimerCallbackScheduled())) {
+    MVVLOG(10) << __func__ << ": " << type_ << " already scheduled";
+    return;
+  }
+  // If we are pacing, we're about to write again, if it's close, just write
+  // now.
+  if (hasPacingCallback_ && isTimerCallbackScheduled()) {
+    auto n = Clock::now();
+    auto timeUntilWrite = nextPacingTime_ < n
+        ? 0us
+        : std::chrono::duration_cast<std::chrono::milliseconds>(
+              nextPacingTime_ - n);
+    if (timeUntilWrite <= 1ms) {
+      cancelTimerCallback();
+      // The next loop is good enough
+      thisIteration = false;
+    } else {
+      return;
+    }
+  }
+  evb_->runInLoop(this, thisIteration);
+}
+
+void QuicTransportBaseLite::TransportLooper::stop() noexcept {
+  MVVLOG(10) << __func__ << ": " << type_;
+  running_ = false;
+  if (evb_) {
+    cancelLoopCallback();
+  }
+  cancelTimerCallback();
+}
+
+bool QuicTransportBaseLite::TransportLooper::isRunning() const {
+  return running_;
+}
+
+bool QuicTransportBaseLite::TransportLooper::isPacingScheduled() {
+  return hasPacingCallback_ && isTimerCallbackScheduled();
+}
+
+bool QuicTransportBaseLite::TransportLooper::isLoopCallbackScheduled() {
+  return QuicEventBaseLoopCallback::isLoopCallbackScheduled();
+}
+
+void QuicTransportBaseLite::TransportLooper::attachEventBase(
+    std::shared_ptr<QuicEventBase> evb) {
+  MVVLOG(10) << __func__ << ": " << type_;
+  DCHECK(!evb_);
+  DCHECK(evb && evb->isInEventBaseThread());
+  evb_ = std::move(evb);
+}
+
+void QuicTransportBaseLite::TransportLooper::detachEventBase() {
+  MVVLOG(10) << __func__ << ": " << type_;
+  DCHECK(evb_ && evb_->isInEventBaseThread());
+  stop();
+  cancelTimerCallback();
+  evb_ = nullptr;
+}
+
+void QuicTransportBaseLite::TransportLooper::timeoutExpired() noexcept {
+  folly::DelayedDestruction::DestructorGuard dg(this);
+  commonLoopBody();
+}
+
+void QuicTransportBaseLite::TransportLooper::callbackCanceled() noexcept {
+  return;
+}
+
+OptionalMicros
+QuicTransportBaseLite::TransportLooper::getTimerTickInterval() noexcept {
+  if (pacingTimer_) {
+    return pacingTimer_->getTickInterval();
+  }
+  return std::nullopt;
+}
+
 QuicTransportBaseLite::QuicTransportBaseLite(
     std::shared_ptr<QuicEventBase> evb,
     std::unique_ptr<QuicAsyncUDPSocket> socket,
@@ -64,16 +244,8 @@ QuicTransportBaseLite::QuicTransportBaseLite(
       ackTimeout_(this),
       pathValidationTimeout_(this),
       drainTimeout_(this),
-      writeLooper_(new FunctionLooper(
-          evb_,
-          this,
-          &writeLooperCallback,
-          LooperType::WriteLooper)),
-      readLooper_(new FunctionLooper(
-          evb_,
-          this,
-          &readLooperCallback,
-          LooperType::ReadLooper)) {}
+      writeLooper_(new TransportLooper(evb_, this, LooperType::WriteLooper)),
+      readLooper_(new TransportLooper(evb_, this, LooperType::ReadLooper)) {}
 
 QuicTransportBaseLite::~QuicTransportBaseLite() {
   resetConnectionCallbacks();
@@ -85,18 +257,23 @@ QuicTransportBaseLite::~QuicTransportBaseLite() {
   MVDCHECK(!socket_.get()); // should be no socket
 }
 
-void QuicTransportBaseLite::writeLooperCallback(void* ctx) {
-  static_cast<QuicTransportBaseLite*>(ctx)->pacedWriteDataToSocket();
+void QuicTransportBaseLite::onLooperCallback(LooperType type) {
+  switch (type) {
+    case LooperType::WriteLooper:
+      pacedWriteDataToSocket();
+      break;
+    case LooperType::ReadLooper:
+      invokeReadDataAndCallbacks(true);
+      break;
+    case LooperType::PeekLooper:
+      invokePeekDataAndCallbacks();
+      break;
+  }
 }
 
-void QuicTransportBaseLite::readLooperCallback(void* ctx) {
-  static_cast<QuicTransportBaseLite*>(ctx)->invokeReadDataAndCallbacks(true);
-}
-
-std::chrono::microseconds QuicTransportBaseLite::pacingCallback(void* ctx) {
-  auto* self = static_cast<QuicTransportBaseLite*>(ctx);
-  if (isConnectionPaced(*self->conn_)) {
-    return self->conn_->pacer->getTimeUntilNextWrite();
+std::chrono::microseconds QuicTransportBaseLite::getLooperPacingDelay() {
+  if (isConnectionPaced(*conn_)) {
+    return conn_->pacer->getTimeUntilNextWrite();
   }
   return std::chrono::microseconds::zero();
 }
@@ -2801,7 +2978,7 @@ void QuicTransportBaseLite::setTransportSettings(
   validateCongestionAndPacing(
       conn_->transportSettings.defaultCongestionController);
   if (conn_->transportSettings.pacingEnabled) {
-    writeLooper_->setPacingCallback(&pacingCallback);
+    writeLooper_->enablePacingCallback();
     bool usingBbr =
         (conn_->transportSettings.defaultCongestionController ==
              CongestionControlType::BBR ||

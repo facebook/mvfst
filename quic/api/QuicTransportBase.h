@@ -283,10 +283,7 @@ class QuicTransportBase : public QuicSocket,
   PingTimeout pingTimeout_;
   DatagramCallback* datagramCallback_{nullptr};
   UnorderedMap<StreamId, PeekCallbackData> peekCallbacks_;
-  FunctionLooper::Ptr peekLooper_;
-
-  // Static callback for FunctionLooper
-  static void peekLooperCallback(void* ctx);
+  TransportLooper::Ptr peekLooper_;
 
   bool handshakeDoneNotified_{false};
 };

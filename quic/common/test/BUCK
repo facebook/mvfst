@@ -13,12 +13,12 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
-    name = "FunctionLooperTest",
+    name = "TransportLooperTest",
     srcs = [
         "FunctionLooperTest.cpp",
     ],
     deps = [
-        "//quic/common:looper",
+        "//quic/api:transport_lite",
         "//quic/common/events:folly_eventbase",
         "//quic/common/events:highres_quic_timer",
     ],

@@ -86,30 +86,6 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
-    name = "looper",
-    srcs = [
-        "FunctionLooper.cpp",
-    ],
-    headers = [
-        "FunctionLooper.h",
-    ],
-    deps = [
-        ":mvfst_logging",
-        "//folly:scope_guard",
-    ],
-    exported_deps = [
-        ":optional",
-        "//folly/io/async:delayed_destruction",
-        "//quic:constants",
-        "//quic/common/events:eventbase",
-        "//quic/common/events:quic_timer",
-    ],
-    external_deps = [
-        "glog",
-    ],
-)
-
-mvfst_cpp_library(
     name = "variant",
     headers = [
         "Variant.h",
