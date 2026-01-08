@@ -99,8 +99,7 @@ FizzCryptoFactory::makePacketNumberCipher(fizz::CipherSuite cipher) const {
   }
 }
 
-std::function<bool(ByteRange, ByteRange)>
-FizzCryptoFactory::getCryptoEqualFunction() const {
+CryptoFactory::CryptoEqualFn FizzCryptoFactory::getCryptoEqualFunction() const {
   return fizz::CryptoUtils::equal;
 }
 } // namespace quic

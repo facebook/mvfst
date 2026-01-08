@@ -34,8 +34,7 @@ class FizzCryptoFactory : public CryptoFactory {
       Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
       makePacketNumberCipher(fizz::CipherSuite cipher) const;
 
-  [[nodiscard]] std::function<bool(ByteRange, ByteRange)>
-  getCryptoEqualFunction() const override;
+  [[nodiscard]] CryptoEqualFn getCryptoEqualFunction() const override;
 
   std::shared_ptr<fizz::Factory> getFizzFactory() {
     return fizzFactory_;

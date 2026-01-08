@@ -596,9 +596,8 @@ void QuicReadCodec::setStatelessResetToken(
   statelessResetToken_ = std::move(statelessResetToken);
 }
 
-void QuicReadCodec::setCryptoEqual(
-    std::function<bool(ByteRange, ByteRange)> cryptoEqual) {
-  cryptoEqual_ = std::move(cryptoEqual);
+void QuicReadCodec::setCryptoEqual(CryptoEqualFn cryptoEqual) {
+  cryptoEqual_ = cryptoEqual;
 }
 
 void QuicReadCodec::setConnectionStatsCallback(

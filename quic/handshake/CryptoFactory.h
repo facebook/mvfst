@@ -75,8 +75,12 @@ class CryptoFactory {
       Expected<std::unique_ptr<PacketNumberCipher>, QuicError>
       makePacketNumberCipher(ByteRange baseSecret) const = 0;
 
-  [[nodiscard]] virtual std::function<bool(ByteRange, ByteRange)>
-  getCryptoEqualFunction() const = 0;
+  // Type alias for constant-time comparison function pointer.
+  // Raw function pointer is used instead of std::function since all
+  // implementations are stateless (no captured state).
+  using CryptoEqualFn = bool (*)(folly::ByteRange, folly::ByteRange);
+
+  [[nodiscard]] virtual CryptoEqualFn getCryptoEqualFunction() const = 0;
 
   virtual ~CryptoFactory() = default;
 };

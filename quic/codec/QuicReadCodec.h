@@ -178,7 +178,10 @@ class QuicReadCodec {
   void setClientConnectionId(ConnectionId connId);
   void setServerConnectionId(ConnectionId connId);
   void setStatelessResetToken(StatelessResetToken statelessResetToken);
-  void setCryptoEqual(std::function<bool(ByteRange, ByteRange)> cryptoEqual);
+  // Type alias for constant-time comparison function pointer.
+  using CryptoEqualFn = bool (*)(folly::ByteRange, folly::ByteRange);
+
+  void setCryptoEqual(CryptoEqualFn cryptoEqual);
   [[nodiscard]] const ConnectionId& getClientConnectionId() const;
   [[nodiscard]] const ConnectionId& getServerConnectionId() const;
 
@@ -248,7 +251,7 @@ class QuicReadCodec {
   std::unique_ptr<PacketNumberCipher> handshakeHeaderCipher_;
 
   Optional<StatelessResetToken> statelessResetToken_;
-  std::function<bool(ByteRange, ByteRange)> cryptoEqual_;
+  CryptoEqualFn cryptoEqual_{nullptr};
   Optional<TimePoint> handshakeDoneTime_;
 
   QuicTransportStatsCallback* statsCallback_{nullptr};
