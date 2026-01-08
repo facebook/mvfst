@@ -1119,27 +1119,34 @@ uint64_t unlimitedWritableBytes(QuicConnectionStateBase&) {
   return std::numeric_limits<uint64_t>::max();
 }
 
-HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType) {
-  return [packetType](
-             const ConnectionId& srcConnId,
-             const ConnectionId& dstConnId,
-             PacketNum packetNum,
-             QuicVersion version,
-             const std::string& token) {
-    return LongHeader(
-        packetType, srcConnId, dstConnId, packetNum, version, token);
-  };
+HeaderBuilder HeaderBuilder::makeLong(LongHeader::Types type) {
+  HeaderBuilder builder;
+  builder.kind_ = Kind::Long;
+  builder.longType_ = type;
+  return builder;
 }
 
-HeaderBuilder ShortHeaderBuilder(ProtectionType keyPhase) {
-  return [keyPhase](
-             const ConnectionId& /* srcConnId */,
-             const ConnectionId& dstConnId,
-             PacketNum packetNum,
-             QuicVersion,
-             const std::string&) {
-    return ShortHeader(keyPhase, dstConnId, packetNum);
-  };
+HeaderBuilder HeaderBuilder::makeShort(ProtectionType keyPhase) {
+  HeaderBuilder builder;
+  builder.kind_ = Kind::Short;
+  builder.keyPhase_ = keyPhase;
+  return builder;
+}
+
+PacketHeader HeaderBuilder::operator()(
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    PacketNum packetNum,
+    QuicVersion version,
+    const std::string& token) const {
+  switch (kind_) {
+    case Kind::Long:
+      return LongHeader(
+          longType_, srcConnId, dstConnId, packetNum, version, token);
+    case Kind::Short:
+      return ShortHeader(keyPhase_, dstConnId, packetNum);
+  }
+  folly::assume_unreachable();
 }
 
 quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
@@ -1939,7 +1946,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
-    const HeaderBuilder& builder,
+    HeaderBuilder builder,
     EncryptionLevel encryptionLevel,
     PacketNumberSpace pnSpace,
     FrameScheduler scheduler,

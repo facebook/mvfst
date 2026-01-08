@@ -56,12 +56,24 @@ struct DataPathResult {
         encodedBodySize(encodedBodySizeIn) {}
 };
 
-using HeaderBuilder = std::function<PacketHeader(
-    const ConnectionId& srcConnId,
-    const ConnectionId& dstConnId,
-    PacketNum packetNum,
-    QuicVersion version,
-    const std::string& token)>;
+class HeaderBuilder {
+ public:
+  static HeaderBuilder makeLong(LongHeader::Types type);
+  static HeaderBuilder makeShort(ProtectionType keyPhase);
+
+  PacketHeader operator()(
+      const ConnectionId& srcConnId,
+      const ConnectionId& dstConnId,
+      PacketNum packetNum,
+      QuicVersion version,
+      const std::string& token) const;
+
+ private:
+  enum class Kind { Long, Short };
+  Kind kind_;
+  LongHeader::Types longType_;
+  ProtectionType keyPhase_;
+};
 
 using WritableBytesFunc = FunctionRef<uint64_t(QuicConnectionStateBase& conn)>;
 
@@ -327,7 +339,7 @@ writeProbingDataToSocket(
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
-    const HeaderBuilder& builder,
+    HeaderBuilder builder,
     EncryptionLevel encryptionLevel,
     PacketNumberSpace pnSpace,
     FrameScheduler scheduler,
@@ -337,8 +349,13 @@ writeProbingDataToSocket(
     QuicVersion version,
     const std::string& token = std::string());
 
-HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType);
-HeaderBuilder ShortHeaderBuilder(ProtectionType keyPhase);
+inline HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType) {
+  return HeaderBuilder::makeLong(packetType);
+}
+
+inline HeaderBuilder ShortHeaderBuilder(ProtectionType keyPhase) {
+  return HeaderBuilder::makeShort(keyPhase);
+}
 
 void maybeSendStreamLimitUpdates(QuicConnectionStateBase& conn);
 
