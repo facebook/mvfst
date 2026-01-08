@@ -1062,56 +1062,6 @@ TEST_P(QuicTransportImplTestBase, ReliableResetReadCallback) {
   transport.reset();
 }
 
-TEST_P(
-    QuicTransportImplTestBase,
-    ReadCallbackDataAvailableWithUnidirPrioritized) {
-  InSequence seq;
-
-  auto transportSettings = transport->getTransportSettings();
-  transportSettings.unidirectionalStreamsReadCallbacksFirst = true;
-  transport->setTransportSettings(transportSettings);
-
-  auto& streamManager = *transport->transportConn->streamManager;
-  auto nextPeerUniStream =
-      streamManager.nextAcceptablePeerUnidirectionalStreamId();
-  EXPECT_TRUE(nextPeerUniStream.has_value());
-  auto qpackStreamResult = streamManager.getStream(*nextPeerUniStream);
-  ASSERT_FALSE(qpackStreamResult.hasError());
-  StreamId qpackStream = qpackStreamResult.value()->id;
-
-  auto requestStream = transport->createBidirectionalStream().value();
-
-  NiceMock<MockReadCallback> requestStreamCb;
-  NiceMock<MockReadCallback> qpackStreamCb;
-
-  ASSERT_FALSE(
-      transport->setReadCallback(requestStream, &requestStreamCb).hasError());
-  ASSERT_FALSE(
-      transport->setReadCallback(qpackStream, &qpackStreamCb).hasError());
-
-  transport->addDataToStream(
-      qpackStream,
-      StreamBuffer(
-          folly::IOBuf::copyBuffer(
-              "and i'm qpack data i will block you no tomorrow"),
-          0));
-  transport->addDataToStream(
-      requestStream, StreamBuffer(folly::IOBuf::copyBuffer("i'm headers"), 0));
-
-  bool qpackCbCalled = false;
-
-  EXPECT_CALL(qpackStreamCb, readAvailable(qpackStream))
-      .WillOnce(Invoke([&](StreamId) {
-        EXPECT_FALSE(qpackCbCalled);
-        qpackCbCalled = true;
-      }));
-  EXPECT_CALL(requestStreamCb, readAvailable(requestStream))
-      .WillOnce(Invoke([&](StreamId) { EXPECT_TRUE(qpackCbCalled); }));
-  transport->driveReadCallbacks();
-
-  transport.reset();
-}
-
 TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableNoReap) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();

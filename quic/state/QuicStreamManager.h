@@ -369,10 +369,6 @@ class QuicStreamManager {
     return readableStreams_;
   }
 
-  auto& readableUnidirectionalStreams() {
-    return unidirectionalReadableStreams_;
-  }
-
   auto& peekableStreams() {
     return peekableStreams_;
   }
@@ -526,7 +522,6 @@ class QuicStreamManager {
   // Counter of streams that have bytes in loss buffer
   size_t numStreamsWithLoss_{0};
   UnorderedSet<StreamId> readableStreams_;
-  UnorderedSet<StreamId> unidirectionalReadableStreams_;
   UnorderedSet<StreamId> peekableStreams_;
 
   std::unique_ptr<PriorityQueue> writeQueue_;

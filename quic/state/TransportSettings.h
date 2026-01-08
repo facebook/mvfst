@@ -448,9 +448,6 @@ struct TransportSettings {
   bool networkDataPerSocketRead{false};
   bool cloneAllPacketsWithCryptoFrame{false};
   bool cloneCryptoPacketsAtMostOnce{false};
-  // Raise read callbacks for all unidirectional streams first on data
-  // reception.
-  bool unidirectionalStreamsReadCallbacksFirst{false};
   bool immediatelyRetransmitInitialPackets{false};
   // If > 0 this represents the coalescing of appends to the read buffer
   // which will be applied. i.e. when used the underlying IOBufs in the read

@@ -1181,13 +1181,7 @@ void QuicTransportBaseLite::updateReadLooper() {
       conn_->streamManager->readableStreams().begin(),
       conn_->streamManager->readableStreams().end(),
       matcherFn);
-  auto unidirIter = std::find_if(
-      conn_->streamManager->readableUnidirectionalStreams().begin(),
-      conn_->streamManager->readableUnidirectionalStreams().end(),
-      matcherFn);
   if (iter != conn_->streamManager->readableStreams().end() ||
-      unidirIter !=
-          conn_->streamManager->readableUnidirectionalStreams().end() ||
       !conn_->datagramState.readBuffer.empty()) {
     MVVLOG(10) << "Scheduling read looper " << *this;
     readLooper_->run();
@@ -2614,18 +2608,8 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
   std::vector<StreamId> readableStreamsCopy;
 
   const auto& readableStreams = self->conn_->streamManager->readableStreams();
-  const auto& readableUnidirectionalStreams =
-      self->conn_->streamManager->readableUnidirectionalStreams();
 
-  readableStreamsCopy.reserve(
-      readableStreams.size() + readableUnidirectionalStreams.size());
-
-  if (self->conn_->transportSettings.unidirectionalStreamsReadCallbacksFirst) {
-    std::copy(
-        readableUnidirectionalStreams.begin(),
-        readableUnidirectionalStreams.end(),
-        std::back_inserter(readableStreamsCopy));
-  }
+  readableStreamsCopy.reserve(readableStreams.size());
 
   std::copy(
       readableStreams.begin(),
@@ -2650,14 +2634,7 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
          *stream->reliableSizeFromPeer <= stream->currentReadOffset)) {
       // If we got a reliable reset from the peer, we don't fire the readError
       // callback and remove it until we've read all of the reliable data.
-      if (self->conn_->transportSettings
-              .unidirectionalStreamsReadCallbacksFirst &&
-          isUnidirectionalStream(streamId)) {
-        self->conn_->streamManager->readableUnidirectionalStreams().erase(
-            streamId);
-      } else {
-        self->conn_->streamManager->readableStreams().erase(streamId);
-      }
+      self->conn_->streamManager->readableStreams().erase(streamId);
       readCallbacks_.erase(callback);
       // if there is an error on the stream - it's not readable anymore, so
       // we cannot peek into it as well.

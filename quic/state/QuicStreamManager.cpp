@@ -205,8 +205,6 @@ QuicStreamManager::QuicStreamManager(
   numStreamsWithLoss_ = other.numStreamsWithLoss_;
   other.numStreamsWithLoss_ = 0;
   readableStreams_ = std::move(other.readableStreams_);
-  unidirectionalReadableStreams_ =
-      std::move(other.unidirectionalReadableStreams_);
   peekableStreams_ = std::move(other.peekableStreams_);
   writeQueue_ = std::move(other.writeQueue_);
   controlWriteQueue_ = std::move(other.controlWriteQueue_);
@@ -434,7 +432,6 @@ void QuicStreamManager::clearActionable() {
   deliverableStreams_.clear();
   txStreams_.clear();
   readableStreams_.clear();
-  unidirectionalReadableStreams_.clear();
   peekableStreams_.clear();
   flowControlUpdated_.clear();
 }
@@ -973,12 +970,7 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
   if (conn_.pendingEvents.resets.contains(streamId)) {
     conn_.pendingEvents.resets.erase(streamId);
   }
-  if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
-      isUnidirectionalStream(streamId)) {
-    unidirectionalReadableStreams_.erase(streamId);
-  } else {
-    readableStreams_.erase(streamId);
-  }
+  readableStreams_.erase(streamId);
   peekableStreams_.erase(streamId);
   removeWritable(it->second);
   // Handle loss counter - we have mutable access to the stream here
@@ -1062,22 +1054,12 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
 }
 
 void QuicStreamManager::addToReadableStreams(const QuicStreamState& stream) {
-  if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
-      isUnidirectionalStream(stream.id)) {
-    unidirectionalReadableStreams_.emplace(stream.id);
-  } else {
-    readableStreams_.emplace(stream.id);
-  }
+  readableStreams_.emplace(stream.id);
 }
 
 void QuicStreamManager::removeFromReadableStreams(
     const QuicStreamState& stream) {
-  if (conn_.transportSettings.unidirectionalStreamsReadCallbacksFirst &&
-      isUnidirectionalStream(stream.id)) {
-    unidirectionalReadableStreams_.erase(stream.id);
-  } else {
-    readableStreams_.erase(stream.id);
-  }
+  readableStreams_.erase(stream.id);
 }
 
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
