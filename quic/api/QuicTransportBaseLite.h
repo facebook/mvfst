@@ -512,6 +512,22 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool drainConnection = true,
       bool sendCloseImmediately = true);
 
+  /**
+   * Handles an exception by logging, setting exceptionCloseWhat_, and closing
+   * the connection. Returns the appropriate LocalErrorCode for the caller.
+   *
+   * @param ex The caught exception (must be std::exception or derived)
+   * @param contextMsg Message to include in QuicError (e.g., "writeChain()
+   *                   error")
+   * @param streamId Optional stream ID for logging context
+   * @return LocalErrorCode to return to caller (for Expected-returning
+   *         functions)
+   */
+  LocalErrorCode handleExceptionAndClose(
+      const std::exception& ex,
+      folly::StringPiece contextMsg,
+      Optional<StreamId> streamId = std::nullopt);
+
   void processCallbacksAfterNetworkData();
 
   quic::Expected<void, LocalErrorCode> resetStreamInternal(

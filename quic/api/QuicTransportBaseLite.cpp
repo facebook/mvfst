@@ -213,27 +213,9 @@ void QuicTransportBaseLite::onNetworkData(
         closeImpl(result.error());
       }
     }
-  } catch (const QuicTransportException& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    return closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
-  } catch (const QuicInternalException& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    return closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
-  } catch (const QuicApplicationException& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    return closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const std::exception& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    return closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("error onNetworkData()")));
+    handleExceptionAndClose(ex, "error onNetworkData()");
+    return;
   }
 }
 
@@ -385,28 +367,9 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
       conn_->pacer->reset();
     }
     updateWriteLooper(true);
-  } catch (const QuicTransportException& ex) {
-    MVVLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-              << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    MVVLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-              << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
-    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
-    MVVLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-              << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("writeChain() error")));
-    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(
+        handleExceptionAndClose(ex, "writeChain() error", id));
   }
   return {};
 }
@@ -773,25 +736,8 @@ QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
     }
     return quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode>(
         std::move(result));
-  } catch (const QuicTransportException& ex) {
-    MVVLOG(4) << "read() error " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
-    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(
-        QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
-    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
-    MVVLOG(4) << "read()  error " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("read() error")));
-    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(handleExceptionAndClose(ex, "read() error"));
   }
 }
 
@@ -1200,24 +1146,8 @@ void QuicTransportBaseLite::writeSocketDataAndCatch() {
       return;
     }
     processCallbacksAfterWriteData();
-  } catch (const QuicTransportException& ex) {
-    MVVLOG(4) << __func__ << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()),
-        std::string("writeSocketDataAndCatch()  error")));
-  } catch (const QuicInternalException& ex) {
-    MVVLOG(4) << __func__ << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()),
-        std::string("writeSocketDataAndCatch()  error")));
   } catch (const std::exception& ex) {
-    MVVLOG(4) << __func__ << " error=" << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("writeSocketDataAndCatch()  error")));
+    handleExceptionAndClose(ex, "writeSocketDataAndCatch() error");
   }
 }
 
@@ -1599,6 +1529,43 @@ void QuicTransportBaseLite::closeImpl(
   }
 }
 
+LocalErrorCode QuicTransportBaseLite::handleExceptionAndClose(
+    const std::exception& ex,
+    folly::StringPiece contextMsg,
+    Optional<StreamId> streamId) {
+  // Log with optional stream context
+  if (streamId.has_value()) {
+    MVVLOG(4) << contextMsg << " streamId=" << *streamId << " " << ex.what()
+              << " " << *this;
+  } else {
+    MVVLOG(4) << contextMsg << " " << ex.what() << " " << *this;
+  }
+
+  exceptionCloseWhat_ = ex.what();
+
+  // Determine error code and return value based on exception type
+  if (auto* transportEx = dynamic_cast<const QuicTransportException*>(&ex)) {
+    closeImpl(QuicError(
+        QuicErrorCode(transportEx->errorCode()), std::string(contextMsg)));
+    return LocalErrorCode::TRANSPORT_ERROR;
+  }
+  if (auto* internalEx = dynamic_cast<const QuicInternalException*>(&ex)) {
+    closeImpl(QuicError(
+        QuicErrorCode(internalEx->errorCode()), std::string(contextMsg)));
+    return internalEx->errorCode();
+  }
+  if (auto* appEx = dynamic_cast<const QuicApplicationException*>(&ex)) {
+    closeImpl(
+        QuicError(QuicErrorCode(appEx->errorCode()), std::string(contextMsg)));
+    return LocalErrorCode::TRANSPORT_ERROR;
+  }
+  // Fallback for unknown std::exception
+  closeImpl(QuicError(
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+      std::string(contextMsg)));
+  return LocalErrorCode::INTERNAL_ERROR;
+}
+
 void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
@@ -1726,28 +1693,9 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStreamInternal(
 
     pendingWriteCallbacks_.erase(id);
     QUIC_STATS(conn_->statsCallback, onQuicStreamReset, errorCode);
-  } catch (const QuicTransportException& ex) {
-    MVVLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-              << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
-  } catch (const QuicInternalException& ex) {
-    MVVLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-              << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
-    return quic::make_unexpected(ex.errorCode());
   } catch (const std::exception& ex) {
-    MVVLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
-              << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("resetStream() error")));
-    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
+    return quic::make_unexpected(
+        handleExceptionAndClose(ex, "resetStream() error", id));
   }
   return {};
 }
@@ -2194,24 +2142,8 @@ void QuicTransportBaseLite::lossTimeoutExpired() noexcept {
     }
 
     pacedWriteDataToSocket();
-  } catch (const QuicTransportException& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()),
-        std::string("lossTimeoutExpired() error")));
-  } catch (const QuicInternalException& ex) {
-    MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(ex.errorCode()),
-        std::string("lossTimeoutExpired() error")));
   } catch (const std::exception& ex) {
-    MVVLOG(4) << __func__ << "  " << ex.what() << " " << *this;
-    exceptionCloseWhat_ = ex.what();
-    closeImpl(QuicError(
-        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-        std::string("lossTimeoutExpired() error")));
+    handleExceptionAndClose(ex, "lossTimeoutExpired() error");
   }
 }
 
