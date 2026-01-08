@@ -215,8 +215,6 @@ BETTER_ENUM(
     KEY_UPDATE_INTERVAL = 0x10007,
     // Controls autotune flow control on streams.
     AUTOTUNE_RECV_STREAM_FLOW_CONTROL = 0x10009,
-    // Controls whether to use the inflight reordering heuristic.
-    INFLIGHT_REORDERING_THRESHOLD = 0x1000A,
     // Controls pacer's min burst size.
     PACER_MIN_BURST_PACKETS = 0x1000B,
     // Controls  write connection data packets limit.

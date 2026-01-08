@@ -1204,20 +1204,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(
-          TransportKnobParamId::INFLIGHT_REORDERING_THRESHOLD),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        bool inflightReorderingThreshold =
-            static_cast<bool>(std::get<uint64_t>(value));
-        auto server_conn = serverTransport.serverConn_;
-        server_conn->transportSettings.useInflightReorderingThreshold =
-            inflightReorderingThreshold;
-        MVVLOG(3) << "INFLIGHT_REORDERING_THRESHOLD KnobParam received: "
-                  << inflightReorderingThreshold;
-        return {};
-      });
-  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_MIN_BURST_PACKETS),
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {

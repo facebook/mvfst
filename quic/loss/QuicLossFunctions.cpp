@@ -311,12 +311,6 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
     const auto reorderDistance = largestAckedForComparison - currentPacketNum;
     auto reorderingThreshold = conn.lossState.reorderingThreshold;
 
-    if (conn.transportSettings.useInflightReorderingThreshold) {
-      reorderingThreshold = std::max(
-          conn.lossState.reorderingThreshold,
-          std::min<uint32_t>(
-              conn.outstandings.numOutstanding() / 2, kMaxReorderingThreshold));
-    }
     const auto& skippedPacketNum = getAckState(conn, pnSpace).skippedPacketNum;
     if (skippedPacketNum && skippedPacketNum.value() >= currentPacketNum &&
         skippedPacketNum.value() <= largestAckedForComparison) {
