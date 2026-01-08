@@ -376,9 +376,6 @@ struct TransportSettings {
   // The default priority to instantiate streams with.
   PriorityQueue::Priority defaultPriority;
 
-  // Whether to include ACKs whenever we have data to write and packets to ACK.
-  bool opportunisticAcking{true};
-
   // Local configuration for ACK receive timestamps.
   //
   // Determines the ACK receive timestamp configuration sent to peer,

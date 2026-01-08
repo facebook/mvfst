@@ -196,12 +196,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
           .pathValidationFrames(connection.currentPathId)
           .pingFrames()
           .datagramFrames()
-          .immediateAckFrames();
-  // Only add ACK frames if we need to send an ACK.
-  if (connection.transportSettings.opportunisticAcking ||
-      toWriteAppDataAcks(connection)) {
-    schedulerBuilder.ackFrames();
-  }
+          .immediateAckFrames()
+          .ackFrames();
   if (!exceptCryptoStream) {
     schedulerBuilder.cryptoFrames();
   }
