@@ -20,6 +20,7 @@
 #include <quic/common/events/HighResQuicTimer.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/fizz/client/handshake/QuicTokenCache.h>
 #include <quic/fizz/client/handshake/test/MockQuicPskCache.h>
 #include <quic/fizz/client/test/QuicClientTransportTestUtil.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
@@ -799,10 +800,8 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
-  auto newToken = std::make_shared<std::string>("");
-  client->setNewTokenCallback([newToken = newToken](std::string token) {
-    *newToken = std::move(token);
-  });
+  BasicQuicTokenCache tokenCache;
+  client->setTokenCache(&tokenCache);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -816,14 +815,14 @@ TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
   expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
-  EXPECT_FALSE(newToken->empty());
+  auto token = tokenCache.getToken(hostname);
+  EXPECT_TRUE(token.has_value());
+  EXPECT_FALSE(token->empty());
 }
 
 TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
-  auto newToken = std::make_shared<std::string>("");
-  client->setNewTokenCallback([newToken = newToken](std::string token) {
-    *newToken = std::move(token);
-  });
+  BasicQuicTokenCache tokenCache;
+  client->setTokenCache(&tokenCache);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -837,6 +836,8 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
   expected->appendToChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 
+  auto newToken = tokenCache.getToken(hostname);
+  EXPECT_TRUE(newToken.has_value());
   EXPECT_FALSE(newToken->empty());
 
   /**

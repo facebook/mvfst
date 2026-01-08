@@ -39,6 +39,7 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
         "//quic/congestion_control:congestion_controller_factory",
+        "//quic/fizz/client/handshake:token_cache",
         "//quic/flowcontrol:flow_control",
         "//quic/handshake:handshake",
         "//quic/happyeyeballs:happyeyeballs",

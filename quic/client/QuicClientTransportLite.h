@@ -22,6 +22,7 @@
 namespace quic {
 
 class ClientHandshakeFactory;
+class QuicTokenCache;
 
 class QuicClientTransportLite
     : virtual public QuicTransportBaseLite,
@@ -207,12 +208,12 @@ class QuicClientTransportLite
       std::shared_ptr<QuicTransportStatsCallback> statsCallback) noexcept;
 
   /**
-   * Set a callback function to be invoked and passed
-   * the new token upon receiving a NEW_TOKEN (0x07) frame.
+   * Set a token cache to store NEW_TOKEN frames received from the server.
+   * The cache's putToken() will be called with the hostname and token.
+   * The cache must outlive the transport.
    */
-  void setNewTokenCallback(
-      std::function<void(std::string)> newTokenCallback) noexcept {
-    newTokenCallback_ = std::move(newTokenCallback);
+  void setTokenCache(QuicTokenCache* tokenCache) noexcept {
+    tokenCache_ = tokenCache;
   }
 
   /**
@@ -414,8 +415,8 @@ class QuicClientTransportLite
   std::shared_ptr<QuicTransportStatsCallback> statsCallback_;
   // We will only send transport knobs once, this flag keeps track of it
   bool transportKnobsSent_{false};
-  // Callback function to invoke when the client receives a new token
-  std::function<void(std::string)> newTokenCallback_;
+  // Token cache for storing NEW_TOKEN frames from the server
+  QuicTokenCache* tokenCache_{nullptr};
 
   // Output buf/accessor to be used for continuous memory writes.
   std::unique_ptr<BufAccessor> bufAccessor_;

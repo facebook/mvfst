@@ -18,6 +18,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/StringUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/fizz/client/handshake/QuicTokenCache.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
@@ -674,8 +675,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         std::string tokenStr = newTokenFrame.token->toString();
         MVVLOG(10) << "client received new token token="
                    << quic::hexlify(tokenStr);
-        if (newTokenCallback_) {
-          newTokenCallback_(std::move(tokenStr));
+        if (tokenCache_ && hostname_) {
+          tokenCache_->putToken(*hostname_, std::move(tokenStr));
         }
         break;
       }
