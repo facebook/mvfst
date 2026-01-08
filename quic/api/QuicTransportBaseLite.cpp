@@ -339,8 +339,6 @@ void QuicTransportBaseLite::onNetworkData(
         closeImpl(QuicError(
             QuicErrorCode(TransportErrorCode::NO_ERROR), "Peer closed"));
         return;
-      } else if (conn_->transportSettings.processCallbacksPerPacket) {
-        invokeReadDataAndCallbacks(false);
       }
     }
 

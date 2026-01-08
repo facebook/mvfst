@@ -443,8 +443,6 @@ struct TransportSettings {
   // If flow control updates should be sent based on time passed since last
   // update.
   bool disableFlowControlTimeBasedUpdates{false};
-  // Whether to process callbacks per received packet.
-  bool processCallbacksPerPacket{false};
   // Whether to trigger packet processing per socket read rather than batch
   // receiving and then processing.
   bool networkDataPerSocketRead{false};
