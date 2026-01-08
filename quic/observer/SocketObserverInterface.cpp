@@ -126,7 +126,7 @@ SocketObserverInterface::AppLimitedEvent::AppLimitedEvent(
 
 void SocketObserverInterface::PacketsWrittenEvent::
     invokeForEachNewOutstandingPacketOrdered(
-        const std::function<void(const OutstandingPacketWrapper&)>& fn) const {
+        FunctionRef<void(const OutstandingPacketWrapper&)> fn) const {
   DCHECK_GE(outstandingPackets.size(), numAckElicitingPacketsWritten);
   if (numAckElicitingPacketsWritten == 0) {
     return; // nothing to do

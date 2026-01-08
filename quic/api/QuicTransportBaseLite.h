@@ -10,6 +10,7 @@
 #include <quic/api/QuicSocketLite.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/FunctionLooper.h>
+#include <quic/common/FunctionRef.h>
 
 namespace quic {
 
@@ -522,7 +523,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void cancelByteEventCallbacksForStreamInternal(
       const ByteEvent::Type type,
       const StreamId id,
-      const std::function<bool(uint64_t)>& offsetFilter);
+      FunctionRef<bool(uint64_t)> offsetFilter);
 
   void onSocketWritable() noexcept override;
 
@@ -606,15 +607,14 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    *
    * Removes number of locations to update when a byte event is added.
    */
-  void invokeForEachByteEventType(
-      const std::function<void(const ByteEvent::Type)>& fn) {
+  void invokeForEachByteEventType(FunctionRef<void(const ByteEvent::Type)> fn) {
     for (const auto& type : ByteEvent::kByteEventTypes) {
       fn(type);
     }
   }
 
   void invokeForEachByteEventTypeConst(
-      const std::function<void(const ByteEvent::Type)>& fn) const {
+      FunctionRef<void(const ByteEvent::Type)> fn) const {
     for (const auto& type : ByteEvent::kByteEventTypes) {
       fn(type);
     }

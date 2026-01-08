@@ -13,6 +13,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
+#include <quic/common/FunctionRef.h>
 #include <quic/priority/PriorityQueue.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
@@ -203,7 +204,7 @@ class QuicStreamManager {
   /*
    * Call the given function on every currently open stream's state.
    */
-  void streamStateForEach(const std::function<void(QuicStreamState&)>& f);
+  void streamStateForEach(FunctionRef<void(QuicStreamState&)> f);
 
   [[nodiscard]] bool hasLoss() const {
     return numStreamsWithLoss_ > 0;

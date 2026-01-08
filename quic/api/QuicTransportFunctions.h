@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/common/Expected.h>
+#include <quic/common/FunctionRef.h>
 
 #include <quic/QuicException.h>
 #include <quic/api/IoBufQuicBatch.h>
@@ -55,18 +56,6 @@ struct DataPathResult {
         encodedBodySize(encodedBodySizeIn) {}
 };
 
-using DataPathFunc = std::function<DataPathResult(
-    QuicConnectionStateBase&,
-    PacketHeader,
-    PacketNumberSpace,
-    PacketNum,
-    uint64_t,
-    QuicPacketScheduler&,
-    uint64_t,
-    IOBufQuicBatch&,
-    const Aead&,
-    const PacketNumberCipher&)>;
-
 using HeaderBuilder = std::function<PacketHeader(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
@@ -74,8 +63,7 @@ using HeaderBuilder = std::function<PacketHeader(
     QuicVersion version,
     const std::string& token)>;
 
-using WritableBytesFunc =
-    std::function<uint64_t(QuicConnectionStateBase& conn)>;
+using WritableBytesFunc = FunctionRef<uint64_t(QuicConnectionStateBase& conn)>;
 
 // Encapsulating the return value for the write functions.
 // Useful because probes can go over the packet limit.

@@ -12,6 +12,7 @@
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicSocketLite.h>
+#include <quic/common/FunctionRef.h>
 #include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/observer/SocketObserverContainer.h>
@@ -262,7 +263,7 @@ class QuicSocket : virtual public QuicSocketLite {
    */
   virtual quic::Expected<void, LocalErrorCode> peek(
       StreamId id,
-      const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+      FunctionRef<void(StreamId id, const folly::Range<PeekIterator>&)>
           peekCallback) = 0;
 
   /**

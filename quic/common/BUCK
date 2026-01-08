@@ -22,6 +22,16 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "function_ref",
+    headers = [
+        "FunctionRef.h",
+    ],
+    exported_deps = [
+        ":mvfst_check",
+    ],
+)
+
+mvfst_cpp_library(
     name = "mvfst_logging",
     headers = select({
         "DEFAULT": select({

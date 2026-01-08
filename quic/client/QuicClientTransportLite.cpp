@@ -487,7 +487,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
   bool pktHasRetransmittableData = false;
   bool pktHasCryptoData = false;
 
-  AckedPacketVisitor ackedPacketVisitor =
+  auto ackedPacketVisitor =
       [&](const OutstandingPacketWrapper& outstandingPacket) {
         auto outstandingProtectionType =
             outstandingPacket.packet.header.getProtectionType();
@@ -503,7 +503,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         return maybeVerifyPendingKeyUpdate(
             *conn_, outstandingPacket, regularPacket);
       };
-  AckedFrameVisitor ackedFrameVisitor =
+  auto ackedFrameVisitor =
       [&](const OutstandingPacketWrapper& outstandingPacket,
           const QuicWriteFrame& packetFrame)
       -> quic::Expected<void, QuicError> {

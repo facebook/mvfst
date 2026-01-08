@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/common/Expected.h>
+#include <quic/common/FunctionRef.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -70,7 +71,7 @@ BufPtr readDataFromCryptoStream(QuicCryptoStream& stream, uint64_t amount = 0);
 using PeekIterator = CircularDeque<StreamBuffer>::const_iterator;
 void peekDataFromQuicStream(
     QuicStreamState& state,
-    const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+    FunctionRef<void(StreamId id, const folly::Range<PeekIterator>&)>
         peekCallback);
 
 /**
@@ -134,7 +135,7 @@ uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream);
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,
-    std::function<void(uint64_t, uint64_t)>&& connFlowControlVisitor);
+    FunctionRef<void(uint64_t, uint64_t)> connFlowControlVisitor);
 
 /**
  * Common function to read data from the read buffer in order. Returns a pair of

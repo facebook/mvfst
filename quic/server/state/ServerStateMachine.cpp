@@ -1260,13 +1260,13 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     bool isNonProbingPacket = false;
     bool handshakeConfirmedThisLoop = false;
 
-    AckedPacketVisitor ackedPacketVisitor =
+    auto ackedPacketVisitor =
         [&](const OutstandingPacketWrapper& outstandingPacket) {
           return maybeVerifyPendingKeyUpdate(
               conn, outstandingPacket, regularPacket);
         };
-    AckedFrameVisitor ackedFrameVisitor = [&](const OutstandingPacketWrapper&,
-                                              const QuicWriteFrame& packetFrame)
+    auto ackedFrameVisitor = [&](const OutstandingPacketWrapper&,
+                                 const QuicWriteFrame& packetFrame)
         -> quic::Expected<void, QuicError> {
       switch (packetFrame.type()) {
         case QuicWriteFrame::Type::WriteStreamFrame: {

@@ -319,7 +319,7 @@ QuicStreamManager::nextAcceptableLocalUnidirectionalStreamId() {
 }
 
 void QuicStreamManager::streamStateForEach(
-    const std::function<void(QuicStreamState&)>& f) {
+    FunctionRef<void(QuicStreamState&)> f) {
   for (auto& s : streams_) {
     f(s.second);
   }

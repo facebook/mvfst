@@ -119,6 +119,7 @@ mvfst_cpp_library(
         "//quic/common:buf_accessor",
         "//quic/common:circular_deque",
         "//quic/common:expected",
+        "//quic/common:function_ref",
         "//quic/common:interval_set",
         "//quic/common:mvfst_logging",
         "//quic/common:optional",
@@ -160,6 +161,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/codec:types",
         "//quic/common:expected",
+        "//quic/common:function_ref",
         "//quic/common:interval_set",
         "//quic/common:optional",
         "//quic/congestion_control:congestion_controller",
@@ -183,6 +185,7 @@ mvfst_cpp_library(
     exported_deps = [
         ":quic_state_machine",
         "//quic/common:expected",
+        "//quic/common:function_ref",
     ],
 )
 

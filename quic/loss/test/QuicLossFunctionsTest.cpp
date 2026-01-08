@@ -181,19 +181,19 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   }
 };
 
-LossVisitor testingLossMarkFunc(std::vector<PacketNum>& lostPackets) {
-  return [&lostPackets](
-             auto& /* conn */,
-             auto /* pathId */,
-             auto& packet,
-             bool processed) -> quic::Expected<void, QuicError> {
-    if (!processed) {
-      auto packetNum = packet.header.getPacketSequenceNum();
-      lostPackets.push_back(packetNum);
-    }
-    return {};
-  };
-}
+// Macro to create a LossVisitor lambda inline (required for FunctionRef)
+#define TESTING_LOSS_MARK_FUNC(lostPackets)                  \
+  [&lostPackets](                                            \
+      auto& /* conn */,                                      \
+      auto /* pathId */,                                     \
+      auto& packet,                                          \
+      bool processed) -> quic::Expected<void, QuicError> {   \
+    if (!processed) {                                        \
+      auto packetNum = packet.header.getPacketSequenceNum(); \
+      (lostPackets).push_back(packetNum);                    \
+    }                                                        \
+    return {};                                               \
+  }
 
 PacketNum QuicLossFunctionsTest::sendPacket(
     QuicConnectionStateBase& conn,
@@ -445,7 +445,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_EQ(LossState::AlarmMethod::PTO, conn->lossState.currentAlarmMethod);
   ASSERT_FALSE(
-      onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPacket))
+      onLossDetectionAlarm<MockClock>(*conn, TESTING_LOSS_MARK_FUNC(lostPacket))
           .hasError());
   EXPECT_EQ(conn->lossState.ptoCount, 1);
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
@@ -458,7 +458,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
   ASSERT_FALSE(
-      onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPacket))
+      onLossDetectionAlarm<MockClock>(*conn, TESTING_LOSS_MARK_FUNC(lostPacket))
           .hasError());
   EXPECT_EQ(conn->lossState.ptoCount, 2);
   // PTO doesn't take anything out of outstandings.packets
@@ -1193,7 +1193,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
   auto lossEventResult = detectLossPackets(
       *conn,
       ackState,
-      testingLossMarkFunc(lostPacket),
+      TESTING_LOSS_MARK_FUNC(lostPacket),
       TimePoint(900ms),
       PacketNumberSpace::AppData);
   ASSERT_FALSE(lossEventResult.hasError());
@@ -1237,7 +1237,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
-                   testingLossMarkFunc(lostPackets),
+                   TESTING_LOSS_MARK_FUNC(lostPackets),
                    lossTime,
                    PacketNumberSpace::Handshake)
                    .hasError());
@@ -1262,7 +1262,8 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   conn->outstandings.packets.pop_back();
   MockClock::mockNow = [=]() { return sendTime + expectedDelayUntilLost + 5s; };
   ASSERT_FALSE(
-      onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPackets))
+      onLossDetectionAlarm<MockClock>(
+          *conn, TESTING_LOSS_MARK_FUNC(lostPackets))
           .hasError());
   auto numDeclaredLost = std::count_if(
       conn->outstandings.packets.begin(),
@@ -1294,7 +1295,8 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
   EXPECT_CALL(*quicStats_, onPTO());
   ASSERT_FALSE(
-      onLossDetectionAlarm<MockClock>(*conn, testingLossMarkFunc(lostPackets))
+      onLossDetectionAlarm<MockClock>(
+          *conn, TESTING_LOSS_MARK_FUNC(lostPackets))
           .hasError());
   EXPECT_EQ(1, conn->lossState.ptoCount);
   // Hey PTOs are not losses either from now on
@@ -1330,7 +1332,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
   // Verify packet count doesn't change across PTO.
   auto originalPacketCount = conn->outstandings.packetCount;
   ASSERT_FALSE(
-      onLossDetectionAlarm<Clock>(*conn, testingLossMarkFunc(lostPackets))
+      onLossDetectionAlarm<Clock>(*conn, TESTING_LOSS_MARK_FUNC(lostPackets))
           .hasError());
   EXPECT_EQ(originalPacketCount, conn->outstandings.packetCount);
 

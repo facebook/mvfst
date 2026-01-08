@@ -10,21 +10,16 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
+#include <quic/common/FunctionRef.h>
 #include <quic/common/IntervalSet.h>
 #include <quic/state/StateData.h>
-#include <functional>
 
 namespace quic {
 
-using AckVisitor = std::function<void(
-    const OutstandingPacketWrapper&,
-    const QuicWriteFrame&,
-    const ReadAckFrame&)>;
-
-using AckedPacketVisitor = std::function<quic::Expected<void, QuicError>(
+using AckedPacketVisitor = FunctionRef<quic::Expected<void, QuicError>(
     const OutstandingPacketWrapper&)>; // outstanding packet acked
 
-using AckedFrameVisitor = std::function<quic::Expected<void, QuicError>(
+using AckedFrameVisitor = FunctionRef<quic::Expected<void, QuicError>(
     const OutstandingPacketWrapper&, // outstanding packet acked
     const QuicWriteFrame&)>; // outstanding frame acked
 

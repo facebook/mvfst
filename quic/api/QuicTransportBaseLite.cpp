@@ -1737,7 +1737,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStreamInternal(
 void QuicTransportBaseLite::cancelByteEventCallbacksForStreamInternal(
     const ByteEvent::Type type,
     const StreamId id,
-    const std::function<bool(uint64_t)>& offsetFilter) {
+    FunctionRef<bool(uint64_t)> offsetFilter) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return;
   }

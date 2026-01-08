@@ -328,7 +328,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::pauseOrResumePeek(
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::peek(
     StreamId id,
-    const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+    FunctionRef<void(StreamId id, const folly::Range<PeekIterator>&)>
         peekCallback) {
   if (closeState_ != CloseState::OPEN) {
     return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);

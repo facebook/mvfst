@@ -15,6 +15,7 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/Expected.h>
+#include <quic/common/FunctionRef.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/PacketProcessor.h>
@@ -786,7 +787,7 @@ struct AckStateVersion {
   bool operator!=(const AckStateVersion& other) const;
 };
 
-using LossVisitor = std::function<quic::Expected<void, QuicError>(
+using LossVisitor = FunctionRef<quic::Expected<void, QuicError>(
     QuicConnectionStateBase& conn,
     PathIdType pathId,
     RegularQuicWritePacket& packet,

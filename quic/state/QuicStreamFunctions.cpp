@@ -91,7 +91,7 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,
-    std::function<void(uint64_t, uint64_t)>&& connFlowControlVisitor) {
+    FunctionRef<void(uint64_t, uint64_t)> connFlowControlVisitor) {
   auto& readBuffer = stream.readBuffer;
   auto it = readBuffer.begin();
 
@@ -376,7 +376,7 @@ quic::Expected<std::pair<BufPtr, bool>, QuicError> readDataFromQuicStream(
 
 void peekDataFromQuicStream(
     QuicStreamState& stream,
-    const std::function<void(StreamId id, const folly::Range<PeekIterator>&)>&
+    FunctionRef<void(StreamId id, const folly::Range<PeekIterator>&)>
         peekCallback) {
   if (peekCallback) {
     peekCallback(
