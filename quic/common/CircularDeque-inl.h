@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iterator>
+#include <memory>
 
 namespace quic {
 
@@ -326,7 +327,9 @@ typename CircularDeque<T>::iterator CircularDeque<T>::insert(
 
 template <typename T>
 void CircularDeque<T>::pop_front() {
-  storage_[begin_].~T();
+  if constexpr (!std::is_trivially_destructible_v<T>) {
+    std::destroy_at(&storage_[begin_]);
+  }
   // This if branch is actually faster than operator% on the machine I tested.
   if (++begin_ == capacity_) {
     begin_ = 0;
@@ -342,7 +345,9 @@ void CircularDeque<T>::pop_back() {
     end_ = capacity_;
   }
   --end_;
-  storage_[end_].~T();
+  if constexpr (!std::is_trivially_destructible_v<T>) {
+    std::destroy_at(&storage_[end_]);
+  }
 }
 
 template <typename T>
@@ -375,10 +380,11 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
   if (first == begin() || last == end()) {
     // If we are erasing from either end, destructing the member and adjust the
     // index then we are done.
-    auto iter = first;
-    while (iter != last) {
-      indexSanityCheck(iter);
-      iter++->~T();
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      for (auto iter = first; iter != last; ++iter) {
+        indexSanityCheck(iter);
+        std::destroy_at(&*iter);
+      }
     }
     if (first == begin()) {
       begin_ = last.index_;
@@ -409,10 +415,11 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
     auto firstMutable = begin() + (first - cbegin());
     auto lastMutable = begin() + (last - cbegin());
     reverseMoveOrCopy(begin(), firstMutable, lastMutable);
-    auto iter = begin();
     auto newBeginMutable = begin() + (newBegin - cbegin());
-    while (iter != newBeginMutable) {
-      iter++->~T();
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      for (auto iter = begin(); iter != newBeginMutable; ++iter) {
+        std::destroy_at(&*iter);
+      }
     }
     begin_ = newBegin.index_;
     MVDCHECK_EQ(
@@ -427,9 +434,10 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
   auto firstMutable = begin() + (first - cbegin());
   moveOrCopy(lastMutable, end(), firstMutable);
   auto newEnd = end() - elemsRemoved;
-  auto iter = newEnd;
-  while (iter != end()) {
-    iter++->~T();
+  if constexpr (!std::is_trivially_destructible_v<T>) {
+    for (auto iter = newEnd; iter != end(); ++iter) {
+      std::destroy_at(&*iter);
+    }
   }
   end_ = newEnd.index_;
   MVDCHECK(size() == currentSize - elemsRemoved);
@@ -441,9 +449,10 @@ void CircularDeque<T>::clear() noexcept {
   if (empty() || capacity_ == 0) {
     return;
   }
-  auto iter = begin();
-  while (iter != end()) {
-    iter++->~T();
+  if constexpr (!std::is_trivially_destructible_v<T>) {
+    for (auto iter = begin(); iter != end(); ++iter) {
+      std::destroy_at(&*iter);
+    }
   }
   begin_ = 0;
   end_ = 0;

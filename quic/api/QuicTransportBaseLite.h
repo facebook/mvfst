@@ -730,7 +730,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     ByteEventCallback* callback;
   };
 
-  using ByteEventMap = UnorderedMap<StreamId, std::deque<ByteEventDetail>>;
+  using ByteEventMap = UnorderedMap<StreamId, CircularDeque<ByteEventDetail>>;
   ByteEventMap& getByteEventMap(const ByteEvent::Type type);
   [[nodiscard]] const ByteEventMap& getByteEventMapConst(
       const ByteEvent::Type type) const;

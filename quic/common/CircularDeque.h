@@ -117,6 +117,10 @@ struct CircularDeque {
     return size() == other.size() && std::equal(begin(), end(), other.begin());
   }
 
+  bool operator!=(const CircularDeque& other) const {
+    return !(*this == other);
+  }
+
   // Iterator - Hand-rolled random access iterator
   template <typename U>
   class CircularDequeIterator {

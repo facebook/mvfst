@@ -8,13 +8,12 @@
 #pragma once
 
 #include <quic/common/MvfstLogging.h>
-#include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <queue>
 
 #include <folly/Likely.h>
 #include <glog/logging.h>
+#include <quic/common/CircularDeque.h>
 #include <quic/common/Expected.h>
 
 namespace quic {
@@ -79,7 +78,7 @@ struct Interval {
 template <
     typename T,
     T Unit = (T)1,
-    template <typename... I> class Container = std::deque>
+    template <typename... I> class Container = CircularDeque>
 class IntervalSet : private Container<Interval<T, Unit>> {
  public:
   using interval_type = Interval<T, Unit>;

@@ -307,7 +307,7 @@ class QuicPathManager {
   // Deque of paths that have sent a challenge and are waiting for a response.
   // They are ordered by the time the challenge was sent, earliest in front.
   // This is used to determine the next challenge timeout.
-  std::deque<PathIdType> pathsPendingResponse_;
+  CircularDeque<PathIdType> pathsPendingResponse_;
 
   // Counter for generating unique PathId
   PathIdType nextPathId_;

@@ -13,6 +13,7 @@
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
 
+#include <deque>
 #include <utility>
 
 namespace quic {

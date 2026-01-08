@@ -56,6 +56,7 @@ mvfst_cpp_library(
         "IntervalSet-inl.h",
     ],
     exported_deps = [
+        ":circular_deque",
         ":expected",
         ":mvfst_logging",
         ":optional",
