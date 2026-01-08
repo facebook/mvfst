@@ -150,6 +150,14 @@ class QuicClientTransport : public QuicTransportBase,
       uint64_t readBufferSize,
       uint16_t numPackets);
 
+  [[nodiscard]] quic::Expected<void, QuicError> recvMmsg(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets,
+      NetworkData& networkData,
+      Optional<folly::SocketAddress>& server,
+      size_t& totalData);
+
   // Happy Eyeballs virtual method overrides
   void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept override;
 
@@ -170,6 +178,24 @@ class QuicClientTransport : public QuicTransportBase,
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
   bool happyEyeballsEnabled_{false};
   sa_family_t happyEyeballsCachedFamily_{AF_UNSPEC};
+
+  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
+  struct RecvmmsgStorage {
+    struct impl_ {
+      struct sockaddr_storage addr;
+      struct iovec iovec;
+      // Buffers we pass to recvmmsg.
+      BufPtr readBuffer;
+    };
+
+    // Storage for the recvmmsg system call.
+    std::vector<struct mmsghdr> msgs;
+    std::vector<struct impl_> impl_;
+    void resize(size_t numPackets);
+  };
+
+  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
+  RecvmmsgStorage recvmmsgStorage_;
 
   // Container of observers for the socket / transport.
   //

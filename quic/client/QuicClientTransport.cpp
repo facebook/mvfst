@@ -10,6 +10,12 @@
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/loss/QuicLossFunctions.h>
 
+#include <folly/String.h>
+
+namespace {
+constexpr socklen_t kAddrLen = sizeof(sockaddr_storage);
+} // namespace
+
 namespace quic {
 
 QuicClientTransport::~QuicClientTransport() {
@@ -176,6 +182,208 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
 
   return processPackets(
       localAddressRes.value(), std::move(networkData), server);
+}
+
+quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
+    QuicAsyncUDPSocket& sock,
+    uint64_t readBufferSize,
+    uint16_t numPackets,
+    NetworkData& networkData,
+    Optional<folly::SocketAddress>& server,
+    size_t& totalData) {
+  auto& msgs = recvmmsgStorage_.msgs;
+  int flags = 0;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+  auto groResult = sock.getGRO();
+  if (!groResult.has_value()) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "Failed to get GRO status: {}", groResult.error().message)));
+  }
+  bool useGRO = groResult.value() > 0;
+
+  auto tsResult = sock.getTimestamping();
+  if (!tsResult.has_value()) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "Failed to get timestamping status: {}",
+            tsResult.error().message)));
+  }
+  bool useTs = tsResult.value() > 0;
+
+  auto tosResult = sock.getRecvTos();
+  if (!tosResult.has_value()) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "Failed to get TOS status: {}", tosResult.error().message)));
+  }
+  bool recvTos = tosResult.value();
+
+  bool checkCmsgs = useGRO || useTs || recvTos;
+  std::vector<std::array<
+      char,
+      QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace>>
+      controlVec(checkCmsgs ? numPackets : 0);
+
+  // we need to consider MSG_TRUNC too
+  if (useGRO) {
+    flags |= MSG_TRUNC;
+  }
+#endif
+  for (uint16_t i = 0; i < numPackets; ++i) {
+    auto& addr = recvmmsgStorage_.impl_[i].addr;
+    auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
+    auto& iovec = recvmmsgStorage_.impl_[i].iovec;
+    struct msghdr* msg = &msgs[i].msg_hdr;
+
+    if (!readBuffer) {
+      readBuffer = BufHelpers::createCombined(readBufferSize);
+      iovec.iov_base = readBuffer->writableData();
+      iovec.iov_len = readBufferSize;
+      msg->msg_iov = &iovec;
+      msg->msg_iovlen = 1;
+    }
+    MVCHECK(readBuffer != nullptr);
+
+    auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
+    auto addrResult = sock.address();
+    if (!addrResult.has_value()) {
+      return quic::make_unexpected(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          fmt::format(
+              "Failed to get socket address: {}", addrResult.error().message)));
+    }
+    rawAddr->sa_family = addrResult.value().getFamily();
+    msg->msg_name = rawAddr;
+    msg->msg_namelen = kAddrLen;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (checkCmsgs) {
+      ::memset(controlVec[i].data(), 0, controlVec[i].size());
+      msg->msg_control = controlVec[i].data();
+      msg->msg_controllen = controlVec[i].size();
+    }
+#endif
+  }
+
+  int numMsgsRecvd = sock.recvmmsg(msgs.data(), numPackets, flags, nullptr);
+  if (numMsgsRecvd < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      // Exit, socket will notify us again when socket is readable.
+      if (conn_->loopDetectorCallback) {
+        conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+      }
+      return {};
+    }
+    // If we got a non-retriable error, we might have received
+    // a packet that we could process, however let's just quit early.
+    sock.pauseRead();
+    if (conn_->loopDetectorCallback) {
+      conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
+    }
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "recvmmsg() failed, errno={} {}", errno, folly::errnoStr(errno))));
+  }
+
+  MVCHECK_LE(numMsgsRecvd, numPackets);
+  for (uint16_t i = 0; i < static_cast<uint16_t>(numMsgsRecvd); ++i) {
+    auto& addr = recvmmsgStorage_.impl_[i].addr;
+    auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
+    auto& msg = msgs[i];
+
+    size_t bytesRead = msg.msg_len;
+    if (bytesRead == 0) {
+      // Empty datagram, this is probably garbage matching our tuple, we
+      // should ignore such datagrams.
+      continue;
+    }
+    QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (checkCmsgs) {
+      QuicAsyncUDPSocket::fromMsg(params, msg.msg_hdr);
+
+      // truncated
+      if (bytesRead > readBufferSize) {
+        bytesRead = readBufferSize;
+        if (params.gro > 0) {
+          bytesRead = bytesRead - bytesRead % params.gro;
+        }
+      }
+    }
+#endif
+    totalData += bytesRead;
+
+    if (!server) {
+      server.emplace(folly::SocketAddress());
+      auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
+      server->setFromSockaddr(rawAddr, kAddrLen);
+    }
+
+    ReceivedUdpPacket::Timings timings;
+    if (params.ts.has_value()) {
+      timings.maybeSoftwareTs =
+          QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
+    }
+
+    MVVLOG(10) << "Got data from socket peer=" << *server
+               << " len=" << bytesRead;
+    readBuffer->append(bytesRead);
+    if (params.gro > 0) {
+      size_t len = bytesRead;
+      size_t remaining = len;
+      size_t offset = 0;
+      size_t totalNumPackets = networkData.getPackets().size() +
+          ((len + params.gro - 1) / params.gro);
+      networkData.reserve(totalNumPackets);
+      while (remaining) {
+        if (static_cast<int>(remaining) > params.gro) {
+          auto tmp = readBuffer->cloneOne();
+          // start at offset
+          tmp->trimStart(offset);
+          // the actual len is len - offset now
+          // leave gro bytes
+          tmp->trimEnd(len - offset - params.gro);
+          DCHECK_EQ(tmp->length(), params.gro);
+
+          offset += params.gro;
+          remaining -= params.gro;
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
+        } else {
+          // do not clone the last packet
+          // start at offset, use all the remaining data
+          readBuffer->trimStart(offset);
+          DCHECK_EQ(readBuffer->length(), remaining);
+          remaining = 0;
+          networkData.addPacket(
+              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+          // This is the last packet. Break here to silence the linter's warning
+          // about a use-after-move in the next iteration of the loop
+          break;
+        }
+      }
+    } else {
+      networkData.addPacket(
+          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+    }
+
+    maybeQlogDatagram(bytesRead);
+  }
+  trackDatagramsReceived(
+      networkData.getPackets().size(), networkData.getTotalData());
+
+  return {};
+}
+
+void QuicClientTransport::RecvmmsgStorage::resize(size_t numPackets) {
+  if (msgs.size() != numPackets) {
+    msgs.resize(numPackets);
+    impl_.resize(numPackets);
+  }
 }
 
 void QuicClientTransport::setHappyEyeballsEnabled(bool happyEyeballsEnabled) {

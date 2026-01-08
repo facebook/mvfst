@@ -11,6 +11,7 @@ mvfst_cpp_library(
         "QuicClientTransport.h",
     ],
     deps = [
+        "//folly:string",
         "//quic/common:mvfst_logging",
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/loss:loss",

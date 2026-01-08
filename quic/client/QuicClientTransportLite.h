@@ -281,14 +281,6 @@ class QuicClientTransportLite
       Optional<folly::SocketAddress>& server,
       size_t& totalData);
 
-  [[nodiscard]] quic::Expected<void, QuicError> recvMmsg(
-      QuicAsyncUDPSocket& sock,
-      uint64_t readBufferSize,
-      uint16_t numPackets,
-      NetworkData& networkData,
-      Optional<folly::SocketAddress>& server,
-      size_t& totalData);
-
   /**
    * Process a single UDP packet.
    *
@@ -374,24 +366,6 @@ class QuicClientTransportLite
   // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
-
-  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
-  struct RecvmmsgStorage {
-    struct impl_ {
-      struct sockaddr_storage addr;
-      struct iovec iovec;
-      // Buffers we pass to recvmmsg.
-      BufPtr readBuffer;
-    };
-
-    // Storage for the recvmmsg system call.
-    std::vector<struct mmsghdr> msgs;
-    std::vector<struct impl_> impl_;
-    void resize(size_t numPackets);
-  };
-
-  // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
-  RecvmmsgStorage recvmmsgStorage_;
 
   void runOnEvbAsync(
       std::function<void(std::shared_ptr<QuicClientTransportLite>)> func);
