@@ -454,12 +454,6 @@ void QuicStreamManager::onMaxData() {
   connFlowControlBlocked_.clear();
 }
 
-void QuicStreamManager::setWriteQueueMaxNextsPerStream(
-    uint64_t maxNextsPerStream) {
-  dynamic_cast<HTTPPriorityQueue&>(writeQueue())
-      .advanceAfterNext(maxNextsPerStream);
-}
-
 bool QuicStreamManager::streamExists(StreamId streamId) {
   if (isLocalStream(nodeType_, streamId)) {
     if (isUnidirectionalStream(streamId)) {
@@ -652,13 +646,9 @@ quic::Expected<void, QuicError> QuicStreamManager::refreshTransportSettings(
     return quic::make_unexpected(resultUni.error());
   }
 
-  // TODO: The dependency on HTTPPriorityQueue here seems out of place in
-  // the long term
   if (!writeQueue_) {
     writeQueue_ = std::make_unique<HTTPPriorityQueue>();
   }
-  setWriteQueueMaxNextsPerStream(
-      transportSettings_->priorityQueueWritesPerStream);
   return {};
 }
 

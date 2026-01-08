@@ -25,29 +25,6 @@ class RoundRobinTest : public ::testing::Test {
   RoundRobin rr_;
 };
 
-TEST_F(RoundRobinTest, AdvanceAfterNext) {
-  rr_.advanceAfterBytes(3); // force 100% coverage in next call
-  rr_.advanceAfterNext(3);
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
-}
-
-TEST_F(RoundRobinTest, AdvanceAfterBytes) {
-  rr_.advanceAfterBytes(10);
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
-  EXPECT_EQ(rr_.getNext(10), Identifier::fromStreamID(2));
-  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
-}
-
 TEST_F(RoundRobinTest, Empty) {
   RoundRobin empty_rr;
   EXPECT_TRUE(empty_rr.empty());
@@ -55,16 +32,13 @@ TEST_F(RoundRobinTest, Empty) {
 }
 
 TEST_F(RoundRobinTest, Erase) {
-  rr_.advanceAfterNext(2);
   EXPECT_FALSE(rr_.erase(Identifier())); // doesn't match anything
 
   auto id1 = Identifier::fromStreamID(1);
   EXPECT_EQ(rr_.getNext(std::nullopt), id1);
   EXPECT_TRUE(rr_.erase(id1));
-  // erase head resets current - id2 gets two nexts
 
   auto id2 = Identifier::fromStreamID(2);
-  EXPECT_EQ(rr_.getNext(std::nullopt), id2);
   EXPECT_EQ(rr_.getNext(std::nullopt), id2);
   // erase head - 1
   EXPECT_TRUE(rr_.erase(id2));

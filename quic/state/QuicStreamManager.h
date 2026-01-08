@@ -456,8 +456,6 @@ class QuicStreamManager {
 
   [[nodiscard]] bool isAppIdle() const;
 
-  void setWriteQueueMaxNextsPerStream(uint64_t maxNextsPerStream);
-
   void addConnFCBlockedStream(StreamId id);
 
   void onMaxData();

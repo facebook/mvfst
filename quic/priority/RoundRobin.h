@@ -17,9 +17,6 @@ namespace quic {
 
 class RoundRobin {
  public:
-  void advanceAfterNext(size_t n);
-  void advanceAfterBytes(uint64_t bytes);
-
   [[nodiscard]] bool empty() const;
   void insert(quic::PriorityQueue::Identifier value);
   bool erase(quic::PriorityQueue::Identifier value);
@@ -43,11 +40,7 @@ class RoundRobin {
       ListType::iterator,
       PriorityQueue::Identifier::hash>
       indexMap_;
-  enum class AdvanceType : uint8_t { Nexts, Bytes };
-  AdvanceType advanceType_{AdvanceType::Nexts};
   bool useIndexMap_{false};
-  uint64_t advanceAfter_{1};
-  uint64_t current_{0};
 };
 
 } // namespace quic

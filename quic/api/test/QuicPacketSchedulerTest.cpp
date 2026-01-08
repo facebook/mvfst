@@ -176,13 +176,6 @@ std::unique_ptr<MockQuicPacketBuilder> setupMockPacketBuilder() {
   return builder;
 }
 
-std::unique_ptr<MockQuicPacketBuilder> setupMockPacketBuilder(
-    std::vector<size_t> expectedRemaining) {
-  auto builder = std::make_unique<NiceMock<MockQuicPacketBuilder>>();
-  builder->setExpectedSpaceRemaining(std::move(expectedRemaining));
-  return builder;
-}
-
 void verifyStreamFrames(
     MockQuicPacketBuilder& builder,
     const std::vector<WriteStreamFrame>& expectedFrames) {
@@ -197,23 +190,6 @@ void verifyStreamFrames(
     builder.frames_.erase(
         builder.frames_.begin(),
         builder.frames_.begin() + expectedFrames.size());
-  }
-}
-
-void verifyStreamFrames(
-    MockQuicPacketBuilder& builder,
-    const std::vector<StreamId>& expectedIds) {
-  ASSERT_EQ(builder.frames_.size(), expectedIds.size());
-  for (size_t i = 0; i < expectedIds.size(); ++i) {
-    ASSERT_TRUE(builder.frames_[i].asWriteStreamFrame());
-    EXPECT_EQ(
-        builder.frames_[i].asWriteStreamFrame()->streamId, expectedIds[i]);
-  }
-  if (expectedIds.size() == builder.frames_.size()) {
-    builder.frames_.clear();
-  } else {
-    builder.frames_.erase(
-        builder.frames_.begin(), builder.frames_.begin() + expectedIds.size());
   }
 }
 } // namespace
@@ -1532,39 +1508,6 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   auto result2 = scheduler.writeStreams(*builder2);
   ASSERT_FALSE(result2.hasError());
   verifyStreamFrames(*builder2, {f2, f3, f1});
-}
-
-TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinNextsPer) {
-  auto connPtr = createConn(10, 100000, 100000, GetParam());
-  auto& conn = *connPtr;
-  conn.streamManager->setWriteQueueMaxNextsPerStream(2);
-  StreamFrameScheduler scheduler(conn);
-
-  auto stream1 = createStream(conn);
-  auto stream2 = createStream(conn);
-  auto stream3 = createStream(conn);
-
-  auto largeBuf = createLargeBuffer(conn.udpSendPacketLen * 2);
-  (void)writeDataToStream(conn, stream1, std::move(largeBuf));
-  (void)writeDataToStream(conn, stream2, "some data");
-  (void)writeDataToStream(conn, stream3, "some data");
-
-  // Should write frames for stream1, stream1, stream2, stream3, followed >
-  // stream1 again.
-  auto builder2 =
-      setupMockPacketBuilder({1500, 0, 1400, 0, 1300, 1100, 1000, 0});
-  auto result2 = scheduler.writeStreams(*builder2);
-  ASSERT_FALSE(result2.hasError());
-  builder2->advanceRemaining();
-  ASSERT_EQ(nextScheduledStreamID(conn), stream1);
-  ASSERT_EQ(builder2->frames_.size(), 1);
-  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
-  ASSERT_EQ(builder2->frames_.size(), 2);
-  ASSERT_EQ(nextScheduledStreamID(conn), stream2);
-  builder2->advanceRemaining();
-  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
-  ASSERT_FALSE(scheduler.writeStreams(*builder2).hasError());
-  verifyStreamFrames(*builder2, {stream1, stream1, stream2, stream3, stream1});
 }
 
 TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {

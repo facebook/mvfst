@@ -108,18 +108,6 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
   };
 
-  void advanceAfterNext(size_t n) {
-    for (auto& rr : roundRobins_) {
-      rr.advanceAfterNext(n);
-    }
-  }
-
-  void advanceAfterBytes(uint64_t bytes) {
-    for (auto& rr : roundRobins_) {
-      rr.advanceAfterBytes(bytes);
-    }
-  }
-
   [[nodiscard]] bool empty() const override {
     return heap_.empty() && roundRobinElements_ == 0;
   }
