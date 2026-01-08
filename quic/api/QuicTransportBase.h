@@ -118,10 +118,7 @@ class QuicTransportBase : public QuicSocket,
 
   virtual void setAckRxTimestampsEnabled(bool enableAckRxTimestamps);
 
-  void setEarlyDataAppParamsFunctions(
-      std::function<bool(const Optional<std::string>&, const BufPtr&)>
-          validator,
-      std::function<BufPtr()> getter) final;
+  void setEarlyDataAppParamsHandler(EarlyDataAppParamsHandler* handler) final;
 
   bool isDetachable() override;
 

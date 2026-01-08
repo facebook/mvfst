@@ -506,11 +506,9 @@ void QuicTransportBase::setAckRxTimestampsEnabled(bool enableAckRxTimestamps) {
   }
 }
 
-void QuicTransportBase::setEarlyDataAppParamsFunctions(
-    std::function<bool(const Optional<std::string>&, const BufPtr&)> validator,
-    std::function<BufPtr()> getter) {
-  conn_->earlyDataAppParamsValidator = std::move(validator);
-  conn_->earlyDataAppParamsGetter = std::move(getter);
+void QuicTransportBase::setEarlyDataAppParamsHandler(
+    EarlyDataAppParamsHandler* handler) {
+  conn_->earlyDataAppParamsHandler = handler;
 }
 
 void QuicTransportBase::resetNonControlStreams(

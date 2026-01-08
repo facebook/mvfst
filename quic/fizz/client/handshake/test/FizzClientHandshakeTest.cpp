@@ -28,6 +28,7 @@
 #include <quic/fizz/client/handshake/test/MockQuicPskCache.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
+#include <quic/state/EarlyDataAppParamsHandler.h>
 #include <quic/state/StateData.h>
 
 #include <memory>
@@ -35,6 +36,27 @@
 using namespace testing;
 
 namespace quic::test {
+
+namespace {
+
+// Test helper for EarlyDataAppParamsHandler
+class TestEarlyDataAppParamsHandler : public EarlyDataAppParamsHandler {
+ public:
+  bool getCalled{false};
+
+  bool validate(
+      const Optional<std::string>& /* alpn */,
+      const BufPtr& /* appParams */) override {
+    return true;
+  }
+
+  BufPtr get() override {
+    getCalled = true;
+    return {};
+  }
+};
+
+} // namespace
 
 class ClientHandshakeTest : public Test {
  public:
@@ -470,14 +492,11 @@ TEST_F(ClientHandshakeCallbackTest, TestHandshakeSuccess) {
   serverClientRound();
   clientServerRound();
 
-  bool gotEarlyDataParams = false;
-  conn->earlyDataAppParamsGetter = [&]() -> BufPtr {
-    gotEarlyDataParams = true;
-    return {};
-  };
+  TestEarlyDataAppParamsHandler handler;
+  conn->earlyDataAppParamsHandler = &handler;
 
   serverClientRound();
-  EXPECT_TRUE(gotEarlyDataParams);
+  EXPECT_TRUE(handler.getCalled);
 }
 
 class ClientHandshakeHRRTest : public ClientHandshakeTest {

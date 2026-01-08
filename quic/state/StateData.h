@@ -27,6 +27,7 @@
 #include <quic/state/AckEvent.h>
 #include <quic/state/AckStates.h>
 #include <quic/state/ClonedPacketIdentifier.h>
+#include <quic/state/EarlyDataAppParamsHandler.h>
 #include <quic/state/LossState.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicConnectionStats.h>
@@ -614,11 +615,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
 
   /**
-   * Eerie data app params functions.
+   * Early data app params handler.
+   * Non-owning pointer - application must ensure handler outlives connection.
    */
-  std::function<bool(const Optional<std::string>&, const BufPtr&)>
-      earlyDataAppParamsValidator;
-  std::function<BufPtr()> earlyDataAppParamsGetter;
+  EarlyDataAppParamsHandler* earlyDataAppParamsHandler{nullptr};
 
   // Get the next available peer connection id and mark it as used.
   // If the caller decides not to use the returned connection id, it must retire

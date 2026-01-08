@@ -17,6 +17,7 @@
 #include <quic/common/events/QuicEventBase.h>
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/priority/PriorityQueue.h>
+#include <quic/state/EarlyDataAppParamsHandler.h>
 #include <chrono>
 
 namespace quic {
@@ -24,53 +25,19 @@ namespace quic {
 class QuicSocket : virtual public QuicSocketLite {
  public:
   /**
-   * Sets the functions that mvfst will invoke to validate early data params
-   * and encode early data params to NewSessionTicket.
-   * It's up to the application's responsibility to make sure captured objects
-   * (if any) are alive when the functions are called.
+   * Sets the handler for early data (0-RTT) application parameters.
    *
-   * validator:
-   *   On server side:
-   *     Called during handshake while negotiating early data.
-   *     @param alpn
-   *       The negotiated ALPN. Optional because it may be absent from
-   *       ClientHello.
-   *     @param appParams
-   *       The encoded and encrypted application parameters from PSK.
-   *     @return
-   *       Whether application accepts parameters from resumption state for
-   *       0-RTT.
-   *   On client side:
-   *     Called when transport is applying psk from cache.
-   *     @param alpn
-   *       The ALPN client is going to use for this connection. Optional
-   *       because client may not set ALPN.
-   *     @param appParams
-   *       The encoded (not encrypted) application parameter from local cache.
-   *     @return
-   *       Whether application will attempt early data based on the cached
-   *       application parameters. This is useful when client updates to use a
-   *       new binary but still reads PSK from an old cache. Client may choose
-   *       to not attempt 0-RTT at all given client thinks server will likely
-   *       reject it.
+   * The handler is used to:
+   * - Validate cached/resumption app params during early data setup
+   * - Provide current app params for caching in session tickets
    *
-   * getter:
-   *   On server side:
-   *     Called when transport is writing NewSessionTicket.
-   *     @return
-   *       The encoded application parameters that will be included in
-   *       NewSessionTicket.
-   *   On client side:
-   *     Called when client receives NewSessionTicket and is going to write to
-   *     cache.
-   *     @return
-   *       Encoded application parameters that will be written to cache.
+   * See EarlyDataAppParamsHandler for detailed method documentation.
+   *
+   * @param handler Non-owning pointer. Application must ensure handler
+   *                outlives the connection. Pass nullptr to clear.
    */
-  virtual void setEarlyDataAppParamsFunctions(
-      std::function<
-          bool(const Optional<std::string>& alpn, const BufPtr& appParams)>
-          validator,
-      std::function<BufPtr()> getter) = 0;
+  virtual void setEarlyDataAppParamsHandler(
+      EarlyDataAppParamsHandler* handler) = 0;
 
   ~QuicSocket() override = default;
 

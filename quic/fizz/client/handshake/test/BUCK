@@ -25,6 +25,7 @@ mvfst_cpp_test(
         "//quic/common/test:test_utils",
         "//quic/fizz/client/handshake:fizz_client_handshake",
         "//quic/fizz/handshake:fizz_handshake",
+        "//quic/state:early_data_app_params_handler",
         "//quic/state:quic_state_machine",
     ],
 )

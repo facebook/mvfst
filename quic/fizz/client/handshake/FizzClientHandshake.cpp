@@ -111,12 +111,12 @@ folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
   const QuicClientConnectionState* conn = getClientConn();
   if (!conn->transportSettings.attemptEarlyData) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
-  } else if (conn->earlyDataAppParamsValidator) {
+  } else if (conn->earlyDataAppParamsHandler) {
     Optional<std::string> alpn;
     if (quicCachedPsk->cachedPsk.alpn.has_value()) {
       alpn = quicCachedPsk->cachedPsk.alpn.value();
     }
-    if (!conn->earlyDataAppParamsValidator(
+    if (!conn->earlyDataAppParamsHandler->validate(
             alpn, BufHelpers::copyBuffer(quicCachedPsk->appParams))) {
       quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
       // Do not remove psk here, will let application decide
@@ -277,8 +277,8 @@ void FizzClientHandshake::onNewCachedPsk(
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
   quicCachedPsk.transportParams = getServerCachedTransportParameters(*conn);
 
-  if (conn->earlyDataAppParamsGetter) {
-    auto appParams = conn->earlyDataAppParamsGetter();
+  if (conn->earlyDataAppParamsHandler) {
+    auto appParams = conn->earlyDataAppParamsHandler->get();
     if (appParams) {
       quicCachedPsk.appParams = appParams->toString();
     }

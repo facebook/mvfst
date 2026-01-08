@@ -3517,9 +3517,12 @@ class QuicServerTransportHandshakeTest
 
   void expectWriteNewSessionTicket() override {
     std::string appParams("APP params");
-    server->setEarlyDataAppParamsFunctions(
-        [](const Optional<std::string>&, const BufPtr&) { return false; },
-        [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams); });
+    earlyDataHandler_.validateFn = [](const Optional<std::string>&,
+                                      const BufPtr&) { return false; };
+    earlyDataHandler_.getFn = [=]() -> BufPtr {
+      return folly::IOBuf::copyBuffer(appParams);
+    };
+    server->setEarlyDataAppParamsHandler(&earlyDataHandler_);
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
         .WillOnce(Invoke(
             [=, this](

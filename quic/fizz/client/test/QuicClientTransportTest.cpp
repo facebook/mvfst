@@ -38,6 +38,23 @@ using namespace quic::samples;
 
 namespace quic::test {
 
+// Test helper that implements EarlyDataAppParamsHandler with std::function
+// for flexible test setup
+class TestEarlyDataAppParamsHandler : public EarlyDataAppParamsHandler {
+ public:
+  bool validate(const Optional<std::string>& alpn, const BufPtr& params)
+      override {
+    return validateFn ? validateFn(alpn, params) : true;
+  }
+
+  BufPtr get() override {
+    return getFn ? getFn() : nullptr;
+  }
+
+  std::function<bool(const Optional<std::string>&, const BufPtr&)> validateFn;
+  std::function<BufPtr()> getFn;
+};
+
 namespace {
 std::vector<uint8_t> kInitialDstConnIdVecForRetryTest =
     {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
@@ -270,6 +287,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   bool connected_{false};
   std::shared_ptr<MockQuicStats> quicStats_;
   std::vector<MockQuicStats*> statsCallbacks_;
+  TestEarlyDataAppParamsHandler earlyDataHandler_;
 };
 
 class StreamData {
@@ -617,13 +635,14 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   server_->setFizzContext(serverCtx);
   Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
+  earlyDataHandler_.validateFn =
       [&](const Optional<std::string>& alpnToValidate, const BufPtr&) {
         performedValidation = true;
         EXPECT_EQ(alpnToValidate, alpn);
         return true;
-      },
-      []() -> BufPtr { return nullptr; });
+      };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
 
   // Set the onTransportReadyCallback before starting the client to guarantee
   // the callback is set by the time the handshake is started
@@ -725,13 +744,14 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
 
   Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
+  earlyDataHandler_.validateFn =
       [&](const Optional<std::string>& alpnToValidate, const BufPtr&) {
         performedValidation = true;
         EXPECT_EQ(alpnToValidate, alpn);
         return true;
-      },
-      []() -> BufPtr { return nullptr; });
+      };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
     CHECK(client->getConn().zeroRttWriteCipher);
@@ -862,12 +882,13 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   // Change the ctx
   server_->setFizzContext(serverCtx);
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h3");
     ASSERT_NE(
@@ -947,12 +968,13 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   // Change the ctx
   server_->setFizzContext(serverCtx);
   client->getNonConstConn().transportSettings.attemptEarlyData = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        EXPECT_TRUE(false);
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
     CHECK(client->getConn().oneRttWriteCipher);
@@ -988,12 +1010,13 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   // Change the ctx
   server_->setFizzContext(serverCtx);
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return false;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return false;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
     CHECK(client->getConn().oneRttWriteCipher);
@@ -5232,13 +5255,17 @@ class QuicClientTransportPskCacheTest
 
  protected:
   std::shared_ptr<MockQuicPskCache> mockPskCache_;
+  TestEarlyDataAppParamsHandler earlyDataHandler_;
 };
 
 TEST_F(QuicClientTransportPskCacheTest, TestOnNewCachedPsk) {
   std::string appParams = "APP params";
-  client->setEarlyDataAppParamsFunctions(
-      [](const Optional<std::string>&, const BufPtr&) { return true; },
-      [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams); });
+  earlyDataHandler_.validateFn = [](const Optional<std::string>&,
+                                    const BufPtr&) { return true; };
+  earlyDataHandler_.getFn = [=]() -> BufPtr {
+    return folly::IOBuf::copyBuffer(appParams);
+  };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         EXPECT_EQ(psk.appParams, appParams);
@@ -5248,9 +5275,12 @@ TEST_F(QuicClientTransportPskCacheTest, TestOnNewCachedPsk) {
 
 TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
   std::string appParams1 = "APP params1";
-  client->setEarlyDataAppParamsFunctions(
-      [](const Optional<std::string>&, const BufPtr&) { return true; },
-      [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams1); });
+  earlyDataHandler_.validateFn = [](const Optional<std::string>&,
+                                    const BufPtr&) { return true; };
+  earlyDataHandler_.getFn = [=]() -> BufPtr {
+    return folly::IOBuf::copyBuffer(appParams1);
+  };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
@@ -5276,9 +5306,10 @@ TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
       .flowControlState.peerAdvertisedInitialMaxStreamOffsetUni = 123;
 
   std::string appParams2 = "APP params2";
-  client->setEarlyDataAppParamsFunctions(
-      [](const Optional<std::string>&, const BufPtr&) { return true; },
-      [=]() -> BufPtr { return folly::IOBuf::copyBuffer(appParams2); });
+  earlyDataHandler_.getFn = [=]() -> BufPtr {
+    return folly::IOBuf::copyBuffer(appParams2);
+  };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
@@ -5362,6 +5393,7 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
 
  protected:
   std::shared_ptr<MockQuicPskCache> mockQuicPskCache_;
+  TestEarlyDataAppParamsHandler earlyDataHandler_;
 };
 
 TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
@@ -5386,12 +5418,13 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
         return quicCachedPsk;
       }));
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   startClient();
   EXPECT_TRUE(performedValidation);
 
@@ -5465,12 +5498,13 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   tp.earlyRetransmit0Rtt = true;
   client->setTransportSettings(tp);
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   startClient();
   EXPECT_TRUE(performedValidation);
 
@@ -5546,12 +5580,13 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
         return quicCachedPsk;
       }));
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   startClient();
   EXPECT_TRUE(performedValidation);
 
@@ -5599,12 +5634,13 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
         return quicCachedPsk;
       }));
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   startClient();
   EXPECT_TRUE(performedValidation);
 
@@ -5643,12 +5679,13 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionCannotResendZeroRttData) {
         return quicCachedPsk;
       }));
   bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) {
+    performedValidation = true;
+    return true;
+  };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
   startClient();
   EXPECT_TRUE(performedValidation);
 
@@ -5767,9 +5804,10 @@ TEST_F(
             std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) { return true; },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) { return true; };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
 
   EXPECT_CALL(*sock, write(firstAddress, _, _))
       .WillRepeatedly(Invoke(
@@ -5861,9 +5899,10 @@ TEST_F(
             std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
-  client->setEarlyDataAppParamsFunctions(
-      [&](const Optional<std::string>&, const BufPtr&) { return true; },
-      []() -> BufPtr { return nullptr; });
+  earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
+                                     const BufPtr&) { return true; };
+  earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+  client->setEarlyDataAppParamsHandler(&earlyDataHandler_);
 
   EXPECT_CALL(*sock, write(firstAddress, _, _))
       .WillOnce(Invoke(

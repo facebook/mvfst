@@ -111,6 +111,7 @@ mvfst_cpp_library(
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/observer:socket_observer_container",
         "//quic/priority:priority_queue",
+        "//quic/state:early_data_app_params_handler",
         "//quic/state:quic_state_machine",
     ] + select({
         "DEFAULT": [

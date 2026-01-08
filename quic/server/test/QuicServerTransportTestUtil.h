@@ -29,6 +29,23 @@
 
 namespace quic::test {
 
+// Test helper that implements EarlyDataAppParamsHandler with std::function
+// for flexible test setup
+class TestEarlyDataAppParamsHandler : public EarlyDataAppParamsHandler {
+ public:
+  bool validate(const Optional<std::string>& alpn, const BufPtr& params)
+      override {
+    return validateFn ? validateFn(alpn, params) : true;
+  }
+
+  BufPtr get() override {
+    return getFn ? getFn() : nullptr;
+  }
+
+  std::function<bool(const Optional<std::string>&, const BufPtr&)> validateFn;
+  std::function<BufPtr()> getFn;
+};
+
 class TestingQuicServerTransport : public QuicServerTransport {
  public:
   TestingQuicServerTransport(
@@ -421,9 +438,10 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   }
 
   virtual void expectWriteNewSessionTicket() {
-    server->setEarlyDataAppParamsFunctions(
-        [](const Optional<std::string>&, const BufPtr&) { return false; },
-        []() -> BufPtr { return nullptr; });
+    earlyDataHandler_.validateFn = [](const Optional<std::string>&,
+                                      const BufPtr&) { return false; };
+    earlyDataHandler_.getFn = []() -> BufPtr { return nullptr; };
+    server->setEarlyDataAppParamsHandler(&earlyDataHandler_);
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(testing::_))
         .Times(testing::AtLeast(1));
   }
@@ -680,6 +698,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   quic::test::MockAsyncUDPSocket* socket;
   FakeServerHandshake* fakeHandshake{nullptr};
   std::shared_ptr<FizzServerQuicHandshakeContext> fizzServerContext;
+  TestEarlyDataAppParamsHandler earlyDataHandler_;
   PacketNum clientNextInitialPacketNum{0}, clientNextHandshakePacketNum{0},
       clientNextAppDataPacketNum{0};
 };

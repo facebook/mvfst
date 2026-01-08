@@ -218,8 +218,8 @@ bool DefaultAppTokenValidator::validate(
 
   // If application has set validator and the token is invalid, reject 0-RTT.
   // If application did not set validator, it's valid.
-  if (conn_->earlyDataAppParamsValidator &&
-      !conn_->earlyDataAppParamsValidator(
+  if (conn_->earlyDataAppParamsHandler &&
+      !conn_->earlyDataAppParamsHandler->validate(
           resumptionState.alpn
               ? quic::Optional<std::string>(*resumptionState.alpn)
               : std::nullopt,

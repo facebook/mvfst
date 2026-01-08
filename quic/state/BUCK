@@ -16,6 +16,17 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "early_data_app_params_handler",
+    headers = [
+        "EarlyDataAppParamsHandler.h",
+    ],
+    exported_deps = [
+        "//quic/common:buf_util",
+        "//quic/common:optional",
+    ],
+)
+
+mvfst_cpp_library(
     name = "loss_state",
     headers = [
         "LossState.h",
@@ -104,6 +115,7 @@ mvfst_cpp_library(
         ":ack_event",
         ":ack_states",
         ":cloned_packet_identifier",
+        ":early_data_app_params_handler",
         ":loss_state",
         ":outstanding_packet",
         ":quic_connection_stats",

@@ -60,9 +60,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       conn->originalVersion.value(),
       conn->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
       conn->transportSettings.advertisedExtendedAckFeatures));
-  newConn->earlyDataAppParamsValidator =
-      std::move(conn->earlyDataAppParamsValidator);
-  newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);
+  newConn->earlyDataAppParamsHandler = conn->earlyDataAppParamsHandler;
   newConn->happyEyeballsState = std::move(conn->happyEyeballsState);
   newConn->flowControlState = std::move(conn->flowControlState);
   newConn->bufAccessor = conn->bufAccessor;

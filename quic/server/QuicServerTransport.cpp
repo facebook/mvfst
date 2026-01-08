@@ -649,8 +649,8 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
 
     // Keep connection state in sync with what was written to the session ticket
     serverConn_->tokenSourceAddresses = appToken.sourceAddresses;
-    if (conn_->earlyDataAppParamsGetter) {
-      appToken.appParams = conn_->earlyDataAppParamsGetter();
+    if (conn_->earlyDataAppParamsHandler) {
+      appToken.appParams = conn_->earlyDataAppParamsHandler->get();
     }
     auto result =
         serverConn_->serverHandshakeLayer->writeNewSessionTicket(appToken);

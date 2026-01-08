@@ -25,6 +25,23 @@ using namespace testing;
 
 namespace quic::test {
 
+// Test helper that implements EarlyDataAppParamsHandler with std::function
+// for flexible test setup
+class TestEarlyDataAppParamsHandler : public EarlyDataAppParamsHandler {
+ public:
+  bool validate(const Optional<std::string>& alpn, const BufPtr& params)
+      override {
+    return validateFn ? validateFn(alpn, params) : true;
+  }
+
+  BufPtr get() override {
+    return getFn ? getFn() : nullptr;
+  }
+
+  std::function<bool(const Optional<std::string>&, const BufPtr&)> validateFn;
+  std::function<BufPtr()> getFn;
+};
+
 TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -51,8 +68,11 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) { return true; };
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
+    return true;
+  };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted());
   EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
@@ -89,8 +109,11 @@ TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) { return true; };
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
+    return true;
+  };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(1);
   EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
@@ -127,8 +150,11 @@ TEST(
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) { return true; };
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
+    return true;
+  };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttRejected()).Times(0);
   EXPECT_CALL(*quicStats, onZeroRttAccepted());
@@ -149,11 +175,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   conn.version = QuicVersion::MVFST;
 
   ResumptionState resState;
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
@@ -170,11 +197,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(0);
   EXPECT_CALL(*quicStats, onZeroRttRejected());
@@ -226,11 +254,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(0);
   EXPECT_CALL(*quicStats, onZeroRttRejected());
@@ -305,11 +334,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
@@ -339,11 +369,12 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(0);
   EXPECT_CALL(*quicStats, onZeroRttRejected());
@@ -375,11 +406,12 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_CALL(*quicStats, onZeroRttAccepted()).Times(0);
   EXPECT_CALL(*quicStats, onZeroRttRejected());
@@ -411,11 +443,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidExtendedAckSupportChanged) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) {
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
     EXPECT_TRUE(false);
     return true;
   };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
@@ -452,8 +485,11 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  conn.earlyDataAppParamsValidator = [](const Optional<std::string>&,
-                                        const BufPtr&) { return false; };
+  TestEarlyDataAppParamsHandler handler;
+  handler.validateFn = [](const Optional<std::string>&, const BufPtr&) {
+    return false;
+  };
+  conn.earlyDataAppParamsHandler = &handler;
   DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
@@ -487,10 +523,10 @@ class SourceAddressTokenTest : public Test {
     ResumptionState resState;
     resState.appToken = encodeAppToken(appToken_);
 
-    conn_.earlyDataAppParamsValidator = [=](const Optional<std::string>&,
-                                            const BufPtr&) {
+    handler_.validateFn = [=](const Optional<std::string>&, const BufPtr&) {
       return acceptZeroRtt;
     };
+    conn_.earlyDataAppParamsHandler = &handler_;
     DefaultAppTokenValidator validator(&conn_);
     EXPECT_EQ(validator.validate(resState), acceptZeroRtt);
   }
@@ -498,6 +534,7 @@ class SourceAddressTokenTest : public Test {
  protected:
   QuicServerConnectionState conn_;
   AppToken appToken_;
+  TestEarlyDataAppParamsHandler handler_;
 };
 
 class LimitIfNoMatchPolicyTest : public SourceAddressTokenTest {
