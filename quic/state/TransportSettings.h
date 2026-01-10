@@ -449,10 +449,6 @@ struct TransportSettings {
   bool cloneAllPacketsWithCryptoFrame{false};
   bool cloneCryptoPacketsAtMostOnce{false};
   bool immediatelyRetransmitInitialPackets{false};
-  // If > 0 this represents the coalescing of appends to the read buffer
-  // which will be applied. i.e. when used the underlying IOBufs in the read
-  // buffer will mostly be in chunks of this size.
-  uint32_t readCoalescingSize{0};
 
   // Ceiling of packets to receive from signaled socket per evb loop on the
   // server side.

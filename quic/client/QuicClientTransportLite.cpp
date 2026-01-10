@@ -1706,12 +1706,7 @@ void QuicClientTransportLite::onNotifyDataAvailable(
                             uint64_t(kDefaultUDPReadBufferSize)) *
       numGROBuffers_;
 
-  const size_t readAllocSize =
-      conn_->transportSettings.readCoalescingSize > kDefaultUDPSendPacketLen
-      ? conn_->transportSettings.readCoalescingSize
-      : readBufferSize;
-
-  auto result = readWithRecvmsgSinglePacketLoop(sock, readAllocSize);
+  auto result = readWithRecvmsgSinglePacketLoop(sock, readBufferSize);
   if (!result.has_value()) {
     asyncClose(result.error());
   }

@@ -265,7 +265,7 @@ quic::Expected<void, QuicError> appendDataToReadBuffer(
   return appendDataToReadBufferCommon(
       stream,
       std::move(buffer),
-      stream.conn.transportSettings.readCoalescingSize,
+      0,
       [&stream](uint64_t previousMaxOffsetObserved, uint64_t bufferEndOffset) {
         return updateFlowControlOnStreamData(
             stream, previousMaxOffsetObserved, bufferEndOffset);
