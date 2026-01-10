@@ -2628,28 +2628,6 @@ TEST_F(
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
 }
 
-class QuicServerTransportSendAckOnlyInitialTest
-    : public QuicUnencryptedServerTransportTest,
-      public testing::WithParamInterface<bool> {};
-
-TEST_P(
-    QuicServerTransportSendAckOnlyInitialTest,
-    TestSkipAckOnlyCryptoInitial) {
-  auto transportSettings = server->getTransportSettings();
-  transportSettings.sendAckOnlyInitial = GetParam();
-  server->setTransportSettings(transportSettings);
-  // start at some random packet number that isn't zero
-  clientNextInitialPacketNum = folly::Random::rand32(1, 100);
-
-  // bypass doHandshake() in fakeServerHandshake by sending something other than
-  // "CHLO"
-  recvClientHello(true, QuicVersion::MVFST, "hello :)");
-
-  // we expect nothing to be written as we're skipping the initial ack-only
-  // packet
-  EXPECT_EQ(serverWrites.size(), (size_t)transportSettings.sendAckOnlyInitial);
-}
-
 TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
   recvClientHello();
 
@@ -2681,11 +2659,6 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
     }
   }
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    QuicServerTransportSendAckOnlyInitialTests,
-    QuicServerTransportSendAckOnlyInitialTest,
-    Bool());
 
 TEST_F(QuicUnencryptedServerTransportTest, TestDuplicateCryptoInitialLogging) {
   auto transportSettings = server->getTransportSettings();

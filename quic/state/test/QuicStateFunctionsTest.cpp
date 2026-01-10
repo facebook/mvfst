@@ -718,7 +718,7 @@ INSTANTIATE_TEST_SUITE_P(
         PacketNumberSpace::AppData));
 
 class UpdateAckSendStateOnRecvPacketsInitCryptoTest
-    : public TestWithParam<std::tuple<PacketNumberSpace, bool>> {};
+    : public TestWithParam<PacketNumberSpace> {};
 
 TEST_P(
     UpdateAckSendStateOnRecvPacketsInitCryptoTest,
@@ -726,11 +726,10 @@ TEST_P(
   // Crypto data leads to immediate ack unless init packet space.
   QuicConnectionStateBase conn(QuicNodeType::Server);
 
-  auto pktNumSpace = std::get<0>(GetParam());
+  auto pktNumSpace = GetParam();
   bool isInitPktNumSpace = pktNumSpace == PacketNumberSpace::Initial;
-  conn.transportSettings.sendAckOnlyInitial = std::get<1>(GetParam());
-  bool sendAck =
-      !isInitPktNumSpace || conn.transportSettings.sendAckOnlyInitial;
+  // Server skips ack-only in Initial packet space
+  bool sendAck = !isInitPktNumSpace;
 
   auto& ackState = getAckState(conn, pktNumSpace);
   updateAckSendStateOnRecvPacket(
@@ -744,12 +743,10 @@ TEST_P(
 INSTANTIATE_TEST_SUITE_P(
     UpdateAckSendStateOnRecvPacketsInitCryptoTests,
     UpdateAckSendStateOnRecvPacketsInitCryptoTest,
-    Combine(
-        Values(
-            PacketNumberSpace::Initial,
-            PacketNumberSpace::Handshake,
-            PacketNumberSpace::AppData),
-        Bool()));
+    Values(
+        PacketNumberSpace::Initial,
+        PacketNumberSpace::Handshake,
+        PacketNumberSpace::AppData));
 
 class QuicStateFunctionsTest : public TestWithParam<PacketNumberSpace> {};
 

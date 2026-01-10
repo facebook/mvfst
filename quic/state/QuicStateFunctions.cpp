@@ -125,7 +125,7 @@ void updateAckSendStateOnRecvPacket(
   bool exceedsReorderThreshold =
       distanceFromExpectedPacketNum > ackState.reorderThreshold;
   if (pktHasRetransmittableData) {
-    bool skipCryptoAck = !conn.transportSettings.sendAckOnlyInitial &&
+    bool skipCryptoAck =
         conn.nodeType == QuicNodeType::Server && initPktNumSpace;
 
     if ((pktHasCryptoData && !skipCryptoAck) || exceedsReorderThreshold ||
