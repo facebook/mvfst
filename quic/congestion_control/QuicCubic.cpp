@@ -266,7 +266,7 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
   auto timeElapsed = folly::chrono::ceil<std::chrono::milliseconds>(
       ackTime - *steadyState_.lastReductionTime);
   int64_t delta = 0;
-  double timeElapsedCount = static_cast<double>(timeElapsed.count());
+  auto timeElapsedCount = static_cast<double>(timeElapsed.count());
   if (std::pow((timeElapsedCount - steadyState_.timeToOrigin), 3) >
       std::numeric_limits<double>::max()) {
     // (timeElapsed - timeToOrigin) ^ 3 will overflow/underflow, cut delta
