@@ -47,7 +47,7 @@ std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
       if (folly::IoUringBackend::kernelSupportsRecvmsgMultishot()) {
         options.setInitialProvidedBuffers(2048, 2000);
       }
-      auto ret = std::make_unique<folly::IoUringBackend>(options);
+      auto ret = std::make_unique<folly::IoUringBackend>(std::move(options));
       MVLOG_INFO << "Allocating io_uring backend(" << FLAGS_qs_io_uring_capacity
                  << "," << FLAGS_qs_io_uring_max_submit << ","
                  << FLAGS_qs_io_uring_max_get << ","
