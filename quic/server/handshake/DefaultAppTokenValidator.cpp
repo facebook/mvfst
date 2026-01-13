@@ -16,7 +16,6 @@
 
 #include <fizz/server/ResumptionState.h>
 #include <folly/IPAddress.h>
-#include <quic/common/Optional.h>
 
 #include <quic/common/MvfstLogging.h>
 

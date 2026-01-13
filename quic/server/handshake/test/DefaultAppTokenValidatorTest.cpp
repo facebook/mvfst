@@ -15,7 +15,6 @@
 #include <quic/state/test/MockQuicStats.h>
 
 #include <fizz/server/ResumptionState.h>
-#include <quic/common/Optional.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

@@ -10,8 +10,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/server/state/ServerStateMachine.h>
 
-#include <quic/common/Optional.h>
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
