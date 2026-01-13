@@ -7,13 +7,14 @@
 
 #include <gtest/gtest.h>
 #include <quic/common/QuicRange.h>
+#include <array>
 
 namespace quic::test {
 
 TEST(QuicRangeConversionTest, MutableToConstConversion) {
   // Test basic conversion from MutableByteRange to ByteRange
-  uint8_t data[] = {1, 2, 3, 4, 5};
-  MutableByteRange mutableRange(data, sizeof(data));
+  auto data = std::to_array<uint8_t>({1, 2, 3, 4, 5});
+  MutableByteRange mutableRange(data.data(), data.size());
 
   // Implicit conversion should work
   ByteRange constRange = mutableRange;
@@ -27,8 +28,8 @@ TEST(QuicRangeConversionTest, PassToFunction) {
   // Test that we can pass MutableByteRange to a function expecting ByteRange
   auto processBytes = [](ByteRange range) -> size_t { return range.size(); };
 
-  uint8_t data[] = {1, 2, 3};
-  MutableByteRange mutableRange(data, sizeof(data));
+  auto data = std::to_array<uint8_t>({1, 2, 3});
+  MutableByteRange mutableRange(data.data(), data.size());
 
   // Should be able to pass mutableRange directly
   EXPECT_EQ(processBytes(mutableRange), 3);
@@ -36,8 +37,8 @@ TEST(QuicRangeConversionTest, PassToFunction) {
 
 TEST(QuicRangeConversionTest, CopyConstruction) {
   // Test explicit copy construction
-  uint8_t data[] = {10, 20, 30};
-  MutableByteRange mutableRange(data, sizeof(data));
+  auto data = std::to_array<uint8_t>({10, 20, 30});
+  MutableByteRange mutableRange(data.data(), data.size());
 
   ByteRange constRange(mutableRange);
 
