@@ -43,11 +43,11 @@ class BufQueue {
   BufQueue(const BufQueue&) = delete;
   BufQueue& operator=(const BufQueue&) = delete;
 
-  size_t chainLength() const {
+  [[nodiscard]] size_t chainLength() const {
     return chainLength_;
   }
 
-  bool empty() const {
+  [[nodiscard]] bool empty() const {
     return chainLength_ == 0;
   }
 
@@ -56,11 +56,11 @@ class BufQueue {
     return std::move(chain_);
   }
 
-  BufPtr clone() const {
+  [[nodiscard]] BufPtr clone() const {
     return chain_ ? chain_->clone() : nullptr;
   }
 
-  const Buf* front() const {
+  [[nodiscard]] const Buf* front() const {
     return chain_.get();
   }
 

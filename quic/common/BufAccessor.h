@@ -44,19 +44,19 @@ class BufAccessor {
   /**
    * Returns whether the BufAccessor currently owns an IOBuf.
    */
-  bool ownsBuffer() const;
+  [[nodiscard]] bool ownsBuffer() const;
 
   // Mirrored APIs from IOBuf.h
-  const uint8_t* tail() const;
-  const uint8_t* data() const;
-  std::size_t tailroom() const;
-  std::size_t headroom() const;
+  [[nodiscard]] const uint8_t* tail() const;
+  [[nodiscard]] const uint8_t* data() const;
+  [[nodiscard]] std::size_t tailroom() const;
+  [[nodiscard]] std::size_t headroom() const;
 
-  std::size_t length() const;
+  [[nodiscard]] std::size_t length() const;
 
   void clear();
 
-  bool isChained() const;
+  [[nodiscard]] bool isChained() const;
 
   void trimEnd(std::size_t amount);
 

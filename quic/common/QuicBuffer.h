@@ -101,7 +101,7 @@ class QuicBuffer {
 
   void retreat(std::size_t amount) noexcept;
 
-  bool isSharedOne() const noexcept;
+  [[nodiscard]] bool isSharedOne() const noexcept;
 
   [[nodiscard]] bool isShared() const noexcept;
 
@@ -164,13 +164,13 @@ class QuicBuffer {
 
   [[nodiscard]] std::size_t computeChainDataLength() const noexcept;
 
-  bool isChained() const noexcept {
+  [[nodiscard]] bool isChained() const noexcept {
     return next_ != this;
   }
 
-  size_t countChainElements() const noexcept;
+  [[nodiscard]] size_t countChainElements() const noexcept;
 
-  bool empty() const noexcept;
+  [[nodiscard]] bool empty() const noexcept;
 
   /*
    * Operations to trim, append, split, clone, etc.
@@ -191,9 +191,9 @@ class QuicBuffer {
    */
   std::unique_ptr<QuicBuffer> separateChain(QuicBuffer* head, QuicBuffer* tail);
 
-  std::unique_ptr<QuicBuffer> clone() const;
+  [[nodiscard]] std::unique_ptr<QuicBuffer> clone() const;
 
-  std::unique_ptr<QuicBuffer> cloneOne() const {
+  [[nodiscard]] std::unique_ptr<QuicBuffer> cloneOne() const {
     return cloneOneImpl();
   }
 
@@ -210,7 +210,7 @@ class QuicBuffer {
    * @return  A QuicBuffer for which isChained() == false, and whose data is the
    *          same as coalesce(). Returns nullptr if we fail to allocate memory.
    */
-  std::unique_ptr<QuicBuffer> cloneCoalesced() const;
+  [[nodiscard]] std::unique_ptr<QuicBuffer> cloneCoalesced() const;
 
   ByteRange coalesce();
 
@@ -230,7 +230,7 @@ class QuicBuffer {
   /**
    * Non-destructively convert this QuicBuffer chain into a std::string.
    */
-  std::string toString() const;
+  [[nodiscard]] std::string toString() const;
 
   void clear() noexcept;
 
@@ -339,7 +339,7 @@ class QuicBuffer {
 
   std::unique_ptr<QuicBuffer> unlink();
 
-  std::unique_ptr<QuicBuffer> cloneOneImpl() const;
+  [[nodiscard]] std::unique_ptr<QuicBuffer> cloneOneImpl() const;
 
   // This is set if the underlying buffer is shared.
   // Otherwise, if the buffer is owned externally, this is

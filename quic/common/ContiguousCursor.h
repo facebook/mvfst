@@ -18,27 +18,27 @@ class ContiguousReadCursor {
  public:
   ContiguousReadCursor(const uint8_t* data, size_t size) noexcept;
 
-  const uint8_t* data() const {
+  [[nodiscard]] const uint8_t* data() const {
     return data_;
   }
 
-  const uint8_t* end() const {
+  [[nodiscard]] const uint8_t* end() const {
     return end_;
   }
 
-  size_t remaining() const {
+  [[nodiscard]] size_t remaining() const {
     return uintptr_t(end_ - data_);
   }
 
-  bool canAdvance(size_t bytes) const noexcept {
+  [[nodiscard]] bool canAdvance(size_t bytes) const noexcept {
     return uintptr_t(end_ - data_) >= bytes;
   }
 
-  bool isAtEnd() const noexcept {
+  [[nodiscard]] bool isAtEnd() const noexcept {
     return data_ == end_;
   }
 
-  size_t getCurrentPosition() const noexcept {
+  [[nodiscard]] size_t getCurrentPosition() const noexcept {
     return uintptr_t(data_ - begin_);
   }
 
@@ -67,7 +67,7 @@ class ContiguousReadCursor {
     return true;
   }
 
-  ByteRange peekBytes() const noexcept {
+  [[nodiscard]] ByteRange peekBytes() const noexcept {
     return ByteRange(data_, end_);
   }
 
