@@ -399,7 +399,7 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
       QuicAsyncUDPSocket& /*unused*/,
       const folly::SocketAddress& /*unused*/) override;
 
-  size_t getBufSize() const {
+  [[nodiscard]] size_t getBufSize() const {
     return bufSize_;
   }
 

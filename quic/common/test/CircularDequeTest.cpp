@@ -110,7 +110,7 @@ struct NoexceptString {
     return data.at(pos);
   }
 
-  const char& at(size_t pos) const {
+  [[nodiscard]] const char& at(size_t pos) const {
     return data.at(pos);
   }
 

@@ -72,7 +72,7 @@ class MockTransportForLooperTest : public QuicTransportBaseLite {
     return {};
   }
 
-  bool hasWriteCipher() const override {
+  [[nodiscard]] bool hasWriteCipher() const override {
     return true;
   }
 
@@ -84,15 +84,15 @@ class MockTransportForLooperTest : public QuicTransportBaseLite {
     return nullptr;
   }
 
-  Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
+  [[nodiscard]] Optional<std::vector<uint8_t>> getExportedKeyingMaterial(
       const std::string& /* label */,
       const Optional<folly::ByteRange>& /* context */,
       uint16_t /* keyLength */) const override {
     return std::nullopt;
   }
 
-  Optional<std::vector<TransportParameter>> getPeerTransportParams()
-      const override {
+  [[nodiscard]] Optional<std::vector<TransportParameter>>
+  getPeerTransportParams() const override {
     return std::nullopt;
   }
 

@@ -29,7 +29,7 @@ struct Range {
           std::is_convertible<OtherIter, Iter>::value>::type* = nullptr)
       : begin_(other.begin_), end_(other.end_) {}
 
-  size_t size() const {
+  [[nodiscard]] size_t size() const {
     return end_ - begin_;
   }
 
@@ -37,7 +37,7 @@ struct Range {
     begin_ += amount;
   }
 
-  bool empty() const {
+  [[nodiscard]] bool empty() const {
     return begin_ == end_;
   }
 
@@ -64,7 +64,7 @@ struct Range {
     return *(begin_ + index);
   }
 
-  std::string toString() const {
+  [[nodiscard]] std::string toString() const {
     return std::string(
         reinterpret_cast<const char*>(begin_),
         reinterpret_cast<const char*>(end_));
