@@ -434,7 +434,7 @@ struct QuicStreamState : public QuicStreamLike {
 
   // Returns true if both send and receive state machines are in a terminal
   // state
-  [[nodiscard]] bool inTerminalStates() const {
+  [[nodiscard]] bool inTerminalStates() const noexcept {
     bool sendInTerminalState = sendState == StreamSendState::Closed ||
         sendState == StreamSendState::Invalid;
 
@@ -445,18 +445,19 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   // If the stream is still writable.
-  [[nodiscard]] bool writable() const {
+  [[nodiscard]] bool writable() const noexcept {
     return sendState == StreamSendState::Open && !finalWriteOffset.has_value();
   }
 
-  [[nodiscard]] bool shouldSendFlowControl() const {
+  [[nodiscard]] bool shouldSendFlowControl() const noexcept {
     return recvState == StreamRecvState::Open;
   }
 
   // If the stream has writable data. That is, in a
   // regular stream write, it will be able to write something. So it either
   // needs to have data in the pendingWrites chain, or it has EOF to send.
-  [[nodiscard]] bool hasWritableData(bool connFlowControlOpen = true) const {
+  [[nodiscard]] bool hasWritableData(
+      bool connFlowControlOpen = true) const noexcept {
     if (!pendingWrites.empty()) {
       MVCHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
       return connFlowControlOpen &&
@@ -469,32 +470,33 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   // Whether this stream has data in the write buffer or loss buffer.
-  [[nodiscard]] bool hasSchedulableData(bool connFlowControlOpen = true) const {
+  [[nodiscard]] bool hasSchedulableData(
+      bool connFlowControlOpen = true) const noexcept {
     return hasWritableData(connFlowControlOpen) || !lossBuffer.empty();
   }
 
-  [[nodiscard]] bool hasSentFIN() const {
+  [[nodiscard]] bool hasSentFIN() const noexcept {
     if (!finalWriteOffset) {
       return false;
     }
     return currentWriteOffset > *finalWriteOffset;
   }
 
-  [[nodiscard]] bool hasLoss() const {
+  [[nodiscard]] bool hasLoss() const noexcept {
     return !lossBuffer.empty();
   }
 
-  [[nodiscard]] uint64_t nextOffsetToWrite() const {
+  [[nodiscard]] uint64_t nextOffsetToWrite() const noexcept {
     return currentWriteOffset;
   }
 
-  [[nodiscard]] bool hasReadableData() const {
+  [[nodiscard]] bool hasReadableData() const noexcept {
     return (readBuffer.size() > 0 &&
             currentReadOffset == readBuffer.front().offset) ||
         (finalReadOffset && currentReadOffset == *finalReadOffset);
   }
 
-  [[nodiscard]] bool hasPeekableData() const {
+  [[nodiscard]] bool hasPeekableData() const noexcept {
     return readBuffer.size() > 0;
   }
 

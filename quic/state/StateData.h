@@ -692,8 +692,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     ~DatagramState() = default;
 
     // Move-only (due to DatagramFlowManager being move-only)
-    DatagramState(DatagramState&&) = default;
-    DatagramState& operator=(DatagramState&&) = default;
+    DatagramState(DatagramState&&) noexcept = default;
+    DatagramState& operator=(DatagramState&&) noexcept = default;
     DatagramState(const DatagramState&) = delete;
     DatagramState& operator=(const DatagramState&) = delete;
   };

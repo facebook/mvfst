@@ -21,7 +21,7 @@ struct A {
     destructor_called() = true;
   }
 
-  A(A&&) {
+  A(A&&) noexcept {
     moved = true;
   }
 
@@ -29,7 +29,7 @@ struct A {
     copied = true;
   }
 
-  A& operator=(A&&) {
+  A& operator=(A&&) noexcept {
     moveAssign = true;
     return *this;
   }
@@ -52,7 +52,7 @@ struct A {
 struct B {
   B() = default;
 
-  B(B&&) {
+  B(B&&) noexcept {
     moved = true;
   }
 

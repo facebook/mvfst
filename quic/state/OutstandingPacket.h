@@ -230,9 +230,9 @@ struct OutstandingPacket {
     declaredLost = false;
   }
 
-  OutstandingPacket(OutstandingPacket&&) = default;
+  OutstandingPacket(OutstandingPacket&&) noexcept = default;
 
-  OutstandingPacket& operator=(OutstandingPacket&&) = default;
+  OutstandingPacket& operator=(OutstandingPacket&&) noexcept = default;
 
   OutstandingPacket() = delete;
 };

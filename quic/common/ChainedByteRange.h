@@ -72,15 +72,15 @@ class ChainedByteRangeHead {
 
   ~ChainedByteRangeHead();
 
-  [[nodiscard]] bool isChained() const {
+  [[nodiscard]] bool isChained() const noexcept {
     return head_.next_ != nullptr;
   }
 
-  [[nodiscard]] bool empty() const {
+  [[nodiscard]] bool empty() const noexcept {
     return chainLength_ == 0;
   }
 
-  [[nodiscard]] size_t chainLength() const {
+  [[nodiscard]] size_t chainLength() const noexcept {
     return chainLength_;
   }
 

@@ -63,9 +63,9 @@ struct ReceivedUdpPacket {
 
     Timings() = default;
     Timings(const Timings&) = default;
-    Timings(Timings&&) = default;
+    Timings(Timings&&) noexcept = default;
     Timings& operator=(const Timings&) = default;
-    Timings& operator=(Timings&&) = default;
+    Timings& operator=(Timings&&) noexcept = default;
     ~Timings() = default;
   };
 

@@ -108,7 +108,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
   };
 
-  [[nodiscard]] bool empty() const override {
+  [[nodiscard]] bool empty() const noexcept override {
     return heap_.empty() && roundRobinElements_ == 0;
   }
 
@@ -126,7 +126,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   [[nodiscard]] PriorityLogFields toLogFields(
       const PriorityQueue::Priority& pri) const override;
 
-  [[nodiscard]] bool contains(Identifier id) const override {
+  [[nodiscard]] bool contains(Identifier id) const noexcept override {
     return find(id) != std::nullopt;
   }
 

@@ -37,8 +37,8 @@ class DatagramFlowManager {
     ~DatagramFlowQueue() = default;
 
     // Move-only
-    DatagramFlowQueue(DatagramFlowQueue&&) = default;
-    DatagramFlowQueue& operator=(DatagramFlowQueue&&) = default;
+    DatagramFlowQueue(DatagramFlowQueue&&) noexcept = default;
+    DatagramFlowQueue& operator=(DatagramFlowQueue&&) noexcept = default;
     DatagramFlowQueue(const DatagramFlowQueue&) = delete;
     DatagramFlowQueue& operator=(const DatagramFlowQueue&) = delete;
 
@@ -66,8 +66,8 @@ class DatagramFlowManager {
   ~DatagramFlowManager() = default;
 
   // Move-only
-  DatagramFlowManager(DatagramFlowManager&&) = default;
-  DatagramFlowManager& operator=(DatagramFlowManager&&) = default;
+  DatagramFlowManager(DatagramFlowManager&&) noexcept = default;
+  DatagramFlowManager& operator=(DatagramFlowManager&&) noexcept = default;
   DatagramFlowManager(const DatagramFlowManager&) = delete;
   DatagramFlowManager& operator=(const DatagramFlowManager&) = delete;
 

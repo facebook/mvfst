@@ -70,37 +70,37 @@ class PriorityQueue {
       return Identifier((uint64_t(Type::DATAGRAM) << kTypeShift) | flowID);
     }
 
-    [[nodiscard]] Type getType() const {
+    [[nodiscard]] Type getType() const noexcept {
       return Type((value & kTypeMask) >> kTypeShift);
     }
 
-    [[nodiscard]] bool isStreamID() const {
+    [[nodiscard]] bool isStreamID() const noexcept {
       return getType() == Type::STREAM;
     }
 
-    [[nodiscard]] bool isDatagramFlowID() const {
+    [[nodiscard]] bool isDatagramFlowID() const noexcept {
       return getType() == Type::DATAGRAM;
     }
 
-    [[nodiscard]] bool isInitialized() const {
+    [[nodiscard]] bool isInitialized() const noexcept {
       return getType() != Type::UNINITIALIZED;
     }
 
-    [[nodiscard]] uint64_t asStreamID() const {
+    [[nodiscard]] uint64_t asStreamID() const noexcept {
       MVCHECK(isStreamID());
       return value & ~kTypeMask;
     }
 
-    [[nodiscard]] uint32_t asDatagramFlowID() const {
+    [[nodiscard]] uint32_t asDatagramFlowID() const noexcept {
       MVCHECK(isDatagramFlowID());
       return uint32_t(value); // truncating the top works
     }
 
-    [[nodiscard]] uint64_t asUint64() const {
+    [[nodiscard]] uint64_t asUint64() const noexcept {
       return value & ~kTypeMask;
     }
 
-    bool operator==(const Identifier& other) const {
+    bool operator==(const Identifier& other) const noexcept {
       return value == other.value;
     }
 
@@ -127,7 +127,7 @@ class PriorityQueue {
 
     ~Priority() = default;
 
-    [[nodiscard]] bool isInitialized() const {
+    [[nodiscard]] bool isInitialized() const noexcept {
       return storage_ != kUninitialized;
     }
 
@@ -160,10 +160,10 @@ class PriorityQueue {
   virtual ~PriorityQueue() = default;
 
   // Returns true if the queue contains ID, false otherwise
-  [[nodiscard]] virtual bool contains(Identifier id) const = 0;
+  [[nodiscard]] virtual bool contains(Identifier id) const noexcept = 0;
 
   // Returns true if the queue contains no elements, false otherwise
-  [[nodiscard]] virtual bool empty() const = 0;
+  [[nodiscard]] virtual bool empty() const noexcept = 0;
 
   // Convert the Priority to JSON string.
   using PriorityLogFields = std::vector<std::pair<std::string, std::string>>;
@@ -229,8 +229,8 @@ class PriorityQueue {
 class PriorityQueue::Transaction {
  public:
   ~Transaction() = default;
-  Transaction(Transaction&&) = default;
-  Transaction& operator=(Transaction&&) = default;
+  Transaction(Transaction&&) noexcept = default;
+  Transaction& operator=(Transaction&&) noexcept = default;
   Transaction(const Transaction&) = delete;
   Transaction& operator=(const Transaction&) = delete;
 

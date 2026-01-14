@@ -206,7 +206,7 @@ class QuicStreamManager {
    */
   void streamStateForEach(FunctionRef<void(QuicStreamState&)> f);
 
-  [[nodiscard]] bool hasLoss() const {
+  [[nodiscard]] bool hasLoss() const noexcept {
     return numStreamsWithLoss_ > 0;
   }
 
@@ -232,7 +232,7 @@ class QuicStreamManager {
     return *writeQueue_;
   }
 
-  [[nodiscard]] bool hasWritable() const {
+  [[nodiscard]] bool hasWritable() const noexcept {
     return !writeQueue_->empty() || !controlWriteQueue_.empty();
   }
 
@@ -251,7 +251,7 @@ class QuicStreamManager {
     blockedStreams_.erase(streamId);
   }
 
-  [[nodiscard]] bool hasBlocked() const {
+  [[nodiscard]] bool hasBlocked() const noexcept {
     return !blockedStreams_.empty();
   }
 
@@ -309,7 +309,7 @@ class QuicStreamManager {
     windowUpdates_.erase(streamId);
   }
 
-  [[nodiscard]] bool hasWindowUpdates() const {
+  [[nodiscard]] bool hasWindowUpdates() const noexcept {
     return !windowUpdates_.empty();
   }
 
@@ -335,11 +335,11 @@ class QuicStreamManager {
 
   Optional<StreamId> popDeliverable();
 
-  [[nodiscard]] bool hasDeliverable() const {
+  [[nodiscard]] bool hasDeliverable() const noexcept {
     return !deliverableStreams_.empty();
   }
 
-  [[nodiscard]] bool deliverableContains(StreamId streamId) const {
+  [[nodiscard]] bool deliverableContains(StreamId streamId) const noexcept {
     return deliverableStreams_.count(streamId) > 0;
   }
 
@@ -357,11 +357,11 @@ class QuicStreamManager {
 
   Optional<StreamId> popTx();
 
-  [[nodiscard]] bool hasTx() const {
+  [[nodiscard]] bool hasTx() const noexcept {
     return !txStreams_.empty();
   }
 
-  [[nodiscard]] bool txContains(StreamId streamId) const {
+  [[nodiscard]] bool txContains(StreamId streamId) const noexcept {
     return txStreams_.count(streamId) > 0;
   }
 

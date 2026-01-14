@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 namespace quic {
 
 #define UNION_TYPE(X, ...) X X##_;
@@ -74,15 +76,21 @@ namespace quic {
   case Type::X:                        \
     return X##_ == *other.as##X();
 
+#define STATIC_ASSERT_NOTHROW_MOVE(X, ...)     \
+  static_assert(                               \
+      std::is_nothrow_move_constructible_v<X>, \
+      #X " must be nothrow move constructible");
+
 #define DECLARE_VARIANT_TYPE(NAME, X)          \
   struct NAME {                                \
+    X(STATIC_ASSERT_NOTHROW_MOVE)              \
     enum class Type { X(ENUM_TYPES) };         \
                                                \
     X(UNION_CTORS, NAME)                       \
                                                \
     X(UNION_COPY_CTORS, NAME)                  \
                                                \
-    NAME(NAME&& other) {                       \
+    NAME(NAME&& other) noexcept {              \
       switch (other.type_) {                   \
         X(UNION_MOVE_CASES, other)             \
         default:                               \
@@ -91,7 +99,7 @@ namespace quic {
       type_ = other.type_;                     \
     }                                          \
                                                \
-    NAME& operator=(NAME&& other) {            \
+    NAME& operator=(NAME&& other) noexcept {   \
       destroyVariant();                        \
       switch (other.type_) {                   \
         X(UNION_MOVE_CASES, other)             \
