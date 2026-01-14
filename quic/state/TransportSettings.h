@@ -343,9 +343,6 @@ struct TransportSettings {
   bool enableKeepalive{false};
   // Whether or not to enable WritableBytes limit (server only)
   bool enableWritableBytesLimit{false};
-  // If set to true, the users won't get new stream notification until an
-  // actual stream frame with the new stream id arrives.
-  bool notifyOnNewStreamsExplicitly{false};
   bool experimentalPacer{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};

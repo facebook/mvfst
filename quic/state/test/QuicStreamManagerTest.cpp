@@ -21,7 +21,6 @@ using namespace testing;
 namespace quic::test {
 
 struct StreamManagerTestParam {
-  bool notifyOnNewStreamsExplicitly{false};
   bool isUnidirectional{false};
 };
 
@@ -57,8 +56,6 @@ class QuicStreamManagerTest
     mockController = congestionController.get();
     conn.congestionController = std::move(congestionController);
 
-    conn.transportSettings.notifyOnNewStreamsExplicitly =
-        GetParam().notifyOnNewStreamsExplicitly;
     ASSERT_TRUE(
         conn.streamManager->refreshTransportSettings(conn.transportSettings)
             .has_value());
@@ -750,7 +747,6 @@ INSTANTIATE_TEST_SUITE_P(
     QuicStreamManagerTest,
     QuicStreamManagerTest,
     ::testing::Values(
-        StreamManagerTestParam{false, false}, // isUnidirectional = false
-        StreamManagerTestParam{true, false})); // isUnidirectional = false
+        StreamManagerTestParam{false})); // isUnidirectional = false
 
 } // namespace quic::test

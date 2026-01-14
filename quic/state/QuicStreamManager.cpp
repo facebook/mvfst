@@ -776,9 +776,6 @@ QuicStreamManager::createNextUnidirectionalStream() {
 
 QuicStreamState* FOLLY_NULLABLE
 QuicStreamManager::instantiatePeerStream(StreamId streamId) {
-  if (transportSettings_->notifyOnNewStreamsExplicitly) {
-    newPeerStreams_.push_back(streamId);
-  }
   // Use try_emplace to avoid potential double-check issues if called directly
   auto [it, inserted] = streams_.try_emplace(streamId, streamId, conn_);
 
@@ -838,16 +835,13 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
       ? maxRemoteUnidirectionalStreamId_
       : maxRemoteBidirectionalStreamId_;
 
-  // Determine where to store newly opened stream IDs for notification
-  bool notifyExplicitly = transportSettings_->notifyOnNewStreamsExplicitly;
-
   // openPeerStreamIfNotClosed checks limits and adds to the StreamIdSet
   auto openedResult = openPeerStreamIfNotClosed(
       streamId,
       openPeerStreams,
       nextAcceptableStreamId,
       maxStreamId,
-      notifyExplicitly ? nullptr : &newPeerStreams_);
+      &newPeerStreams_);
 
   // Check if the peer exceeded the stream limit
   if (openedResult == LocalErrorCode::STREAM_LIMIT_EXCEEDED) {
