@@ -32,7 +32,10 @@ target_link_libraries(
   ${Boost_LIBRARIES}
 )
 
-install(FILES QuicConstants.h QuicTypealiases.h DESTINATION include/quic/)
+install(
+  FILES QuicConstants.h QuicEnum.h QuicTypealiases.h
+  DESTINATION include/quic/
+)
 
 install(
   TARGETS mvfst_constants

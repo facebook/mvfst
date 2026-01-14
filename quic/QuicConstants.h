@@ -17,8 +17,8 @@
 
 #include <folly/chrono/Clock.h>
 #include <folly/io/Cursor.h>
+#include <quic/QuicEnum.h>
 #include <quic/QuicTypealiases.h>
-#include <quic/common/third-party/enum.h>
 #include <sys/types.h>
 #include <chrono>
 #include <cstdint>
@@ -118,9 +118,12 @@ constexpr uint64_t kDefaultQuicTransportKnobSpace = 0xfaceb001;
 // Default knob id for transport knobs (used for internal use-cases only)
 constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 
+// QUIC_ENUM expands to BETTER_ENUM on server (with ._to_string() support),
+// or plain enum class on mobile (to reduce binary size by ~6KB per enum).
 FOLLY_PUSH_WARNING
 FOLLY_CLANG_DISABLE_WARNING("-Wglobal-constructors")
-BETTER_ENUM(
+
+QUIC_ENUM(
     PacketDropReason,
     uint8_t,
     NONE,
@@ -167,7 +170,7 @@ BETTER_ENUM(
     UNKNOWN_CID_VERSION,
     CANNOT_FORWARD_DATA)
 
-BETTER_ENUM(
+QUIC_ENUM(
     TransportKnobParamId,
     uint64_t,
     // Any value not in the list below

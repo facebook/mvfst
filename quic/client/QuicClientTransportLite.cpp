@@ -372,11 +372,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         conn_->statsCallback,
         onPacketDropped,
         PacketDropReason::PROTOCOL_VIOLATION);
-    QLOG(
-        *conn_,
-        addPacketDrop,
-        packetSize,
-        PacketDropReason(PacketDropReason::PROTOCOL_VIOLATION)._to_string());
+    QLOG(*conn_, addPacketDrop, packetSize, "PROTOCOL_VIOLATION");
     return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Packet has no frames"));
   }

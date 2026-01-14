@@ -4,6 +4,42 @@ load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
 oncall("traffic_protocols")
 
 mvfst_cpp_library(
+    name = "enum",
+    headers = select({
+        "DEFAULT": {
+            "QuicEnum.h": "QuicEnum.h",
+        },
+        # Mobile: use plain enum class without BETTER_ENUM overhead (~6KB savings)
+        # ARVR Android uses BETTER_ENUM (needs TransportKnobs, etc.)
+        "ovr_config//os/constraints:android": select({
+            "DEFAULT": {
+                "QuicEnum.h": "facebook/QuicEnumMobile.h",
+            },
+            "ovr_config//build_mode/constraints:arvr_mode_enabled": {
+                "QuicEnum.h": "QuicEnum.h",
+            },
+        }),
+        "ovr_config//os/constraints:iphoneos": {
+            "QuicEnum.h": "facebook/QuicEnumMobile.h",
+        },
+    }),
+    exported_deps = select({
+        "DEFAULT": [
+            "//folly/lang:assume",
+            "//quic/common/third-party:better_enums",
+        ],
+        "ovr_config//os/constraints:android": select({
+            "DEFAULT": [],
+            "ovr_config//build_mode/constraints:arvr_mode_enabled": [
+                "//folly/lang:assume",
+                "//quic/common/third-party:better_enums",
+            ],
+        }),
+        "ovr_config//os/constraints:iphoneos": [],
+    }),
+)
+
+mvfst_cpp_library(
     name = "config",
     headers = select({
         "DEFAULT": select({
@@ -43,9 +79,9 @@ mvfst_cpp_library(
         "//folly/lang:assume",
     ],
     exported_deps = [
+        ":enum",
         "//folly/chrono:clock",
         "//folly/io:iobuf",
-        "//quic/common/third-party:better_enums",
     ],
 )
 
