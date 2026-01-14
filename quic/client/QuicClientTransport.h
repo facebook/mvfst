@@ -66,7 +66,7 @@ class QuicClientTransport : public QuicTransportBase,
     conn_->observerContainer = wrappedObserverContainer_.getWeakPtr();
   }
 
-  virtual ~QuicClientTransport() override;
+  ~QuicClientTransport() override;
 
   /**
    * Returns an un-connected QuicClientTransportLite which is self-owning.
@@ -130,7 +130,7 @@ class QuicClientTransport : public QuicTransportBase,
 
  protected:
   // From QuicSocket
-  [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
+  [[nodiscard]] SocketObserverContainer* getSocketObserverContainer()
       const override {
     return wrappedObserverContainer_.getPtr();
   }
