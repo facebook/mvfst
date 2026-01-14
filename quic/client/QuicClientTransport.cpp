@@ -402,11 +402,7 @@ void QuicClientTransport::
   happyEyeballsStartSecondSocket(clientConn_->happyEyeballsState);
   // If this gets called from the write path then we haven't added the packets
   // to the outstanding packet list yet.
-  runOnEvbAsync([&](auto) {
-    auto result = markZeroRttPacketsLost(*conn_, markPacketLoss);
-    LOG_IF(ERROR, !result.has_value())
-        << "Failed to mark 0-RTT packets as lost.";
-  });
+  runOnEvbAsyncOp({.type = AsyncOpType::MarkZeroRttPacketsLost});
 }
 
 void QuicClientTransport::cleanupHappyEyeballsState() {

@@ -1315,12 +1315,7 @@ QuicClientTransportLite::startCryptoHandshake() {
 
   if (!transportReadyNotified_ && clientConn_->zeroRttWriteCipher) {
     transportReadyNotified_ = true;
-    runOnEvbAsync([](auto self) {
-      auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-      if (clientPtr->connSetupCallback_) {
-        clientPtr->connSetupCallback_->onTransportReady();
-      }
-    });
+    runOnEvbAsyncOp({.type = AsyncOpType::TransportReady});
   } else if (clientConn_->transportSettings.isPriming) {
     auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
     if (clientPtr->connSetupCallback_) {
@@ -1879,26 +1874,46 @@ void QuicClientTransportLite::setSupportedVersions(
   conn_->readCodec->setCodecParameters(params);
 }
 
-void QuicClientTransportLite::runOnEvbAsync(
-    std::function<void(std::shared_ptr<QuicClientTransportLite>)> func) {
-  auto evb = getEventBase();
-  evb->runInLoop(
-      [self = sharedGuardClient(), func = std::move(func), evb]() mutable {
-        if (self->getEventBase() != evb) {
-          // The eventbase changed between scheduling the loop and invoking
-          // the callback, ignore this
-          return;
-        }
-        func(std::move(self));
-      },
-      true);
+void QuicClientTransportLite::dispatchAsyncOp(AsyncOpData data) {
+  switch (data.type) {
+    case AsyncOpType::TransportReady:
+      if (connSetupCallback_) {
+        connSetupCallback_->onTransportReady();
+      }
+      break;
+    case AsyncOpType::AsyncClose:
+      if (data.error) {
+        closeImpl(std::move(*data.error), false, false);
+      }
+      break;
+    case AsyncOpType::MarkZeroRttPacketsLost: {
+      auto result = markZeroRttPacketsLost(*conn_, markPacketLoss);
+      LOG_IF(ERROR, !result.has_value())
+          << "Failed to mark 0-RTT packets as lost.";
+      break;
+    }
+    case AsyncOpType::RemoveNonCurrentPathClient: {
+      // Remove a path that is not the current path after validation callback.
+      // The path may have become current if the callback migrated to it.
+      auto pathId = data.pathId;
+      if (conn_->currentPathId == pathId) {
+        return;
+      }
+      auto removeRes = conn_->pathManager->removePath(pathId);
+      if (removeRes.hasError()) {
+        MVLOG_WARNING << "Failed to remove path " << pathId
+                      << " after validation: " << removeRes.error();
+      }
+      break;
+    }
+    default:
+      QuicTransportBaseLite::dispatchAsyncOp(data);
+      break;
+  }
 }
 
 void QuicClientTransportLite::asyncClose(QuicError error) {
-  runOnEvbAsync([error = std::move(error)](auto self) {
-    auto clientPtr = static_cast<QuicClientTransportLite*>(self.get());
-    clientPtr->closeImpl(std::move(error), false, false);
-  });
+  runOnEvbAsyncOp({.type = AsyncOpType::AsyncClose, .error = std::move(error)});
 }
 
 void QuicClientTransportLite::onNetworkSwitch(
@@ -2276,18 +2291,9 @@ void QuicClientTransportLite::onPathValidationResult(const PathInfo& pathInfo) {
     // The upper layer should decide to migrate or not in the callback. After
     // the callback, if this path is not the current one, remove it to avoid
     // dangling paths/sockets.
-    evb_->runInLoop(
-        [&, pathId = pathInfo.id]() {
-          if (conn_->currentPathId == pathId) {
-            return;
-          }
-          auto removeRes = conn_->pathManager->removePath(pathId);
-          if (removeRes.hasError()) {
-            MVLOG_WARNING << "Failed to remove path " << pathId
-                          << " after validation: " << removeRes.error();
-          }
-        },
-        /*thisIteration=*/true);
+    runOnEvbAsyncOp(
+        {.type = AsyncOpType::RemoveNonCurrentPathClient,
+         .pathId = pathInfo.id});
   } else if (pathInfo.status != PathStatus::Validated) {
     // This is the current path and it has failed validation, we need to close
     // the connection.

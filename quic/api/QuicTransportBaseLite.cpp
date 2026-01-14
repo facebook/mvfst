@@ -577,18 +577,7 @@ QuicTransportBaseLite::notifyPendingWriteOnConnection(
   // the connection while we are still scheduled, the write callback will get
   // an error synchronously.
   connWriteCallback_ = wcb;
-  runOnEvbAsync([](auto self) {
-    if (!self->connWriteCallback_) {
-      // The connection was probably closed.
-      return;
-    }
-    auto connWritableBytes = self->maxWritableOnConn();
-    if (connWritableBytes != 0) {
-      auto connWriteCallback = self->connWriteCallback_;
-      self->connWriteCallback_ = nullptr;
-      connWriteCallback->onConnectionWriteReady(connWritableBytes);
-    }
-  });
+  runOnEvbAsyncOp({.type = AsyncOpType::ConnectionWriteReady});
   return {};
 }
 
@@ -671,32 +660,7 @@ QuicTransportBaseLite::notifyPendingWriteOnStream(
       return quic::make_unexpected(LocalErrorCode::CALLBACK_ALREADY_INSTALLED);
     }
   }
-  runOnEvbAsync([id](auto self) {
-    auto wcbIt = self->pendingWriteCallbacks_.find(id);
-    if (wcbIt == self->pendingWriteCallbacks_.end()) {
-      // the connection was probably closed.
-      return;
-    }
-    auto writeCallback = wcbIt->second;
-    auto* stream = self->conn_->streamManager->getStreamIfExists(id);
-    if (!stream) {
-      self->pendingWriteCallbacks_.erase(wcbIt);
-      writeCallback->onStreamWriteError(
-          id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
-      return;
-    }
-    if (!stream->writable()) {
-      self->pendingWriteCallbacks_.erase(wcbIt);
-      writeCallback->onStreamWriteError(
-          id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
-      return;
-    }
-    auto maxCanWrite = self->maxWritableOnStream(*stream);
-    if (maxCanWrite != 0) {
-      self->pendingWriteCallbacks_.erase(wcbIt);
-      writeCallback->onStreamWriteReady(id, maxCanWrite);
-    }
-  });
+  runOnEvbAsyncOp({.type = AsyncOpType::StreamWriteReady, .streamId = id});
   return {};
 }
 
@@ -773,37 +737,12 @@ QuicTransportBaseLite::registerByteEventCallback(
       break;
   }
   if (maxOffsetReady.has_value() && (offset <= *maxOffsetReady)) {
-    runOnEvbAsync([id, cb, offset, type](auto selfObj) {
-      if (selfObj->closeState_ != CloseState::OPEN) {
-        // Close will error out all byte event callbacks.
-        return;
-      }
-
-      auto& byteEventMapL = selfObj->getByteEventMap(type);
-      auto streamByteEventCbIt = byteEventMapL.find(id);
-      if (streamByteEventCbIt == byteEventMapL.end()) {
-        return;
-      }
-
-      // This is scheduled to run in the future (during the next iteration of
-      // the event loop). It is possible that the ByteEventDetail list gets
-      // mutated between the time it was scheduled to now when we are ready to
-      // run it. Look at the current outstanding ByteEvents for this stream ID
-      // and confirm that our ByteEvent's offset and recipient callback are
-      // still present.
-      auto pos = std::find_if(
-          streamByteEventCbIt->second.begin(),
-          streamByteEventCbIt->second.end(),
-          [offset, cb](const ByteEventDetail& p) {
-            return ((p.offset == offset) && (p.callback == cb));
-          });
-      // if our byteEvent is not present, it must have been delivered already.
-      if (pos == streamByteEventCbIt->second.end()) {
-        return;
-      }
-      streamByteEventCbIt->second.erase(pos);
-
-      cb->onByteEvent(ByteEvent{id, offset, type});
+    runOnEvbAsyncOp({
+        .type = AsyncOpType::ByteEventReady,
+        .streamId = id,
+        .offset = offset,
+        .byteEventType = type,
+        .callback = cb,
     });
   }
   return {};
@@ -835,7 +774,7 @@ void QuicTransportBaseLite::setConnectionCallback(
     folly::MaybeManagedPtr<ConnectionCallback> callback) {
   connCallback_ = callback;
   if (connCallback_) {
-    runOnEvbAsync([](auto self) { self->processCallbacksAfterNetworkData(); });
+    runOnEvbAsyncOp({.type = AsyncOpType::ProcessCallbacksAfterNetworkData});
   }
 }
 
@@ -1104,19 +1043,111 @@ QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
       stream->flowControlState.advertisedMaxOffset);
 }
 
-void QuicTransportBaseLite::runOnEvbAsync(
-    std::function<void(std::shared_ptr<QuicTransportBaseLite>)> func) {
+void QuicTransportBaseLite::runOnEvbAsyncOp(AsyncOpData data) {
   auto evb = getEventBase();
   evb->runInLoop(
-      [self = sharedGuard(), func = std::move(func), evb]() mutable {
+      [self = sharedGuard(), data, evb]() mutable {
         if (self->getEventBase() != evb) {
           // The eventbase changed between scheduling the loop and invoking
           // the callback, ignore this
           return;
         }
-        func(std::move(self));
+        self->dispatchAsyncOp(data);
       },
       true);
+}
+
+void QuicTransportBaseLite::dispatchAsyncOp(AsyncOpData data) {
+  switch (data.type) {
+    case AsyncOpType::ProcessCallbacksAfterNetworkData:
+      processCallbacksAfterNetworkData();
+      break;
+    case AsyncOpType::ConnectionWriteReady: {
+      if (!connWriteCallback_) {
+        // The connection was probably closed.
+        return;
+      }
+      auto connWritableBytes = maxWritableOnConn();
+      if (connWritableBytes != 0) {
+        auto connWriteCallback = connWriteCallback_;
+        connWriteCallback_ = nullptr;
+        connWriteCallback->onConnectionWriteReady(connWritableBytes);
+      }
+      break;
+    }
+    case AsyncOpType::StreamWriteReady: {
+      auto id = data.streamId;
+      auto wcbIt = pendingWriteCallbacks_.find(id);
+      if (wcbIt == pendingWriteCallbacks_.end()) {
+        // the connection was probably closed.
+        return;
+      }
+      auto writeCallback = wcbIt->second;
+      auto* stream = conn_->streamManager->getStreamIfExists(id);
+      if (!stream) {
+        pendingWriteCallbacks_.erase(wcbIt);
+        writeCallback->onStreamWriteError(
+            id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
+        return;
+      }
+      if (!stream->writable()) {
+        pendingWriteCallbacks_.erase(wcbIt);
+        writeCallback->onStreamWriteError(
+            id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
+        return;
+      }
+      auto maxCanWrite = maxWritableOnStream(*stream);
+      if (maxCanWrite != 0) {
+        pendingWriteCallbacks_.erase(wcbIt);
+        writeCallback->onStreamWriteReady(id, maxCanWrite);
+      }
+      break;
+    }
+    case AsyncOpType::ByteEventReady: {
+      if (closeState_ != CloseState::OPEN) {
+        // Close will error out all byte event callbacks.
+        return;
+      }
+
+      auto id = data.streamId;
+      auto offset = data.offset;
+      auto type = data.byteEventType;
+      auto cb = data.callback;
+
+      auto& byteEventMapL = getByteEventMap(type);
+      auto streamByteEventCbIt = byteEventMapL.find(id);
+      if (streamByteEventCbIt == byteEventMapL.end()) {
+        return;
+      }
+
+      // This is scheduled to run in the future (during the next iteration of
+      // the event loop). It is possible that the ByteEventDetail list gets
+      // mutated between the time it was scheduled to now when we are ready to
+      // run it. Look at the current outstanding ByteEvents for this stream ID
+      // and confirm that our ByteEvent's offset and recipient callback are
+      // still present.
+      auto pos = std::find_if(
+          streamByteEventCbIt->second.begin(),
+          streamByteEventCbIt->second.end(),
+          [offset, cb](const ByteEventDetail& p) {
+            return ((p.offset == offset) && (p.callback == cb));
+          });
+      // if our byteEvent is not present, it must have been delivered already.
+      if (pos == streamByteEventCbIt->second.end()) {
+        return;
+      }
+      streamByteEventCbIt->second.erase(pos);
+
+      cb->onByteEvent(ByteEvent{id, offset, type});
+      break;
+    }
+    case AsyncOpType::TransportReady:
+    case AsyncOpType::MarkZeroRttPacketsLost:
+    case AsyncOpType::AsyncClose:
+    case AsyncOpType::RemoveNonCurrentPathClient:
+      // Handled by derived class override
+      break;
+  }
 }
 
 void QuicTransportBaseLite::updateWriteLooper(bool thisIteration) {

@@ -367,8 +367,24 @@ class QuicClientTransportLite
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
 
-  void runOnEvbAsync(
-      std::function<void(std::shared_ptr<QuicClientTransportLite>)> func);
+  // Override dispatchAsyncOp to handle client-specific operations
+  void dispatchAsyncOp(AsyncOpData data) override;
+
+  // Template-based async dispatch for complex cases with custom captures
+  template <typename F>
+  void runOnEvbAsync(F&& func) {
+    auto evb = getEventBase();
+    evb->runInLoop(
+        [self = sharedGuardClient(),
+         func = std::forward<F>(func),
+         evb]() mutable {
+          if (self->getEventBase() != evb) {
+            return;
+          }
+          func(std::move(self));
+        },
+        true);
+  }
 
   folly::SocketOptionMap socketOptions_;
 

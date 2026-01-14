@@ -27,6 +27,30 @@ std::ostream& operator<<(std::ostream& out, const LooperType& rhs);
 
 enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
 
+// Async operation types for enum-based dispatch (reduces binary size vs
+// std::function)
+enum class AsyncOpType : uint8_t {
+  ProcessCallbacksAfterNetworkData,
+  ConnectionWriteReady,
+  StreamWriteReady,
+  ByteEventReady,
+  TransportReady,
+  MarkZeroRttPacketsLost,
+  AsyncClose,
+  RemoveNonCurrentPathClient,
+};
+
+// Data for async operations - captures needed state without type erasure
+struct AsyncOpData {
+  AsyncOpType type;
+  StreamId streamId{0};
+  uint64_t offset{0};
+  ByteEvent::Type byteEventType{ByteEvent::Type::TX};
+  ByteEventCallback* callback{nullptr};
+  PathIdType pathId{0};
+  Optional<QuicError> error{};
+};
+
 class QuicTransportBaseLite : virtual public QuicSocketLite,
                               QuicAsyncUDPSocket::WriteCallback {
  public:
@@ -682,8 +706,23 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   quic::Expected<StreamId, LocalErrorCode> createStreamInternal(
       bool bidirectional);
 
-  void runOnEvbAsync(
-      std::function<void(std::shared_ptr<QuicTransportBaseLite>)> func);
+  // Enum-based async dispatch for binary size optimization
+  void runOnEvbAsyncOp(AsyncOpData data);
+  virtual void dispatchAsyncOp(AsyncOpData data);
+
+  // Template-based async dispatch for complex cases with custom captures
+  template <typename F>
+  void runOnEvbAsync(F&& func) {
+    auto evb = getEventBase();
+    evb->runInLoop(
+        [self = sharedGuard(), func = std::forward<F>(func), evb]() mutable {
+          if (self->getEventBase() != evb) {
+            return;
+          }
+          func(std::move(self));
+        },
+        true);
+  }
 
   void updateWriteLooper(bool thisIteration);
   void updateReadLooper();
