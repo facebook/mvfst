@@ -29,6 +29,8 @@
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
 
+#include <memory>
+
 using namespace folly;
 // using namespace folly::test;
 using namespace testing;
@@ -101,8 +103,8 @@ class QuicTransportTest : public Test {
         .WillByDefault(Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*socket_, applyOptions(_, _))
         .WillByDefault(Return(quic::Expected<void, QuicError>{}));
-    transport_.reset(new TestQuicTransport(
-        qEvb_, std::move(sock), &connSetupCallback_, &connCallback_));
+    transport_ = std::make_shared<TestQuicTransport>(
+        qEvb_, std::move(sock), &connSetupCallback_, &connCallback_);
     // Set the write handshake state to tell the client that the handshake has
     // a cipher.
     auto aead = createNoOpAead();
