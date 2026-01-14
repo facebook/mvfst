@@ -873,7 +873,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   UnorderedMap<StreamId, ReadCallbackData> readCallbacks_;
 
   ConnectionWriteCallback* connWriteCallback_{nullptr};
-  std::map<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
+  UnorderedMap<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
 
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
