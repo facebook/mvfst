@@ -24,7 +24,7 @@ std::unique_ptr<folly::IOBuf> getProtectionKey();
 
 class MockPacketNumberCipher : public PacketNumberCipher {
  public:
-  virtual ~MockPacketNumberCipher() = default;
+  ~MockPacketNumberCipher() override = default;
 
   MOCK_METHOD((quic::Expected<void, QuicError>), setKey, (ByteRange key));
   MOCK_METHOD(
