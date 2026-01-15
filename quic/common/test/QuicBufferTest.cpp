@@ -56,9 +56,9 @@ TEST(QuicBufferTest, TestAppendToChain) {
 }
 
 TEST(QuicBufferTest, TestAppendChain) {
-  const uint8_t* data1 = (const uint8_t*)"hello";
-  const uint8_t* data2 = (const uint8_t*)"my";
-  const uint8_t* data3 = (const uint8_t*)"friend";
+  const auto* data1 = (const uint8_t*)"hello";
+  const auto* data2 = (const uint8_t*)"my";
+  const auto* data3 = (const uint8_t*)"friend";
 
   auto quicBuffer1 = QuicBuffer::wrapBuffer((void*)data1, 5);
   auto quicBuffer2 = QuicBuffer::wrapBuffer((void*)data2, 2);
@@ -276,7 +276,7 @@ TEST(QuicBufferTest, TestCloneCoalescedAllEmpty) {
 }
 
 TEST(QuicBufferTest, TestAdvance) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer1 = QuicBuffer::create(100);
   memcpy(quicBuffer1->writableData(), data, 5);
   quicBuffer1->append(5);
@@ -287,7 +287,7 @@ TEST(QuicBufferTest, TestAdvance) {
 }
 
 TEST(QuicBufferTest, TestAdvanceNotEnoughRoom) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer1 = QuicBuffer::create(6);
   memcpy(quicBuffer1->writableData(), data, 5);
   quicBuffer1->append(5);
@@ -296,7 +296,7 @@ TEST(QuicBufferTest, TestAdvanceNotEnoughRoom) {
 }
 
 TEST(QuicBufferTest, TestRetreat) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer1 = QuicBuffer::copyBuffer(data, 5, 3);
   const uint8_t* originalBufData = quicBuffer1->data();
   EXPECT_EQ(quicBuffer1->length(), 5);
@@ -313,13 +313,13 @@ TEST(QuicBufferTest, TestRetreat) {
 }
 
 TEST(QuicBufferTest, TestRetreatNotEnoughRoom) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer1 = QuicBuffer::copyBuffer(data, 5, 3);
   EXPECT_DEATH(quicBuffer1->retreat(5), "");
 }
 
 TEST(QuicBufferTest, TestIsSharedOne) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer1 = QuicBuffer::wrapBuffer((void*)data, 5);
   EXPECT_TRUE(quicBuffer1->isSharedOne());
 
@@ -333,7 +333,7 @@ TEST(QuicBufferTest, TestIsSharedOne) {
 }
 
 TEST(QuicBufferTest, TestIsShared) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer1 = QuicBuffer::copyBuffer(data, 5);
   auto quicBuffer2 = QuicBuffer::copyBuffer(data, 5);
   quicBuffer1->appendToChain(std::move(quicBuffer2));
@@ -346,7 +346,7 @@ TEST(QuicBufferTest, TestIsShared) {
 }
 
 TEST(QuicBufferTest, TestCopyBufferSpan) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   ByteRange range(data, 5);
   auto quicBuffer =
       QuicBuffer::copyBuffer(range, 1 /*headroom*/, 3 /*tailroom*/);
@@ -365,7 +365,7 @@ TEST(QuicBufferTest, TestCopyBufferString) {
 }
 
 TEST(QuicBufferTest, TestCopyBufferPointerAndSize) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer =
       QuicBuffer::copyBuffer(data, 5 /*size*/, 1 /*headroom*/, 3 /*tailroom*/);
   EXPECT_EQ(quicBuffer->length(), 5);
@@ -409,9 +409,9 @@ TEST(QuicBufferTest, TestComputeChainDataLength) {
 }
 
 TEST(QuicBufferTest, TestCoalesce) {
-  const uint8_t* data1 = (const uint8_t*)"hello";
-  const uint8_t* data2 = (const uint8_t*)"my";
-  const uint8_t* data3 = (const uint8_t*)"friend";
+  const auto* data1 = (const uint8_t*)"hello";
+  const auto* data2 = (const uint8_t*)"my";
+  const auto* data3 = (const uint8_t*)"friend";
 
   auto quicBuffer1 =
       QuicBuffer::copyBuffer(data1, 5 /* size */, 2 /* headroom */);
@@ -431,9 +431,9 @@ TEST(QuicBufferTest, TestCoalesce) {
 }
 
 TEST(QuicBufferTest, TestCountChainElements) {
-  const uint8_t* data1 = (const uint8_t*)"hello";
-  const uint8_t* data2 = (const uint8_t*)"my";
-  const uint8_t* data3 = (const uint8_t*)"friend";
+  const auto* data1 = (const uint8_t*)"hello";
+  const auto* data2 = (const uint8_t*)"my";
+  const auto* data3 = (const uint8_t*)"friend";
 
   auto quicBuffer1 = QuicBuffer::copyBuffer(data1, 5 /* size */);
   EXPECT_EQ(quicBuffer1->countChainElements(), 1);
@@ -448,7 +448,7 @@ TEST(QuicBufferTest, TestCountChainElements) {
 }
 
 TEST(QuicBufferTest, TestTrimStart) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
 
   auto quicBuffer = QuicBuffer::copyBuffer(data, 5 /* size */);
   quicBuffer->trimStart(2);
@@ -459,7 +459,7 @@ TEST(QuicBufferTest, TestTrimStart) {
 }
 
 TEST(QuicBufferTest, TestTrimEnd) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
 
   auto quicBuffer = QuicBuffer::copyBuffer(data, 5 /* size */);
   quicBuffer->trimEnd(2);
@@ -470,7 +470,7 @@ TEST(QuicBufferTest, TestTrimEnd) {
 }
 
 TEST(QuicBufferTest, TestPopOneChainElement) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
 
   auto quicBuffer = QuicBuffer::copyBuffer(data, 5 /* size */);
   auto result = quicBuffer->pop();
@@ -480,9 +480,9 @@ TEST(QuicBufferTest, TestPopOneChainElement) {
 }
 
 TEST(QuicBufferTest, TestPopManyChainElements) {
-  const uint8_t* data1 = (const uint8_t*)"hello";
-  const uint8_t* data2 = (const uint8_t*)"my";
-  const uint8_t* data3 = (const uint8_t*)"friend";
+  const auto* data1 = (const uint8_t*)"hello";
+  const auto* data2 = (const uint8_t*)"my";
+  const auto* data3 = (const uint8_t*)"friend";
 
   auto quicBuffer1 = QuicBuffer::copyBuffer(data1, 5 /* size */);
   EXPECT_EQ(quicBuffer1->countChainElements(), 1);
@@ -606,7 +606,7 @@ TEST(QuicBufferTest, TestIterator) {
 }
 
 TEST(QuicBufferTest, TestRange) {
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   ByteRange range(data, 5);
   EXPECT_FALSE(range.empty());
   EXPECT_EQ(range.begin(), data);
@@ -1132,7 +1132,7 @@ TEST(QuicBufferTest, TestWrapIovChainIntegrity) {
 
 TEST(QuicBufferTest, TestPrepend) {
   // Create a buffer with headroom
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer = QuicBuffer::copyBuffer(data, 5, 10, 0);
 
   EXPECT_EQ(quicBuffer->length(), 5);
@@ -1156,7 +1156,7 @@ TEST(QuicBufferTest, TestPrepend) {
 
 TEST(QuicBufferTest, TestPrependWithDataPopulation) {
   // Create a buffer with headroom
-  const uint8_t* data = (const uint8_t*)"world";
+  const auto* data = (const uint8_t*)"world";
   auto quicBuffer = QuicBuffer::copyBuffer(data, 5, 6, 0);
 
   EXPECT_EQ(quicBuffer->length(), 5);
@@ -1175,7 +1175,7 @@ TEST(QuicBufferTest, TestPrependWithDataPopulation) {
 
 TEST(QuicBufferTest, TestPrependZeroBytes) {
   // Create a buffer with headroom
-  const uint8_t* data = (const uint8_t*)"test";
+  const auto* data = (const uint8_t*)"test";
   auto quicBuffer = QuicBuffer::copyBuffer(data, 4, 5, 0);
 
   const uint8_t* originalData = quicBuffer->data();
@@ -1193,7 +1193,7 @@ TEST(QuicBufferTest, TestPrependZeroBytes) {
 
 TEST(QuicBufferTest, TestPrependInsufficientHeadroom) {
   // Create a buffer with limited headroom
-  const uint8_t* data = (const uint8_t*)"hello";
+  const auto* data = (const uint8_t*)"hello";
   auto quicBuffer = QuicBuffer::copyBuffer(data, 5, 3, 0);
 
   EXPECT_EQ(quicBuffer->headroom(), 3);
@@ -1204,7 +1204,7 @@ TEST(QuicBufferTest, TestPrependInsufficientHeadroom) {
 
 TEST(QuicBufferTest, TestPrependMultipleTimes) {
   // Create a buffer with ample headroom
-  const uint8_t* data = (const uint8_t*)"end";
+  const auto* data = (const uint8_t*)"end";
   auto quicBuffer = QuicBuffer::copyBuffer(data, 3, 10, 0);
 
   const uint8_t* originalData = quicBuffer->data();
@@ -1227,7 +1227,7 @@ TEST(QuicBufferTest, TestPrependMultipleTimes) {
 
 TEST(QuicBufferTest, TestPrependExhaustHeadroom) {
   // Create a buffer with specific headroom
-  const uint8_t* data = (const uint8_t*)"data";
+  const auto* data = (const uint8_t*)"data";
   auto quicBuffer = QuicBuffer::copyBuffer(data, 4, 8, 0);
 
   EXPECT_EQ(quicBuffer->headroom(), 8);
