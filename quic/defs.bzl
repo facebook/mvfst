@@ -69,6 +69,11 @@ def _compute_header_namespace():
     base_path = native.package_name()
     return base_path[6:]
 
+def gen_select(select_args = {}):
+    if native.package_name().startswith("xplat/"):
+        select_args.pop("ovr_config//runtime/constraints:fbcode", 0)
+    return select(select_args)
+
 def mvfst_cpp_library(
         name,
         compiler_flags = [],
