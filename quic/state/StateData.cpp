@@ -7,7 +7,6 @@
 
 #include <quic/codec/QuicInteger.h>
 #include <quic/common/Expected.h>
-#include <quic/common/MvfstLogging.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
