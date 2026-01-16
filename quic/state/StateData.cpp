@@ -144,7 +144,7 @@ void QuicConnectionStateBase::retirePeerConnectionId(ConnectionId peerCid) {
     return;
   }
 
-  pendingEvents.frames.push_back(
+  pendingEvents.frames.emplace_back(
       RetireConnectionIdFrame(cidData->sequenceNumber));
 
   peerConnectionIds.erase(cidData);
