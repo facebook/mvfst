@@ -111,6 +111,7 @@ mvfst_cpp_library(
         "//fizz/crypto/test:TestUtil",
         "//fizz/protocol/clock/test:mock_clock",
         "//fizz/protocol/test:mocks",
+        "//fizz/server:cert_manager",
         "//quic/api:transport_helpers",
         "//quic/common:mvfst_logging",
         "//quic/common:string_utils",

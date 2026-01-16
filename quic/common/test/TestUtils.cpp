@@ -12,6 +12,7 @@
 #include <fizz/crypto/test/TestUtil.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <fizz/protocol/test/Mocks.h>
+#include <fizz/server/DefaultCertManager.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
@@ -148,7 +149,7 @@ std::shared_ptr<fizz::client::FizzClientContext> createClientCtx() {
 
 std::shared_ptr<fizz::server::FizzServerContext> createServerCtx() {
   auto cert = readCert();
-  auto certManager = std::make_unique<fizz::server::CertManager>();
+  auto certManager = std::make_unique<fizz::server::DefaultCertManager>();
   certManager->addCertAndSetDefault(std::move(cert));
   auto serverCtx = std::make_shared<fizz::server::FizzServerContext>();
   serverCtx->setFactory(std::make_shared<QuicFizzFactory>());
@@ -269,7 +270,7 @@ QuicCachedPsk setupZeroRttOnClientCtx(
 
 void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx) {
   auto cert = readCert();
-  auto certManager = std::make_unique<fizz::server::CertManager>();
+  auto certManager = std::make_unique<fizz::server::DefaultCertManager>();
   certManager->addCertAndSetDefault(std::move(cert));
   ctx.setCertManager(std::move(certManager));
 }
