@@ -9,7 +9,6 @@
 #include <quic/congestion_control/Copa2.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
-#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
 
 namespace quic {
