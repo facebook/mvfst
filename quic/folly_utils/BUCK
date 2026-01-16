@@ -1,4 +1,4 @@
-load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
 
 oncall("traffic_protocols")
 
@@ -14,5 +14,34 @@ mvfst_cpp_library(
     exported_deps = [
         "//folly/io:iobuf",
         "//quic/common:optional",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "buf_conv",
+    srcs = [
+        "BufConv.cpp",
+    ],
+    headers = [
+        "BufConv.h",
+    ],
+    tests = [
+        ":buf_conv_test",
+    ],
+    exported_deps = [
+        "//folly/io:iobuf",
+        "//quic/common:quic_buffer",
+    ],
+)
+
+mvfst_cpp_test(
+    name = "buf_conv_test",
+    srcs = [
+        "test/BufConvTest.cpp",
+    ],
+    deps = [
+        ":buf_conv",
+        "//folly/io:iobuf",
+        "//quic/common:quic_buffer",
     ],
 )
