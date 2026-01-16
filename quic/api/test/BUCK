@@ -76,7 +76,6 @@ mvfst_cpp_test(
         "//folly/portability:gtest",
         "//quic:constants",
         "//quic/api:transport",
-        "//quic/codec:pktbuilder",
         "//quic/codec:types",
         "//quic/common/events:folly_eventbase",
         "//quic/common/test:test_utils",

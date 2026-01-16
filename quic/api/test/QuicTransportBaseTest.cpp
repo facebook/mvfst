@@ -14,7 +14,6 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
-#include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
