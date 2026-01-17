@@ -42,16 +42,13 @@ mvfst_cpp_library(
 mvfst_cpp_library(
     name = "config",
     headers = select({
-        # @oss-only: "DEFAULT": {"mvfst-config.h": "//:mvfst-config.h"},
-        "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
-        "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-        "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-        "ovr_config//os/constraints:macos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-        "ovr_config//runtime/constraints:fbcode": select({
-            "DEFAULT": {"mvfst-config.h": "facebook/mvfst-config-fbcode.h"},  # @fb-only
-            "ovr_config//build_mode:arvr_mode": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
-            "ovr_config//runtime/constraints:android-host-test": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
-        }),  # @fb-only
+        "DEFAULT": select({
+            # @oss-only: "DEFAULT": {"mvfst-config.h": "//:mvfst-config.h"},
+            "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
+            "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+            "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+            "ovr_config//os/constraints:macos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+        }),
     }),
     exported_deps = select({
         "DEFAULT": [
