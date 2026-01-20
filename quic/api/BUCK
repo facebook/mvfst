@@ -232,9 +232,6 @@ mvfst_cpp_library(
         "//quic/state:stats_callback",
         "//quic/state:stream_functions",
     ],
-    exported_external_deps = [
-        "boost",
-    ],
 )
 
 mvfst_cpp_library(

@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <boost/iterator/iterator_facade.hpp>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicAckScheduler.h>

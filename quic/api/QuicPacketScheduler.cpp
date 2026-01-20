@@ -23,21 +23,21 @@ class MiddleStartingIterationWrapper {
  public:
   using MapType = std::set<StreamId>;
 
-  class MiddleStartingIterator
-      : public boost::iterator_facade<
-            MiddleStartingIterator,
-            const MiddleStartingIterationWrapper::MapType::value_type,
-            boost::forward_traversal_tag> {
-    friend class boost::iterator_core_access;
-
+  class MiddleStartingIterator {
    public:
-    using MapType = MiddleStartingIterationWrapper::MapType;
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = MapType::value_type;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const value_type*;
+    using reference = const value_type&;
+
+    using InnerMapType = MiddleStartingIterationWrapper::MapType;
 
     MiddleStartingIterator() = delete;
 
     MiddleStartingIterator(
-        const MapType* streams,
-        const MapType::key_type& start)
+        const InnerMapType* streams,
+        const InnerMapType::key_type& start)
         : streams_(streams) {
       itr_ = streams_->lower_bound(start);
       checkForWrapAround();
@@ -46,7 +46,9 @@ class MiddleStartingIterationWrapper {
       wrappedAround_ = false;
     }
 
-    MiddleStartingIterator(const MapType* streams, MapType::const_iterator itr)
+    MiddleStartingIterator(
+        const InnerMapType* streams,
+        InnerMapType::const_iterator itr)
         : streams_(streams), itr_(itr) {
       checkForWrapAround();
       // We don't want to mark it as wrapped around initially, instead just
@@ -54,23 +56,39 @@ class MiddleStartingIterationWrapper {
       wrappedAround_ = false;
     }
 
-    [[nodiscard]] const MapType::value_type& dereference() const {
+    [[nodiscard]] reference operator*() const {
       return *itr_;
     }
 
-    [[nodiscard]] MapType::const_iterator rawIterator() const {
-      return itr_;
+    [[nodiscard]] pointer operator->() const {
+      return &(*itr_);
     }
 
-    [[nodiscard]] bool equal(const MiddleStartingIterator& other) const {
+    MiddleStartingIterator& operator++() {
+      ++itr_;
+      checkForWrapAround();
+      return *this;
+    }
+
+    MiddleStartingIterator operator++(int) {
+      MiddleStartingIterator tmp(*this);
+      ++(*this);
+      return tmp;
+    }
+
+    [[nodiscard]] bool operator==(const MiddleStartingIterator& other) const {
       return wrappedAround_ == other.wrappedAround_ && itr_ == other.itr_;
     }
 
-    void increment() {
-      ++itr_;
-      checkForWrapAround();
+    [[nodiscard]] bool operator!=(const MiddleStartingIterator& other) const {
+      return !(*this == other);
     }
 
+    [[nodiscard]] InnerMapType::const_iterator rawIterator() const {
+      return itr_;
+    }
+
+   private:
     void checkForWrapAround() {
       if (itr_ == streams_->cend()) {
         wrappedAround_ = true;
@@ -78,11 +96,10 @@ class MiddleStartingIterationWrapper {
       }
     }
 
-   private:
     friend class MiddleStartingIterationWrapper;
     bool wrappedAround_{false};
-    const MapType* streams_{nullptr};
-    MapType::const_iterator itr_;
+    const InnerMapType* streams_{nullptr};
+    InnerMapType::const_iterator itr_;
   };
 
   MiddleStartingIterationWrapper(
