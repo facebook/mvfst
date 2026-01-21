@@ -234,7 +234,9 @@ QUIC_ENUM(
     // Controls the max number of PTOs to send before closing the connection
     MAX_PTO = 0x10012,
     // Controls buffer reset behavior in the ContinuousMemory write path
-    CONTINUOUS_MEMORY_RESET = 0x10013)
+    CONTINUOUS_MEMORY_RESET = 0x10013,
+    // Skip packets with non-monotonic receive timestamps
+    SKIP_NON_MONOTONIC_TIMESTAMPS = 0x10014)
 
 FOLLY_POP_WARNING
 
