@@ -395,6 +395,10 @@ struct TransportSettings {
   // are enabled or not and should not a part of
   //  maybeAckReceiveTimestampsConfigSentToPeer optional.
   uint64_t maxReceiveTimestampsPerAckStored{kMaxReceivedPktsTimestampsStored};
+  // Whether to skip adding packets with non-monotonic receive timestamps to
+  // recvdPacketInfos. When enabled, packets with receive times earlier than
+  // the last entry are not added to preserve timestamp monotonicity.
+  bool skipNonMonotonicPacketTimestamps{false};
   // Close the connection completely if a migration occurs during the handshake.
   bool closeIfMigrationDuringHandshake{true};
   // Whether to use writable bytes to apply app backpressure via the callbacks

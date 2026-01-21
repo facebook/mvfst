@@ -266,8 +266,11 @@ struct WriteAckFrameState {
   // The packet number of entries in the deque is guaranteed to increase
   // monotonically because an entry is only added for a received packet
   // if the packet number is greater than the packet number of the last
-  // element in the deque (e.g., entries are not added for packets that
-  // arrive out of order relative to previously received packets).
+  // element in the deque.
+  //
+  // When skipNonMonotonicPacketTimestamps is enabled, receive timestamps
+  // are also guaranteed to increase monotonically. Packets with receive
+  // times earlier than the last entry are skipped to preserve this invariant.
   CircularDeque<ReceivedPacket> recvdPacketInfos;
   // The count of ECN marks seen on received packets.
   uint32_t ecnECT0CountReceived{0};
