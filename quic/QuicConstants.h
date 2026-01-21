@@ -232,7 +232,9 @@ QUIC_ENUM(
     // Controls whether to send a ConnectionClose on idle timeout
     SEND_CLOSE_ON_IDLE_TIMEOUT = 0x10011,
     // Controls the max number of PTOs to send before closing the connection
-    MAX_PTO = 0x10012)
+    MAX_PTO = 0x10012,
+    // Controls buffer reset behavior in the ContinuousMemory write path
+    CONTINUOUS_MEMORY_RESET = 0x10013)
 
 FOLLY_POP_WARNING
 
