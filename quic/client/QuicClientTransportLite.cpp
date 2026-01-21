@@ -1377,7 +1377,7 @@ void QuicClientTransportLite::errMessage(
       }
     }
 
-    const struct sock_extended_err* serr =
+    const auto* serr =
         reinterpret_cast<const struct sock_extended_err*>(CMSG_DATA(&cmsg));
     auto errStr = quic::errnoStr(serr->ee_errno);
     if (!happyEyeballsState.shouldWriteToFirstSocket &&
@@ -1546,7 +1546,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
           QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
     }
 
-    size_t bytesRead = size_t(ret);
+    auto bytesRead = size_t(ret);
     totalData += bytesRead;
     if (!server) {
       server = folly::SocketAddress();
