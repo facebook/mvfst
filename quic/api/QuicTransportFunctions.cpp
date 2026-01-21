@@ -1736,6 +1736,16 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
              << " writing data using scheduler=" << scheduler.name() << " "
              << connection;
 
+  // Reset the shared buffer at the start of each write loop when using
+  // ContinuousMemory data path.
+  if (connection.transportSettings.enableContinuousMemoryReset &&
+      connection.transportSettings.dataPathType ==
+          DataPathType::ContinuousMemory &&
+      connection.bufAccessor && connection.bufAccessor->ownsBuffer() &&
+      connection.bufAccessor->length() > 0) {
+    connection.bufAccessor->clear();
+  }
+
   if (!connection.gsoSupported.has_value()) {
     auto gsoResult = sock.getGSO();
     if (!gsoResult.has_value()) {
