@@ -25,7 +25,6 @@ class BatchWriterFactory {
   static BatchWriterPtr makeBatchWriter(
       const quic::QuicBatchingMode& batchingMode,
       uint32_t batchSize,
-      bool enableBackpressure,
       DataPathType dataPathType,
       QuicConnectionStateBase& conn,
       bool gsoSupported);

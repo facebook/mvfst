@@ -1230,10 +1230,7 @@ void QuicTransportBaseLite::maybeStopWriteLooperAndArmSocketWritableEvent() {
       !socket_->isWritableCallbackSet()) {
     // Check if all data has been written and we're not limited by flow
     // control/congestion control.
-    auto writeReason = shouldWriteData(*conn_);
-    bool haveBufferToRetry = writeReason == WriteDataReason::BUFFERED_WRITE;
-    bool haveNewDataToWrite =
-        (writeReason != WriteDataReason::NO_WRITE) && !haveBufferToRetry;
+    bool haveDataToWrite = shouldWriteData(*conn_) != WriteDataReason::NO_WRITE;
     bool haveCongestionControlWindow = true;
     if (conn_->congestionController) {
       haveCongestionControlWindow =
@@ -1242,7 +1239,7 @@ void QuicTransportBaseLite::maybeStopWriteLooperAndArmSocketWritableEvent() {
     bool haveFlowControlWindow = getSendConnFlowControlBytesAPI(*conn_) > 0;
     bool connHasWriteWindow =
         haveCongestionControlWindow && haveFlowControlWindow;
-    if (haveBufferToRetry || (haveNewDataToWrite && connHasWriteWindow)) {
+    if (haveDataToWrite && connHasWriteWindow) {
       // Re-arm the write event and stop the write
       // looper.
       auto resumeResult = socket_->resumeWrite(this);
@@ -2211,8 +2208,7 @@ QuicTransportBaseLite::handleInitialWriteDataCommon(
   if ((initialCryptoStream.retransmissionBuffer.size() &&
        conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
        numProbePackets) ||
-      initialScheduler.hasData() || toWriteInitialAcks(*conn_) ||
-      hasBufferedDataToWrite(*conn_)) {
+      initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
     MVCHECK(conn_->initialHeaderCipher);
     return writeCryptoAndAckDataToSocket(
         *socket_,
@@ -2243,8 +2239,7 @@ QuicTransportBaseLite::handleHandshakeWriteDataCommon(
       conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
   if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
        handshakeCryptoStream.retransmissionBuffer.size() && numProbePackets) ||
-      handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_) ||
-      hasBufferedDataToWrite(*conn_)) {
+      handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
     MVCHECK(conn_->handshakeWriteHeaderCipher);
     return writeCryptoAndAckDataToSocket(
         *socket_,

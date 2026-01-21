@@ -39,16 +39,12 @@ BatchWriterPtr makeSendmmsgInplaceGsoInplaceBatchWriter(
 BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
-    bool enableBackpressure,
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
     bool gsoSupported) {
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
-      if (enableBackpressure && dataPathType == DataPathType::ChainedMemory &&
-          conn.transportSettings.useSockWritableEvents) {
-        return BatchWriterPtr(new SinglePacketBackpressureBatchWriter(conn));
-      } else if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
+      if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
         return BatchWriterPtr(new SinglePacketInplaceBatchWriter(conn));
       }
       return BatchWriterPtr(new SinglePacketBatchWriter());

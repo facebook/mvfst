@@ -551,15 +551,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Current state of flow control.
   ConnectionFlowControlState flowControlState;
 
-  struct PendingWriteBatch {
-    BufPtr buf;
-    // More fields will be needed here for other batch writer types.
-  };
-
-  // A write batch that was attempted but did not succeed.
-  // This is only used by the SinglePacketBackpressureBatchWriter.
-  PendingWriteBatch pendingWriteBatch_;
-
   // Settings for transports.
   TransportSettings transportSettings;
 

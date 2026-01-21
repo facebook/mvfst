@@ -431,10 +431,6 @@ struct TransportSettings {
   uint64_t cwndModerateJumpstart{48000};
   uint64_t cwndStrongJumpstart{72000};
   bool useSockWritableEvents{false};
-  // use backpressure single packet batch writer. Only works for
-  // QuicBatchingMode::BATCHING_MODE_NONE and DataPathType::ChainedMemory
-  // and requires useSockWritableEvents to be enabled.
-  bool enableWriterBackpressure{false};
   // Ack timeout = SRTT * ackTimerFactor
   double ackTimerFactor{kAckTimerFactor};
   // If flow control updates should be sent based on time passed since last

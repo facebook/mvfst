@@ -172,7 +172,6 @@ writeQuicDataExceptCryptoStreamToSocket(
 WriteDataReason shouldWriteData(QuicConnectionStateBase& conn);
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
-bool hasBufferedDataToWrite(const QuicConnectionStateBase& conn);
 bool hasAlternatePathValidationDataToWrite(const QuicConnectionStateBase& conn);
 
 /**

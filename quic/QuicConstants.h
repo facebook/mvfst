@@ -773,7 +773,6 @@ enum class WriteDataReason {
   PATH_VALIDATION,
   PING,
   DATAGRAM,
-  BUFFERED_WRITE,
 };
 
 enum class NoWriteReason {
