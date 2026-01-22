@@ -2990,7 +2990,12 @@ void QuicTransportBaseLite::setTransportSettings(
     if (conn_->pacer) {
       conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
     }
-    conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
+    // Only set canBePaced during initial setup. After handshake,
+    // updatePacingOnKeyEstablished() already set canBePaced = true, and we
+    // shouldn't reset it when updating transport settings.
+    if (!conn_->transportParametersEncoded) {
+      conn_->canBePaced = conn_->transportSettings.pacingEnabledFirstFlight;
+    }
   }
   setCongestionControl(conn_->transportSettings.defaultCongestionController);
   if (conn_->transportSettings.datagramConfig.enabled) {
@@ -3425,6 +3430,8 @@ void QuicTransportBaseLite::updateCongestionControlSettings(
   conn_->transportSettings.limitedCwndInMss =
       transportSettings.limitedCwndInMss;
   conn_->transportSettings.pacingEnabled = transportSettings.pacingEnabled;
+  conn_->transportSettings.pacingEnabledFirstFlight =
+      transportSettings.pacingEnabledFirstFlight;
   conn_->transportSettings.pacingTickInterval =
       transportSettings.pacingTickInterval;
   conn_->transportSettings.pacingTimerResolution =

@@ -4578,6 +4578,38 @@ TEST_F(QuicTransportTest, SetPacingTimerThenEnablesPacing) {
   EXPECT_TRUE(isConnectionPaced(transport_->getConnectionState()));
 }
 
+TEST_F(
+    QuicTransportTest,
+    SetTransportSettingsAfterHandshakePreservesCanBePaced) {
+  // Initial setup with pacing enabled
+  TransportSettings transportSettings;
+  transportSettings.pacingEnabled = true;
+  transport_->setPacingTimer(
+      std::make_shared<HighResQuicTimer>(
+          &evb_, transportSettings.pacingTimerResolution));
+  transport_->setTransportSettings(transportSettings);
+
+  auto& conn = transport_->getConnectionState();
+
+  // Simulate post-handshake state where updatePacingOnKeyEstablished() was
+  // called
+  conn.transportParametersEncoded = true;
+  conn.canBePaced = true;
+  EXPECT_TRUE(isConnectionPaced(conn));
+
+  // Get current settings, modify burst settings (like SocketOptionRule does),
+  // and call setTransportSettings again
+  auto updatedSettings = transport_->getTransportSettings();
+  updatedSettings.minBurstPackets = 25;
+  updatedSettings.writeConnectionDataPacketsLimit = 25;
+  transport_->setTransportSettings(updatedSettings);
+
+  // canBePaced should still be true after calling setTransportSettings
+  // post-handshake
+  EXPECT_TRUE(conn.canBePaced);
+  EXPECT_TRUE(isConnectionPaced(conn));
+}
+
 TEST_F(QuicTransportTest, NoPacingNoBbr) {
   TransportSettings transportSettings;
   transportSettings.defaultCongestionController = CongestionControlType::BBR;
