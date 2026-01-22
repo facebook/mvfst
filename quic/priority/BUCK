@@ -13,9 +13,6 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
         "//quic/common:optional",
     ],
-    exported_external_deps = [
-        "glog",
-    ],
 )
 
 mvfst_cpp_library(

@@ -80,9 +80,6 @@ mvfst_cpp_library(
     exported_deps = [
         "//folly/portability:sys_uio",
     ],
-    external_deps = [
-        "glog",
-    ],
 )
 
 mvfst_cpp_library(
@@ -235,9 +232,6 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":optional",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 

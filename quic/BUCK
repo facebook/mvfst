@@ -76,6 +76,7 @@ mvfst_cpp_library(
         "QuicTypealiases.h",
     ],
     deps = [
+        "fbsource//third-party/fmt:fmt",
         "//folly/lang:assume",
     ],
     exported_deps = [
@@ -96,8 +97,12 @@ mvfst_cpp_library(
     headers = [
         "QuicException.h",
     ],
-    deps = select({
-        "DEFAULT": ["//quic/common:mvfst_logging"],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+    ] + select({
+        "DEFAULT": [
+            "//quic/common:mvfst_logging",
+        ],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
         "ovr_config//os/constraints:macos": [],
@@ -108,9 +113,6 @@ mvfst_cpp_library(
         "//folly:range",
         "//quic/common:optional",
         "//quic/common:variant",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 
