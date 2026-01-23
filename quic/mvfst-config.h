@@ -17,6 +17,10 @@
 #include <chrono>
 
 namespace quic {
+
+#define QUIC_DEFAULT_AEAD_HEADER <quic/fizz/handshake/FizzBridge.h>
+#define QUIC_DEFAULT_AEAD ::quic::FizzAead
+
 template <class... Args>
 struct UnorderedMap : folly::F14FastMap<Args...> {};
 

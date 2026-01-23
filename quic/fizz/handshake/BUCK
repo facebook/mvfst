@@ -40,5 +40,12 @@ mvfst_cpp_library(
         "//quic/handshake:handshake",
         "//quic/handshake:retry_integrity_tag_generator",
         "//quic/handshake:transport_parameters",
-    ],
+    ] + select({
+        "DEFAULT": [],
+        "ovr_config//runtime/constraints:fbcode": select({
+            "DEFAULT": ["fbcode//quic/facebook/handshake:xsec_crypto_bridge"],  # @fb-only
+            "ovr_config//build_mode:arvr_mode": [],  # @fb-only
+            "ovr_config//runtime/constraints:android-host-test": [],  # @fb-only
+        }),  # @fb-only
+    }),
 )
