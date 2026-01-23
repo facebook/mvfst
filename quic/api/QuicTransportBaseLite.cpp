@@ -2363,7 +2363,9 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
       quic::QuicError(
           QuicErrorCode(localError),
           fmt::format(
-              "{}: {} seconds", toString(localError), idleTimeoutCount / 1000)),
+              "{}: {} seconds timeout",
+              toString(localError),
+              idleTimeoutCount / 1000)),
       drain /* drainConnection */,
       sendCloseImmediately);
 }
