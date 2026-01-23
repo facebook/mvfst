@@ -24,7 +24,7 @@ class MockCongestionControllerFactory : public CongestionControllerFactory {
 
 class MockCongestionController : public CongestionController {
  public:
-  ~MockCongestionController() override {}
+  ~MockCongestionController() override = default;
 
   MOCK_METHOD(void, onRemoveBytesFromInflight, (uint64_t));
   MOCK_METHOD(void, onPacketSent, (const OutstandingPacketWrapper&));
