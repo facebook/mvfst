@@ -6,7 +6,6 @@
  */
 
 #include <quic/common/BufUtil.h>
-#include <quic/common/MvfstLogging.h>
 
 namespace quic {
 

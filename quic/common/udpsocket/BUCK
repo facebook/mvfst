@@ -80,7 +80,6 @@ mvfst_cpp_library(
     ],
     labels = ci.labels(ci.remove(ci.windows())),
     deps = [
-        "//quic/common:optional",
         "//quic/common:string_utils",
     ],
     exported_deps = [

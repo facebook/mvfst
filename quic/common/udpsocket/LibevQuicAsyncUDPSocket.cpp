@@ -8,7 +8,6 @@
 #include <quic/QuicException.h>
 #include <quic/common/Expected.h>
 #include <quic/common/MvfstLogging.h> // For QuicError, QuicErrorCode, TransportErrorCode
-#include <quic/common/Optional.h>
 #include <quic/common/StringUtils.h>
 #include <quic/common/udpsocket/LibevQuicAsyncUDPSocket.h>
 
