@@ -9,7 +9,6 @@ mvfst_cpp_test(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
-        ":mock_psk_cache",
         "//fizz/backend:openssl",
         "//fizz/client/test:mocks",
         "//fizz/crypto/test:TestUtil",
