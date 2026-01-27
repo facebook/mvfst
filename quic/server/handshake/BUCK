@@ -13,7 +13,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//quic/common:mvfst_logging",
-        "//quic/fizz/handshake:fizz_bridge",
+        "//quic/fizz/handshake:fizz_handshake",
         "//quic/state:stream_functions",
     ],
     exported_deps = [
