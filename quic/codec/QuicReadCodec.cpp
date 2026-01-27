@@ -840,13 +840,13 @@ OptionalIntegral<size_t> calculateSconePacketLength(Cursor cursor) {
 
   cursor.skip(4); // Skip version
 
-  uint8_t dstCidLen = cursor.read<uint8_t>();
+  auto dstCidLen = cursor.read<uint8_t>();
   if (!cursor.canAdvance(dstCidLen + 1)) { // dstCid + srcCidLen
     return {};
   }
 
   cursor.skip(dstCidLen); // Skip destination CID
-  uint8_t srcCidLen = cursor.read<uint8_t>();
+  auto srcCidLen = cursor.read<uint8_t>();
   if (!cursor.canAdvance(srcCidLen)) {
     return {};
   }
@@ -869,7 +869,7 @@ Expected<SCONEPacket, TransportErrorCode> decodeScone(Cursor& cursor) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
 
-  uint8_t firstByte = cursor.read<uint8_t>();
+  auto firstByte = cursor.read<uint8_t>();
 
   if (!cursor.canAdvance(sizeof(uint32_t))) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -891,7 +891,7 @@ Expected<SCONEPacket, TransportErrorCode> decodeScone(Cursor& cursor) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
 
-  uint8_t dstCidLen = cursor.read<uint8_t>();
+  auto dstCidLen = cursor.read<uint8_t>();
 
   if (!cursor.canAdvance(dstCidLen)) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -911,7 +911,7 @@ Expected<SCONEPacket, TransportErrorCode> decodeScone(Cursor& cursor) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
 
-  uint8_t srcCidLen = cursor.read<uint8_t>();
+  auto srcCidLen = cursor.read<uint8_t>();
 
   if (!cursor.canAdvance(srcCidLen)) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
