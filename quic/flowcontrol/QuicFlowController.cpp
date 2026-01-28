@@ -559,7 +559,7 @@ MaxDataFrame generateMaxDataFrame(const QuicConnectionStateBase& conn) {
 }
 
 MaxStreamDataFrame generateMaxStreamDataFrame(const QuicStreamState& stream) {
-  return MaxStreamDataFrame(stream.id, calculateMaximumData(stream));
+  return {stream.id, calculateMaximumData(stream)};
 }
 
 } // namespace quic
