@@ -16,10 +16,11 @@ quic_add_test(TARGET QuicTransportTest
   QuicTransportTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_bufutil
-  mvfst_events
-  mvfst_transport
-  mvfst_server
+  mvfst_common_buf_util
+  mvfst_common_events_eventbase
+  mvfst_congestion_control_static_cwnd_congestion_controller
+  mvfst_api_transport
+  mvfst_server_server
   mvfst_state_stream_functions
   mvfst_test_utils
 )
@@ -29,12 +30,12 @@ quic_add_test(TARGET QuicTransportBaseTest
   QuicTransportBaseTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_transport
+  mvfst_api_transport
   mvfst_codec_types
-  mvfst_folly_utils
+  mvfst_folly_utils_folly_utils
   mvfst_test_utils
   mvfst_state_stream_functions
-  mvfst_server
+  mvfst_server_server
 )
 
 quic_add_test(TARGET QuicTransportFunctionsTest
@@ -42,9 +43,10 @@ quic_add_test(TARGET QuicTransportFunctionsTest
   QuicTransportFunctionsTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_transport
+  mvfst_api_transport
   mvfst_test_utils
-  mvfst_server
+  mvfst_server_server
+  mvfst_logging_file_qlogger
 )
 
 quic_add_test(TARGET QuicPacketSchedulerTest
@@ -52,10 +54,10 @@ quic_add_test(TARGET QuicPacketSchedulerTest
   QuicPacketSchedulerTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_fizz_client
-  mvfst_server
+  mvfst_fizz_client_handshake_fizz_client_handshake
+  mvfst_server_server
   mvfst_codec_pktbuilder
-  mvfst_transport
+  mvfst_api_transport
   mvfst_test_utils
 )
 
@@ -64,10 +66,10 @@ quic_add_test(TARGET IoBufQuicBatchTest
   IoBufQuicBatchTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_fizz_client
+  mvfst_fizz_client_handshake_fizz_client_handshake
   mvfst_test_utils
-  mvfst_transport
-  mvfst_state_machine
+  mvfst_api_transport
+  mvfst_state_quic_state_machine
 )
 
 quic_add_test(TARGET QuicBatchWriterTest
@@ -75,9 +77,9 @@ quic_add_test(TARGET QuicBatchWriterTest
   QuicBatchWriterTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_buf_accessor
-  mvfst_server
-  mvfst_transport
+  mvfst_common_buf_accessor
+  mvfst_server_server
+  mvfst_api_transport
   mvfst_test_utils
 )
 
@@ -86,9 +88,10 @@ quic_add_test(TARGET QuicStreamAsyncTransportTest
   QuicStreamAsyncTransportTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_buf_accessor
-  mvfst_client
-  mvfst_server
+  mvfst_api_stream_async_transport
+  mvfst_common_buf_accessor
+  mvfst_client_client
+  mvfst_server_server
   mvfst_test_utils
-  mvfst_transport
+  mvfst_api_transport
 )

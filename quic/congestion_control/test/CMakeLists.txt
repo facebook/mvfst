@@ -28,6 +28,7 @@ quic_add_test(TARGET CongestionControllerTests
   Utils.cpp
   DEPENDS
   Folly::folly
-  mvfst_cc_algo
+  mvfst_congestion_control_congestion_controller
+  mvfst_congestion_control_simulated_tbf
   mvfst_test_utils
 )

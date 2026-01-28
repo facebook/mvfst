@@ -13,10 +13,10 @@ quic_add_test(TARGET QuicLossFunctionsTest
   DEPENDS
   Folly::folly
   mvfst_codec_types
-  mvfst_folly_utils
-  mvfst_client
-  mvfst_loss
-  mvfst_server
+  mvfst_folly_utils_folly_utils
+  mvfst_client_client
+  mvfst_loss_loss
+  mvfst_server_server
   mvfst_test_utils
-  mvfst_transport
+  mvfst_api_transport
 )

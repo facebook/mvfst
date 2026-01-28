@@ -12,7 +12,7 @@ quic_add_test(TARGET FizzTransportParametersTest
   FizzTransportParametersTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_handshake
+  mvfst_handshake_handshake
   mvfst_test_utils
 )
 
@@ -22,9 +22,9 @@ quic_add_test(TARGET FizzCryptoFactoryTest
   DEPENDS
   Folly::folly
   mvfst_codec_types
-  mvfst_folly_utils
-  mvfst_fizz_handshake
-  mvfst_string_utils
+  mvfst_folly_utils_folly_utils
+  mvfst_fizz_handshake_fizz_handshake
+  mvfst_common_string_utils
   mvfst_test_utils
 )
 
@@ -33,7 +33,8 @@ quic_add_test(TARGET FizzPacketNumberCipherTest
   FizzPacketNumberCipherTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_fizz_handshake
+  fizz::fizz_record_record
+  mvfst_fizz_handshake_fizz_handshake
   mvfst_codec_packet_number_cipher
-  mvfst_string_utils
+  mvfst_common_string_utils
 )

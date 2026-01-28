@@ -85,9 +85,6 @@ mvfst_cpp_library(
         "//folly/io:iobuf",
         "//quic/common:optional",
     ],
-    external_deps = [
-        "glog",
-    ],
 )
 
 mvfst_cpp_library(
