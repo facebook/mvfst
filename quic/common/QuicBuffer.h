@@ -281,7 +281,7 @@ class QuicBuffer {
       return dereference();
     }
 
-    ByteRange operator*() const {
+    const ByteRange& operator*() const {
       return val_;
     }
 
