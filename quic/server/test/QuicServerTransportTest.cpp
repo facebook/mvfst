@@ -3854,6 +3854,25 @@ TEST_F(QuicServerTransportTest, TestAutotuneStreamFlowControlKnobHandler) {
   EXPECT_FALSE(transportSettings.autotuneReceiveStreamFlowControl);
 }
 
+TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  server->getNonConstConn().pacer = std::move(mockPacer);
+
+  EXPECT_CALL(*rawPacer, setExperimental(true)).Times(2);
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        .val = uint64_t{1}}});
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        .val = uint64_t{2}}});
+
+  EXPECT_CALL(*rawPacer, setExperimental(false)).Times(1);
+  server->handleKnobParams(
+      {{.id = static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        .val = uint64_t{0}}});
+}
+
 TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
   server->handleKnobParams(
       {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),

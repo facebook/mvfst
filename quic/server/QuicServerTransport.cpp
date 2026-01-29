@@ -1019,6 +1019,21 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+      [](QuicServerTransport& serverTransport,
+         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
+        auto server_conn = serverTransport.serverConn_;
+        if (server_conn->pacer) {
+          auto enableExperimental = static_cast<bool>(std::get<uint64_t>(val));
+          server_conn->pacer->setExperimental(enableExperimental);
+          MVVLOG(3) << fmt::format(
+              "PACER_EXPERIMENTAL KnobParam received, "
+              "setting experimental={} for pacer",
+              enableExperimental);
+        }
+        return {};
+      });
+  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED),
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {

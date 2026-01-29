@@ -226,7 +226,7 @@ struct TransportSettings {
       ZeroRttSourceTokenMatchingPolicy::REJECT_IF_NO_EXACT_MATCH};
   // Scale pacing rate for CC, non-empty indicates override via transport knobs
   std::pair<uint8_t, uint8_t> startupRttFactor{1, 2};
-  std::pair<uint8_t, uint8_t> defaultRttFactor{1, 1};
+  std::pair<uint8_t, uint8_t> defaultRttFactor{4, 5};
   //
   bool attemptEarlyData{false};
   // Maximum number of packets the connection will write in
@@ -346,6 +346,7 @@ struct TransportSettings {
   bool enableKeepalive{false};
   // Whether or not to enable WritableBytes limit (server only)
   bool enableWritableBytesLimit{false};
+  bool experimentalPacer{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
   bool advertisedReliableResetStreamSupport{false};

@@ -216,6 +216,8 @@ struct Pacer {
 
   virtual void onPacketSent() = 0;
   virtual void onPacketsLoss() = 0;
+
+  virtual void setExperimental(bool experimental) = 0;
 };
 
 struct PacingRate {

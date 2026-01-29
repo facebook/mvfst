@@ -483,6 +483,7 @@ TPerfServer::TPerfServer(
     bool gso,
     uint32_t maxCwndInMss,
     bool pacing,
+    bool experimentalPacer,
     uint32_t numStreams,
     uint64_t maxBytesPerStream,
     uint32_t maxReceivePacketSize,
@@ -536,6 +537,7 @@ TPerfServer::TPerfServer(
     settings.pacingTickInterval = 200us;
     settings.writeLimitRttFraction = 0;
   }
+  settings.experimentalPacer = experimentalPacer;
 
   if (gso) {
     settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
@@ -555,6 +557,7 @@ TPerfServer::TPerfServer(
     settings.enableEcnOnEgress = true;
     settings.useL4sEcn = true;
     settings.minBurstPackets = 1;
+    settings.experimentalPacer = true;
     settings.ccaConfig.onlyGrowCwndWhenLimited = true;
     settings.ccaConfig.leaveHeadroomForCwndLimited = true;
   }
