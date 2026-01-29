@@ -225,7 +225,6 @@ void TPerfClient::start() {
     settings.enableEcnOnEgress = true;
     settings.useL4sEcn = true;
     settings.minBurstPackets = 1;
-    settings.experimentalPacer = true;
     settings.ccaConfig.onlyGrowCwndWhenLimited = true;
     settings.ccaConfig.leaveHeadroomForCwndLimited = true;
   }

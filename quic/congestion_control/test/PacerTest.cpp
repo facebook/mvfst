@@ -53,7 +53,7 @@ TEST_F(TokenlessPacerTest, NoCompensateTimerDrift) {
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
 }
 
-TEST_F(TokenlessPacerTest, CompensateTimerDriftForExperimental) {
+TEST_F(TokenlessPacerTest, CompensateTimerDrift) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -73,7 +73,6 @@ TEST_F(TokenlessPacerTest, CompensateTimerDriftForExperimental) {
     return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
   });
 
-  pacer.setExperimental(true);
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
@@ -85,7 +84,7 @@ TEST_F(TokenlessPacerTest, CompensateTimerDriftForExperimental) {
   EXPECT_EQ(50, pacer.updateAndGetWriteBatchSize(currentTime + 9000us));
 }
 
-TEST_F(TokenlessPacerTest, CompensatePartialTimerDriftForExperimental) {
+TEST_F(TokenlessPacerTest, CompensatePartialTimerDrift) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -102,7 +101,6 @@ TEST_F(TokenlessPacerTest, CompensatePartialTimerDriftForExperimental) {
     return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
   });
 
-  pacer.setExperimental(true);
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
@@ -120,7 +118,7 @@ TEST_F(TokenlessPacerTest, CompensatePartialTimerDriftForExperimental) {
   EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 4150us));
 }
 
-TEST_F(TokenlessPacerTest, PendingCompensationDelayResetForExperimental) {
+TEST_F(TokenlessPacerTest, PendingCompensationDelayReset) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -137,7 +135,6 @@ TEST_F(TokenlessPacerTest, PendingCompensationDelayResetForExperimental) {
     return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
   });
 
-  pacer.setExperimental(true);
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
@@ -159,7 +156,7 @@ TEST_F(TokenlessPacerTest, PendingCompensationDelayResetForExperimental) {
   EXPECT_EQ(11, pacer.updateAndGetWriteBatchSize(currentTime + 4650us));
 }
 
-TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDownToZero) {
+TEST_F(TokenlessPacerTest, DoesNotScaleBurstDownToZero) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -176,7 +173,6 @@ TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDownToZero) {
     return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
   });
 
-  pacer.setExperimental(true);
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
@@ -188,7 +184,7 @@ TEST_F(TokenlessPacerTest, ExperimentalPacerDoesNotScaleBurstDownToZero) {
   EXPECT_EQ(1, pacer.updateAndGetWriteBatchSize(currentTime + 1005us));
 }
 
-TEST_F(TokenlessPacerTest, ExperimentalDelayCompensationDoesNotUnderflow) {
+TEST_F(TokenlessPacerTest, DelayCompensationDoesNotUnderflow) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -209,7 +205,6 @@ TEST_F(TokenlessPacerTest, ExperimentalDelayCompensationDoesNotUnderflow) {
         .build();
   });
 
-  pacer.setExperimental(true);
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(10, 10000us); // burstSize = 10, interval = 10000us
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 10000us));
@@ -306,9 +301,10 @@ TEST_F(TokenlessPacerTest, ChangeMaxPacingRate) {
       pacer.updateAndGetWriteBatchSize(timestamp));
   EXPECT_EQ(rtt.count(), pacer.getTimeUntilNextWrite(timestamp).count());
 
-  // Set max pacing rate to 40 Mbps
-  pacer.setMaxPacingRate(5 * 1000 * 1000u); // Bytes per second
-  // This should bring down the pacer rate to 40 Mbps
+  // Set max pacing rate 40 Mbps and ensure it took effect
+  // Bytes per second
+  pacer.setMaxPacingRate(static_cast<uint64_t>(5) * 1000 * 1000);
+  pacer.reset(); // Reset to allow immediate write after rate change
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
   auto burst = pacer.updateAndGetWriteBatchSize(timestamp);
   auto interval = pacer.getTimeUntilNextWrite(timestamp);
@@ -362,7 +358,9 @@ TEST_F(TokenlessPacerTest, SetMaxPacingRateOnUnlimitedPacer) {
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
 
   // Set max pacing rate 40 Mbps and ensure it took effect
-  pacer.setMaxPacingRate(5 * 1000 * 1000u); // Bytes per second
+  pacer.setMaxPacingRate(
+      static_cast<uint64_t>(5) * 1000 * 1000); // Bytes per second
+  pacer.reset(); // Reset to allow immediate write after rate change
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
   auto burst = pacer.updateAndGetWriteBatchSize(timestamp);
   auto interval = pacer.getTimeUntilNextWrite(timestamp);

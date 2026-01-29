@@ -46,8 +46,6 @@ class TokenlessPacer : public Pacer {
   void onPacketSent() override;
   void onPacketsLoss() override;
 
-  void setExperimental(bool experimental) override;
-
  private:
   static void maybeNotifyObservers(
       const QuicConnectionStateBase& conn,
@@ -63,11 +61,9 @@ class TokenlessPacer : public Pacer {
   Optional<TimePoint> lastWriteTime_;
   uint8_t rttFactorNumerator_{1};
   uint8_t rttFactorDenominator_{1};
-  bool experimental_{false};
   // This is not a raw delay value. It's scaled by the batchSize
   std::chrono::microseconds pendingDelayAdjustment_{0us};
 
-  // Experimental
   // Maximum factor the batchSize can be multiplied by to account for pacer
   // timer delays. I.e., if the pacing function is late by up to 5 intervals, it
   // will be allowed to write 5 times as many packets

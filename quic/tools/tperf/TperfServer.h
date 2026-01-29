@@ -136,7 +136,6 @@ class TPerfServer {
       bool gso,
       uint32_t maxCwndInMss,
       bool pacing,
-      bool experimentalPacer,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
       uint32_t maxReceivePacketSize,
