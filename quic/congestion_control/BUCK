@@ -63,7 +63,6 @@ mvfst_cpp_library(
             ":bbr_bandwidth_sampler",
             ":bbr_rtt_sampler",
             ":copa",
-            ":copa2",
             ":cubic",
             ":newreno",
         ],
@@ -114,7 +113,6 @@ mvfst_cpp_library(
         ":bbr_bandwidth_sampler",
         ":bbr_rtt_sampler",
         ":copa",
-        ":copa2",
         ":cubic",
         ":newreno",
     ],
@@ -187,27 +185,6 @@ mvfst_cpp_library(
         ":congestion_controller",
         "//quic:exception",
         "//quic/common:optional",
-        "//quic/congestion_control/third_party:chromium_windowed_filter",
-        "//quic/state:ack_event",
-        "//quic/state:quic_state_machine",
-    ],
-)
-
-mvfst_cpp_library(
-    name = "copa2",
-    srcs = [
-        "Copa2.cpp",
-    ],
-    headers = [
-        "Copa2.h",
-    ],
-    deps = [
-        ":congestion_control_functions",
-        "//quic/common:mvfst_logging",
-        "//quic/logging:qlogger_macros",
-    ],
-    exported_deps = [
-        ":congestion_controller",
         "//quic/congestion_control/third_party:chromium_windowed_filter",
         "//quic/state:ack_event",
         "//quic/state:quic_state_machine",

@@ -13,7 +13,6 @@
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/BbrRttSampler.h>
 #include <quic/congestion_control/Copa.h>
-#include <quic/congestion_control/Copa2.h>
 #include <quic/congestion_control/NewReno.h>
 #include <quic/congestion_control/QuicCubic.h>
 
@@ -40,9 +39,6 @@ DefaultCongestionControllerFactory::makeCongestionController(
       break;
     case CongestionControlType::Copa:
       congestionController = std::make_unique<Copa>(conn);
-      break;
-    case CongestionControlType::Copa2:
-      congestionController = std::make_unique<Copa2>(conn);
       break;
     case CongestionControlType::BBR: {
       auto bbr = std::make_unique<BbrCongestionController>(conn);

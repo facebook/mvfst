@@ -488,7 +488,6 @@ constexpr std::string_view kCongestionControlCubicStr = "cubic";
 constexpr std::string_view kCongestionControlBbrStr = "bbr";
 constexpr std::string_view kCongestionControlBbr2Str = "bbr2";
 constexpr std::string_view kCongestionControlCopaStr = "copa";
-constexpr std::string_view kCongestionControlCopa2Str = "copa2";
 constexpr std::string_view kCongestionControlNewRenoStr = "newreno";
 constexpr std::string_view kCongestionControlStaticCwndStr = "staticcwnd";
 constexpr std::string_view kCongestionControlCustomStr = "custom";
@@ -499,7 +498,6 @@ enum class CongestionControlType : uint8_t {
   Cubic,
   NewReno,
   Copa,
-  Copa2,
   BBR,
   BBR2,
   StaticCwnd,

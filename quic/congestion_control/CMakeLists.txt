@@ -13,7 +13,6 @@ add_library(
   CongestionControlFunctions.cpp
   CongestionControllerFactory.cpp
   Copa.cpp
-  Copa2.cpp
   NewReno.cpp
   PacerFactory.cpp
   QuicCubic.cpp
