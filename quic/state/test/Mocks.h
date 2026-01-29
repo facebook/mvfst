@@ -98,7 +98,6 @@ class MockPacer : public Pacer {
   MOCK_METHOD(void, setAppLimited, (bool));
   MOCK_METHOD(void, onPacketSent, ());
   MOCK_METHOD(void, onPacketsLoss, ());
-  MOCK_METHOD(void, setExperimental, (bool));
 };
 
 } // namespace quic::test

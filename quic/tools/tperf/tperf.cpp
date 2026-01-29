@@ -102,7 +102,6 @@ DEFINE_string(
     pacer_interval_source,
     "std::nullopt",
     "If the StaticCwnd congestion controller is used with a pacer, this is the rtt that will be used to updated the pacer. (mrtt, lrtt, srtt, std::nullopt)");
-DEFINE_bool(experimental_pacer, false, "Whether to use the experimental pacer");
 
 namespace quic::tperf {
 
@@ -141,7 +140,6 @@ int main(int argc, char* argv[]) {
         FLAGS_gso,
         FLAGS_max_cwnd_mss,
         FLAGS_pacing,
-        FLAGS_experimental_pacer,
         FLAGS_num_streams,
         FLAGS_bytes_per_stream,
         FLAGS_max_receive_packet_size,
