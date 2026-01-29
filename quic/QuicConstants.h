@@ -487,7 +487,6 @@ constexpr DurationRep kDefaultWriteLimitRttFraction = 25;
 constexpr std::string_view kCongestionControlCubicStr = "cubic";
 constexpr std::string_view kCongestionControlBbrStr = "bbr";
 constexpr std::string_view kCongestionControlBbr2Str = "bbr2";
-constexpr std::string_view kCongestionControlBbrTestingStr = "bbr_testing";
 constexpr std::string_view kCongestionControlCopaStr = "copa";
 constexpr std::string_view kCongestionControlCopa2Str = "copa2";
 constexpr std::string_view kCongestionControlNewRenoStr = "newreno";
@@ -503,7 +502,6 @@ enum class CongestionControlType : uint8_t {
   Copa2,
   BBR,
   BBR2,
-  BBRTesting,
   StaticCwnd,
   Custom,
   None,

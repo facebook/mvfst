@@ -193,8 +193,7 @@ void TPerfClient::start() {
   settings.maxRecvBatchSize = 64;
   settings.numGROBuffers_ = 64;
   settings.defaultCongestionController = congestionControlType_;
-  if (congestionControlType_ == quic::CongestionControlType::BBR ||
-      congestionControlType_ == CongestionControlType::BBRTesting) {
+  if (congestionControlType_ == quic::CongestionControlType::BBR) {
     settings.pacingEnabled = true;
     settings.pacingTickInterval = 200us;
     settings.writeLimitRttFraction = 0;

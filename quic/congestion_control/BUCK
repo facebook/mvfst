@@ -113,7 +113,6 @@ mvfst_cpp_library(
         ":bbr2",
         ":bbr_bandwidth_sampler",
         ":bbr_rtt_sampler",
-        ":bbr_testing",
         ":copa",
         ":copa2",
         ":cubic",
@@ -293,19 +292,6 @@ mvfst_cpp_library(
         ":bbr",
         "//quic/congestion_control/third_party:chromium_windowed_filter",
         "//quic/state:quic_state_machine",
-    ],
-)
-
-mvfst_cpp_library(
-    name = "bbr_testing",
-    srcs = [
-        "BbrTesting.cpp",
-    ],
-    headers = [
-        "BbrTesting.h",
-    ],
-    exported_deps = [
-        ":bbr",
     ],
 )
 

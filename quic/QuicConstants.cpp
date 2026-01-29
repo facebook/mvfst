@@ -20,8 +20,6 @@ std::string congestionControlTypeToString(CongestionControlType type) {
       return std::string(kCongestionControlBbrStr);
     case CongestionControlType::BBR2:
       return std::string(kCongestionControlBbr2Str);
-    case CongestionControlType::BBRTesting:
-      return std::string(kCongestionControlBbrTestingStr);
     case CongestionControlType::Copa:
       return std::string(kCongestionControlCopaStr);
     case CongestionControlType::Copa2:
@@ -49,8 +47,6 @@ std::optional<CongestionControlType> congestionControlStrToType(
     return quic::CongestionControlType::BBR2;
   } else if (str == kCongestionControlBbrStr) {
     return quic::CongestionControlType::BBR;
-  } else if (str == kCongestionControlBbrTestingStr) {
-    return quic::CongestionControlType::BBRTesting;
   } else if (str == kCongestionControlCopaStr) {
     return quic::CongestionControlType::Copa;
   } else if (str == kCongestionControlCopa2Str) {

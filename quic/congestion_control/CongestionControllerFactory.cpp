@@ -44,10 +44,6 @@ DefaultCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::Copa2:
       congestionController = std::make_unique<Copa2>(conn);
       break;
-    case CongestionControlType::BBRTesting:
-      MVLOG_ERROR
-          << "Default CC Factory cannot make BbrTesting. Falling back to BBR.";
-      [[fallthrough]];
     case CongestionControlType::BBR: {
       auto bbr = std::make_unique<BbrCongestionController>(conn);
       setupBBR(bbr.get());

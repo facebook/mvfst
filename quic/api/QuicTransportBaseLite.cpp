@@ -2983,8 +2983,6 @@ void QuicTransportBaseLite::setTransportSettings(
         (conn_->transportSettings.defaultCongestionController ==
              CongestionControlType::BBR ||
          conn_->transportSettings.defaultCongestionController ==
-             CongestionControlType::BBRTesting ||
-         conn_->transportSettings.defaultCongestionController ==
              CongestionControlType::BBR2);
     auto minCwnd =
         usingBbr ? kMinCwndInMssForBbr : conn_->transportSettings.minCwndInMss;
@@ -3076,27 +3074,20 @@ void QuicTransportBaseLite::validateCongestionAndPacing(
     CongestionControlType& type) {
   // Fallback to Cubic if Pacing isn't enabled with BBR together
   if ((type == CongestionControlType::BBR ||
-       type == CongestionControlType::BBRTesting ||
        type == CongestionControlType::BBR2) &&
       !conn_->transportSettings.pacingEnabled) {
     MVLOG_ERROR << "Unpaced BBR isn't supported";
     type = CongestionControlType::Cubic;
   }
 
-  if (type == CongestionControlType::BBR2 ||
-      type == CongestionControlType::BBRTesting) {
-    // We need to have the pacer rate be as accurate as possible for BBR2 and
-    // BBRTesting.
+  if (type == CongestionControlType::BBR2) {
+    // We need to have the pacer rate be as accurate as possible for BBR2.
     // The current BBR behavior is dependent on the existing pacing
-    // behavior so the override is only for BBR2/BBRTesting.
+    // behavior so the override is only for BBR2.
     // TODO: This should be removed once the pacer changes are adopted as
     // the defaults or the pacer is fixed in another way.
     conn_->transportSettings.experimentalPacer = true;
     conn_->transportSettings.defaultRttFactor = {1, 1};
-    if (type == CongestionControlType::BBRTesting) {
-      // Force-disable startup pace scaling only for BBRTesting
-      conn_->transportSettings.startupRttFactor = {1, 1};
-    }
     if (conn_->pacer) {
       conn_->pacer->setExperimental(conn_->transportSettings.experimentalPacer);
       conn_->pacer->setRttFactor(
