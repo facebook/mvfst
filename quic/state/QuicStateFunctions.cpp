@@ -433,11 +433,10 @@ Expected<uint64_t, IntervalSetError> addPacketToAckState(
   ackState.lastRecvdPacketInfo = {packetNum, udpPacket.timings};
 
   if (packetNum >= expectedNextPacket) {
-    // Optionally ensure timestamp monotonicity: only add if receive time is >=
-    // last entry's time. Network reordering can cause packets with higher
-    // packet numbers to have earlier receive times.
+    // Ensure timestamp monotonicity: only add if receive time is >= last
+    // entry's time. Network reordering can cause packets with higher packet
+    // numbers to have earlier receive times.
     bool shouldAdd = ackState.recvdPacketInfos.empty() ||
-        !conn.transportSettings.skipNonMonotonicPacketTimestamps ||
         udpPacket.timings.receiveTimePoint >=
             ackState.recvdPacketInfos.back().timings.receiveTimePoint;
 

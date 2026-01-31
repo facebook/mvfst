@@ -268,9 +268,10 @@ struct WriteAckFrameState {
   // if the packet number is greater than the packet number of the last
   // element in the deque.
   //
-  // When skipNonMonotonicPacketTimestamps is enabled, receive timestamps
-  // are also guaranteed to increase monotonically. Packets with receive
-  // times earlier than the last entry are skipped to preserve this invariant.
+  // Receive timestamps are guaranteed to increase monotonically. Packets
+  // with receive times earlier than the last entry are skipped to preserve
+  // this invariant.
+  // TODO: update this when we support out-of-order packets.
   CircularDeque<ReceivedPacket> recvdPacketInfos;
   // The count of ECN marks seen on received packets.
   uint32_t ecnECT0CountReceived{0};

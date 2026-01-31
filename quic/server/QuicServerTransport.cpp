@@ -1278,29 +1278,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         MVVLOG(3) << "MAX_PTO KnobParam received: " << maxPTOCount;
         return {};
       });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::CONTINUOUS_MEMORY_RESET),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        auto enabled = static_cast<bool>(std::get<uint64_t>(value));
-        auto serverConn = serverTransport.serverConn_;
-        serverConn->transportSettings.enableContinuousMemoryReset = enabled;
-        MVVLOG(3) << "CONTINUOUS_MEMORY_RESET KnobParam received: " << enabled;
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(
-          TransportKnobParamId::SKIP_NON_MONOTONIC_TIMESTAMPS),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        auto enabled = static_cast<bool>(std::get<uint64_t>(value));
-        auto serverConn = serverTransport.serverConn_;
-        serverConn->transportSettings.skipNonMonotonicPacketTimestamps =
-            enabled;
-        MVVLOG(3) << "SKIP_NON_MONOTONIC_TIMESTAMPS KnobParam received: "
-                  << enabled;
-        return {};
-      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

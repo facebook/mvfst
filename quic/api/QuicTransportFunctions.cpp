@@ -1738,8 +1738,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
 
   // Reset the shared buffer at the start of each write loop when using
   // ContinuousMemory data path.
-  if (connection.transportSettings.enableContinuousMemoryReset &&
-      connection.transportSettings.dataPathType ==
+  if (connection.transportSettings.dataPathType ==
           DataPathType::ContinuousMemory &&
       connection.bufAccessor && connection.bufAccessor->ownsBuffer() &&
       connection.bufAccessor->length() > 0) {
