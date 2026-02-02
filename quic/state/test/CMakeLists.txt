@@ -12,7 +12,7 @@ quic_add_test(TARGET StateMachineTest
   StateDataTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_state_machine
+  mvfst_state_quic_state_machine
   mvfst_test_utils
 )
 
@@ -20,8 +20,8 @@ quic_add_test(TARGET QuicStreamFunctionsTest
   SOURCES
   QuicStreamFunctionsTest.cpp
   DEPENDS
-  mvfst_client
-  mvfst_server
+  mvfst_client_client
+  mvfst_server_server
   mvfst_state_stream_functions
   mvfst_test_utils
 )
@@ -30,8 +30,8 @@ quic_add_test(TARGET QuicStreamManagerTest
   SOURCES
   QuicStreamManagerTest.cpp
   DEPENDS
-  mvfst_client
-  mvfst_server
+  mvfst_client_client
+  mvfst_server_server
   mvfst_state_stream_functions
   mvfst_test_utils
 )
@@ -41,8 +41,8 @@ quic_add_test(TARGET AckHandlersTest
   AckEventTestUtil.cpp
   AckHandlersTest.cpp
   DEPENDS
-  mvfst_server
-  mvfst_state_machine
+  mvfst_server_server
+  mvfst_state_quic_state_machine
   mvfst_state_ack_handler
   mvfst_test_utils
 )
@@ -58,9 +58,9 @@ quic_add_test(TARGET QuicStateFunctionsTest
   SOURCES
   QuicStateFunctionsTest.cpp
   DEPENDS
-  mvfst_server
+  mvfst_server_server
   mvfst_test_utils
-  mvfst_state_functions
+  mvfst_state_state_functions
 )
 
 quic_add_test(TARGET QuicPacingFunctionsTest
@@ -75,5 +75,5 @@ quic_add_test(TARGET QuicTransportSettingsFunctionsTest
   TransportSettingsFunctionsTest.cpp
   DEPENDS
   mvfst_test_utils
-  mvfst_transport_settings_functions
+  mvfst_state_transport_settings_functions
 )

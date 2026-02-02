@@ -15,9 +15,9 @@ quic_add_test(TARGET StreamStateMachineTest
   Folly::folly
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_server
+  mvfst_server_server
   mvfst_state_stream
   mvfst_state_stream_functions
   mvfst_test_utils
-  mvfst_transport
+  mvfst_api_transport
 )
