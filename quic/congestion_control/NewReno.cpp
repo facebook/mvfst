@@ -9,6 +9,7 @@
 #include <quic/congestion_control/NewReno.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
 
 namespace quic {
@@ -46,6 +47,12 @@ void NewReno::onRemoveBytesFromInflight(uint64_t /* bytes */) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cwndBytes_ < ssthresh_ ? "SlowStart" : "CongestionAvoidance",
+      kRemoveInflight);
 }
 
 void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
@@ -70,6 +77,12 @@ void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cwndBytes_ < ssthresh_ ? "SlowStart" : "CongestionAvoidance",
+      kCongestionPacketSent);
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
@@ -94,6 +107,12 @@ void NewReno::onAckEvent(const AckEvent& ack) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cwndBytes_ < ssthresh_ ? "SlowStart" : "CongestionAvoidance",
+      kCongestionPacketAck);
   for (const auto& packet : ack.ackedPackets) {
     onPacketAcked(packet);
   }
@@ -183,6 +202,12 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cwndBytes_ < ssthresh_ ? "SlowStart" : "CongestionAvoidance",
+      kCongestionPacketLoss);
   if (loss.persistentCongestion) {
     MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
                << " cwnd=" << cwndBytes_
@@ -203,6 +228,12 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cwndBytes_ < ssthresh_ ? "SlowStart" : "CongestionAvoidance",
+        kPersistentCongestion);
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   }
 }

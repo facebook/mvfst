@@ -9,6 +9,7 @@
 #include <quic/congestion_control/Bbr2.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
 #include <chrono>
 #include <cstdint>
@@ -116,6 +117,12 @@ void Bbr2CongestionController::onPacketAckOrLoss(
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        bbr2StateToString(state_),
+        kCongestionPacketAck);
     QLOG(
         conn_,
         addNetworkPathModelUpdate,

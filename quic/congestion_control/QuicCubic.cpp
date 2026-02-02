@@ -49,6 +49,12 @@ Cubic::Cubic(
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cubicStateToString(state_).str(),
+      kCubicInit);
 }
 
 CubicStates Cubic::state() const noexcept {
@@ -163,6 +169,12 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kCubicSkipLoss);
   }
 
   if (loss.persistentCongestion) {
@@ -187,6 +199,12 @@ void Cubic::onRemoveBytesFromInflight(uint64_t /* bytes */) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cubicStateToString(state_).str(),
+      kRemoveInflight);
 }
 
 void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
@@ -302,6 +320,12 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cubicStateToString(state_).str(),
+      kCubicSteadyCwnd);
   return delta;
 }
 
@@ -388,6 +412,12 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kCubicSkipAck);
     return;
   }
   switch (state_) {
@@ -422,6 +452,12 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kCwndNoChange);
   }
   QLOG(
       conn_,
@@ -439,6 +475,12 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
       std::nullopt,
       std::nullopt,
       conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      std::nullopt,
+      cubicStateToString(state_).str(),
+      kCongestionPacketAck);
 }
 
 void Cubic::startHystartRttRound(TimePoint time) noexcept {
@@ -644,6 +686,12 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kAckInQuiescence);
     return;
   }
 
@@ -685,6 +733,12 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kResetTimeToOrigin);
     steadyState_.timeToOrigin = 0.0;
     steadyState_.lastMaxCwndBytes = cwndBytes_;
     steadyState_.originPoint = cwndBytes_;
@@ -714,6 +768,12 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kResetLastReductionTime);
   }
   uint64_t newCwnd = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
   if (conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart &&
@@ -764,6 +824,12 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        cubicStateToString(state_).str(),
+        kRenoCwndEstimation);
   }
 }
 

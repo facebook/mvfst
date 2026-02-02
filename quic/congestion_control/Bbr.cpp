@@ -127,6 +127,12 @@ void BbrCongestionController::onPacketLoss(
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        bbrStateToString(state_),
+        kPersistentCongestion);
   }
 }
 
@@ -213,6 +219,12 @@ void BbrCongestionController::onPacketAcked(
         std::nullopt,
         std::nullopt,
         conn_.lossState.ptoCount);
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        bbrStateToString(state_),
+        kCongestionPacketAck);
   };
   if (ack.implicit) {
     // This is an implicit ACK during the handshake, we can't trust very

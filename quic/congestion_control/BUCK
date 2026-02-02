@@ -157,6 +157,7 @@ mvfst_cpp_library(
     deps = [
         ":congestion_control_functions",
         "//quic/common:mvfst_logging",
+        "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
     ],
     exported_deps = [
@@ -179,6 +180,7 @@ mvfst_cpp_library(
         ":congestion_control_functions",
         "//quic/common:mvfst_logging",
         "//quic/common:time_util",
+        "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
     ],
     exported_deps = [
@@ -229,6 +231,7 @@ mvfst_cpp_library(
     deps = [
         ":congestion_control_functions",
         "//quic/common:mvfst_logging",
+        "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
     ],
     exported_deps = [
