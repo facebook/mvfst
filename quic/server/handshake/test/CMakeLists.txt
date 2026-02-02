@@ -18,13 +18,13 @@ quic_add_test(TARGET ServerHandshakeTest
   DEPENDS
   Folly::folly
   ${LIBFIZZ_LIBRARY}
-  mvfst_client
+  mvfst_client_client
   mvfst_codec_types
   mvfst_folly_utils
   mvfst_constants
   mvfst_handshake
-  mvfst_server
-  mvfst_state_machine
-  mvfst_string_utils
+  mvfst_server_server
+  mvfst_state_quic_state_machine
+  mvfst_common_string_utils
   mvfst_test_utils
 )

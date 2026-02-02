@@ -33,13 +33,13 @@ target_compile_options(
 
 add_dependencies(
   mvfst_test_utils
-  mvfst_fizz_client
+  mvfst_fizz_client_handshake
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_server
-  mvfst_state_machine
-  mvfst_transport
+  mvfst_server_server
+  mvfst_state_quic_state_machine
+  mvfst_api_transport
 )
 
 target_link_libraries(
@@ -47,14 +47,14 @@ target_link_libraries(
   Folly::folly
   ${LIBGMOCK_LIBRARIES}
   ${LIBGTEST_LIBRARIES}
-  mvfst_fizz_client
+  mvfst_fizz_client_handshake
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_server
-  mvfst_state_machine
-  mvfst_string_utils
-  mvfst_transport
+  mvfst_server_server
+  mvfst_state_quic_state_machine
+  mvfst_common_string_utils
+  mvfst_api_transport
   PRIVATE
   ${BOOST_LIBRARIES}
 )
@@ -68,17 +68,19 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   BufUtilTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_buf_accessor
-  mvfst_bufutil
-  mvfst_fizz_client
+  mvfst_api_transport_lite
+  mvfst_common_buf_accessor
+  mvfst_common_buf_util
+  mvfst_common_events_folly_eventbase
+  mvfst_common_events_highres_quic_timer
+  mvfst_fizz_client_handshake
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_looper
-  mvfst_string_utils
-  mvfst_transport
-  mvfst_server
-  mvfst_state_machine
+  mvfst_common_string_utils
+  mvfst_api_transport
+  mvfst_server_server
+  mvfst_state_quic_state_machine
   mvfst_test_utils
   ${BOOST_LIBRARIES}
 )

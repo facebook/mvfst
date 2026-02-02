@@ -15,6 +15,7 @@ quic_add_test(TARGET ClientStateMachineTest
   QuicConnectorTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_client
+  mvfst_client_client
+  mvfst_client_connector
   mvfst_test_utils
 )

@@ -5,31 +5,54 @@
 
 install(FILES mvfst-config.h DESTINATION include/quic/)
 
-add_library(
-  mvfst_constants
-  QuicConstants.cpp
+# =============================================================================
+# Root-level targets (manually maintained - matches BUCK structure)
+# =============================================================================
+
+# Header-only config target
+mvfst_add_library(mvfst_config
+  EXPORTED_DEPS
+    Folly::folly_small_vector
+    Folly::folly_container_f14_hash
+    Folly::folly_container_heap_vector_types
 )
 
-set_property(TARGET mvfst_constants PROPERTY VERSION ${PACKAGE_VERSION})
-
-target_include_directories(
-  mvfst_constants PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-  PRIVATE
-  ${Boost_INCLUDE_DIR}
+# Header-only enum target
+mvfst_add_library(mvfst_enum
+  EXPORTED_DEPS
+    Folly::folly_lang_assume
 )
 
-target_compile_options(
-  mvfst_constants
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
+# Constants library
+mvfst_add_library(mvfst_constants
+  SRCS
+    QuicConstants.cpp
+  EXPORTED_DEPS
+    mvfst_enum
+    Folly::folly_chrono_clock
+    Folly::folly_io_iobuf
+    Folly::folly_lang_assume
 )
 
-target_link_libraries(
-  mvfst_constants PUBLIC
-  Folly::folly
-  ${Boost_LIBRARIES}
+# TLS Exception library
+mvfst_add_library(mvfst_tls_exception
+  SRCS
+    QuicTLSExceptionFizz.cpp
+  EXPORTED_DEPS
+    mvfst_constants
+    fizz::fizz
+)
+
+# Exception library
+mvfst_add_library(mvfst_exception
+  SRCS
+    QuicException.cpp
+  EXPORTED_DEPS
+    mvfst_constants
+    mvfst_tls_exception
+    mvfst_common_optional
+    mvfst_common_variant
+    Folly::folly_range
 )
 
 install(
@@ -37,64 +60,36 @@ install(
   DESTINATION include/quic/
 )
 
-install(
-  TARGETS mvfst_constants
-  EXPORT mvfst-exports
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
-add_library(
-  mvfst_exception
-  QuicException.cpp
-  QuicTLSExceptionFizz.cpp
-)
-
-set_property(TARGET mvfst_exception PROPERTY VERSION ${PACKAGE_VERSION})
-
-target_include_directories(
-  mvfst_exception PUBLIC
-  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_exception
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-target_link_libraries(
-  mvfst_exception PUBLIC
-  Folly::folly
-  ${LIBFIZZ_LIBRARY}
-)
-
 install(FILES QuicException.h DESTINATION include/quic/)
 install(FILES QuicTLSException.h DESTINATION include/quic/)
 
-install(
-  TARGETS mvfst_exception
-  EXPORT mvfst-exports
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-add_subdirectory(api)
-add_subdirectory(client)
-add_subdirectory(codec)
+# =============================================================================
+# Subdirectories with granular targets
+# =============================================================================
+
 add_subdirectory(common)
-add_subdirectory(congestion_control)
-add_subdirectory(datagram)
-add_subdirectory(fizz)
+add_subdirectory(codec)
+add_subdirectory(state)
 add_subdirectory(flowcontrol)
-add_subdirectory(folly_utils)
 add_subdirectory(handshake)
-add_subdirectory(happyeyeballs)
-add_subdirectory(logging)
+add_subdirectory(congestion_control)
 add_subdirectory(loss)
+add_subdirectory(logging)
 add_subdirectory(observer)
 add_subdirectory(priority)
-add_subdirectory(samples)
-add_subdirectory(server)
-add_subdirectory(state)
-add_subdirectory(tools)
+add_subdirectory(happyeyeballs)
+add_subdirectory(folly_utils)
+add_subdirectory(datagram)
 add_subdirectory(xsk)
+add_subdirectory(api)
+add_subdirectory(client)
+add_subdirectory(server)
+add_subdirectory(fizz)
+
+if(BUILD_SAMPLES)
+  add_subdirectory(samples)
+endif()
+
+if(BUILD_TOOLS)
+  add_subdirectory(tools)
+endif()

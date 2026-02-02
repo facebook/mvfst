@@ -7,6 +7,10 @@ cmake_minimum_required(VERSION 3.10)
 
 project(mvfst)
 
+# Set for FetchContent to skip find_package(mvfst)
+set(mvfst_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+  CACHE INTERNAL "mvfst source directory")
+
 if (NOT DEFINED PACKAGE_VERSION)
   set(PACKAGE_VERSION "0")
 endif()
@@ -31,6 +35,8 @@ if (NOT DEFINED CMAKE_INSTALL_LIBDIR)
 endif()
 set(CMAKE_INSTALL_MODULE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/mvfst CACHE STRING
     "The subdirectory where CMake module files should be installed")
+set(INCLUDE_INSTALL_DIR include CACHE STRING
+    "The subdirectory where header files should be installed")
 
 include(FBBuildOptions)
 fb_activate_static_library_option()
@@ -41,11 +47,19 @@ fb_activate_static_library_option()
 set(QUIC_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Dependencies
+# Boost headers only (iterator_facade.hpp in QuicPacketScheduler.h)
+find_package(Boost 1.69 REQUIRED)
 find_package(fmt REQUIRED)
-find_package(folly REQUIRED)
-find_package(Fizz REQUIRED)
+# If folly/fizz are being built from source (FetchContent), skip find_package
+if (NOT DEFINED folly_SOURCE_DIR)
+  find_package(folly REQUIRED)
+endif()
+if (NOT DEFINED fizz_SOURCE_DIR)
+  find_package(Fizz REQUIRED)
+endif()
 find_package(Glog REQUIRED)
 find_package(Threads)
+find_package(OpenSSL REQUIRED)
 
 SET(GFLAG_DEPENDENCIES "")
 SET(QUIC_EXTRA_LINK_LIBRARIES "")
@@ -93,21 +107,70 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     -Wunused-value
   )
 else()
-  # MSVC: Enable conforming preprocessor for __VA_OPT__ support
+  # MSVC: Enable conforming preprocessor for __VA_OPT__ support and extended
+  # alignment storage for std::aligned_storage with Align > alignof(max_align_t)
   list(APPEND
     _QUIC_COMMON_COMPILE_OPTIONS
     /Zc:preprocessor
   )
+  add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 endif()
 
 SET(LIBFIZZ_LIBRARY ${FIZZ_LIBRARIES})
 SET(LIBFIZZ_INCLUDE_DIR ${FIZZ_INCLUDE_DIR})
+
+# =============================================================================
+# Granular CMake targets
+# =============================================================================
+
+# Include mvfst functions for granular library targets
+include(MvfstFunctions)
+
 if(BUILD_TESTS)
   enable_testing()
   include(QuicTest)
 endif()
 
 add_subdirectory(quic)
+
+# Create the monolithic mvfst library for backward compatibility
+mvfst_create_monolithic_library()
+
+# Resolve deferred dependencies between mvfst targets
+mvfst_resolve_deferred_dependencies()
+
+# =============================================================================
+# Backwards compatibility aliases
+# =============================================================================
+# Manually maintained in cmake/MvfstCompatAliases.cmake
+include(MvfstCompatAliases)
+
+# =============================================================================
+# Header installation
+# =============================================================================
+
+# Collect all headers (.h and .hpp), excluding test/facebook/build directories
+file(GLOB_RECURSE MVFST_HEADERS
+  "${CMAKE_CURRENT_SOURCE_DIR}/quic/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/quic/*.hpp"
+)
+list(FILTER MVFST_HEADERS EXCLUDE REGEX "/test/")
+list(FILTER MVFST_HEADERS EXCLUDE REGEX "/facebook/")
+list(FILTER MVFST_HEADERS EXCLUDE REGEX "/build/")
+
+# Install headers preserving directory structure
+mvfst_install_headers(quic ${CMAKE_CURRENT_SOURCE_DIR}/quic ${MVFST_HEADERS})
+
+# =============================================================================
+# Install and export configuration
+# =============================================================================
+
+install(
+  TARGETS mvfst
+  EXPORT mvfst-exports
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
 
 install(
   EXPORT mvfst-exports

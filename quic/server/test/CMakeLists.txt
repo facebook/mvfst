@@ -16,9 +16,9 @@ quic_add_test(TARGET QuicServerTest
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_server
+  mvfst_server_server
   mvfst_test_utils
-  mvfst_transport
+  mvfst_api_transport
 )
 
 quic_add_test(TARGET QuicClientServerIntegrationTest
@@ -26,12 +26,13 @@ quic_add_test(TARGET QuicClientServerIntegrationTest
   QuicClientServerIntegrationTest.cpp
   DEPENDS
   Folly::folly
+  mvfst_client_client
   mvfst_codec
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_server
+  mvfst_server_server
   mvfst_test_utils
-  mvfst_transport
+  mvfst_api_transport
 )
 
 quic_add_test(TARGET QuicServerTransportTest
@@ -42,10 +43,10 @@ quic_add_test(TARGET QuicServerTransportTest
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_folly_utils
-  mvfst_server
+  mvfst_server_server
   mvfst_state_stream_functions
   mvfst_test_utils
-  mvfst_transport
+  mvfst_api_transport
 )
 
 quic_add_test(TARGET ServerStateMachineTest
@@ -53,7 +54,7 @@ quic_add_test(TARGET ServerStateMachineTest
   ServerStateMachineTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_server
+  mvfst_server_server
   mvfst_test_utils
 )
 
@@ -62,5 +63,5 @@ quic_add_test(TARGET SlidingWindowRateLimiterTest
   SlidingWindowRateLimiterTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_server
+  mvfst_server_server
 )

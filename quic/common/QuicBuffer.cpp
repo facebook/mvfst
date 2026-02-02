@@ -8,6 +8,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/QuicBuffer.h>
 
+#include <algorithm>
 #include <utility>
 
 namespace quic {

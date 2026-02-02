@@ -24,7 +24,7 @@ quic_add_test(TARGET QuicReadCodecTest
   Folly::folly
   mvfst_codec
   mvfst_exception
-  mvfst_string_utils
+  mvfst_common_string_utils
   mvfst_test_utils
 )
 
@@ -33,7 +33,7 @@ quic_add_test(TARGET QuicWriteCodecTest
   QuicWriteCodecTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_bufutil
+  mvfst_common_buf_util
   mvfst_codec
   mvfst_codec_decode
   mvfst_codec_types
@@ -82,7 +82,7 @@ quic_add_test(TARGET QuicConnectionIdTest
   DEPENDS
   Folly::folly
   mvfst_codec_types
-  mvfst_string_utils
+  mvfst_common_string_utils
   mvfst_folly_utils
 )
 
@@ -98,9 +98,9 @@ quic_add_test(TARGET QuicPacketBuilderTest
   mvfst_codec_types
   mvfst_folly_utils
   mvfst_handshake
-  mvfst_server
-  mvfst_state_functions
-  mvfst_state_machine
+  mvfst_server_server
+  mvfst_state_state_functions
+  mvfst_state_quic_state_machine
   mvfst_state_stream_functions
   mvfst_test_utils
 )
@@ -113,7 +113,7 @@ quic_add_test(TARGET QuicIntegerTest
   mvfst_codec_types
   mvfst_folly_utils
   mvfst_exception
-  mvfst_string_utils
+  mvfst_common_string_utils
 )
 
 quic_add_test(TARGET ServerConnectionIdParamsTest

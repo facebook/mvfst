@@ -51,6 +51,8 @@ function(quic_add_test)
     "${QUIC_TEST_DEPENDS}"
     ${LIBGMOCK_LIBRARIES}
     ${GLOG_LIBRARY}
+    Folly::folly_init_init
+    mvfst_logging_file_qlogger
   )
 
   # Per https://github.com/facebook/mvfst/pull/9, disable some warnings
