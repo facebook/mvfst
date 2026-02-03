@@ -57,6 +57,9 @@ class ServerTransportParameters : public testing::Test {
     if (client_) {
       client_->close(std::nullopt);
     }
+    if (server_) {
+      server_->shutdown();
+    }
     evb_.loop();
   }
 
