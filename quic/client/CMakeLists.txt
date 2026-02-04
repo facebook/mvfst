@@ -104,6 +104,17 @@ mvfst_add_library(mvfst_client_cached_server_tp
     mvfst_constants
 )
 
+mvfst_add_library(mvfst_client_cached_server_tp_serialization
+  SRCS
+    handshake/CachedServerTransportParametersSerialization.cpp
+  DEPS
+    fizz::fizz
+  EXPORTED_DEPS
+    mvfst_client_cached_server_tp
+    Folly::folly_io_iobuf
+    Folly::folly_range
+)
+
 mvfst_add_library(mvfst_client_client_async_transport
   SRCS
     QuicClientAsyncTransport.cpp

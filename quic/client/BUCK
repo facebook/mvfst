@@ -135,6 +135,24 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "cached_server_tp_serialization",
+    srcs = [
+        "handshake/CachedServerTransportParametersSerialization.cpp",
+    ],
+    headers = [
+        "handshake/CachedServerTransportParametersSerialization.h",
+    ],
+    deps = [
+        "//fizz/record:record",
+    ],
+    exported_deps = [
+        ":cached_server_tp",
+        "//folly:range",
+        "//folly/io:iobuf",
+    ],
+)
+
+mvfst_cpp_library(
     name = "client_async_transport",
     srcs = [
         "QuicClientAsyncTransport.cpp",
