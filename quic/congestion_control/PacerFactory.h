@@ -8,6 +8,7 @@
 #pragma once
 
 #include <memory>
+#include <cstdint>
 
 namespace quic {
 struct Pacer;
