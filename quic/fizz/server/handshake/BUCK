@@ -18,6 +18,7 @@ mvfst_cpp_library(
         "//fizz/server:replay_cache",
         "//quic:constants",
         "//quic/common:mvfst_logging",
+        "//quic/fizz/handshake:fizz_bridge",
         "//quic/server/state:server",
     ],
     exported_deps = [

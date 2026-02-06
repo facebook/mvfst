@@ -10,7 +10,7 @@ mvfst_add_library(mvfst_server_handshake
     ServerHandshake.cpp
   DEPS
     mvfst_common_mvfst_logging
-    mvfst_fizz_handshake
+    mvfst_fizz_handshake_fizz_bridge
     mvfst_state_stream_functions
   EXPORTED_DEPS
     mvfst_constants

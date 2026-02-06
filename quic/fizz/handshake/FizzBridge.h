@@ -19,8 +19,15 @@ namespace quic {
 
 class FizzAead final : public Aead {
  public:
+  /**
+   * Wrap a fizz::Aead in a FizzAead.
+   * @param fizzAeadIn The fizz AEAD to wrap.
+   * @param useAlternativeCrypto Ignored - only present for API compatibility
+   * with XSecCryptoAead::wrap() when used as QUIC_DEFAULT_AEAD.
+   */
   static std::unique_ptr<FizzAead> wrap(
-      std::unique_ptr<fizz::Aead> fizzAeadIn) {
+      std::unique_ptr<fizz::Aead> fizzAeadIn,
+      bool /*useAlternativeCrypto*/ = false) {
     if (!fizzAeadIn) {
       return nullptr;
     }

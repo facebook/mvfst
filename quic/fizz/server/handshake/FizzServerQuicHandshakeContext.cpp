@@ -8,6 +8,7 @@
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
+#include <quic/server/state/ServerStateMachine.h>
 
 #include <fizz/protocol/Protocol.h>
 #include <fizz/server/ReplayCache.h>
@@ -28,7 +29,8 @@ std::unique_ptr<ServerHandshake>
 FizzServerQuicHandshakeContext::makeServerHandshake(
     QuicServerConnectionState* conn) && {
   if (!cryptoFactory_) {
-    cryptoFactory_ = std::make_unique<FizzCryptoFactory>();
+    cryptoFactory_ = std::make_unique<FizzCryptoFactory>(
+        conn->transportSettings.useAlternativeCrypto);
   }
   return std::make_unique<FizzServerHandshake>(
       conn, shared_from_this(), std::move(cryptoFactory_));

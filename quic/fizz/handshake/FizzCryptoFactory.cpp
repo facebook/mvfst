@@ -10,7 +10,10 @@
 
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzPacketNumberCipher.h>
+#include QUIC_DEFAULT_AEAD_HEADER
 #include <quic/handshake/HandshakeLayer.h>
+
+using DefaultAead = QUIC_DEFAULT_AEAD;
 
 namespace quic {
 
@@ -62,7 +65,7 @@ FizzCryptoFactory::makeInitialAead(
   trafficKey.key = std::move(key);
   trafficKey.iv = std::move(iv);
   aead->setKey(std::move(trafficKey));
-  return FizzAead::wrap(std::move(aead));
+  return DefaultAead::wrap(std::move(aead), useAlternativeCrypto_);
 }
 
 quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>

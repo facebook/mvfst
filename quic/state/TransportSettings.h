@@ -485,6 +485,10 @@ struct TransportSettings {
   std::chrono::milliseconds keepAliveTimeout{0};
 
   bool enableScone{false};
+
+  // Whether to use alternative AEAD instead of Fizz AEAD for packet encryption.
+  // When true, uses architecture-specific crypto instructions where available.
+  bool useAlternativeCrypto{false};
 };
 
 } // namespace quic

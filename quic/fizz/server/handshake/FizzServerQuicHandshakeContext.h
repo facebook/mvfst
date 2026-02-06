@@ -44,7 +44,7 @@ class FizzServerQuicHandshakeContext
    *   - We can enforce that the internal state of FizzServerContext is always
    * sane.
    */
-  FizzServerQuicHandshakeContext(
+  explicit FizzServerQuicHandshakeContext(
       std::shared_ptr<const fizz::server::FizzServerContext> context);
 
   FizzServerQuicHandshakeContext(

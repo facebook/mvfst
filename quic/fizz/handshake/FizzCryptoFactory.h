@@ -14,7 +14,9 @@ namespace quic {
 
 class FizzCryptoFactory : public CryptoFactory {
  public:
-  FizzCryptoFactory() : fizzFactory_{std::make_shared<QuicFizzFactory>()} {}
+  explicit FizzCryptoFactory(bool useAlternativeCrypto = false)
+      : fizzFactory_{std::make_shared<QuicFizzFactory>()},
+        useAlternativeCrypto_{useAlternativeCrypto} {}
 
   [[nodiscard]] quic::Expected<BufPtr, QuicError> makeInitialTrafficSecret(
       folly::StringPiece label,
@@ -40,8 +42,13 @@ class FizzCryptoFactory : public CryptoFactory {
     return fizzFactory_;
   }
 
+  [[nodiscard]] bool useAlternativeCrypto() const {
+    return useAlternativeCrypto_;
+  }
+
  protected:
   std::shared_ptr<fizz::Factory> fizzFactory_;
+  bool useAlternativeCrypto_{false};
 };
 
 } // namespace quic
