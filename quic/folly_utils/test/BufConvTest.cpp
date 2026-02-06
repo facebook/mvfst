@@ -162,4 +162,130 @@ TYPED_TEST(BufConvTest, ChainedBufferWithCoalesce) {
       "hello world");
 }
 
+// Tests for the template to<Output, Input>() function
+
+TYPED_TEST(BufConvTest, ToTemplateSameTypePassthrough) {
+  const std::string data = "same type passthrough";
+  auto srcBuf = createBuffer<TypeParam>(data);
+
+  const void* originalDataPtr = srcBuf->data();
+  const size_t originalLength = srcBuf->length();
+
+  auto dstBuf = to<TypeParam, TypeParam>(std::move(srcBuf));
+
+  ASSERT_EQ(srcBuf, nullptr);
+  ASSERT_NE(dstBuf, nullptr);
+  EXPECT_EQ(dstBuf->data(), originalDataPtr)
+      << "Same-type passthrough should not copy data";
+  EXPECT_EQ(dstBuf->length(), originalLength);
+  EXPECT_EQ(
+      std::string(
+          reinterpret_cast<const char*>(dstBuf->data()), dstBuf->length()),
+      data);
+}
+
+TYPED_TEST(BufConvTest, ToTemplateSameTypePassthroughChained) {
+  auto buf1 = createBuffer<TypeParam>("hello");
+  auto buf2 = createBuffer<TypeParam>(" ");
+  auto buf3 = createBuffer<TypeParam>("world");
+
+  const void* ptr1 = buf1->data();
+  const void* ptr2 = buf2->data();
+  const void* ptr3 = buf3->data();
+
+  buf1->appendToChain(std::move(buf2));
+  buf1->appendToChain(std::move(buf3));
+
+  EXPECT_TRUE(buf1->isChained());
+  EXPECT_EQ(buf1->countChainElements(), 3);
+
+  auto dstBuf = to<TypeParam, TypeParam>(std::move(buf1));
+
+  ASSERT_EQ(buf1, nullptr);
+  ASSERT_NE(dstBuf, nullptr);
+  EXPECT_TRUE(dstBuf->isChained());
+  EXPECT_EQ(dstBuf->countChainElements(), 3);
+
+  std::vector<const void*> dstPtrs;
+  for (const auto& range : *dstBuf) {
+    dstPtrs.push_back(range.data());
+  }
+
+  ASSERT_EQ(dstPtrs.size(), 3);
+  EXPECT_EQ(dstPtrs[0], ptr1)
+      << "Same-type passthrough should preserve chain pointers";
+  EXPECT_EQ(dstPtrs[1], ptr2);
+  EXPECT_EQ(dstPtrs[2], ptr3);
+}
+
+TYPED_TEST(BufConvTest, ToTemplateSameTypeNullBuffer) {
+  std::unique_ptr<TypeParam> srcBuf = nullptr;
+
+  auto dstBuf = to<TypeParam, TypeParam>(std::move(srcBuf));
+
+  EXPECT_EQ(dstBuf, nullptr);
+}
+
+TYPED_TEST(BufConvTest, ToTemplateCrossTypeConversion) {
+  const std::string data = "cross type conversion";
+  auto srcBuf = createBuffer<TypeParam>(data);
+
+  using OtherType = std::conditional_t<
+      std::is_same_v<TypeParam, QuicBuffer>,
+      folly::IOBuf,
+      QuicBuffer>;
+
+  auto dstBuf = to<OtherType, TypeParam>(std::move(srcBuf));
+
+  ASSERT_EQ(srcBuf, nullptr);
+  ASSERT_NE(dstBuf, nullptr);
+  EXPECT_FALSE(dstBuf->isChained());
+  EXPECT_EQ(dstBuf->length(), data.size());
+  EXPECT_EQ(
+      std::string(
+          reinterpret_cast<const char*>(dstBuf->data()), dstBuf->length()),
+      data);
+}
+
+TYPED_TEST(BufConvTest, ToTemplateCrossTypeChained) {
+  auto buf1 = createBuffer<TypeParam>("hello");
+  auto buf2 = createBuffer<TypeParam>(" ");
+  auto buf3 = createBuffer<TypeParam>("world");
+
+  buf1->appendToChain(std::move(buf2));
+  buf1->appendToChain(std::move(buf3));
+
+  using OtherType = std::conditional_t<
+      std::is_same_v<TypeParam, QuicBuffer>,
+      folly::IOBuf,
+      QuicBuffer>;
+
+  auto dstBuf = to<OtherType, TypeParam>(std::move(buf1));
+
+  ASSERT_EQ(buf1, nullptr);
+  ASSERT_NE(dstBuf, nullptr);
+  EXPECT_TRUE(dstBuf->isChained());
+  EXPECT_EQ(dstBuf->countChainElements(), 3);
+  EXPECT_EQ(dstBuf->computeChainDataLength(), 11);
+
+  std::string result;
+  for (const auto& range : *dstBuf) {
+    result.append(reinterpret_cast<const char*>(range.data()), range.size());
+  }
+  EXPECT_EQ(result, "hello world");
+}
+
+TYPED_TEST(BufConvTest, ToTemplateCrossTypeNullBuffer) {
+  std::unique_ptr<TypeParam> srcBuf = nullptr;
+
+  using OtherType = std::conditional_t<
+      std::is_same_v<TypeParam, QuicBuffer>,
+      folly::IOBuf,
+      QuicBuffer>;
+
+  auto dstBuf = to<OtherType, TypeParam>(std::move(srcBuf));
+
+  EXPECT_EQ(dstBuf, nullptr);
+}
+
 } // namespace quic::follyutils

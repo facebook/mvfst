@@ -18,7 +18,9 @@ mvfst_add_library(mvfst_folly_utils
 mvfst_add_library(mvfst_folly_utils_buf_conv
   SRCS
     BufConv.cpp
-  EXPORTED_DEPS
+  DEPS
     mvfst_common_quic_buffer
     Folly::folly_io_iobuf
+  EXPORTED_DEPS
+    Folly::folly_lang_assume
 )

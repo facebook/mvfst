@@ -34,6 +34,7 @@ mvfst_add_library(mvfst_congestion_control_congestion_controller_factory
   SRCS
     CongestionControllerFactory.cpp
   DEPS
+    mvfst_common_mvfst_logging
     mvfst_congestion_control_bbr
     mvfst_congestion_control_bbr2
     mvfst_congestion_control_bbr_bandwidth_sampler
@@ -96,6 +97,7 @@ mvfst_add_library(mvfst_congestion_control_newreno
   DEPS
     mvfst_common_mvfst_logging
     mvfst_congestion_control_congestion_control_functions
+    mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
   EXPORTED_DEPS
     mvfst_congestion_control_congestion_controller
@@ -111,6 +113,7 @@ mvfst_add_library(mvfst_congestion_control_copa
     mvfst_common_mvfst_logging
     mvfst_common_time_util
     mvfst_congestion_control_congestion_control_functions
+    mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
   EXPORTED_DEPS
     mvfst_common_optional
@@ -147,6 +150,7 @@ mvfst_add_library(mvfst_congestion_control_bbr2
   DEPS
     mvfst_common_mvfst_logging
     mvfst_congestion_control_congestion_control_functions
+    mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
   EXPORTED_DEPS
     mvfst_congestion_control_bandwidth

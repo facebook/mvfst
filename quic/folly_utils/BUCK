@@ -25,13 +25,11 @@ mvfst_cpp_library(
     headers = [
         "BufConv.h",
     ],
-    tests = [
-        ":buf_conv_test",
-    ],
-    exported_deps = [
+    deps = [
         "//folly/io:iobuf",
         "//quic/common:quic_buffer",
     ],
+    exported_deps = ["//folly/lang:assume"],
 )
 
 mvfst_cpp_test(

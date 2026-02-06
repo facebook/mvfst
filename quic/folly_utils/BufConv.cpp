@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/io/IOBuf.h>
+#include <quic/common/QuicBuffer.h>
 #include <quic/folly_utils/BufConv.h>
 
 namespace {
