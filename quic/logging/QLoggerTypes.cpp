@@ -83,12 +83,8 @@ folly::dynamic MaxStreamDataFrameLog::toDynamic() const {
 
 folly::dynamic MaxStreamsFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  FrameType type;
-  if (isForBidirectional) {
-    type = FrameType::MAX_STREAMS_BIDI;
-  } else {
-    type = FrameType::MAX_STREAMS_UNI;
-  }
+  FrameType type = isForBidirectional ? FrameType::MAX_STREAMS_BIDI
+                                      : FrameType::MAX_STREAMS_UNI;
   d["frame_type"] = toString(type);
   d["max_streams"] = maxStreams;
   return d;
@@ -96,12 +92,8 @@ folly::dynamic MaxStreamsFrameLog::toDynamic() const {
 
 folly::dynamic StreamsBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  FrameType type;
-  if (isForBidirectional) {
-    type = FrameType::STREAMS_BLOCKED_BIDI;
-  } else {
-    type = FrameType::STREAMS_BLOCKED_UNI;
-  }
+  FrameType type = isForBidirectional ? FrameType::STREAMS_BLOCKED_BIDI
+                                      : FrameType::STREAMS_BLOCKED_UNI;
   d["frame_type"] = toString(type);
   d["stream_limit"] = streamLimit;
   return d;
