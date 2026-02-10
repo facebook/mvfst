@@ -1344,6 +1344,29 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             *valPtr);
         return {};
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
+      [](QuicServerTransport& serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        const uint64_t* valPtr = std::get_if<uint64_t>(&value);
+        if (!valPtr) {
+          return quic::make_unexpected(QuicError(
+              QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+              "SCONE_KNOB: Expected uint64_t value"));
+        }
+        auto& conn = *serverTransport.conn_;
+        uint64_t bps = *valPtr;
+        uint8_t rateSignal = bpsToSconeRateSignal(bps);
+        if (!conn.scone) {
+          conn.scone.emplace();
+        }
+        conn.scone->negotiated = true;
+        conn.scone->configuredRateSignal = rateSignal;
+        VLOG(3) << "SCONE_KNOB: Enabled SCONE with rate signal "
+                << static_cast<int>(rateSignal) << " from " << bps << " bps";
+        return {};
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

@@ -4488,4 +4488,93 @@ TEST_F(QuicServerTransportTest, SconeRateSignalProcessingE2E) {
   EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
 }
 
+TEST_F(QuicServerTransportTest, SconeKnobEnablesSconeAndSetsRateSignal) {
+  auto& conn = server->getNonConstConn();
+
+  // SCONE should not be active before knob
+  EXPECT_FALSE(conn.scone.has_value());
+
+  // Send SCONE_KNOB with 1 Mbps (1000000 bps)
+  // Expected signal: 20 * log10(1000000 / 100000) = 20 * 1 = 20
+  TransportKnobParams params;
+  params.push_back(
+      {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
+       uint64_t{1000000}});
+  server->handleKnobParams(params);
+
+  ASSERT_TRUE(conn.scone.has_value());
+  EXPECT_TRUE(conn.scone->negotiated);
+  EXPECT_EQ(conn.scone->configuredRateSignal, 20);
+}
+
+TEST_F(QuicServerTransportTest, SconeKnobRateConversion) {
+  auto& conn = server->getNonConstConn();
+
+  // Test various bps values and expected rate signals
+  struct TestCase {
+    uint64_t bps;
+    uint8_t expectedSignal;
+  };
+
+  std::vector<TestCase> testCases = {
+      {100000, 0}, // 100 Kbps -> signal 0 (minimum)
+      {1000000, 20}, // 1 Mbps -> signal 20
+      {10000000, 40}, // 10 Mbps -> signal 40
+      {100000000, 60}, // 100 Mbps -> signal 60
+      {1000000000, 80}, // 1 Gbps -> signal 80
+  };
+
+  for (const auto& tc : testCases) {
+    conn.scone.reset();
+    TransportKnobParams params;
+    params.push_back(
+        {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
+         uint64_t{tc.bps}});
+    server->handleKnobParams(params);
+
+    ASSERT_TRUE(conn.scone.has_value()) << "bps=" << tc.bps;
+    EXPECT_EQ(conn.scone->configuredRateSignal, tc.expectedSignal)
+        << "bps=" << tc.bps;
+  }
+}
+
+TEST_F(QuicServerTransportTest, SconeKnobEdgeCases) {
+  auto& conn = server->getNonConstConn();
+
+  // Test below minimum: 0 bps should clamp to signal 0
+  {
+    conn.scone.reset();
+    TransportKnobParams params;
+    params.push_back(
+        {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB), uint64_t{0}});
+    server->handleKnobParams(params);
+    ASSERT_TRUE(conn.scone.has_value());
+    EXPECT_EQ(conn.scone->configuredRateSignal, 0);
+  }
+
+  // Test below minimum: 50 Kbps should clamp to signal 0
+  {
+    conn.scone.reset();
+    TransportKnobParams params;
+    params.push_back(
+        {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
+         uint64_t{50000}});
+    server->handleKnobParams(params);
+    ASSERT_TRUE(conn.scone.has_value());
+    EXPECT_EQ(conn.scone->configuredRateSignal, 0);
+  }
+
+  // Test very high value: should clamp to 126
+  {
+    conn.scone.reset();
+    TransportKnobParams params;
+    params.push_back(
+        {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
+         uint64_t{500000000000ULL}}); // 500 Gbps
+    server->handleKnobParams(params);
+    ASSERT_TRUE(conn.scone.has_value());
+    EXPECT_EQ(conn.scone->configuredRateSignal, 126);
+  }
+}
+
 } // namespace quic::test

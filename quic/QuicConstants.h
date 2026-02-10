@@ -21,6 +21,7 @@
 #include <quic/QuicTypealiases.h>
 #include <sys/types.h>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -235,7 +236,9 @@ QUIC_ENUM(
     // Controls the max number of PTOs to send before closing the connection
     MAX_PTO = 0x10012,
     // Egress policer config: rate_bytes_per_sec,burst_ms,delay_ms
-    EGRESS_POLICER_CONFIG = 0x20001)
+    EGRESS_POLICER_CONFIG = 0x20001,
+    // Enable SCONE and set the rate signal from a bps value
+    SCONE_KNOB = 0x5C0E)
 
 FOLLY_POP_WARNING
 
@@ -843,6 +846,18 @@ constexpr uint16_t kSkipOneInNPacketSequenceNumber = 1000;
 constexpr uint16_t kDistanceToClearSkippedPacketNumber = 1000;
 
 constexpr uint8_t kSconeNoAdvice = 0x7F;
+
+// Convert a bits-per-second rate to the nearest SCONE rate signal (0-126).
+// Formula: rate_bps = 100000 * 10^(n/20), so n = 20 * log10(rate_bps / 100000)
+inline uint8_t bpsToSconeRateSignal(uint64_t bps) {
+  constexpr uint64_t kSconeMinRateBps = 100000; // 100 Kbps
+  if (bps <= kSconeMinRateBps) {
+    return 0;
+  }
+  double n = 20.0 * std::log10(static_cast<double>(bps) / 100000.0);
+  int rounded = static_cast<int>(std::round(n));
+  return static_cast<uint8_t>(std::clamp(rounded, 0, 126));
+}
 } // namespace quic
 
 // Restore Windows NO_ERROR macro if it was previously defined

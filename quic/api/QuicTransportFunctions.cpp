@@ -260,7 +260,7 @@ uint64_t writeSconePacketIfNeeded(
   // SCONE packets are only sent with AppData (short headers)
   auto sconeDstCid = header.asShort()->getConnectionId();
   auto sconeSrcCid = ConnectionId::createZeroLength();
-  uint8_t sconeRateSignal = kSconeNoAdvice;
+  uint8_t sconeRateSignal = connection.scone->configuredRateSignal;
   auto sconePacket =
       buildSconePacket(sconeRateSignal, sconeDstCid, sconeSrcCid);
   uint64_t sconeSize = sconePacket.computeChainDataLength();
@@ -465,7 +465,6 @@ iobufChainBasedBuildScheduleEncrypt(
   // SCONE: Pre-build SCONE packet and adjust max packet size to avoid overflow
   std::unique_ptr<folly::IOBuf> preBuildSconePacket;
   uint64_t adjustedMaxPacketSize = connection.udpSendPacketLen;
-  uint8_t sconeRateSignal = kSconeNoAdvice;
   bool needScone = connection.scone && connection.scone->negotiated &&
       !connection.scone->sentThisLoop &&
       pnSpace == PacketNumberSpace::AppData &&
@@ -474,7 +473,8 @@ iobufChainBasedBuildScheduleEncrypt(
     // AppData packets use short headers, so we get DCID from short header
     ConnectionId sconeDstCid = header.asShort()->getConnectionId();
     ConnectionId sconeSrcCid = ConnectionId::createZeroLength();
-    auto scone = buildSconePacket(sconeRateSignal, sconeDstCid, sconeSrcCid);
+    auto scone = buildSconePacket(
+        connection.scone->configuredRateSignal, sconeDstCid, sconeSrcCid);
     preBuildSconePacket = std::make_unique<folly::IOBuf>(std::move(scone));
     uint64_t sconeSize = preBuildSconePacket->computeChainDataLength();
 
@@ -573,7 +573,9 @@ iobufChainBasedBuildScheduleEncrypt(
 
     if (connection.qLogger) {
       connection.qLogger->addTransportStateUpdate(
-          fmt::format("scone_sent:rate={}", static_cast<int>(sconeRateSignal)));
+          fmt::format(
+              "scone_sent:rate={}",
+              static_cast<int>(connection.scone->configuredRateSignal)));
     }
   }
   if (encodedSize > connection.udpSendPacketLen) {
