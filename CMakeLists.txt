@@ -58,6 +58,7 @@ if (NOT DEFINED fizz_SOURCE_DIR)
   find_package(Fizz REQUIRED)
 endif()
 find_package(Glog REQUIRED)
+add_compile_definitions(GLOG_USE_GLOG_EXPORT)
 find_package(Threads)
 find_package(OpenSSL REQUIRED)
 
