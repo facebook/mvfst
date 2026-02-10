@@ -40,3 +40,22 @@ mvfst_cpp_library(
         "//quic/congestion_control:congestion_controller",
     ],
 )
+
+mvfst_cpp_library(
+    name = "bbr2_probe_bw",
+    srcs = [
+        "Bbr2ProbeBw.cpp",
+    ],
+    headers = [
+        "Bbr2ProbeBw.h",
+    ],
+    deps = [
+        ":bbr2_probe_rtt",
+        "//quic/congestion_control:congestion_control_functions",
+    ],
+    exported_deps = [
+        ":bbr2_shared",
+        "//quic/congestion_control:bandwidth",
+        "//quic/congestion_control:congestion_controller",
+    ],
+)

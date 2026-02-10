@@ -29,3 +29,15 @@ mvfst_add_library(mvfst_congestion_control_modular_bbr2_probe_rtt
     mvfst_congestion_control_congestion_controller
     mvfst_congestion_control_modular_bbr2_shared
 )
+
+mvfst_add_library(mvfst_congestion_control_modular_bbr2_probe_bw
+  SRCS
+    Bbr2ProbeBw.cpp
+  DEPS
+    mvfst_congestion_control_congestion_control_functions
+    mvfst_congestion_control_modular_bbr2_probe_rtt
+  EXPORTED_DEPS
+    mvfst_congestion_control_bandwidth
+    mvfst_congestion_control_congestion_controller
+    mvfst_congestion_control_modular_bbr2_shared
+)
