@@ -23,3 +23,20 @@ mvfst_cpp_library(
         "//quic/state:transport_settings",
     ],
 )
+
+mvfst_cpp_library(
+    name = "bbr2_probe_rtt",
+    srcs = [
+        "Bbr2ProbeRtt.cpp",
+    ],
+    headers = [
+        "Bbr2ProbeRtt.h",
+    ],
+    deps = [
+        "//quic/congestion_control:congestion_control_functions",
+    ],
+    exported_deps = [
+        ":bbr2_shared",
+        "//quic/congestion_control:congestion_controller",
+    ],
+)

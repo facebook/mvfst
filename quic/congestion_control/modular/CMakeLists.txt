@@ -19,3 +19,13 @@ mvfst_add_library(mvfst_congestion_control_modular_bbr2_shared
     mvfst_state_quic_state_machine
     mvfst_state_transport_settings
 )
+
+mvfst_add_library(mvfst_congestion_control_modular_bbr2_probe_rtt
+  SRCS
+    Bbr2ProbeRtt.cpp
+  DEPS
+    mvfst_congestion_control_congestion_control_functions
+  EXPORTED_DEPS
+    mvfst_congestion_control_congestion_controller
+    mvfst_congestion_control_modular_bbr2_shared
+)
