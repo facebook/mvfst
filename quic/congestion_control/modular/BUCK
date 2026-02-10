@@ -59,3 +59,26 @@ mvfst_cpp_library(
         "//quic/congestion_control:congestion_controller",
     ],
 )
+
+mvfst_cpp_library(
+    name = "bbr2_startup",
+    srcs = [
+        "Bbr2Startup.cpp",
+    ],
+    headers = [
+        "Bbr2Startup.h",
+    ],
+    deps = [
+        ":bbr2_probe_bw",
+        ":bbr2_probe_rtt",
+        "//quic/congestion_control:congestion_control_functions",
+    ],
+    exported_deps = [
+        ":bbr2_shared",
+        "//quic/congestion_control:bandwidth",
+        "//quic/congestion_control:congestion_controller",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:quic_state_machine",
+        "//quic/state:transport_settings",
+    ],
+)

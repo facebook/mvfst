@@ -41,3 +41,19 @@ mvfst_add_library(mvfst_congestion_control_modular_bbr2_probe_bw
     mvfst_congestion_control_congestion_controller
     mvfst_congestion_control_modular_bbr2_shared
 )
+
+mvfst_add_library(mvfst_congestion_control_modular_bbr2_startup
+  SRCS
+    Bbr2Startup.cpp
+  DEPS
+    mvfst_congestion_control_congestion_control_functions
+    mvfst_congestion_control_modular_bbr2_probe_bw
+    mvfst_congestion_control_modular_bbr2_probe_rtt
+  EXPORTED_DEPS
+    mvfst_congestion_control_bandwidth
+    mvfst_congestion_control_congestion_controller
+    mvfst_congestion_control_modular_bbr2_shared
+    mvfst_congestion_control_third_party_chromium_windowed_filter
+    mvfst_state_quic_state_machine
+    mvfst_state_transport_settings
+)
