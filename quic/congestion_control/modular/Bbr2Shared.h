@@ -74,7 +74,7 @@ class Bbr2Shared {
 
   // ===== Congestion Window =====
   [[nodiscard]] CongestionControlType type() const noexcept {
-    return CongestionControlType::BBR2;
+    return CongestionControlType::BBR2Modular;
   }
 
   [[nodiscard]] uint64_t getWritableBytes() const noexcept;

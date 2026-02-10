@@ -2983,7 +2983,9 @@ void QuicTransportBaseLite::setTransportSettings(
         (conn_->transportSettings.defaultCongestionController ==
              CongestionControlType::BBR ||
          conn_->transportSettings.defaultCongestionController ==
-             CongestionControlType::BBR2);
+             CongestionControlType::BBR2 ||
+         conn_->transportSettings.defaultCongestionController ==
+             CongestionControlType::BBR2Modular);
     auto minCwnd =
         usingBbr ? kMinCwndInMssForBbr : conn_->transportSettings.minCwndInMss;
     conn_->pacer = createPacer(*conn_, minCwnd);
@@ -3071,7 +3073,8 @@ void QuicTransportBaseLite::validateCongestionAndPacing(
     CongestionControlType& type) {
   // Fallback to Cubic if Pacing isn't enabled with BBR together
   if ((type == CongestionControlType::BBR ||
-       type == CongestionControlType::BBR2) &&
+       type == CongestionControlType::BBR2 ||
+       type == CongestionControlType::BBR2Modular) &&
       !conn_->transportSettings.pacingEnabled) {
     MVLOG_ERROR << "Unpaced BBR isn't supported";
     type = CongestionControlType::Cubic;
