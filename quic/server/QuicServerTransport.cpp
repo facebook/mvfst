@@ -20,8 +20,6 @@
 #include <chrono>
 #include <memory>
 
-#include <folly/TokenBucket.h>
-
 namespace quic {
 
 QuicServerTransport::QuicServerTransport(
@@ -1278,70 +1276,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto serverConn = serverTransport.serverConn_;
         serverConn->transportSettings.maxNumPTOs = maxPTOCount;
         MVVLOG(3) << "MAX_PTO KnobParam received: " << maxPTOCount;
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::EGRESS_POLICER_CONFIG),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        const std::string* valPtr = std::get_if<std::string>(&value);
-        if (!valPtr) {
-          auto errMsg =
-              "Received invalid type for EGRESS_POLICER_CONFIG KnobParam: expected string";
-          MVVLOG(3) << errMsg;
-          return quic::make_unexpected(
-              QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
-        }
-
-        auto serverConn = serverTransport.serverConn_;
-        uint64_t rateBytesPerSec = 0;
-        uint32_t burstMs = 0;
-        uint32_t delayMs = 0;
-        bool parseSuccess = false;
-        try {
-          parseSuccess =
-              folly::split(',', *valPtr, rateBytesPerSec, burstMs, delayMs);
-        } catch (const std::exception&) {
-          parseSuccess = false;
-        }
-
-        if (!parseSuccess) {
-          auto errMsg = fmt::format(
-              "Received invalid KnobParam for EGRESS_POLICER_CONFIG: {}",
-              *valPtr);
-          MVVLOG(3) << errMsg;
-          return quic::make_unexpected(
-              QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
-        }
-
-        serverConn->transportSettings.egressPolicerConfig.rateBytesPerSec =
-            rateBytesPerSec;
-        serverConn->transportSettings.egressPolicerConfig.burstMs = burstMs;
-        serverConn->transportSettings.egressPolicerConfig.delayMs = delayMs;
-
-        if (rateBytesPerSec > 0) {
-          serverConn->transportSettings.egressPolicerConfig.enabled = true;
-          double burstBytes =
-              static_cast<double>(rateBytesPerSec) * burstMs / 1000.0;
-          if (burstBytes < kDefaultMaxUDPPayload) {
-            burstBytes = kDefaultMaxUDPPayload;
-          }
-          serverConn->egressPolicer = std::make_unique<folly::TokenBucket>(
-              static_cast<double>(rateBytesPerSec), burstBytes);
-          serverConn->egressPolicerActivationTime =
-              Clock::now() + std::chrono::milliseconds(delayMs);
-        } else {
-          serverConn->transportSettings.egressPolicerConfig.enabled = false;
-          serverConn->egressPolicer.reset();
-          serverConn->egressPolicerActivationTime.reset();
-        }
-        MVVLOG(3) << fmt::format(
-            "EGRESS_POLICER_CONFIG KnobParam received, "
-            "rateBytesPerSec={}, burstMs={}, delayMs={}, raw knob={}",
-            rateBytesPerSec,
-            burstMs,
-            delayMs,
-            *valPtr);
         return {};
       });
 }

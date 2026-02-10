@@ -58,7 +58,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
             case TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB:
             case TransportKnobParamId::ACK_FREQUENCY_POLICY:
             case TransportKnobParamId::CC_CONFIG:
-            case TransportKnobParamId::EGRESS_POLICER_CONFIG:
             case TransportKnobParamId::NO_OP:
               break;
             default:
@@ -131,8 +130,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
           } else if (paramId == TransportKnobParamId::ACK_FREQUENCY_POLICY) {
             knobParams.push_back({paramId, val.asString()});
           } else if (paramId == TransportKnobParamId::CC_CONFIG) {
-            knobParams.push_back({paramId, val.asString()});
-          } else if (paramId == TransportKnobParamId::EGRESS_POLICER_CONFIG) {
             knobParams.push_back({paramId, val.asString()});
           } else {
             MVLOG_ERROR

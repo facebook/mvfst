@@ -50,7 +50,6 @@ mvfst_add_library(mvfst_server_server
     Folly::folly_portability_gflags
     Folly::folly_system_hardware_concurrency
     Folly::folly_system_thread_id
-    Folly::folly_token_bucket
   EXPORTED_DEPS
     mvfst_api_transport
     mvfst_api_transport_helpers

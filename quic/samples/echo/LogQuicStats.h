@@ -68,10 +68,6 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     MVVLOG(2) << prefix_ << __func__;
   }
 
-  void onPacketDroppedByEgressPolicer() override {
-    MVVLOG(2) << prefix_ << __func__;
-  }
-
   void onForwardedPacketReceived() override {
     MVVLOG(2) << prefix_ << __func__;
   }

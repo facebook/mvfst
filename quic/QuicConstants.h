@@ -168,8 +168,7 @@ QUIC_ENUM(
     CLIENT_SHUTDOWN,
     INVALID_SRC_PORT,
     UNKNOWN_CID_VERSION,
-    CANNOT_FORWARD_DATA,
-    EGRESS_POLICER_DROP)
+    CANNOT_FORWARD_DATA)
 
 QUIC_ENUM(
     TransportKnobParamId,
@@ -233,9 +232,7 @@ QUIC_ENUM(
     // Controls whether to send a ConnectionClose on idle timeout
     SEND_CLOSE_ON_IDLE_TIMEOUT = 0x10011,
     // Controls the max number of PTOs to send before closing the connection
-    MAX_PTO = 0x10012,
-    // Egress policer config: rate_bytes_per_sec,burst_ms,delay_ms
-    EGRESS_POLICER_CONFIG = 0x20001)
+    MAX_PTO = 0x10012)
 
 FOLLY_POP_WARNING
 
