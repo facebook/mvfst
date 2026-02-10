@@ -235,6 +235,7 @@ mvfst_add_library(mvfst_congestion_control_ecn_l4s_tracker
     mvfst_state_quic_state_machine
 )
 
+add_subdirectory(modular)
 add_subdirectory(third_party)
 
 add_subdirectory(test)

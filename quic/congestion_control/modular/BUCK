@@ -1,0 +1,25 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "bbr2_shared",
+    srcs = [
+        "Bbr2Shared.cpp",
+    ],
+    headers = [
+        "Bbr2Shared.h",
+    ],
+    deps = [
+        "//quic/congestion_control:congestion_control_functions",
+        "//quic/logging:qlogger_constants",
+        "//quic/logging:qlogger_macros",
+    ],
+    exported_deps = [
+        "//quic/congestion_control:bandwidth",
+        "//quic/congestion_control:congestion_controller",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:quic_state_machine",
+        "//quic/state:transport_settings",
+    ],
+)
