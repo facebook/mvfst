@@ -99,6 +99,7 @@ mvfst_cpp_test(
     deps = [
         ":mocks",
         "//folly:range",
+        "//folly:token_bucket",
         "//quic/api:transport_helpers",
         "//quic/codec:pktbuilder",
         "//quic/common:mvfst_logging",
