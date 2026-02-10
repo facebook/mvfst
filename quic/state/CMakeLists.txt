@@ -99,6 +99,7 @@ mvfst_add_library(mvfst_state_quic_state_machine
     Folly::folly_container_f14_hash
     Folly::folly_io_async_delayed_destruction
     Folly::folly_network_address
+    Folly::folly_token_bucket
 )
 
 mvfst_add_library(mvfst_state_ack_handler

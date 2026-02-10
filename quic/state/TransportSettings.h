@@ -165,6 +165,13 @@ struct ServerDirectEncapConfig {
   uint8_t supportedZones;
 };
 
+struct EgressPolicerConfig {
+  bool enabled{false};
+  uint64_t rateBytesPerSec{0};
+  uint32_t burstMs{100};
+  uint32_t delayMs{1000};
+};
+
 struct TransportSettings {
   // The initial flow control window for the whole connection advertised to the
   // peer.
@@ -485,6 +492,8 @@ struct TransportSettings {
   std::chrono::milliseconds keepAliveTimeout{0};
 
   bool enableScone{false};
+
+  EgressPolicerConfig egressPolicerConfig;
 
   // Whether to use alternative AEAD instead of Fizz AEAD for packet encryption.
   // When true, uses architecture-specific crypto instructions where available.

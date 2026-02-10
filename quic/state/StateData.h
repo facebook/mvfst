@@ -37,6 +37,7 @@
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 
+#include <folly/TokenBucket.h>
 #include <folly/container/F14Map.h>
 #include <folly/io/async/DelayedDestruction.h>
 #include <quic/common/Optional.h>
@@ -326,6 +327,11 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Pacer
   std::unique_ptr<Pacer> pacer;
+
+  // Egress token bucket policer for rate limiting outgoing packets.
+  // Server-only: only set via server transport knob handlers.
+  std::unique_ptr<folly::TokenBucket> egressPolicer;
+  Optional<TimePoint> egressPolicerActivationTime;
 
   // Congestion Controller factory to create specific impl of cc algorithm
   std::shared_ptr<CongestionControllerFactory> congestionControllerFactory;

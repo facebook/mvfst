@@ -81,6 +81,8 @@ class QuicTransportStatsCallback {
 
   virtual void onPacketForwarded() = 0;
 
+  virtual void onPacketDroppedByEgressPolicer() = 0;
+
   virtual void onForwardedPacketReceived() = 0;
 
   virtual void onForwardedPacketProcessed() = 0;
