@@ -213,11 +213,9 @@ mvfst_add_library(mvfst_congestion_control_simulated_tbf
   DEPS
     mvfst_common_mvfst_logging
     mvfst_exception
-    ${GLOG_LIBRARIES}
   EXPORTED_DEPS
     mvfst_constants
     Folly::folly_token_bucket
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_congestion_control_throttling_signal_provider

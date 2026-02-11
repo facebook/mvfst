@@ -9,7 +9,6 @@ mvfst_add_library(mvfst_priority_priority_queue
   EXPORTED_DEPS
     mvfst_common_mvfst_logging
     mvfst_common_optional
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_priority_round_robin

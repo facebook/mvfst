@@ -42,10 +42,8 @@ mvfst_cpp_library(
         }),
     }),
     exported_deps = [
+        "fbsource//third-party/glog:glog",
         ":mvfst_check",
-    ],
-    exported_external_deps = [
-        "glog",
     ],
 )
 
@@ -56,14 +54,12 @@ mvfst_cpp_library(
         "IntervalSet-inl.h",
     ],
     exported_deps = [
+        "fbsource//third-party/glog:glog",
         ":circular_deque",
         ":expected",
         ":mvfst_logging",
         ":optional",
         "//folly:likely",
-    ],
-    exported_external_deps = [
-        "glog",
     ],
 )
 
@@ -76,12 +72,12 @@ mvfst_cpp_library(
         "QuicBuffer.h",
         "QuicRange.h",
     ],
-    deps = [":mvfst_logging"],
+    deps = [
+        "fbsource//third-party/glog:glog",
+        ":mvfst_logging",
+    ],
     exported_deps = [
         "//folly/portability:sys_uio",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 
@@ -132,10 +128,8 @@ mvfst_cpp_library(
         "EnumArray.h",
     ],
     exported_deps = [
+        "fbsource//third-party/glog:glog",
         "//folly:portability",
-    ],
-    exported_external_deps = [
-        "glog",
     ],
 )
 
@@ -178,10 +172,8 @@ mvfst_cpp_library(
         "CircularDeque-inl.h",
     ],
     exported_deps = [
+        "fbsource//third-party/glog:glog",
         ":mvfst_logging",
-    ],
-    exported_external_deps = [
-        "glog",
     ],
 )
 
@@ -229,15 +221,13 @@ mvfst_cpp_library(
         "TransportKnobs.h",
     ],
     deps = [
+        "fbsource//third-party/glog:glog",
         ":mvfst_logging",
         "//folly:dynamic",
         "//quic:constants",
     ],
     exported_deps = [
         ":optional",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 

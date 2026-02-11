@@ -42,7 +42,6 @@ mvfst_add_library(mvfst_codec_packet_number
     mvfst_common_mvfst_logging
     mvfst_constants
     Folly::folly_lang_bits
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_codec_packet_number_cipher

@@ -27,7 +27,6 @@ mvfst_add_library(mvfst_server_state_server
     mvfst_state_pacing_functions
     mvfst_state_stats_callback
     mvfst_state_stream
-    ${GLOG_LIBRARIES}
   EXPORTED_DEPS
     mvfst_codec_types
     mvfst_common_network_data
@@ -48,5 +47,4 @@ mvfst_add_library(mvfst_server_state_server
     Folly::folly_network_address
     Folly::folly_overload
     Folly::folly_random
-    ${GLOG_LIBRARIES}
 )

@@ -341,11 +341,9 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
     ],
     exported_deps = [
+        "fbsource//third-party/glog:glog",
         "//folly:token_bucket",
         "//quic:constants",
-    ],
-    exported_external_deps = [
-        "glog",
     ],
 )
 

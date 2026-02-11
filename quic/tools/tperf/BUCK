@@ -56,6 +56,7 @@ mvfst_cpp_binary(
         "tperf.cpp",
     ],
     deps = [
+        "fbsource//third-party/glog:glog",
         ":tperf_client",
         ":tperf_server",
         "//folly/init:init",
@@ -65,9 +66,6 @@ mvfst_cpp_binary(
         "DEFAULT": ["//folly:memcpy-use"],
         "ovr_config//os:windows": [],
     }),
-    external_deps = [
-        "glog",
-    ],
 )
 
 mvfst_cpp_library(

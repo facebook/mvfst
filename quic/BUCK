@@ -111,16 +111,13 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
         "ovr_config//os/constraints:macos": [],
-    }),
+    }) + ["fbsource//third-party/glog:glog"],
     exported_deps = [
         ":constants",
         ":tls_exception",
         "//folly:range",
         "//quic/common:optional",
         "//quic/common:variant",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 

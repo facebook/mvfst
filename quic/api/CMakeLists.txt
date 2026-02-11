@@ -12,7 +12,6 @@ mvfst_add_library(mvfst_api_quic_batch_writer
     QuicGsoBatchWriters.cpp
   DEPS
     mvfst_common_buf_accessor
-    ${GLOG_LIBRARIES}
   EXPORTED_DEPS
     mvfst_common_events_eventbase
     mvfst_common_mvfst_logging
@@ -23,7 +22,6 @@ mvfst_add_library(mvfst_api_quic_batch_writer
     Folly::folly_io_iobuf
     Folly::folly_network_address
     Folly::folly_portability
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_api_quic_callbacks

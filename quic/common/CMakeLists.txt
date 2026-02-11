@@ -15,7 +15,6 @@ mvfst_add_library(mvfst_common_function_ref
 mvfst_add_library(mvfst_common_mvfst_logging
   EXPORTED_DEPS
     mvfst_common_mvfst_check
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_common_interval_set
@@ -25,7 +24,6 @@ mvfst_add_library(mvfst_common_interval_set
     mvfst_common_mvfst_logging
     mvfst_common_optional
     Folly::folly_likely
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_common_quic_buffer
@@ -33,7 +31,6 @@ mvfst_add_library(mvfst_common_quic_buffer
     QuicBuffer.cpp
   DEPS
     mvfst_common_mvfst_logging
-    ${GLOG_LIBRARIES}
   EXPORTED_DEPS
     Folly::folly_portability_sys_uio
 )
@@ -64,7 +61,6 @@ mvfst_add_library(mvfst_common_buf_util
 mvfst_add_library(mvfst_common_enum_array
   EXPORTED_DEPS
     Folly::folly_portability
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_common_socket_util
@@ -88,7 +84,6 @@ mvfst_add_library(mvfst_common_string_utils
 mvfst_add_library(mvfst_common_circular_deque
   EXPORTED_DEPS
     mvfst_common_mvfst_logging
-    ${GLOG_LIBRARIES}
 )
 
 mvfst_add_library(mvfst_common_network_data
@@ -118,7 +113,6 @@ mvfst_add_library(mvfst_common_transport_knobs
     mvfst_common_mvfst_logging
     mvfst_constants
     Folly::folly_dynamic
-    ${GLOG_LIBRARIES}
   EXPORTED_DEPS
     mvfst_common_optional
 )

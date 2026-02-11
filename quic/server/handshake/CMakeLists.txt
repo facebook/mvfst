@@ -56,7 +56,6 @@ mvfst_add_library(mvfst_server_handshake_default_app_token_validator
     mvfst_server_state_server
     fizz::fizz
     Folly::folly_network_address
-    ${GLOG_LIBRARIES}
   EXPORTED_DEPS
     mvfst_common_optional
     fizz::fizz

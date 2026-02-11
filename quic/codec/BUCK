@@ -52,12 +52,10 @@ mvfst_cpp_library(
         "PacketNumber.h",
     ],
     deps = [
+        "fbsource//third-party/glog:glog",
         "//folly/lang:bits",
         "//quic:constants",
         "//quic/common:mvfst_logging",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 

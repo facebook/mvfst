@@ -70,6 +70,7 @@ mvfst_cpp_library(
         "DefaultAppTokenValidator.h",
     ],
     deps = [
+        "fbsource//third-party/glog:glog",
         "//fizz/server:resumption_state",
         "//folly:network_address",
         "//quic:constants",
@@ -84,9 +85,6 @@ mvfst_cpp_library(
         "//fizz/server:protocol",
         "//folly/io:iobuf",
         "//quic/common:optional",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
 
