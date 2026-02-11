@@ -1421,9 +1421,9 @@ QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
 
 CipherInfo QuicServerTransport::getOneRttCipherInfo() const {
   return {
-      *conn_->oneRttWriteCipher->getKey(),
-      *serverConn_->serverHandshakeLayer->getState().cipher(),
-      conn_->oneRttWriteHeaderCipher->getKey()->clone()};
+      .trafficKey = *conn_->oneRttWriteCipher->getKey(),
+      .cipherSuite = *serverConn_->serverHandshakeLayer->getState().cipher(),
+      .packetProtectionKey = conn_->oneRttWriteHeaderCipher->getKey()->clone()};
 }
 
 Optional<std::string> QuicServerTransport::getSni() {

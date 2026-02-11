@@ -123,7 +123,7 @@ void QuicServerWorker::bind(
     }
   }
   socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
-  socket_->setTXTime({CLOCK_MONOTONIC, /*deadline=*/false});
+  socket_->setTXTime({.clockid = CLOCK_MONOTONIC, .deadline = false});
 
   socket_->setMaxReadsPerEvent(transportSettings_.maxServerRecvPacketsPerLoop);
   MVVLOG(3) << "Socket max reads per event set to "

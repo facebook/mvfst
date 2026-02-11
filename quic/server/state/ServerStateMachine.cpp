@@ -460,11 +460,11 @@ quic::Expected<void, QuicError> processClientInitialParams(
     if (maxReceiveTimestampsPerAck.has_value() &&
         receiveTimestampsExponent.has_value()) {
       conn.maybePeerAckReceiveTimestampsConfig = {
-          std::min(
+          .maxReceiveTimestampsPerAck = std::min(
               static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
               static_cast<uint8_t>(
                   conn.transportSettings.maxReceiveTimestampsPerAckStored)),
-          std::max(
+          .receiveTimestampsExponent = std::max(
               static_cast<uint8_t>(receiveTimestampsExponent.value()),
               static_cast<uint8_t>(0))};
     }
@@ -1119,7 +1119,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
             // Store rate signal conditionally - only queue if subsequent packet
             // processes successfully
             pendingSconeRateSignal = QuicConnectionStateBase::SconeRateSignal{
-                sp->rate, static_cast<QuicVersion>(sp->version)};
+                .rate = sp->rate,
+                .version = static_cast<QuicVersion>(sp->version)};
           }
         }
         continue; // SCONE packet carries no frames - continue to next packet

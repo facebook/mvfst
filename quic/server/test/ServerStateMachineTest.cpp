@@ -515,7 +515,8 @@ TEST(ServerStateMachineTest, ServerEmitsRateSignal) {
   // logic)
   uint8_t testRate = 0x25;
   QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
-  serverConn.scone->pendingRateSignals.push_back({testRate, testVersion});
+  serverConn.scone->pendingRateSignals.push_back(
+      {.rate = testRate, .version = testVersion});
 
   // Verify rate signal was generated
   EXPECT_GT(serverConn.scone->pendingRateSignals.size(), 0);

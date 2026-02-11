@@ -4511,7 +4511,8 @@ TEST_F(QuicServerTransportTest, SconeRateSignalFlushedOnWrite) {
   // Push value into server->getConn().scone->pendingRateSignals
   uint8_t testRate = 0x42;
   QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
-  conn.scone->pendingRateSignals.push_back({testRate, testVersion});
+  conn.scone->pendingRateSignals.push_back(
+      {.rate = testRate, .version = testVersion});
 
   // Verify rate signal is queued
   EXPECT_EQ(conn.scone->pendingRateSignals.size(), 1);
