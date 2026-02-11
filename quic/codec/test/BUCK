@@ -191,7 +191,6 @@ mvfst_cpp_test(
         "//quic/codec:types",
         "//quic/common:contiguous_cursor",
         "//quic/common:mvfst_logging",
-        "//quic/common:optional",
         "//quic/common:string_utils",
     ],
 )

@@ -9,7 +9,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/codec/QuicInteger.h>
 #include <quic/common/MvfstLogging.h>
-#include <quic/common/Optional.h>
 #include <quic/common/StringUtils.h>
 
 #include <quic/QuicException.h>
