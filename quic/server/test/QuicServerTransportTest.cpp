@@ -4386,6 +4386,100 @@ TEST_F(QuicServerTransportTest, TestSendCloseOnIdleTimeoutKnobHandler) {
   EXPECT_TRUE(transportSettings.alwaysSendConnectionCloseOnIdleTimeout);
 }
 
+TEST_F(QuicServerTransportTest, TestRxPacketsBeforeAckKnobHandler) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+
+  // Verify defaults
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckAfterInit,
+      kDefaultRxPacketsBeforeAckAfterInit);
+
+  // Test invalid: wrong type (uint64_t instead of string)
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = uint64_t{1}}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckAfterInit,
+      kDefaultRxPacketsBeforeAckAfterInit);
+
+  // Test invalid: malformed string
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "blah,blah"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+
+  // Test invalid: wrong number of fields
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "10"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "10,10,10"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+
+  // Test invalid: zero beforeInit
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "0,10"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+
+  // Test invalid: zero afterInit
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "10,0"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckAfterInit,
+      kDefaultRxPacketsBeforeAckAfterInit);
+
+  // Test invalid: beforeInit=1 (must be >= 2)
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "1,10"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckBeforeInit,
+      kDefaultRxPacketsBeforeAckBeforeInit);
+
+  // Test invalid: afterInit=1 (must be >= 2)
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "10,1"}});
+  EXPECT_EQ(
+      transportSettings.rxPacketsBeforeAckAfterInit,
+      kDefaultRxPacketsBeforeAckAfterInit);
+
+  // Test valid: beforeInit=20, afterInit=30
+  server->handleKnobParams(
+      {{.id =
+            static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+        .val = "20,30"}});
+  EXPECT_EQ(transportSettings.rxPacketsBeforeAckBeforeInit, 20);
+  EXPECT_EQ(transportSettings.rxPacketsBeforeAckAfterInit, 30);
+}
+
 TEST_F(QuicServerTransportTest, SconeNegotiationServerSide) {
   // In transportSettings passed to server, set enableScone=true
   server->getNonConstConn().transportSettings.enableScone = true;

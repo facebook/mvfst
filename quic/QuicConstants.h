@@ -238,7 +238,9 @@ QUIC_ENUM(
     // Egress policer config: rate_bytes_per_sec,burst_ms,delay_ms
     EGRESS_POLICER_CONFIG = 0x20001,
     // Enable SCONE and set the rate signal from a bps value
-    SCONE_KNOB = 0x5C0E)
+    SCONE_KNOB = 0x5C0E,
+    // Controls rx packets before ack thresholds (beforeInit,afterInit)
+    RX_PACKETS_BEFORE_ACK = 0x10013)
 
 FOLLY_POP_WARNING
 

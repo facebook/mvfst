@@ -1367,6 +1367,48 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << static_cast<int>(rateSignal) << " from " << bps << " bps";
         return {};
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::RX_PACKETS_BEFORE_ACK),
+      [](QuicServerTransport& serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        const std::string* valPtr = std::get_if<std::string>(&value);
+        if (!valPtr) {
+          auto errMsg =
+              "Received invalid type for RX_PACKETS_BEFORE_ACK KnobParam: expected string";
+          MVVLOG(3) << errMsg;
+          return quic::make_unexpected(
+              QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
+        }
+
+        const std::string& val = *valPtr;
+        uint16_t beforeInit = 0;
+        uint16_t afterInit = 0;
+        bool parseSuccess = false;
+        try {
+          parseSuccess = folly::split(',', val, beforeInit, afterInit);
+          parseSuccess = parseSuccess && beforeInit >= 2 && afterInit >= 2;
+        } catch (std::exception&) {
+          parseSuccess = false;
+        }
+        if (parseSuccess) {
+          MVVLOG(3) << fmt::format(
+              "RX_PACKETS_BEFORE_ACK KnobParam received, "
+              "beforeInit={}, afterInit={}",
+              beforeInit,
+              afterInit);
+          auto serverConn = serverTransport.serverConn_;
+          serverConn->transportSettings.rxPacketsBeforeAckBeforeInit =
+              beforeInit;
+          serverConn->transportSettings.rxPacketsBeforeAckAfterInit = afterInit;
+        } else {
+          auto errMsg = fmt::format(
+              "Received invalid KnobParam for RX_PACKETS_BEFORE_ACK: {}", val);
+          MVVLOG(3) << errMsg;
+          return quic::make_unexpected(
+              QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
+        }
+        return {};
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
