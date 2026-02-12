@@ -7,7 +7,6 @@
 
 #include <common/init/Init.h>
 #include <folly/Benchmark.h>
-#include <quic/common/MvfstLogging.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <vector>
 
