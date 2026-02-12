@@ -1655,6 +1655,7 @@ void QuicTransportBaseLite::closeImpl(
   MVVLOG(10) << "Stopping read looper due to immediate close " << *this;
   readLooper_->stop();
   writeLooper_->stop();
+  writeLooper_->setPacingTimer(nullptr);
   cleanupPeekPingDatagramResources();
 
   // Drop any alternate paths
