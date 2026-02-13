@@ -1694,6 +1694,9 @@ TEST_F(QuicServerTransportTest, UnboundConnection) {
   // Need to do this otherwise server transport destructor will still call
   // onConnectionUnbound
   server->setRoutingCallback(nullptr);
+
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _)).Times(0);
+  server->unbindConnection();
 }
 
 TEST_F(
@@ -1763,6 +1766,9 @@ TEST_F(QuicServerTransportTest, DestroyWithoutClosingCancelByteEvents) {
   auto serverRegisterByteEvent2 = server->registerByteEventCallback(
       ByteEvent::Type::ACK, streamId, 0, &deliveryCallback);
 
+  EXPECT_TRUE(serverRegisterByteEvent1.has_value());
+  EXPECT_TRUE(serverRegisterByteEvent2.has_value());
+
   EXPECT_CALL(txCallback, onByteEventCanceled(_));
   EXPECT_CALL(deliveryCallback, onByteEventCanceled(_));
   EXPECT_CALL(readCb, readError(_, _));
@@ -1788,6 +1794,7 @@ TEST_F(QuicServerTransportTest, SetCongestionControl) {
 
 TEST_F(QuicServerTransportTest, TestServerNotDetachable) {
   EXPECT_FALSE(server->isDetachable());
+  EXPECT_EQ(server->getConn().nodeType, QuicNodeType::Server);
 }
 
 TEST_F(
