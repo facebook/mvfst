@@ -42,7 +42,10 @@ class FizzClientExtensions : public fizz::ClientExtensions {
 
     if (chloPaddingBytes_ > 0) {
       fizz::extensions::Padding padding{chloPaddingBytes_};
-      exts.push_back(fizz::encodeExtension(padding));
+      fizz::Error err;
+      fizz::Extension ext;
+      FIZZ_THROW_ON_ERROR(fizz::encodeExtension(ext, err, padding), err);
+      exts.push_back(std::move(ext));
     }
     return exts;
   }
