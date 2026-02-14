@@ -65,6 +65,7 @@ mvfst_cpp_library(
             ":copa",
             ":cubic",
             ":newreno",
+            "//quic/congestion_control/modular:bbr2_startup",
         ],
         "ovr_config//os/constraints:android": [
             ":copa",
@@ -76,7 +77,6 @@ mvfst_cpp_library(
         ],
     }) + [
         "//quic/common:mvfst_logging",
-        "//quic/congestion_control/modular:bbr2_startup",
     ],
     exported_deps = [
         "//quic:constants",
