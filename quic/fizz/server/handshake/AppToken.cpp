@@ -20,10 +20,16 @@ std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken) {
   auto buf = folly::IOBuf::create(20);
   folly::io::Appender appender(buf.get(), 20);
   auto ext = encodeExtension(appToken.transportParams, QuicVersion::MVFST);
-  fizz::detail::write(ext, appender);
-  fizz::detail::writeVector<uint8_t>(appToken.sourceAddresses, appender);
-  fizz::detail::write(appToken.version, appender);
-  fizz::detail::writeBuf<uint16_t>(appToken.appParams, appender);
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(fizz::detail::write(err, ext, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::writeVector<uint8_t>(
+          err, appToken.sourceAddresses, appender),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, appToken.version, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::writeBuf<uint16_t>(err, appToken.appParams, appender), err);
   return buf;
 }
 

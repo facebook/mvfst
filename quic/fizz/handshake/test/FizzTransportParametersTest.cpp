@@ -47,7 +47,8 @@ class QuicExtensionsTest : public testing::Test {
     auto encoded = encodeExtension(std::forward<T>(ext), encodingVersion);
     auto buf = folly::IOBuf::create(0);
     folly::io::Appender appender(buf.get(), 10);
-    fizz::detail::write(encoded, appender);
+    Error err;
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, encoded, appender), err);
     EXPECT_TRUE(folly::IOBufEqualTo()(buf, getBuf(expectedHex)));
   }
 };

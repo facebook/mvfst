@@ -15,22 +15,39 @@ namespace quic {
 void writeCachedServerTransportParameters(
     const CachedServerTransportParameters& params,
     folly::io::Appender& appender) {
-  fizz::detail::write(params.idleTimeout, appender);
-  fizz::detail::write(params.maxRecvPacketSize, appender);
-  fizz::detail::write(params.initialMaxData, appender);
-  fizz::detail::write(params.initialMaxStreamDataBidiLocal, appender);
-  fizz::detail::write(params.initialMaxStreamDataBidiRemote, appender);
-  fizz::detail::write(params.initialMaxStreamDataUni, appender);
-  fizz::detail::write(params.initialMaxStreamsBidi, appender);
-  fizz::detail::write(params.initialMaxStreamsUni, appender);
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.idleTimeout, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.maxRecvPacketSize, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.initialMaxData, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.initialMaxStreamDataBidiLocal, appender),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.initialMaxStreamDataBidiRemote, appender),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.initialMaxStreamDataUni, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.initialMaxStreamsBidi, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.initialMaxStreamsUni, appender), err);
   uint8_t knobSupport = params.knobFrameSupport ? 1 : 0;
-  fizz::detail::write(knobSupport, appender);
+  FIZZ_THROW_ON_ERROR(fizz::detail::write(err, knobSupport, appender), err);
   uint8_t ackReceiveTimestampsEnabled =
       params.ackReceiveTimestampsEnabled ? 1 : 0;
-  fizz::detail::write(ackReceiveTimestampsEnabled, appender);
-  fizz::detail::write(params.maxReceiveTimestampsPerAck, appender);
-  fizz::detail::write(params.receiveTimestampsExponent, appender);
-  fizz::detail::write(params.extendedAckFeatures, appender);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, ackReceiveTimestampsEnabled, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.maxReceiveTimestampsPerAck, appender),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.receiveTimestampsExponent, appender),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, params.extendedAckFeatures, appender), err);
 }
 
 void readCachedServerTransportParameters(

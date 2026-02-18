@@ -42,11 +42,15 @@ struct Reader<folly::IPAddress> {
 template <>
 struct Writer<folly::IPAddress> {
   template <class T>
-  void write(const folly::IPAddress& ipAddress, folly::io::Appender& out) {
+  Status write(
+      Error& err,
+      const folly::IPAddress& ipAddress,
+      folly::io::Appender& out) {
     MVDCHECK(!ipAddress.empty());
     auto buf =
         folly::IOBuf::wrapBuffer(ipAddress.bytes(), ipAddress.byteCount());
-    writeBuf<uint8_t>(buf, out);
+    FIZZ_RETURN_ON_ERROR(writeBuf<uint8_t>(err, buf, out));
+    return Status::Success;
   }
 };
 
