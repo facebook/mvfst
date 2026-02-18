@@ -26,11 +26,16 @@ namespace fizz::detail {
 template <>
 struct Reader<folly::IPAddress> {
   template <class T>
-  size_t read(folly::IPAddress& ipAddress, folly::io::Cursor& cursor) {
+  Status read(
+      size_t& ret,
+      Error& /* err */,
+      folly::IPAddress& ipAddress,
+      folly::io::Cursor& cursor) {
     std::unique_ptr<folly::IOBuf> sourceAddressBuf;
     size_t len = readBuf<uint8_t>(sourceAddressBuf, cursor);
     ipAddress = folly::IPAddress::fromBinary(sourceAddressBuf->coalesce());
-    return len;
+    ret = len;
+    return Status::Success;
   }
 };
 

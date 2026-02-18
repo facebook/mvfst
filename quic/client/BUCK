@@ -144,6 +144,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "//fizz/record:record",
+        "//fizz/util:status",
     ],
     exported_deps = [
         ":cached_server_tp",

@@ -8,6 +8,7 @@
 #include <quic/client/handshake/CachedServerTransportParametersSerialization.h>
 
 #include <fizz/record/Types.h>
+#include <fizz/util/Status.h>
 
 namespace quic {
 
@@ -35,23 +36,45 @@ void writeCachedServerTransportParameters(
 void readCachedServerTransportParameters(
     folly::io::Cursor& cursor,
     CachedServerTransportParameters& params) {
-  fizz::detail::read(params.idleTimeout, cursor);
-  fizz::detail::read(params.maxRecvPacketSize, cursor);
-  fizz::detail::read(params.initialMaxData, cursor);
-  fizz::detail::read(params.initialMaxStreamDataBidiLocal, cursor);
-  fizz::detail::read(params.initialMaxStreamDataBidiRemote, cursor);
-  fizz::detail::read(params.initialMaxStreamDataUni, cursor);
-  fizz::detail::read(params.initialMaxStreamsBidi, cursor);
-  fizz::detail::read(params.initialMaxStreamsUni, cursor);
+  size_t len;
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.idleTimeout, cursor), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.maxRecvPacketSize, cursor), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.initialMaxData, cursor), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(
+          len, err, params.initialMaxStreamDataBidiLocal, cursor),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(
+          len, err, params.initialMaxStreamDataBidiRemote, cursor),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.initialMaxStreamDataUni, cursor),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.initialMaxStreamsBidi, cursor), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.initialMaxStreamsUni, cursor), err);
   uint8_t knobFrameSupport;
-  fizz::detail::read(knobFrameSupport, cursor);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, knobFrameSupport, cursor), err);
   params.knobFrameSupport = knobFrameSupport > 0;
   uint8_t ackReceiveTimestampsEnabled;
-  fizz::detail::read(ackReceiveTimestampsEnabled, cursor);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, ackReceiveTimestampsEnabled, cursor), err);
   params.ackReceiveTimestampsEnabled = ackReceiveTimestampsEnabled > 0;
-  fizz::detail::read(params.maxReceiveTimestampsPerAck, cursor);
-  fizz::detail::read(params.receiveTimestampsExponent, cursor);
-  fizz::detail::read(params.extendedAckFeatures, cursor);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.maxReceiveTimestampsPerAck, cursor),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.receiveTimestampsExponent, cursor),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, params.extendedAckFeatures, cursor), err);
 }
 
 std::unique_ptr<folly::IOBuf> serializeCachedServerTransportParameters(

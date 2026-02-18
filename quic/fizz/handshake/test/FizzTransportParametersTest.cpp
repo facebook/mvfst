@@ -29,7 +29,10 @@ class QuicExtensionsTest : public testing::Test {
     auto buf = QuicExtensionsTest::getBuf(hex);
     Cursor cursor(buf.get());
     Extension ext;
-    EXPECT_EQ(fizz::detail::read(ext, cursor), buf->computeChainDataLength());
+    size_t len;
+    Error err;
+    FIZZ_THROW_ON_ERROR(fizz::detail::read(len, err, ext, cursor), err);
+    EXPECT_EQ(len, buf->computeChainDataLength());
     EXPECT_TRUE(cursor.isAtEnd());
     std::vector<Extension> exts;
     exts.push_back(std::move(ext));
