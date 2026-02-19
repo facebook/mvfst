@@ -606,6 +606,13 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
       newSessionTicketWrittenCwndHint_ = cwndHint;
     }
     AppToken appToken;
+    Optional<uint64_t> rttHintMs;
+    if (conn_->lossState.srtt > 0us) {
+      rttHintMs = static_cast<uint64_t>(
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              conn_->lossState.srtt)
+              .count());
+    }
     auto transportParamsResult = createTicketTransportParameters(
         conn_->transportSettings.idleTimeout.count(),
         conn_->transportSettings.maxRecvPacketSize,
@@ -618,7 +625,8 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
         conn_->transportSettings.advertisedInitialMaxStreamsBidi,
         conn_->transportSettings.advertisedInitialMaxStreamsUni,
         conn_->transportSettings.advertisedExtendedAckFeatures,
-        cwndHint);
+        newSessionTicketWrittenCwndHint_,
+        rttHintMs);
     if (transportParamsResult.hasError()) {
       return quic::make_unexpected(transportParamsResult.error());
     }

@@ -111,8 +111,6 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // A false value indicates 0-rtt is rejected.
   Optional<bool> transportParamsMatching;
 
-  Optional<uint64_t> maybeCwndHintBytes;
-
   // Whether source address token matches client ip.
   // A false value indicates either 0-rtt is rejected or inflight bytes are
   // limited until CFIN depending on matching policy.

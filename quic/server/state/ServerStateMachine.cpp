@@ -696,16 +696,27 @@ void maybeUpdateTransportFromAppToken(
     return;
   }
   auto& params = appToken->transportParams.parameters;
+
+  // Extract cwnd and rtt hints
   auto maybeCwndHintBytesResult =
       getIntegerParameter(TransportParameterId::cwnd_hint_bytes, params);
   if (maybeCwndHintBytesResult.hasError()) {
     return;
   }
   auto maybeCwndHintBytes = maybeCwndHintBytesResult.value();
-  if (maybeCwndHintBytes) {
+
+  auto maybeRttHintMsResult =
+      getIntegerParameter(TransportParameterId::rtt_hint_ms, params);
+  if (maybeRttHintMsResult.hasError()) {
+    return;
+  }
+  const auto& maybeRttHintMs = maybeRttHintMsResult.value();
+
+  if (maybeCwndHintBytes && maybeRttHintMs) {
     QUIC_STATS(conn.statsCallback, onCwndHintBytesSample, *maybeCwndHintBytes);
 
-    // Only use the cwndHint if the source address is included in the token
+    // Only use the cwndHint and rtt hints if the source address is included in
+    // the token
     MVDCHECK(conn.peerAddress.isInitialized());
     auto addressMatches =
         std::find(
@@ -713,7 +724,10 @@ void maybeUpdateTransportFromAppToken(
             appToken->sourceAddresses.end(),
             conn.peerAddress.getIPAddress()) != appToken->sourceAddresses.end();
     if (addressMatches) {
-      conn.maybeCwndHintBytes = maybeCwndHintBytes;
+      if (conn.congestionController) {
+        conn.congestionController->setResumeHints(
+            *maybeCwndHintBytes, std::chrono::milliseconds(*maybeRttHintMs));
+      }
     }
   }
 }

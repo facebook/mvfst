@@ -20,7 +20,8 @@ createTicketTransportParameters(
     uint64_t initialMaxStreamsBidi,
     uint64_t initialMaxStreamsUni,
     ExtendedAckFeatureMaskType extendedAckFeatures,
-    Optional<uint64_t> cwndHintBytes) {
+    Optional<uint64_t> cwndHintBytes,
+    Optional<uint64_t> rttHintMs) {
   TicketTransportParameters params;
   auto idleTimeoutResult =
       encodeIntegerParameter(TransportParameterId::idle_timeout, idleTimeout);
@@ -95,6 +96,15 @@ createTicketTransportParameters(
       return quic::make_unexpected(cwndHintBytesResult.error());
     }
     params.parameters.push_back(cwndHintBytesResult.value());
+  }
+
+  if (rttHintMs) {
+    auto rttHintMsResult =
+        encodeIntegerParameter(TransportParameterId::rtt_hint_ms, *rttHintMs);
+    if (rttHintMsResult.hasError()) {
+      return quic::make_unexpected(rttHintMsResult.error());
+    }
+    params.parameters.push_back(rttHintMsResult.value());
   }
   return params;
 }

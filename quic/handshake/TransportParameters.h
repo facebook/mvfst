@@ -45,6 +45,7 @@ enum class TransportParameterId : uint64_t {
   extended_ack_features = 0xff0a004,
   knob_frames_supported = 0x00005178,
   cwnd_hint_bytes = 0x00007492,
+  rtt_hint_ms = 0x00007493,
   client_direct_encap = 0x000042fc,
   server_direct_encap = 0x000042fd,
   reliable_stream_reset = 0x17f7586d2cb571,
