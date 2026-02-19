@@ -577,15 +577,15 @@ bool QuicServerTransport::shouldWriteNewSessionTicket() {
   // kMinIntervalBetweenSessionTickets
 
   if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
-      conn_->congestionController &&
-      Clock::now() - newSessionTicketWrittenTimestamp_.value() >
-          kMinIntervalBetweenSessionTickets) {
+      conn_->congestionController) {
     const auto& targetBDP = conn_->congestionController->getBDP();
     bool bdpChangedSinceLastHint =
         !newSessionTicketWrittenCwndHint_.has_value() ||
         targetBDP / 2 > *newSessionTicketWrittenCwndHint_ ||
         targetBDP < *newSessionTicketWrittenCwndHint_;
-    if (bdpChangedSinceLastHint) {
+    if (bdpChangedSinceLastHint &&
+        Clock::now() - newSessionTicketWrittenTimestamp_.value() >
+            kMinIntervalBetweenSessionTickets) {
       return true;
     }
   }
@@ -597,13 +597,12 @@ QuicServerTransport::maybeWriteNewSessionTicket() {
   if (shouldWriteNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     newSessionTicketWrittenTimestamp_ = Clock::now();
-    Optional<uint64_t> cwndHint = std::nullopt;
     if (conn_->transportSettings.includeCwndHintsInSessionTicket &&
         conn_->congestionController) {
       const auto& bdp = conn_->congestionController->getBDP();
-      MVVLOG(7) << "Writing a new session ticket with cwnd hint=" << bdp;
-      cwndHint = bdp;
-      newSessionTicketWrittenCwndHint_ = cwndHint;
+      newSessionTicketWrittenCwndHint_ = std::max(
+          bdp,
+          conn_->udpSendPacketLen * conn_->transportSettings.initCwndInMss);
     }
     AppToken appToken;
     Optional<uint64_t> rttHintMs;

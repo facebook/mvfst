@@ -726,7 +726,7 @@ constexpr uint32_t kDefaultDatagramFlowId = 0;
 
 // Minimum interval between new session tickets sent by the server in
 // milliseconds
-constexpr std::chrono::milliseconds kMinIntervalBetweenSessionTickets = 100ms;
+constexpr std::chrono::milliseconds kMinIntervalBetweenSessionTickets = 1000ms;
 
 // Number of packets to write with the current cipher before initiating a key
 // update. This is a conservative number below the confidentiality limit (2^23)
