@@ -72,6 +72,7 @@ mvfst_cpp_library(
         ":bbr2_probe_bw",
         ":bbr2_probe_rtt",
         "//quic/congestion_control:congestion_control_functions",
+        "//quic/logging:qlogger_macros",
     ],
     exported_deps = [
         ":bbr2_shared",

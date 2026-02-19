@@ -86,7 +86,8 @@ class QLoggerCommon : public quic::BaseQLogger {
   void addCongestionStateUpdate(
       Optional<std::string> oldState,
       std::string newState,
-      Optional<std::string> trigger) override;
+      Optional<std::string> trigger,
+      Optional<uint64_t> resumption = std::nullopt) override;
   void addStreamStateUpdate(
       quic::StreamId id,
       std::string update,

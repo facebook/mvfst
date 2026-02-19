@@ -49,6 +49,7 @@ mvfst_add_library(mvfst_congestion_control_modular_bbr2_startup
     mvfst_congestion_control_congestion_control_functions
     mvfst_congestion_control_modular_bbr2_probe_bw
     mvfst_congestion_control_modular_bbr2_probe_rtt
+    mvfst_logging_qlogger_macros
   EXPORTED_DEPS
     mvfst_congestion_control_bandwidth
     mvfst_congestion_control_congestion_controller

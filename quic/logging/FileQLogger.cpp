@@ -288,7 +288,8 @@ void FileQLogger::addCongestionMetricUpdate(
 void FileQLogger::addCongestionStateUpdate(
     Optional<std::string> oldState,
     std::string newState,
-    Optional<std::string> trigger) {
+    Optional<std::string> trigger,
+    Optional<uint64_t> resumption) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
@@ -297,6 +298,7 @@ void FileQLogger::addCongestionStateUpdate(
           std::move(oldState),
           std::move(newState),
           std::move(trigger),
+          resumption,
           refTime));
 }
 

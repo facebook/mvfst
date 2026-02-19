@@ -10,6 +10,7 @@
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/congestion_control/modular/Bbr2ProbeBw.h>
 #include <quic/congestion_control/modular/Bbr2ProbeRtt.h>
+#include <quic/logging/QLoggerMacros.h>
 #include <chrono>
 #include <cstdint>
 
@@ -238,6 +239,13 @@ void Bbr2Startup::checkResumptionState() {
     }
 
     isResuming_ = true;
+    QLOG(
+        conn_,
+        addCongestionStateUpdate,
+        std::nullopt,
+        bbr2StateToString(shared_->state_),
+        std::nullopt,
+        cwndHintBytes_.value());
   } else if (
       isResuming_ && resumeStartRound_.has_value() &&
       resumeStartRound_.value() + 2 <= shared_->roundCount_) {

@@ -122,7 +122,8 @@ class QLogger {
   virtual void addCongestionStateUpdate(
       Optional<std::string> oldState,
       std::string newState,
-      Optional<std::string> trigger) = 0;
+      Optional<std::string> trigger,
+      Optional<uint64_t> resumption = std::nullopt) = 0;
   virtual void addStreamStateUpdate(
       quic::StreamId streamId,
       std::string update,

@@ -583,10 +583,12 @@ QLogCongestionStateUpdateEvent::QLogCongestionStateUpdateEvent(
     Optional<std::string> oldStateIn,
     std::string newStateIn,
     Optional<std::string> triggerIn,
+    Optional<uint64_t> resumptionIn,
     std::chrono::microseconds refTimeIn)
     : oldState{std::move(oldStateIn)},
       newState{std::move(newStateIn)},
-      trigger{std::move(triggerIn)} {
+      trigger{std::move(triggerIn)},
+      resumption{std::move(resumptionIn)} {
   eventType = QLogEventType::CongestionMetricUpdate;
   refTime = refTimeIn;
 }
@@ -607,6 +609,10 @@ folly::dynamic QLogCongestionStateUpdateEvent::toDynamic() const {
 
   if (trigger.has_value()) {
     data["trigger"] = trigger.value();
+  }
+
+  if (resumption.has_value()) {
+    data["resumption"] = resumption.value();
   }
 
   event["data"] = std::move(data);

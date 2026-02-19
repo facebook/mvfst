@@ -575,11 +575,13 @@ class QLogCongestionStateUpdateEvent : public QLogEvent {
       Optional<std::string> oldState,
       std::string newState,
       Optional<std::string> trigger,
+      Optional<uint64_t> resumption,
       std::chrono::microseconds refTimeIn);
   ~QLogCongestionStateUpdateEvent() override = default;
   Optional<std::string> oldState;
   std::string newState;
   Optional<std::string> trigger;
+  Optional<uint64_t> resumption;
 
   [[nodiscard]] folly::dynamic toDynamic() const override;
 };
