@@ -401,12 +401,12 @@ enum class QuicVersion : uint32_t {
   // broken.
   MVFST = 0xfaceb002,
   QUIC_V1 = 0x00000001,
-  // QUIC_V1_ALIAS is used to default to BBRv2 instead of BBRv1 in
-  // QuicServerWorker.cpp
+  // QUIC_V1_ALIAS is is used to enable careful resume for bbr2modular.
   QUIC_V1_ALIAS = 0xfaceb003,
+  // QUIC_V1_ALIAS2 is used to enable sending the cwnd hint in the session
+  // ticket.
   QUIC_V1_ALIAS2 = 0xfaceb004,
-  // MVFST_EXPERIMENTAL is used to default to BBRv2 instead of BBRv1 in
-  // QuicServerWorker.cpp
+  // MVFST_EXPERIMENTAL is used to enable careful resume for bbr2modular
   MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST
   MVFST_ALIAS = 0xfaceb010,
   MVFST_INVALID = 0xfaceb00f,

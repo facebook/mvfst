@@ -649,14 +649,17 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
 
     auto transportSettingsCopy = transportSettings_;
-    if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL ||
-        quicVersion == QuicVersion::QUIC_V1_ALIAS) {
-      // Override BBRv1 with BBRv2
+    if (quicVersion == QuicVersion::QUIC_V1_ALIAS ||
+        quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
+      transportSettingsCopy.includeCwndHintsInSessionTicket = true;
+      transportSettingsCopy.useCwndHintsInSessionTicket = true;
       if (transportSettingsCopy.defaultCongestionController ==
-          CongestionControlType::BBR) {
+          CongestionControlType::BBR2) {
         transportSettingsCopy.defaultCongestionController =
-            CongestionControlType::BBR2;
+            CongestionControlType::BBR2Modular;
       }
+    } else if (quicVersion == QuicVersion::QUIC_V1_ALIAS2) {
+      transportSettingsCopy.includeCwndHintsInSessionTicket = true;
     }
 
     // Call the override function last so it can override any previous config.
