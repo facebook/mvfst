@@ -70,6 +70,9 @@ class Bbr2Startup : public CongestionController {
 
   void setAppIdle(bool, TimePoint) noexcept override {}
 
+  void setResumeHints(uint64_t cwndHintBytes, std::chrono::milliseconds rttHint)
+      override;
+
   void getStats(CongestionControllerStats& stats) const override {
     shared_->getStats(stats);
   }
@@ -92,6 +95,7 @@ class Bbr2Startup : public CongestionController {
   // Congestion signals (startup-specific)
   void resetShortTermModel();
   void updateCongestionSignals();
+  void checkResumptionState();
 
   QuicConnectionStateBase& conn_;
   std::shared_ptr<Bbr2Shared> shared_;
@@ -105,6 +109,12 @@ class Bbr2Startup : public CongestionController {
   // Short term model - used for drain
   Optional<Bandwidth> bandwidthShortTerm_;
   Optional<uint64_t> inflightShortTerm_;
+
+  // Resume state
+  bool isResuming_{false};
+  Optional<uint64_t> resumeStartRound_;
+  Optional<uint64_t> cwndHintBytes_;
+  Optional<std::chrono::milliseconds> rttHint_;
 };
 
 } // namespace quic

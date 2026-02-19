@@ -65,11 +65,14 @@ void Bbr2Startup::onPacketAckOrLoss(
     checkFullBwReached();
     checkStartupDone();
 
+    checkResumptionState();
+
     shared_->finalizeMinRttAndDeliverySignals();
 
     if (isDrainComplete()) {
       // Create ProbeBw controller and set it as the connection's controller
       // NOTE: This destroys 'this' - must return immediately after
+      MVCHECK(!isResuming_);
       auto probeBw = std::make_unique<Bbr2ProbeBw>(conn_, shared_);
       auto* probeBwPtr = probeBw.get();
       conn_.congestionController = std::move(probeBw);
@@ -77,7 +80,7 @@ void Bbr2Startup::onPacketAckOrLoss(
       return;
     }
 
-    if (shared_->shouldEnterProbeRtt()) {
+    if (!isResuming_ && shared_->shouldEnterProbeRtt()) {
       auto probeRtt = std::make_unique<Bbr2ProbeRtt>(
           conn_, shared_, std::move(conn_.congestionController));
       auto* probeRttPtr = probeRtt.get();
@@ -107,6 +110,15 @@ void Bbr2Startup::onPacketAckOrLoss(
   }
 }
 
+void Bbr2Startup::setResumeHints(
+    uint64_t cwndHintBytes,
+    std::chrono::milliseconds rttHint) {
+  if (!cwndHintBytes_.has_value()) {
+    cwndHintBytes_ = cwndHintBytes;
+    rttHint_ = rttHint;
+  }
+}
+
 // Internals
 
 void Bbr2Startup::resetShortTermModel() {
@@ -131,6 +143,9 @@ void Bbr2Startup::setPacing() {
   if (shared_->state_ == Bbr2State::Startup && !fullBwReached_) {
     minPacingWindow =
         conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss;
+    if (isResuming_) {
+      minPacingWindow = std::max(*minPacingWindow, cwndHintBytes_.value() / 2);
+    }
   }
 
   // Choose RTT factor based on state
@@ -155,6 +170,12 @@ uint64_t Bbr2Startup::calculateCwnd() const {
   auto cwndBytes = shared_->cwndBytes_;
   if (fullBwReached_) {
     cwndBytes = std::min(cwndBytes + ackedBytes, inflightMax);
+  } else if (
+      shared_->state_ == Bbr2State::Startup && isResuming_ &&
+      cwndHintBytes_.value() / 2 > inflightMax) {
+    auto resumptionBdp =
+        uint64_t(cwndHintBytes_.value() * kStartupCwndGain / 2);
+    cwndBytes = std::max(cwndBytes, resumptionBdp);
   } else if (
       cwndBytes < inflightMax ||
       conn_.lossState.totalBytesAcked <
@@ -190,6 +211,40 @@ void Bbr2Startup::updateCongestionSignals() {
   }
 }
 
+void Bbr2Startup::checkResumptionState() {
+  if (shared_->state_ != Bbr2State::Startup ||
+      !conn_.transportSettings.useCwndHintsInSessionTicket ||
+      !cwndHintBytes_.has_value() || !shared_->roundStart_) {
+    return;
+  }
+
+  if (!resumeStartRound_.has_value() && shared_->lossEventsInLastRound_ == 0 &&
+      conn_.lossState.maybeLrtt.has_value()) {
+    // New round, we haven't resumed yet, we have no loss, we have an RTT
+    // sample
+
+    // Mark resumption started whether we decide to resume or not so we don't
+    // keep doing this check.
+    resumeStartRound_ = shared_->roundCount_;
+
+    // Current RTT must be within 0.5x-10x of saved RTT for resumption
+    if (rttHint_.has_value()) {
+      auto savedRtt = rttHint_.value();
+      auto currentRtt = conn_.lossState.maybeLrtt.value();
+      if (currentRtt < savedRtt / 2 || currentRtt > savedRtt * 10) {
+        // Path has changed significantly, don't resume
+        return;
+      }
+    }
+
+    isResuming_ = true;
+  } else if (
+      isResuming_ && resumeStartRound_.has_value() &&
+      resumeStartRound_.value() + 2 <= shared_->roundCount_) {
+    isResuming_ = false;
+  }
+}
+
 void Bbr2Startup::checkStartupDone() {
   checkStartupHighLoss();
 
@@ -218,7 +273,7 @@ void Bbr2Startup::checkStartupHighLoss() {
     return; /* no need to check for a the loss exit condition now */
   }
   if (shared_->lossPctInLastRound_ > kLossThreshold &&
-      shared_->lossEventsInLastRound_ >= 6) {
+      (shared_->lossEventsInLastRound_ >= 6 || isResuming_)) {
     fullBwReached_ = true;
     shared_->inflightLongTerm_ =
         std::max(shared_->getBDPWithGain(), shared_->inflightLatest_);
@@ -254,6 +309,11 @@ void Bbr2Startup::resetFullBw() {
 void Bbr2Startup::enterDrain() {
   shared_->state_ = Bbr2State::Drain;
   updatePacingGain();
+  if (isResuming_) {
+    auto safeRetreatBw = shared_->maxBwFilter_.GetBest() / 2;
+    shared_->maxBwFilter_.Reset(safeRetreatBw, shared_->roundCount_);
+    isResuming_ = false;
+  }
 }
 
 bool Bbr2Startup::isDrainComplete() const noexcept {
