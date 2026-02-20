@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <fizz/client/AsyncFizzClient.h>
 #include <fizz/client/ECHPolicy.h>
+#include <fizz/protocol/DefaultCertificateVerifier.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>

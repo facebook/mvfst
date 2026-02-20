@@ -23,9 +23,9 @@ mvfst_cpp_library(
     exported_deps = [
         ":psk_cache",
         "//fizz/client:actions",
-        "//fizz/client:async_fizz_client",
         "//fizz/client:client_extensions",
         "//fizz/client:ech_policy",
+        "//fizz/client:ech_retry_callback",
         "//fizz/client:fizz_client_context",
         "//fizz/client:protocol",
         "//fizz/extensions/clientpadding:types",

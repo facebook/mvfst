@@ -8,7 +8,7 @@
 #pragma once
 
 #include <fizz/client/Actions.h>
-#include <fizz/client/AsyncFizzClient.h>
+#include <fizz/client/ECHRetryCallback.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 

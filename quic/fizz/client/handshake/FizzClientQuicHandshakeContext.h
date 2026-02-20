@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <fizz/client/AsyncFizzClient.h>
 #include <fizz/client/ECHPolicy.h>
+#include <fizz/client/ECHRetryCallback.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 
 #include <quic/fizz/client/handshake/QuicPskCache.h>
