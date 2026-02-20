@@ -167,11 +167,9 @@ class QuicServerTransport
 
   virtual void setBufAccessor(BufAccessor* bufAccessor);
 
-  const std::shared_ptr<const folly::AsyncTransportCertificate>
-  getPeerCertificate() const override;
+  const std::shared_ptr<const fizz::Cert> getPeerCertificate() const override;
 
-  const std::shared_ptr<const folly::AsyncTransportCertificate>
-  getSelfCertificate() const override;
+  const std::shared_ptr<const fizz::Cert> getSelfCertificate() const override;
 
   virtual CipherInfo getOneRttCipherInfo() const;
 

@@ -252,8 +252,7 @@ class QuicClientTransportLite
   EncryptionLevel getReadEncryptionLevel() const;
   bool waitingForHandshakeData() const;
 
-  const std::shared_ptr<const folly::AsyncTransportCertificate>
-  getPeerCertificate() const override;
+  const std::shared_ptr<const fizz::Cert> getPeerCertificate() const override;
 
   Optional<Handshake::TLSSummary> getTLSSummary() const override;
 

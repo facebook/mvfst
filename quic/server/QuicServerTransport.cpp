@@ -774,7 +774,7 @@ void QuicServerTransport::setBufAccessor(BufAccessor* bufAccessor) {
   conn_->bufAccessor = bufAccessor;
 }
 
-const std::shared_ptr<const folly::AsyncTransportCertificate>
+const std::shared_ptr<const fizz::Cert>
 QuicServerTransport::getPeerCertificate() const {
   const auto handshakeLayer = serverConn_->serverHandshakeLayer;
   if (handshakeLayer) {
@@ -783,7 +783,7 @@ QuicServerTransport::getPeerCertificate() const {
   return nullptr;
 }
 
-const std::shared_ptr<const folly::AsyncTransportCertificate>
+const std::shared_ptr<const fizz::Cert>
 QuicServerTransport::getSelfCertificate() const {
   const auto handshakeLayer = serverConn_->serverHandshakeLayer;
   if (handshakeLayer) {

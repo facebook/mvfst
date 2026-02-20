@@ -2252,7 +2252,7 @@ bool QuicClientTransportLite::waitingForHandshakeData() const {
   return clientConn_->clientHandshakeLayer->waitingForData();
 }
 
-const std::shared_ptr<const folly::AsyncTransportCertificate>
+const std::shared_ptr<const fizz::Cert>
 QuicClientTransportLite::getPeerCertificate() const {
   const auto clientHandshakeLayer = clientConn_->clientHandshakeLayer;
   if (clientHandshakeLayer) {

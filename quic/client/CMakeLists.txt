@@ -86,8 +86,8 @@ mvfst_add_library(mvfst_client_state_and_handshake
     mvfst_handshake_transport_parameters
     mvfst_state_quic_state_machine
     mvfst_state_state_functions
+    fizz::fizz
     Folly::folly_exception_wrapper
-    Folly::folly_io_async_async_transport_certificate
     Folly::folly_io_async_delayed_destruction
     Folly::folly_io_iobuf
 )

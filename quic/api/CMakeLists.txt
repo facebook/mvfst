@@ -106,7 +106,7 @@ mvfst_add_library(mvfst_api_transport_lite
     mvfst_handshake
     mvfst_handshake_transport_parameters
     mvfst_state_quic_state_machine
-    Folly::folly_io_async_async_transport_certificate
+    fizz::fizz
     Folly::folly_io_async_delayed_destruction
     Folly::folly_maybe_managed_ptr
 )

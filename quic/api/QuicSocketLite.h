@@ -7,8 +7,8 @@
 
 #pragma once
 
+#include <fizz/protocol/Certificate.h>
 #include <folly/MaybeManagedPtr.h>
-#include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicCallbacks.h>
 #include <quic/api/TransportInfo.h>
@@ -675,8 +675,7 @@ class QuicSocketLite {
   /**
    * Get the cert presented by peer
    */
-  [[nodiscard]] virtual const std::shared_ptr<
-      const folly::AsyncTransportCertificate>
+  [[nodiscard]] virtual const std::shared_ptr<const fizz::Cert>
   getPeerCertificate() const {
     return nullptr;
   }
@@ -684,8 +683,7 @@ class QuicSocketLite {
   /**
    * Get the cert presented by self
    */
-  [[nodiscard]] virtual const std::shared_ptr<
-      const folly::AsyncTransportCertificate>
+  [[nodiscard]] virtual const std::shared_ptr<const fizz::Cert>
   getSelfCertificate() const {
     return nullptr;
   }

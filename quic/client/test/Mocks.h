@@ -135,7 +135,7 @@ class MockClientHandshakeBase : public ClientHandshake {
       (),
       (const, override));
   MOCK_METHOD(
-      const std::shared_ptr<const folly::AsyncTransportCertificate>,
+      const std::shared_ptr<const fizz::Cert>,
       getPeerCertificate,
       (),
       (const, override));

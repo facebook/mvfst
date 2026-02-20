@@ -9,9 +9,9 @@
 
 #include <folly/ExceptionWrapper.h>
 #include <folly/io/IOBufQueue.h>
-#include <folly/io/async/AsyncTransportCertificate.h>
 #include <folly/io/async/DelayedDestruction.h>
 
+#include <fizz/protocol/Certificate.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/common/Expected.h>
@@ -132,8 +132,8 @@ class ClientHandshake : public Handshake {
 
   bool waitingForData() const;
 
-  virtual const std::shared_ptr<const folly::AsyncTransportCertificate>
-  getPeerCertificate() const = 0;
+  virtual const std::shared_ptr<const fizz::Cert> getPeerCertificate()
+      const = 0;
 
   ~ClientHandshake() override = default;
 

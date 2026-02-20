@@ -363,7 +363,7 @@ class MockQuicSocket : public QuicSocket {
       (StreamId, bool),
       (noexcept));
   MOCK_METHOD(
-      (const std::shared_ptr<const folly::AsyncTransportCertificate>),
+      (const std::shared_ptr<const fizz::Cert>),
       getPeerCertificate,
       (),
       (const));

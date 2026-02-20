@@ -298,7 +298,7 @@ void FizzClientHandshake::echRetryAvailable(
   }
 }
 
-const std::shared_ptr<const folly::AsyncTransportCertificate>
+const std::shared_ptr<const fizz::Cert>
 FizzClientHandshake::getPeerCertificate() const {
   return state_.serverCert();
 }

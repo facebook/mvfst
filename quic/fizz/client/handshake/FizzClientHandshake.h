@@ -56,8 +56,7 @@ class FizzClientHandshake : public ClientHandshake {
     echRetryCallback_ = cb;
   }
 
-  const std::shared_ptr<const folly::AsyncTransportCertificate>
-  getPeerCertificate() const override;
+  const std::shared_ptr<const fizz::Cert> getPeerCertificate() const override;
 
   TLSSummary getTLSSummary() const override;
 
