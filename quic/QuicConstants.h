@@ -442,7 +442,7 @@ constexpr uint32_t kDefaultQuicMaxBatchSize = 16;
 // Maximum allowed buffering for crypto stream data before terminating the
 // connection.
 constexpr uint64_t kDefaultMaxCryptoStreamBufferSize =
-    static_cast<const uint64_t>(256 * 1024); // 256kB
+    static_cast<uint64_t>(256 * 1024); // 256kB
 constexpr uint32_t kQuicMaxBatchSizeLimit = 64;
 
 // rfc6298:
