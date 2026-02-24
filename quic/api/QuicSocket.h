@@ -335,12 +335,6 @@ class QuicSocket : virtual public QuicSocketLite {
       PingCallback* cb) = 0;
 
   /**
-   * Send a ping to the peer.  When the ping is acknowledged by the peer or
-   * times out, the transport will invoke the callback.
-   */
-  virtual void sendPing(std::chrono::milliseconds pingTimeout) = 0;
-
-  /**
    * Detaches the eventbase from the socket. This must be called from the
    * eventbase of socket.
    * Normally this is invoked by an app when the connection is idle, i.e.

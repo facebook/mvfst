@@ -33,9 +33,13 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
     return clientConn_;
   }
 
-  // Expose the protected method for testing
+  // Expose protected members for testing
   quic::Expected<void, QuicError> testMaybeIssueConnectionIds() {
     return maybeIssueConnectionIds();
+  }
+
+  auto& getWriteLooper() {
+    return writeLooper_;
   }
 };
 
@@ -543,6 +547,14 @@ TEST_F(QuicClientTransportLiteTest, InitialServerCidMarkedInUse) {
     }
   }
   EXPECT_TRUE(foundInUseCid);
+}
+
+TEST_F(QuicClientTransportLiteTest, SendPingSetsPendingEvent) {
+  auto conn = quicClient_->getConn();
+  EXPECT_FALSE(conn->pendingEvents.sendPing);
+  quicClient_->sendPing();
+  EXPECT_TRUE(conn->pendingEvents.sendPing);
+  EXPECT_TRUE(quicClient_->getWriteLooper()->isLoopCallbackScheduled());
 }
 
 } // namespace quic::test

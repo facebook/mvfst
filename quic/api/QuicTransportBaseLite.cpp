@@ -2386,6 +2386,15 @@ void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
       sendCloseImmediately);
 }
 
+void QuicTransportBaseLite::sendPing(
+    std::chrono::milliseconds /* pingTimeout */) {
+  if (closeState_ == CloseState::CLOSED) {
+    return;
+  }
+  conn_->pendingEvents.sendPing = true;
+  updateWriteLooper(true);
+}
+
 void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   conn_->pendingEvents.sendPing = true;

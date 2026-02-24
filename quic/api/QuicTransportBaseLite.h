@@ -91,6 +91,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   void closeNow(Optional<QuicError> error) override;
 
+  void sendPing(std::chrono::milliseconds pingTimeout = {}) override;
+
   quic::Expected<void, LocalErrorCode> stopSending(
       StreamId id,
       ApplicationErrorCode error) override;

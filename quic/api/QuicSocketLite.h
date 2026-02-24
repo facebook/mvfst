@@ -487,6 +487,12 @@ class QuicSocketLite {
   }
 
   /**
+   * Send a ping to the peer.  When the ping is acknowledged by the peer or
+   * times out, the transport will invoke the callback.
+   */
+  virtual void sendPing(std::chrono::milliseconds /* pingTimeout */ = {}) {}
+
+  /**
    * Cancel the given stream
    */
   virtual quic::Expected<void, LocalErrorCode> resetStream(
