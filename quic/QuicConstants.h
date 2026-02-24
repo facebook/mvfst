@@ -628,6 +628,12 @@ constexpr size_t kMinInitialPacketSize = 1200;
 // Default maximum PTOs that will happen before tearing down the connection
 constexpr uint16_t kDefaultMaxNumPTO = 7;
 
+// Default number of consecutive PTOs before firing onPathDegrading
+constexpr uint16_t kDefaultNumPtosForPathDegrading = 4;
+
+// Default number of consecutive PTOs before firing onBlackholeDetected
+constexpr uint16_t kDefaultNumPtosForBlackhole = 6;
+
 // Maximum early data size that we need to negotiate in TLS
 constexpr uint32_t kRequiredMaxEarlyDataSize = 0xffffffff;
 

@@ -116,5 +116,12 @@ struct LossState {
   AlarmMethod currentAlarmMethod{AlarmMethod::EarlyRetransmitOrReordering};
   // Whether early retransmission of 0-rtt packets has been attempted
   bool attemptedEarlyRetransmit0Rtt{false};
+  // Whether path degrading has already been signaled for the current
+  // degradation episode. Reset to false when an ACK is received
+  // (i.e., when ptoCount resets to 0).
+  bool pathDegradingFired{false};
+  // Whether blackhole has already been signaled for the current episode.
+  // Reset to false when an ACK is received.
+  bool blackholeFired{false};
 };
 } // namespace quic

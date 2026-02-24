@@ -498,6 +498,18 @@ struct TransportSettings {
   // Whether to use alternative AEAD instead of Fizz AEAD for packet encryption.
   // When true, uses architecture-specific crypto instructions where available.
   bool useAlternativeCrypto{false};
+
+  // Enable path degradation / blackhole detection callbacks.
+  // When enabled, the transport fires onPathDegrading() and
+  // onBlackholeDetected() on ConnectionCallback at ptoCount thresholds.
+  bool enablePathDegradationDetection{false};
+
+  // Number of consecutive PTOs before firing onPathDegrading.
+  uint16_t numPtosForPathDegrading{kDefaultNumPtosForPathDegrading};
+
+  // Number of consecutive PTOs before firing onBlackholeDetected.
+  // Must be > numPtosForPathDegrading and < maxNumPTOs.
+  uint16_t numPtosForBlackhole{kDefaultNumPtosForBlackhole};
 };
 
 } // namespace quic

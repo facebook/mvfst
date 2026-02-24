@@ -985,6 +985,8 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
   conn->qLogger = mockQLogger;
   conn->lossState.ptoCount = 10;
   conn->lossState.reorderingThreshold = 10;
+  conn->lossState.pathDegradingFired = true;
+  conn->lossState.blackholeFired = true;
 
   sendPacket(*conn, TimePoint(), std::nullopt, PacketType::OneRtt);
 
@@ -1022,6 +1024,8 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
                    .hasError());
 
   EXPECT_EQ(0, conn->lossState.ptoCount);
+  EXPECT_FALSE(conn->lossState.pathDegradingFired);
+  EXPECT_FALSE(conn->lossState.blackholeFired);
   EXPECT_TRUE(conn->outstandings.packets.empty());
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_FALSE(testLossMarkFuncCalled);
@@ -2864,6 +2868,133 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossRetransmissionMixedTwoPackets) {
   EXPECT_EQ(stream1->lossBuffer.size(), 0);
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
+}
+
+TEST_F(QuicLossFunctionsTest, PathDegradingFiresAtThreshold) {
+  auto conn = createConn();
+  conn->statsCallback = nullptr;
+  conn->transportSettings.enablePathDegradationDetection = true;
+  conn->transportSettings.numPtosForPathDegrading = 4;
+  conn->transportSettings.numPtosForBlackhole = 6;
+  conn->transportSettings.maxNumPTOs = 8;
+
+  // PTOs 1-3: no degradation yet
+  for (int i = 0; i < 3; i++) {
+    auto ret = onPTOAlarm(*conn);
+    EXPECT_FALSE(ret.hasError());
+    EXPECT_FALSE(conn->pendingEvents.notifyPathDegrading);
+    EXPECT_FALSE(conn->lossState.pathDegradingFired);
+  }
+
+  // PTO 4: path degrading fires
+  auto ret = onPTOAlarm(*conn);
+  EXPECT_FALSE(ret.hasError());
+  EXPECT_TRUE(conn->pendingEvents.notifyPathDegrading);
+  EXPECT_TRUE(conn->lossState.pathDegradingFired);
+  EXPECT_FALSE(conn->pendingEvents.notifyBlackholeDetected);
+}
+
+TEST_F(QuicLossFunctionsTest, BlackholeFiresAtThreshold) {
+  auto conn = createConn();
+  conn->statsCallback = nullptr;
+  conn->transportSettings.enablePathDegradationDetection = true;
+  conn->transportSettings.numPtosForPathDegrading = 4;
+  conn->transportSettings.numPtosForBlackhole = 6;
+  conn->transportSettings.maxNumPTOs = 8;
+
+  // PTOs 1-5: no blackhole yet
+  for (int i = 0; i < 5; i++) {
+    auto ret = onPTOAlarm(*conn);
+    EXPECT_FALSE(ret.hasError());
+    EXPECT_FALSE(conn->pendingEvents.notifyBlackholeDetected);
+  }
+
+  // PTO 6: blackhole fires
+  auto ret = onPTOAlarm(*conn);
+  EXPECT_FALSE(ret.hasError());
+  EXPECT_TRUE(conn->pendingEvents.notifyBlackholeDetected);
+  EXPECT_TRUE(conn->lossState.blackholeFired);
+}
+
+TEST_F(QuicLossFunctionsTest, PathDegradingFiresOnlyOnce) {
+  auto conn = createConn();
+  conn->statsCallback = nullptr;
+  conn->transportSettings.enablePathDegradationDetection = true;
+  conn->transportSettings.numPtosForPathDegrading = 2;
+  conn->transportSettings.numPtosForBlackhole = 6;
+  conn->transportSettings.maxNumPTOs = 8;
+
+  // PTO 1
+  (void)onPTOAlarm(*conn);
+  // PTO 2: fires
+  (void)onPTOAlarm(*conn);
+  EXPECT_TRUE(conn->pendingEvents.notifyPathDegrading);
+
+  // Consume the pending event
+  conn->pendingEvents.notifyPathDegrading = false;
+
+  // PTO 3: should not re-fire
+  (void)onPTOAlarm(*conn);
+  EXPECT_FALSE(conn->pendingEvents.notifyPathDegrading);
+  EXPECT_TRUE(conn->lossState.pathDegradingFired);
+}
+
+TEST_F(QuicLossFunctionsTest, BlackholeFiresOnlyOnce) {
+  auto conn = createConn();
+  conn->statsCallback = nullptr;
+  conn->transportSettings.enablePathDegradationDetection = true;
+  conn->transportSettings.numPtosForPathDegrading = 2;
+  conn->transportSettings.numPtosForBlackhole = 3;
+  conn->transportSettings.maxNumPTOs = 8;
+
+  // PTOs 1-3: blackhole fires on 3rd
+  for (int i = 0; i < 3; i++) {
+    (void)onPTOAlarm(*conn);
+  }
+  EXPECT_TRUE(conn->pendingEvents.notifyBlackholeDetected);
+
+  // Consume the pending event
+  conn->pendingEvents.notifyBlackholeDetected = false;
+
+  // PTO 4: should not re-fire
+  (void)onPTOAlarm(*conn);
+  EXPECT_FALSE(conn->pendingEvents.notifyBlackholeDetected);
+  EXPECT_TRUE(conn->lossState.blackholeFired);
+}
+
+TEST_F(QuicLossFunctionsTest, NoDegradationWhenDisabled) {
+  auto conn = createConn();
+  conn->statsCallback = nullptr;
+  conn->transportSettings.enablePathDegradationDetection = false;
+  conn->transportSettings.numPtosForPathDegrading = 2;
+  conn->transportSettings.numPtosForBlackhole = 3;
+  conn->transportSettings.maxNumPTOs = 8;
+
+  for (int i = 0; i < 4; i++) {
+    (void)onPTOAlarm(*conn);
+  }
+  EXPECT_FALSE(conn->pendingEvents.notifyPathDegrading);
+  EXPECT_FALSE(conn->pendingEvents.notifyBlackholeDetected);
+  EXPECT_FALSE(conn->lossState.pathDegradingFired);
+  EXPECT_FALSE(conn->lossState.blackholeFired);
+}
+
+TEST_F(QuicLossFunctionsTest, NoDegradationWithoutOneRttCipher) {
+  auto conn = createConn();
+  conn->statsCallback = nullptr;
+  conn->transportSettings.enablePathDegradationDetection = true;
+  conn->transportSettings.numPtosForPathDegrading = 2;
+  conn->transportSettings.numPtosForBlackhole = 3;
+  conn->transportSettings.maxNumPTOs = 8;
+  conn->oneRttWriteCipher = nullptr;
+
+  for (int i = 0; i < 4; i++) {
+    (void)onPTOAlarm(*conn);
+  }
+  EXPECT_FALSE(conn->pendingEvents.notifyPathDegrading);
+  EXPECT_FALSE(conn->pendingEvents.notifyBlackholeDetected);
+  EXPECT_FALSE(conn->lossState.pathDegradingFired);
+  EXPECT_FALSE(conn->lossState.blackholeFired);
 }
 
 } // namespace quic::test

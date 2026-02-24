@@ -501,6 +501,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // Send an immediate ack frame (requesting an ack)
     bool requestImmediateAck{false};
+
+    // Set by onPTOAlarm when ptoCount reaches path degrading threshold
+    bool notifyPathDegrading{false};
+
+    // Set by onPTOAlarm when ptoCount reaches blackhole threshold
+    bool notifyBlackholeDetected{false};
   };
 
   PendingEvents pendingEvents;

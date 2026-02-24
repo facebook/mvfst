@@ -62,6 +62,24 @@ quic::Expected<void, QuicError> onPTOAlarm(QuicConnectionStateBase& conn) {
       conn.lossState.ptoCount,
       conn.outstandings.numOutstanding(),
       kPtoAlarm);
+  // Path degradation / blackhole detection via ptoCount thresholds.
+  // Uses pending event flags so the transport can invoke connCallback_
+  // (onPTOAlarm only has access to QuicConnectionStateBase, not callbacks).
+  if (conn.transportSettings.enablePathDegradationDetection &&
+      conn.oneRttWriteCipher) {
+    if (conn.lossState.ptoCount >=
+            conn.transportSettings.numPtosForPathDegrading &&
+        !conn.lossState.pathDegradingFired) {
+      conn.lossState.pathDegradingFired = true;
+      conn.pendingEvents.notifyPathDegrading = true;
+    }
+    if (conn.lossState.ptoCount >= conn.transportSettings.numPtosForBlackhole &&
+        !conn.lossState.blackholeFired) {
+      conn.lossState.blackholeFired = true;
+      conn.pendingEvents.notifyBlackholeDetected = true;
+    }
+  }
+
   if (conn.lossState.ptoCount >= conn.transportSettings.maxNumPTOs) {
     return quic::make_unexpected(QuicError(
         QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
@@ -496,6 +514,8 @@ handleAckForLoss(
   auto& ackState = getAckState(conn, pnSpace);
   if (ack.largestNewlyAckedPacket.has_value()) {
     conn.lossState.ptoCount = 0;
+    conn.lossState.pathDegradingFired = false;
+    conn.lossState.blackholeFired = false;
     // Update the largest acked packet number
     ackState.largestAckedByPeer = std::max<PacketNum>(
         ackState.largestAckedByPeer.value_or(*ack.largestNewlyAckedPacket),

@@ -2337,6 +2337,21 @@ void QuicTransportBaseLite::lossTimeoutExpired() noexcept {
       return;
     }
 
+    // Fire path degradation / blackhole callbacks via pending events.
+    // These are set by onPTOAlarm when ptoCount crosses thresholds.
+    if (conn_->pendingEvents.notifyPathDegrading) {
+      conn_->pendingEvents.notifyPathDegrading = false;
+      if (connCallback_) {
+        connCallback_->onPathDegrading();
+      }
+    }
+    if (conn_->pendingEvents.notifyBlackholeDetected) {
+      conn_->pendingEvents.notifyBlackholeDetected = false;
+      if (connCallback_) {
+        connCallback_->onBlackholeDetected();
+      }
+    }
+
     pacedWriteDataToSocket();
   } catch (const std::exception& ex) {
     handleExceptionAndClose(ex, "lossTimeoutExpired() error");

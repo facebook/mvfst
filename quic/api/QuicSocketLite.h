@@ -164,6 +164,27 @@ class QuicSocketLite {
     virtual void onSconeRateSignal(
         uint8_t /*rateSignal*/,
         QuicVersion /*sconeVersion*/) noexcept {}
+
+    /**
+     * Called when the path is detected to be degrading (early warning).
+     * Fires when ptoCount reaches numPtosForPathDegrading (default: 4)
+     * consecutive PTOs without an ACK.
+     *
+     * Applications may use this signal to begin probing alternate paths.
+     * Only fires once per degradation episode (resets on ACK receipt).
+     */
+    virtual void onPathDegrading() noexcept {}
+
+    /**
+     * Called when the path is detected to be blackholed.
+     * Fires when ptoCount reaches numPtosForBlackhole (default: 6)
+     * consecutive PTOs without an ACK.
+     *
+     * Applications should attempt migration to an alternate path
+     * or prepare for connection closure.
+     * Only fires once per degradation episode (resets on ACK receipt).
+     */
+    virtual void onBlackholeDetected() noexcept {}
   };
 
   /**
