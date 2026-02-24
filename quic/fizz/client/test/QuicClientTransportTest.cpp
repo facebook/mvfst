@@ -3167,6 +3167,88 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
 //   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 // }
 
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    MigrateConnectionCleansUpOldPathOnPacketReceived) {
+  auto& conn = client->getNonConstConn();
+  auto initialPathId = conn.currentPathId;
+
+  // Add an extra peer connection ID for path probing.
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+
+  // Create a probe socket and start a path probe.
+  folly::SocketAddress probeLocalAddr("1.2.3.4", 1234);
+  auto probeSock = getMockSocketWithExpectations(qEvb_);
+  auto* probeSockPtr = probeSock.get();
+  ON_CALL(*probeSockPtr, isBound()).WillByDefault(Return(true));
+  ON_CALL(*probeSockPtr, address())
+      .WillByDefault(Return(
+          quic::Expected<folly::SocketAddress, QuicError>{probeLocalAddr}));
+
+  auto probeRes = client->startPathProbe(std::move(probeSock));
+  ASSERT_TRUE(probeRes.has_value()) << probeRes.error();
+  auto probePathId = probeRes.value();
+
+  // Validate the probed path.
+  auto challengeDataRes =
+      conn.pathManager->getNewPathChallengeData(probePathId);
+  ASSERT_FALSE(challengeDataRes.hasError());
+  PathChallengeFrame chall{challengeDataRes.value()};
+  conn.pathManager->onPathChallengeSent(chall);
+  PathResponseFrame resp{challengeDataRes.value()};
+  auto* validated = conn.pathManager->onPathResponseReceived(resp, probePathId);
+  ASSERT_NE(validated, nullptr);
+
+  // Migrate to the probed path.
+  auto migRes = client->migrateConnection(probePathId);
+  ASSERT_TRUE(migRes.has_value()) << migRes.error();
+  EXPECT_EQ(conn.currentPathId, probePathId);
+
+  // The old path should NOT be immediately removed.
+  EXPECT_NE(conn.pathManager->getPath(initialPathId), nullptr);
+
+  // Switch the test's socket to the probe socket so deliverData delivers
+  // packets on the new path (probeLocalAddr, serverAddr).
+  sock = probeSockPtr;
+  ON_CALL(*probeSockPtr, recvmsg(testing::_, testing::_))
+      .WillByDefault(testing::Invoke([&](struct msghdr* msg, int) -> ssize_t {
+        DCHECK_GT(msg->msg_iovlen, 0);
+        if (socketReads.empty()) {
+          errno = EAGAIN;
+          return -1;
+        }
+        auto& udpPacket = socketReads[0].udpPacket;
+        auto testData = std::move(udpPacket.buf.front());
+        size_t testDataLen = testData->length();
+        memcpy(msg->msg_iov[0].iov_base, testData->data(), testData->length());
+        if (msg->msg_name) {
+          socklen_t msgLen = socketReads[0].addr.getAddress(
+              static_cast<sockaddr_storage*>(msg->msg_name));
+          msg->msg_namelen = msgLen;
+        }
+        socketReads.pop_front();
+        return testDataLen;
+      }));
+
+  // Build and deliver a ping packet on the new path.
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *conn.clientConnectionId,
+      appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_TRUE(builder.canBuildPacket());
+  ASSERT_FALSE(writeFrame(PingFrame(), builder).hasError());
+  auto packet = std::move(builder).buildPacket();
+  deliverData(packetToBuf(packet)->coalesce(), false);
+
+  // Now the old path should be cleaned up.
+  EXPECT_EQ(conn.pathManager->getPath(initialPathId), nullptr);
+  EXPECT_NE(conn.pathManager->getPath(probePathId), nullptr);
+}
+
 bool verifyFramePresent(
     std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
     QuicReadCodec& readCodec,

@@ -468,6 +468,13 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
               << destinationCidInPacket.hex();
   }
 
+  // A packet arrived on the current path. If we recently migrated, clean up
+  // the previous path.
+  if (previousPathId_.has_value() && conn_->currentPathId == readPath->id) {
+    (void)conn_->pathManager->removePath(*previousPathId_);
+    previousPathId_.reset();
+  }
+
   // Add the packet to the AckState associated with the packet number space.
   auto& ackState = getAckState(*conn_, pnSpace);
   auto addResult = addPacketToAckState(*conn_, ackState, packetNum, udpPacket);
@@ -2069,19 +2076,12 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
 
   QUIC_STATS(conn_->statsCallback, onConnectionMigration);
 
-  // Keep the old path for some time so we can read any packets that might
-  // already be inflight
-  auto removePathLambda = [conn = shared_from_this(), oldPathId]() {
-    auto removePathRes = conn->clientConn_->pathManager->removePath(oldPathId);
-    if (removePathRes.hasError()) {
-      MVLOG_WARNING << "Failed to remove old path after migration. "
-                    << removePathRes.error();
-    }
-  };
-  auto delay = kClientTimeToKeepOldPathAfterMigration *
-      std::chrono::ceil<std::chrono::milliseconds>(conn_->lossState.srtt)
-          .count();
-  evb_->runAfterDelay(removePathLambda, delay);
+  // If there's already a previous path from an earlier migration, remove it
+  // now. We only keep track of one old path at a time.
+  if (previousPathId_.has_value()) {
+    (void)conn_->pathManager->removePath(*previousPathId_);
+  }
+  previousPathId_ = oldPathId;
 
   // Write something to trigger the migration.
   conn_->pendingEvents.sendPing = true;

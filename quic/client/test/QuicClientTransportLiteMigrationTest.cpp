@@ -246,13 +246,10 @@ TEST_F(
   // This has to be updated manually in the test.
   sockPtr_ = probeSockPtr;
 
-  // Loop once to allow evb callbacks from the path result callback to execute
-  qEvb_->loopOnce();
-
-  // Since we migrated the connection, the probed path should still be there.
+  // The old path is not immediately removed — it's kept until a packet is
+  // received on the new path.
   EXPECT_NE(quicClient_->getConn()->pathManager->getPath(pathId), nullptr);
-  // The initial path id should be removed
-  EXPECT_EQ(
+  EXPECT_NE(
       quicClient_->getConn()->pathManager->getPath(initialPathId), nullptr);
 }
 

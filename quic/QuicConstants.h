@@ -677,10 +677,6 @@ constexpr std::chrono::seconds kTimeToRetainOldPaths =
 // it's not the current path.
 constexpr uint16_t kProbedPathGracePeriodInSRTT = 3;
 
-// The number of SRTTs the client will continue reading from the old socket
-// after migration.
-constexpr uint16_t kClientTimeToKeepOldPathAfterMigration = 2;
-
 // Maximum number of consecutive migration failures (path validation failures
 // on the current path) before closing the connection.
 constexpr uint32_t kMaxConsecutiveMigrationFailures = 5;
