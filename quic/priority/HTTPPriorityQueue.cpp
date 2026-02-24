@@ -114,6 +114,11 @@ void HTTPPriorityQueue::insertOrUpdate(
     Identifier id,
     PriorityQueue::Priority basePriority) {
   Priority priority(basePriority);
+  // When disablePausedPriority is set, treat paused streams as lowest-urgency
+  // incremental instead of skipping them entirely.
+  if (priority->paused && disablePausedPriority_) {
+    priority = Priority(7, true);
+  }
   auto findResult = find(id);
   if (findResult) {
     if (updateInSequential(findResult->elem, priority)) {
@@ -225,12 +230,12 @@ void HTTPPriorityQueue::consume(quic::Optional<uint64_t> consumed) {
   }
 }
 
-HTTPPriorityQueue::Priority HTTPPriorityQueue::headPriority() const {
+quic::PriorityQueue::Priority HTTPPriorityQueue::headPriority() const {
   auto elem = top();
   if (elem) {
     return elem->priority;
   } else {
-    return {lowestRoundRobin_, true};
+    return Priority{lowestRoundRobin_, true};
   }
 }
 

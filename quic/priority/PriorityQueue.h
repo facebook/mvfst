@@ -204,6 +204,8 @@ class PriorityQueue {
   virtual Identifier getNextScheduledID(
       quic::Optional<uint64_t> previousConsumed) = 0;
 
+  [[nodiscard]] virtual Priority headPriority() const = 0;
+
   // Return the highest priority identifier in the queue, but does not
   // mutate any state.  Calling this repeatedly will return the same value.
   // It is an error to call this on an empty queue.

@@ -126,6 +126,10 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   [[nodiscard]] PriorityLogFields toLogFields(
       const PriorityQueue::Priority& pri) const override;
 
+  void setDisablePausedPriority(bool disable) {
+    disablePausedPriority_ = disable;
+  }
+
   [[nodiscard]] bool contains(Identifier id) const noexcept override {
     return find(id) != std::nullopt;
   }
@@ -172,7 +176,11 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
     }
   }
 
-  [[nodiscard]] Priority headPriority() const;
+  [[nodiscard]] quic::PriorityQueue::Priority headPriority() const override;
+
+  [[nodiscard]] Priority headHTTPPriority() const {
+    return static_cast<const HTTPPriorityQueue::Priority&>(headPriority());
+  }
 
  private:
   // Heap Element.  If priority.incremental is true, then Identifier is
@@ -237,6 +245,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   uint8_t lowestRoundRobin_{uint8_t(roundRobins_.size())};
   bool hasOpenTransaction_{false};
   bool useIndexMapForSequential_{false};
+  bool disablePausedPriority_{false};
 };
 
 } // namespace quic

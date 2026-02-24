@@ -598,11 +598,15 @@ bool QuicStreamManager::consumeMaxLocalUnidirectionalStreamIdIncreased() {
 
 quic::Expected<void, LocalErrorCode> QuicStreamManager::setPriorityQueue(
     std::unique_ptr<PriorityQueue> queue) {
-  if (!writeQueue().empty()) {
-    MVLOG_ERROR << "Cannot change priority queue when the queue is not empty";
-    return quic::make_unexpected(LocalErrorCode::INTERNAL_ERROR);
+  // Drain-and-reinsert in one pass by moving items directly into the new queue.
+  // Use default (uninitialized) priority
+  auto newQueue = std::move(queue);
+  while (!writeQueue().empty()) {
+    auto id = writeQueue().peekNextScheduledID();
+    newQueue->insertOrUpdate(id, PriorityQueue::Priority{});
+    writeQueue().erase(id);
   }
-  writeQueue_ = std::move(queue);
+  writeQueue_ = std::move(newQueue);
   return {};
 }
 
@@ -644,7 +648,13 @@ quic::Expected<void, QuicError> QuicStreamManager::refreshTransportSettings(
   }
 
   if (!writeQueue_) {
-    writeQueue_ = std::make_unique<HTTPPriorityQueue>();
+    auto queue = std::make_unique<HTTPPriorityQueue>();
+    queue->setDisablePausedPriority(transportSettings_->disablePausedPriority);
+    writeQueue_ = std::move(queue);
+  } else if (
+      auto* httpQueue = dynamic_cast<HTTPPriorityQueue*>(writeQueue_.get())) {
+    httpQueue->setDisablePausedPriority(
+        transportSettings_->disablePausedPriority);
   }
   return {};
 }
@@ -1091,16 +1101,8 @@ void QuicStreamManager::updateWritableStreams(
     if (stream.isControl) {
       controlWriteQueue_.emplace(stream.id);
     } else {
-      // pausedButDisabled adds a hard dep on writeQueue being an
-      // HTTPPriorityQueue.
-      auto httpPri = HTTPPriorityQueue::Priority(stream.priority);
-      const static PriorityQueue::Priority kPausedDisabledPriority(
-          HTTPPriorityQueue::Priority(7, true));
       writeQueue().insertOrUpdate(
-          PriorityQueue::Identifier::fromStreamID(stream.id),
-          httpPri->paused && transportSettings_->disablePausedPriority
-              ? kPausedDisabledPriority
-              : stream.priority);
+          PriorityQueue::Identifier::fromStreamID(stream.id), stream.priority);
     }
   } else {
     // Not schedulable, remove from queues

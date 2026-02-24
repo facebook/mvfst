@@ -10,7 +10,6 @@ mvfst_cpp_library(
         "PriorityQueue.h",
     ],
     exported_deps = [
-        "fbsource//third-party/glog:glog",
         "//quic/common:mvfst_logging",
         "//quic/common:optional",
     ],

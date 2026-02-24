@@ -2652,9 +2652,9 @@ TEST_P(QuicPacketSchedulerTest, PausedPriorityDisabled) {
   static const HTTPPriorityQueue::Priority kPausedPriority =
       HTTPPriorityQueue::Priority::PAUSED;
 
+  transportSettings.disablePausedPriority = true;
   auto connPtr = createConn(10, 100000, 100000, GetParam());
   auto& conn = *connPtr;
-  transportSettings.disablePausedPriority = true;
   StreamFrameScheduler scheduler(conn);
 
   auto pausedStreamId = createStream(conn, kPausedPriority);

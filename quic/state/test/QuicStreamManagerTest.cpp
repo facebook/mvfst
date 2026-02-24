@@ -20,6 +20,66 @@ using namespace testing;
 
 namespace quic::test {
 
+// Fake PriorityQueue that records insertOrUpdate calls for verification
+class FakePriorityQueue : public PriorityQueue {
+ public:
+  struct InsertRecord {
+    Identifier id;
+    Priority priority;
+  };
+
+  [[nodiscard]] bool contains(Identifier) const noexcept override {
+    return false;
+  }
+
+  [[nodiscard]] bool empty() const noexcept override {
+    return true;
+  }
+
+  [[nodiscard]] PriorityLogFields toLogFields(const Priority&) const override {
+    return {};
+  }
+
+  [[nodiscard]] bool equalPriority(const Priority&, const Priority&)
+      const override {
+    return true;
+  }
+
+  void insertOrUpdate(Identifier id, Priority priority) override {
+    inserts.push_back({id, priority});
+  }
+
+  void updateIfExist(Identifier, Priority) override {}
+
+  void erase(Identifier) override {}
+
+  void clear() override {}
+
+  Identifier getNextScheduledID(quic::Optional<uint64_t>) override {
+    return {};
+  }
+
+  [[nodiscard]] Identifier peekNextScheduledID() const override {
+    return {};
+  }
+
+  [[nodiscard]] Priority headPriority() const override {
+    return {};
+  }
+
+  void consume(quic::Optional<uint64_t>) override {}
+
+  Transaction beginTransaction() override {
+    return makeTransaction();
+  }
+
+  void commitTransaction(Transaction&&) override {}
+
+  void rollbackTransaction(Transaction&&) override {}
+
+  std::vector<InsertRecord> inserts;
+};
+
 struct StreamManagerTestParam {
   bool isUnidirectional{false};
 };
@@ -741,6 +801,47 @@ TEST_P(QuicStreamManagerTest, TestReliableResetBasic) {
   EXPECT_EQ(quicStreamState->lossBuffer[0].offset, 5);
   EXPECT_EQ(quicStreamState->lossBuffer[0].data.chainLength(), 1);
   EXPECT_EQ(quicStreamState->conn.flowControlState.sumCurStreamBufferLen, 0);
+}
+
+TEST_P(QuicStreamManagerTest, SetPriorityQueueEmpty) {
+  auto& manager = *conn.streamManager;
+  auto mockQueue = std::make_unique<FakePriorityQueue>();
+  auto* mockPtr = mockQueue.get();
+  auto result = manager.setPriorityQueue(std::move(mockQueue));
+  ASSERT_FALSE(result.hasError());
+  EXPECT_TRUE(mockPtr->inserts.empty());
+  EXPECT_EQ(&manager.writeQueue(), mockPtr);
+}
+
+TEST_P(QuicStreamManagerTest, SetPriorityQueueDrainsWithUninitPriority) {
+  auto& manager = *conn.streamManager;
+
+  // Insert streams directly into the write queue
+  auto id1 = PriorityQueue::Identifier::fromStreamID(0);
+  auto id2 = PriorityQueue::Identifier::fromStreamID(4);
+  manager.writeQueue().insertOrUpdate(
+      id1, HTTPPriorityQueue::Priority(3, true));
+  manager.writeQueue().insertOrUpdate(
+      id2, HTTPPriorityQueue::Priority(5, false));
+
+  ASSERT_FALSE(manager.writeQueue().empty());
+  ASSERT_TRUE(manager.writeQueue().contains(id1));
+  ASSERT_TRUE(manager.writeQueue().contains(id2));
+
+  // Replace with mock queue
+  auto mockQueue = std::make_unique<FakePriorityQueue>();
+  auto* mockPtr = mockQueue.get();
+  auto result = manager.setPriorityQueue(std::move(mockQueue));
+  ASSERT_FALSE(result.hasError());
+
+  // Verify all streams were drained with uninitialized priority
+  ASSERT_EQ(mockPtr->inserts.size(), 2);
+  // Order depends on HTTPPriorityQueue scheduling; just check both are present
+  // with uninitialized priority
+  for (const auto& record : mockPtr->inserts) {
+    EXPECT_FALSE(record.priority.isInitialized());
+  }
+  EXPECT_NE(mockPtr->inserts[0].id, mockPtr->inserts[1].id);
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -139,7 +139,8 @@ TEST_F(HTTPPriorityQueueTest, UpdateIncrementalToNonIncremental) {
   EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id2);
   // Update from incremental to non-incremental (insertOrUpdate)
   queue_.insertOrUpdate(id2, HTTPPriorityQueue::Priority(0, false));
-  EXPECT_TRUE(queue_.headPriority() == HTTPPriorityQueue::Priority(0, false));
+  EXPECT_TRUE(
+      queue_.headHTTPPriority() == HTTPPriorityQueue::Priority(0, false));
 }
 
 TEST_F(HTTPPriorityQueueTest, UpdateNonIncrementalToIncremental) {
@@ -167,7 +168,8 @@ TEST_F(HTTPPriorityQueueTest, UpdateIncrementalUrgency) {
   queue_.updateIfExist(id, priority);
   EXPECT_TRUE(queue_.contains(id));
   EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id);
-  EXPECT_TRUE(queue_.headPriority() == HTTPPriorityQueue::Priority(1, true));
+  EXPECT_TRUE(
+      queue_.headHTTPPriority() == HTTPPriorityQueue::Priority(1, true));
 }
 
 TEST_F(HTTPPriorityQueueTest, InsertOrUpdateNoOp) {
@@ -179,7 +181,8 @@ TEST_F(HTTPPriorityQueueTest, InsertOrUpdateNoOp) {
   queue_.updateIfExist(id, HTTPPriorityQueue::Priority(1, true));
   EXPECT_TRUE(queue_.contains(id));
   EXPECT_TRUE(queue_.getNextScheduledID(std::nullopt) == id);
-  EXPECT_TRUE(queue_.headPriority() == HTTPPriorityQueue::Priority(1, true));
+  EXPECT_TRUE(
+      queue_.headHTTPPriority() == HTTPPriorityQueue::Priority(1, true));
 }
 
 TEST_F(HTTPPriorityQueueTest, PeekAndClear) {
@@ -275,7 +278,7 @@ TEST_F(HTTPPriorityQueueTest, ComplexOperations) {
   queue_.commitTransaction(std::move(txn));
 
   // Call getNextScheduledID + erase until the queue is empty
-  HTTPPriorityQueue::Priority lastPriority = queue_.headPriority();
+  HTTPPriorityQueue::Priority lastPriority = queue_.headHTTPPriority();
   // clang-format off
   std::list<size_t> expectedOrder{
     /*u=0*/   16,  8, 4,  0,
@@ -289,22 +292,22 @@ TEST_F(HTTPPriorityQueueTest, ComplexOperations) {
   txn = queue_.beginTransaction();
   while (!queue_.empty()) {
     // priorities should not decrease
-    auto headPriority = queue_.headPriority();
-    CHECK(lastPriority == headPriority || lastPriority < headPriority);
-    lastPriority = headPriority;
+    auto headHTTPPriority = queue_.headHTTPPriority();
+    CHECK(lastPriority == headHTTPPriority || lastPriority < headHTTPPriority);
+    lastPriority = headHTTPPriority;
     auto nextId = queue_.peekNextScheduledID();
     queue_.consume(std::nullopt);
     CHECK_EQ(nextId.asUint64(), expectedOrder.front());
     expectedOrder.pop_front();
     auto expectedPri = ids[nextId.asUint64()];
-    CHECK(expectedPri == headPriority);
+    CHECK(expectedPri == headHTTPPriority);
     queue_.erase(nextId);
     CHECK(!queue_.contains(nextId));
   }
   queue_.rollbackTransaction(std::move(txn));
   EXPECT_FALSE(queue_.empty());
   EXPECT_TRUE(
-      queue_.headPriority() == HTTPPriorityQueue::Priority(0, false, 4));
+      queue_.headHTTPPriority() == HTTPPriorityQueue::Priority(0, false, 4));
 }
 
 TEST_F(HTTPPriorityQueueTest, IndexEverything) {
