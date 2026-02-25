@@ -73,7 +73,6 @@ mvfst_cpp_library(
         "QuicRange.h",
     ],
     deps = [
-        "fbsource//third-party/glog:glog",
         ":mvfst_logging",
     ],
     exported_deps = [

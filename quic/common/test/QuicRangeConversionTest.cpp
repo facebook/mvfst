@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 #include <quic/common/QuicRange.h>
 #include <array>
+#include <vector>
 
 namespace quic::test {
 
@@ -46,6 +47,19 @@ TEST(QuicRangeConversionTest, CopyConstruction) {
   EXPECT_EQ(constRange[0], 10);
   EXPECT_EQ(constRange[1], 20);
   EXPECT_EQ(constRange[2], 30);
+}
+
+TEST(QuicRangeConversionTest, ConstructFromMutableVector) {
+  std::vector<uint8_t> vec{10, 20, 30, 40};
+  MutableByteRange range(vec);
+
+  EXPECT_EQ(range.data(), vec.data());
+  EXPECT_EQ(range.size(), vec.size());
+
+  // ByteRange should also be constructible from a mutable vector
+  ByteRange constRange(vec);
+  EXPECT_EQ(constRange.data(), vec.data());
+  EXPECT_EQ(constRange.size(), vec.size());
 }
 
 } // namespace quic::test

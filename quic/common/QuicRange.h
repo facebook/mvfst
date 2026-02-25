@@ -7,13 +7,35 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <string>
+#include <type_traits>
+#include <vector>
 
 namespace quic {
 template <class Iter>
 struct Range {
   Iter begin_;
   Iter end_;
+
+  template <class T, class Alloc>
+  explicit Range(
+      std::vector<T, Alloc>& vec,
+      typename std::enable_if<std::is_convertible<T*, Iter>::value>::type* =
+          nullptr)
+      : begin_(vec.data()), end_(vec.data() + vec.size()) {}
+
+  template <class T, class Alloc>
+  explicit Range(
+      const std::vector<T, Alloc>& vec,
+      typename std::enable_if<
+          std::is_convertible<const T*, Iter>::value>::type* = nullptr)
+      : begin_(vec.data()), end_(vec.data() + vec.size()) {}
+
+  template <class T, class Alloc>
+  Range(std::vector<T, Alloc>&&) = delete;
 
   Range(Iter begin, size_t size) : begin_(begin), end_(begin + size) {}
 
