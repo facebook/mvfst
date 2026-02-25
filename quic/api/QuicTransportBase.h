@@ -77,8 +77,6 @@ class QuicTransportBase : public QuicSocket,
   void unsetAllReadCallbacks() override;
   void unsetAllPeekCallbacks() override;
   void unsetAllDeliveryCallbacks() override;
-  quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) override;
-  quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) override;
 
   quic::Expected<void, LocalErrorCode> setPeekCallback(
       StreamId id,
@@ -229,9 +227,6 @@ class QuicTransportBase : public QuicSocket,
   }
 
  protected:
-  quic::Expected<void, LocalErrorCode> pauseOrResumeRead(
-      StreamId id,
-      bool resume);
   quic::Expected<void, LocalErrorCode> pauseOrResumePeek(
       StreamId id,
       bool resume);

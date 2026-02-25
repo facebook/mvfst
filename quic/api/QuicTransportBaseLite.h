@@ -201,6 +201,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) override;
 
+  quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) override;
+  quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) override;
+
   quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxLen) override;
@@ -766,6 +769,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       StreamId id,
       ReadCallback* cb,
       Optional<ApplicationErrorCode> err) noexcept;
+
+  quic::Expected<void, LocalErrorCode> pauseOrResumeRead(
+      StreamId id,
+      bool resume);
 
   /**
    * The callback function for AsyncUDPSocket to provide the additional cmsgs

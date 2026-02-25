@@ -808,6 +808,41 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setReadCallback(
   return setReadCallbackInternal(id, cb, err);
 }
 
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::pauseRead(
+    StreamId id) {
+  MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
+  return pauseOrResumeRead(id, false);
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resumeRead(
+    StreamId id) {
+  MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
+  return pauseOrResumeRead(id, true);
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::pauseOrResumeRead(
+    StreamId id,
+    bool resume) {
+  if (isSendingStream(conn_->nodeType, id)) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (!conn_->streamManager->streamExists(id)) {
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  auto readCb = readCallbacks_.find(id);
+  if (readCb == readCallbacks_.end()) {
+    return quic::make_unexpected(LocalErrorCode::APP_ERROR);
+  }
+  if (readCb->second.resumed != resume) {
+    readCb->second.resumed = resume;
+    updateReadLooper();
+  }
+  return {};
+}
+
 quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode>
 QuicTransportBaseLite::read(StreamId id, size_t maxLen) {
   if (isSendingStream(conn_->nodeType, id)) {

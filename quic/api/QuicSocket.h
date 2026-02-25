@@ -138,12 +138,6 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual void unsetAllDeliveryCallbacks() = 0;
 
   /**
-   * Pause/Resume read callback being triggered when data is available.
-   */
-  virtual quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) = 0;
-  virtual quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) = 0;
-
-  /**
    * ===== Peek/Consume API =====
    */
 
