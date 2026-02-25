@@ -185,7 +185,7 @@ bool getSconeSupportedParameter(
 TransportParameter encodeSconeSupportedParameter() {
   return TransportParameter{
       TransportParameterId::scone_supported,
-      folly::IOBuf::create(0) // Zero-length value - presence indicates support
+      Buf::create(0) // Zero-length value - presence indicates support
   };
 }
 
