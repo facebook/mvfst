@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <fizz/protocol/Certificate.h>
+#include <fizz/protocol/CertificateBase.h>
 #include <folly/MaybeManagedPtr.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicCallbacks.h>

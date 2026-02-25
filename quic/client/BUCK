@@ -93,7 +93,7 @@ mvfst_cpp_library(
         "//quic/state:stream_functions",
     ],
     exported_deps = [
-        "//fizz/protocol:certificate",
+        "//fizz/protocol:certificate_base",
         "//folly:exception_wrapper",
         "//folly/io:iobuf",
         "//folly/io/async:delayed_destruction",

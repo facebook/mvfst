@@ -11,7 +11,7 @@
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
 
-#include <fizz/protocol/Certificate.h>
+#include <fizz/protocol/CertificateBase.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/common/Expected.h>
