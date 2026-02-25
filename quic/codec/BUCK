@@ -199,6 +199,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/common:buf_util",
         "//quic/common:circular_deque",
+        "//quic/common:contiguous_cursor",
         "//quic/common:interval_set",
         "//quic/common:optional",
         "//quic/handshake:aead",

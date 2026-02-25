@@ -12,6 +12,7 @@
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/ContiguousCursor.h>
 #include <quic/common/Optional.h>
 #include <quic/handshake/Aead.h>
 #include <quic/state/AckStates.h>
@@ -260,6 +261,7 @@ class QuicReadCodec {
 /**
  * Decode a SCONE packet from the given cursor.
  */
-Expected<SCONEPacket, TransportErrorCode> decodeScone(Cursor& cursor);
+Expected<SCONEPacket, TransportErrorCode> decodeScone(
+    ContiguousReadCursor& cursor);
 
 } // namespace quic

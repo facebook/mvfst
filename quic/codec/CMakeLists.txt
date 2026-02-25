@@ -135,6 +135,7 @@ mvfst_add_library(mvfst_codec
     mvfst_codec_types
     mvfst_common_buf_util
     mvfst_common_circular_deque
+    mvfst_common_contiguous_cursor
     mvfst_common_interval_set
     mvfst_common_optional
     mvfst_constants
