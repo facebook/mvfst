@@ -12,7 +12,6 @@ mvfst_add_library(mvfst_fizz_server_handshake
   DEPS
     mvfst_common_mvfst_logging
     mvfst_constants
-    mvfst_fizz_handshake_fizz_bridge
     mvfst_fizz_server_handshake_handshake_app_token
     mvfst_server_state_server
     fizz::fizz

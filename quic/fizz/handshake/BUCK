@@ -5,12 +5,14 @@ oncall("traffic_protocols")
 mvfst_cpp_library(
     name = "fizz_handshake",
     srcs = [
+        "FizzBridge.cpp",
         "FizzCryptoFactory.cpp",
         "FizzPacketNumberCipher.cpp",
         "FizzRetryIntegrityTagGenerator.cpp",
         "QuicFizzFactory.cpp",
     ],
     headers = [
+        "FizzBridge.h",
         "FizzCryptoFactory.h",
         "FizzPacketNumberCipher.h",
         "FizzRetryIntegrityTagGenerator.h",
@@ -18,21 +20,22 @@ mvfst_cpp_library(
         "QuicFizzFactory.h",
     ],
     deps = [
-        ":fizz_bridge",
         "//fizz/crypto:crypto",
         "//fizz/crypto:utils",
-        "//fizz/crypto/aead:aead",
         "//quic/common:optional",
     ],
     exported_deps = [
+        "//fizz/crypto/aead:aead",
         "//fizz/protocol:default_factory",
+        "//fizz/protocol:types",
         "//fizz/record:record",
         "//folly/ssl:openssl_ptr_types",
+        "//quic:constants",
         "//quic/codec:packet_number_cipher",
         "//quic/common:buf_util",
         "//quic/common:mvfst_logging",
-        "//quic/fizz/handshake:fizz_bridge",
         "//quic/folly_utils:folly_utils",
+        "//quic/handshake:aead",
         "//quic/handshake:handshake",
         "//quic/handshake:retry_integrity_tag_generator",
         "//quic/handshake:transport_parameters",
@@ -44,20 +47,4 @@ mvfst_cpp_library(
             "ovr_config//runtime/constraints:android-host-test": [],  # @fb-only
         }),  # @fb-only
     }),
-)
-
-mvfst_cpp_library(
-    name = "fizz_bridge",
-    srcs = [
-        "FizzBridge.cpp",
-    ],
-    headers = [
-        "FizzBridge.h",
-    ],
-    exported_deps = [
-        "//fizz/crypto/aead:aead",
-        "//fizz/protocol:types",
-        "//quic:constants",
-        "//quic/handshake:aead",
-    ],
 )

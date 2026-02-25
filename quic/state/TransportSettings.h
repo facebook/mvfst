@@ -495,10 +495,6 @@ struct TransportSettings {
 
   EgressPolicerConfig egressPolicerConfig;
 
-  // Whether to use alternative AEAD instead of Fizz AEAD for packet encryption.
-  // When true, uses architecture-specific crypto instructions where available.
-  bool useAlternativeCrypto{false};
-
   // Enable path degradation / blackhole detection callbacks.
   // When enabled, the transport fires onPathDegrading() and
   // onBlackholeDetected() on ConnectionCallback at ptoCount thresholds.

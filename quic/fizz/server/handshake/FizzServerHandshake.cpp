@@ -12,7 +12,6 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
-#include QUIC_DEFAULT_AEAD_HEADER
 
 #include <fizz/protocol/Protocol.h>
 #include <fizz/server/ReplayCache.h>
@@ -22,8 +21,6 @@
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
 // QuicServerConnectionState.
 #include <quic/server/state/ServerStateMachine.h>
-
-using DefaultAead = QUIC_DEFAULT_AEAD;
 
 namespace fizz::server {
 struct ResumptionState;
@@ -107,15 +104,14 @@ void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
 }
 
 std::unique_ptr<Aead> FizzServerHandshake::buildAead(ByteRange secret) {
-  return DefaultAead::wrap(
+  return FizzAead::wrap(
       fizz::Protocol::deriveRecordAeadWithLabel(
           *state_.context()->getFactory(),
           *state_.keyScheduler(),
           *state_.cipher(),
           secret,
           kQuicKeyLabel,
-          kQuicIVLabel),
-      cryptoFactory_->useAlternativeCrypto());
+          kQuicIVLabel));
 }
 
 quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>

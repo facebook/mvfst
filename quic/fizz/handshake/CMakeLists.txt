@@ -7,34 +7,26 @@
 
 mvfst_add_library(mvfst_fizz_handshake
   SRCS
+    FizzBridge.cpp
     FizzCryptoFactory.cpp
     FizzPacketNumberCipher.cpp
     FizzRetryIntegrityTagGenerator.cpp
     QuicFizzFactory.cpp
   DEPS
     mvfst_common_optional
-    mvfst_fizz_handshake_fizz_bridge
     fizz::fizz
   EXPORTED_DEPS
     mvfst_codec_packet_number_cipher
     mvfst_common_buf_util
     mvfst_common_mvfst_logging
-    mvfst_fizz_handshake_fizz_bridge
+    mvfst_constants
     mvfst_folly_utils
     mvfst_handshake
+    mvfst_handshake_aead
     mvfst_handshake_retry_integrity_tag_generator
     mvfst_handshake_transport_parameters
     fizz::fizz
     Folly::folly_ssl_openssl_ptr_types
-)
-
-mvfst_add_library(mvfst_fizz_handshake_fizz_bridge
-  SRCS
-    FizzBridge.cpp
-  EXPORTED_DEPS
-    mvfst_constants
-    mvfst_handshake_aead
-    fizz::fizz
 )
 
 add_subdirectory(test)
