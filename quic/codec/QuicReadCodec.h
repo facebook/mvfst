@@ -179,7 +179,7 @@ class QuicReadCodec {
   void setServerConnectionId(ConnectionId connId);
   void setStatelessResetToken(StatelessResetToken statelessResetToken);
   // Type alias for constant-time comparison function pointer.
-  using CryptoEqualFn = bool (*)(folly::ByteRange, folly::ByteRange);
+  using CryptoEqualFn = bool (*)(ByteRange, ByteRange);
 
   void setCryptoEqual(CryptoEqualFn cryptoEqual);
   [[nodiscard]] const ConnectionId& getClientConnectionId() const;

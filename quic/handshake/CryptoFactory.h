@@ -78,7 +78,7 @@ class CryptoFactory {
   // Type alias for constant-time comparison function pointer.
   // Raw function pointer is used instead of std::function since all
   // implementations are stateless (no captured state).
-  using CryptoEqualFn = bool (*)(folly::ByteRange, folly::ByteRange);
+  using CryptoEqualFn = bool (*)(ByteRange, ByteRange);
 
   [[nodiscard]] virtual CryptoEqualFn getCryptoEqualFunction() const = 0;
 
