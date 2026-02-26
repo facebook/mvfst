@@ -21,6 +21,7 @@ fb_dirsync_cpp_unittest(
         "//quic/common:string_utils",
         "//quic/common/test:test_utils",
         "//quic/fizz/client/handshake:fizz_client_handshake",
+        "//quic/fizz/handshake:fizz_bridge",  # @manual direct include of FizzBridge.h
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/fizz/server/handshake:handshake_app_token",

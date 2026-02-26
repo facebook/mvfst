@@ -12,6 +12,7 @@ mvfst_add_library(mvfst_fizz_client_handshake
   DEPS
     mvfst_codec_pktbuilder
     mvfst_common_mvfst_logging
+    mvfst_fizz_handshake_fizz_bridge
     fizz::fizz
   EXPORTED_DEPS
     mvfst_client_client_extension

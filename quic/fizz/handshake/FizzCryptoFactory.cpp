@@ -8,9 +8,10 @@
 #include <fizz/crypto/Utils.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 
-#include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzPacketNumberCipher.h>
 #include <quic/handshake/HandshakeLayer.h>
+
+#include QUIC_DEFAULT_AEAD_HEADER
 
 namespace quic {
 
@@ -62,7 +63,7 @@ FizzCryptoFactory::makeInitialAead(
   trafficKey.key = std::move(key);
   trafficKey.iv = std::move(iv);
   aead->setKey(std::move(trafficKey));
-  return FizzAead::wrap(std::move(aead));
+  return QUIC_DEFAULT_AEAD::wrap(std::move(aead));
 }
 
 quic::Expected<std::unique_ptr<PacketNumberCipher>, QuicError>

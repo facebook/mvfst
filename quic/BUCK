@@ -3,6 +3,17 @@ load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
 
 oncall("traffic_protocols")
 
+fb_native.constraint_setting(
+    name = "use_alt_crypto",
+    visibility = ["PUBLIC"],
+)
+
+fb_native.constraint_value(
+    name = "use_alt_crypto-enabled",
+    constraint_setting = ":use_alt_crypto",
+    visibility = ["PUBLIC"],
+)
+
 mvfst_cpp_library(
     name = "enum",
     headers = select({
@@ -51,6 +62,7 @@ mvfst_cpp_library(
         }),
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": {"mvfst-config.h": "facebook/mvfst-config-fbcode.h"},  # @fb-only
+            "fbcode//quic:use_alt_crypto-enabled": {"mvfst-config.h": "facebook/mvfst-config-alt-crypto.h"},  # @fb-only
             "ovr_config//build_mode:arvr_mode": select({
                 "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
                 "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
@@ -111,7 +123,7 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
         "ovr_config//os/constraints:macos": [],
-    }) + ["fbsource//third-party/glog:glog"],
+    }) + [],
     exported_deps = [
         ":constants",
         ":tls_exception",

@@ -9,13 +9,14 @@
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 
 #include <quic/QuicConstants.h>
-#include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 #include <fizz/protocol/Protocol.h>
 #include <fizz/server/ReplayCache.h>
 #include <fizz/server/State.h>
+
+#include QUIC_DEFAULT_AEAD_HEADER
 
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
@@ -104,7 +105,7 @@ void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
 }
 
 std::unique_ptr<Aead> FizzServerHandshake::buildAead(ByteRange secret) {
-  return FizzAead::wrap(
+  return QUIC_DEFAULT_AEAD::wrap(
       fizz::Protocol::deriveRecordAeadWithLabel(
           *state_.context()->getFactory(),
           *state_.keyScheduler(),

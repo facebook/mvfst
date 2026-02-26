@@ -19,6 +19,7 @@ mvfst_cpp_library(
         "//fizz/protocol:protocol",
         "//quic/codec:pktbuilder",
         "//quic/common:mvfst_logging",
+        "//quic/fizz/handshake:fizz_bridge",  # @manual direct include of FizzBridge.h
     ],
     exported_deps = [
         ":psk_cache",
