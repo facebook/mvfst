@@ -52,6 +52,14 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->udpSendPacketLen = conn->udpSendPacketLen;
   newConn->supportedVersions = conn->supportedVersions;
   newConn->transportSettings = conn->transportSettings;
+  newConn->datagramState.maxReadFrameSize =
+      conn->datagramState.maxReadFrameSize;
+  newConn->datagramState.maxWriteFrameSize =
+      conn->datagramState.maxWriteFrameSize;
+  newConn->datagramState.maxReadBufferSize =
+      conn->datagramState.maxReadBufferSize;
+  newConn->datagramState.maxWriteBufferSize =
+      conn->datagramState.maxWriteBufferSize;
   newConn->initialWriteCipher = std::move(conn->initialWriteCipher);
   newConn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   newConn->readCodec->setClientConnectionId(*conn->clientConnectionId);
