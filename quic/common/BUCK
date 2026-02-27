@@ -12,8 +12,8 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:macos": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
         "ovr_config//os/constraints:windows": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
     }),
-    exported_external_deps = select({
-        "DEFAULT": ["glog"],
+    exported_deps = select({
+        "DEFAULT": ["fbsource//third-party/glog:glog"],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
         "ovr_config//os/constraints:macos": [],
