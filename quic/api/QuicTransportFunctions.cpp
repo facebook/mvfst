@@ -463,7 +463,7 @@ iobufChainBasedBuildScheduleEncrypt(
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   // SCONE: Pre-build SCONE packet and adjust max packet size to avoid overflow
-  std::unique_ptr<folly::IOBuf> preBuildSconePacket;
+  std::unique_ptr<Buf> preBuildSconePacket;
   uint64_t adjustedMaxPacketSize = connection.udpSendPacketLen;
   bool needScone = connection.scone && connection.scone->negotiated &&
       !connection.scone->sentThisLoop &&
@@ -475,7 +475,7 @@ iobufChainBasedBuildScheduleEncrypt(
     ConnectionId sconeSrcCid = ConnectionId::createZeroLength();
     auto scone = buildSconePacket(
         connection.scone->configuredRateSignal, sconeDstCid, sconeSrcCid);
-    preBuildSconePacket = std::make_unique<folly::IOBuf>(std::move(scone));
+    preBuildSconePacket = std::make_unique<Buf>(std::move(scone));
     uint64_t sconeSize = preBuildSconePacket->computeChainDataLength();
 
     // SCONE packets are small; there should always be enough space
@@ -565,7 +565,7 @@ iobufChainBasedBuildScheduleEncrypt(
   // SCONE: Prepend pre-built SCONE packet for co-alescing (size already
   // accounted for)
   if (needScone && preBuildSconePacket) {
-    preBuildSconePacket->prependChain(std::move(packetBuf));
+    preBuildSconePacket->appendChain(std::move(packetBuf));
     packetBuf = std::move(preBuildSconePacket);
     encodedSize = packetBuf->computeChainDataLength();
     connection.scone->sentThisLoop = true;
