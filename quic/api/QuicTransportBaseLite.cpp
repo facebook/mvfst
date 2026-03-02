@@ -2894,7 +2894,7 @@ void QuicTransportBaseLite::notifyAppRateLimited() {
 
 void QuicTransportBaseLite::onTransportKnobs(BufPtr knobBlob) {
   // Not yet implemented,
-  MVVLOG(4) << "Received transport knobs: " << knobBlob->to<std::string>();
+  MVVLOG(4) << "Received transport knobs: " << knobBlob->toString();
 }
 
 void QuicTransportBaseLite::processCallbacksAfterWriteData() {
