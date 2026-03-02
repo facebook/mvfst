@@ -18,6 +18,11 @@
 #include <sys/errno.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#ifdef __linux__
+#ifndef UDP_SEGMENT
+#define UDP_SEGMENT 103
+#endif
+#endif
 
 namespace quic {
 
@@ -128,8 +133,79 @@ ssize_t LibevQuicAsyncUDPSocket::write(
 }
 
 quic::Expected<int, QuicError> LibevQuicAsyncUDPSocket::getGSO() {
-  // TODO: Implement GSO
+#if defined(UDP_SEGMENT)
+  if (!gsoProbed_) {
+    gsoProbed_ = true;
+    if (fd_ == -1) {
+      gso_ = -1;
+      return gso_;
+    }
+    int gso = -1;
+    socklen_t optlen = sizeof(gso);
+    if (::getsockopt(fd_, SOL_UDP, UDP_SEGMENT, &gso, &optlen) == 0) {
+      gso_ = gso;
+    } else {
+      gso_ = -1;
+    }
+  }
+  return gso_;
+#else
   return -1;
+#endif
+}
+
+ssize_t LibevQuicAsyncUDPSocket::writeGSO(
+    const folly::SocketAddress& address,
+    const struct iovec* vec,
+    size_t iovec_len,
+    WriteOptions options) {
+#if defined(UDP_SEGMENT)
+  if (fd_ == -1) {
+    errno = EBADF;
+    MVLOG_ERROR
+        << "LibevQuicAsyncUDPSocket::writeGSO failed: socket not initialized";
+    return -1;
+  }
+
+  sockaddr_storage addrStorage;
+  address.getAddress(&addrStorage);
+
+  struct msghdr msg = {};
+  if (!connected_) {
+    msg.msg_name = reinterpret_cast<void*>(&addrStorage);
+    msg.msg_namelen = address.getActualSize();
+  } else {
+    if (connectedAddress_ != address) {
+      errno = EINVAL;
+      MVLOG_ERROR
+          << "LibevQuicAsyncUDPSocket::writeGSO failed: wrong destination for connected socket";
+      return -1;
+    }
+  }
+  msg.msg_iov = const_cast<struct iovec*>(vec);
+  msg.msg_iovlen = iovec_len;
+
+  char control[CMSG_SPACE(sizeof(uint16_t))] = {};
+  if (options.gso > 0) {
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof(control);
+    struct cmsghdr* cm = CMSG_FIRSTHDR(&msg);
+    cm->cmsg_level = SOL_UDP;
+    cm->cmsg_type = UDP_SEGMENT;
+    cm->cmsg_len = CMSG_LEN(sizeof(uint16_t));
+    auto gsoLen = static_cast<uint16_t>(options.gso);
+    memcpy(CMSG_DATA(cm), &gsoLen, sizeof(gsoLen));
+  }
+
+  return ::sendmsg(fd_, &msg, 0);
+#else
+  (void)address;
+  (void)vec;
+  (void)iovec_len;
+  (void)options;
+  errno = ENOTSUP;
+  return -1;
+#endif
 }
 
 int LibevQuicAsyncUDPSocket::writem(
