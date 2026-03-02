@@ -234,7 +234,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   bool bound_{false};
   bool connected_{false};
-  int gso_{-1};
+  int gso_{0};
   bool gsoProbed_{false};
   bool reuseAddr_{false};
   bool reusePort_{false};

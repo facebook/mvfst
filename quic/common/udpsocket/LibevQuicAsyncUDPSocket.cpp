@@ -134,6 +134,11 @@ ssize_t LibevQuicAsyncUDPSocket::write(
 
 quic::Expected<int, QuicError> LibevQuicAsyncUDPSocket::getGSO() {
 #if defined(UDP_SEGMENT)
+  // If runtime fallback in writeGSO() marked GSO as unsupported, return -1
+  // immediately so the transport switches to SinglePacketBatchWriter.
+  if (gso_ == -1) {
+    return gso_;
+  }
   if (!gsoProbed_) {
     gsoProbed_ = true;
     if (fd_ == -1) {
@@ -197,7 +202,67 @@ ssize_t LibevQuicAsyncUDPSocket::writeGSO(
     memcpy(CMSG_DATA(cm), &gsoLen, sizeof(gsoLen));
   }
 
-  return ::sendmsg(fd_, &msg, 0);
+  auto ret = ::sendmsg(fd_, &msg, 0);
+  if (ret < 0 && options.gso > 0) {
+    int errnoCopy = errno;
+    // On some platforms (e.g., Android kernel 6.1.x), the kernel may
+    // reject UDP GSO with EIO/EINVAL even though getsockopt(UDP_SEGMENT)
+    // succeeds. Fall back to sending each QUIC packet individually without GSO
+    // and mark GSO as unsupported so the transport layer switches to
+    // SinglePacketBatchWriter.
+    //
+    // We split by options.gso (the segment size) rather than by iovec,
+    // because the ContinuousMemory path concatenates all packets into a
+    // single iovec.
+    if (errnoCopy == EIO || errnoCopy == EINVAL) {
+      gso_ = -1;
+
+      auto gsoSize = static_cast<size_t>(options.gso);
+      ssize_t totalSent = 0;
+      size_t vi = 0;
+      size_t vo = 0;
+
+      while (vi < iovec_len) {
+        auto avail = vec[vi].iov_len - vo;
+        if (avail == 0) {
+          vi++;
+          vo = 0;
+          continue;
+        }
+
+        auto segLen = std::min(gsoSize, avail);
+        struct iovec segVec = {
+            static_cast<uint8_t*>(vec[vi].iov_base) + vo, segLen};
+
+        struct msghdr perPktMsg = {};
+        if (!connected_) {
+          perPktMsg.msg_name = reinterpret_cast<void*>(&addrStorage);
+          perPktMsg.msg_namelen = address.getActualSize();
+        }
+        perPktMsg.msg_iov = &segVec;
+        perPktMsg.msg_iovlen = 1;
+
+        auto pktRet = ::sendmsg(fd_, &perPktMsg, 0);
+        if (pktRet < 0) {
+          if (totalSent > 0) {
+            return totalSent;
+          }
+          return -1;
+        }
+        totalSent += pktRet;
+
+        vo += segLen;
+        if (vo >= vec[vi].iov_len) {
+          vi++;
+          vo = 0;
+        }
+      }
+      return totalSent;
+    }
+
+    errno = errnoCopy;
+  }
+  return ret;
 #else
   (void)address;
   (void)vec;

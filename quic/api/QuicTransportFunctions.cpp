@@ -1786,6 +1786,14 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
       return quic::make_unexpected(gsoResult.error());
     }
     connection.gsoSupported = sock.getGSO().value() >= 0;
+  } else if (*connection.gsoSupported) {
+    // Re-check GSO state from the socket. The socket may have detected at
+    // runtime that GSO is not actually supported (e.g. EIO on sendmsg with
+    // UDP_SEGMENT) and updated its cached state.
+    auto gsoResult = sock.getGSO();
+    if (gsoResult.has_value() && gsoResult.value() < 0) {
+      connection.gsoSupported = false;
+    }
   }
 
   auto batchWriter = BatchWriterFactory::makeBatchWriter(
