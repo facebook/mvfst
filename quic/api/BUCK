@@ -11,6 +11,10 @@ mvfst_cpp_library(
             "QuicBatchWriterFactory.cpp",
             "QuicGsoBatchWriters.cpp",
         ],
+        "fbsource//tools/build_defs/config/apps/shared:quic-gso-batch-writer-enabled-android": [
+            "QuicBatchWriterFactoryMobileGSO.cpp",
+            "QuicGsoBatchWriters.cpp",
+        ],
         "ovr_config//os/constraints:android": ["QuicBatchWriterFactoryMobile.cpp"],
         "ovr_config//os/constraints:iphoneos": ["QuicBatchWriterFactoryMobile.cpp"],
     }),
@@ -19,6 +23,9 @@ mvfst_cpp_library(
         "QuicBatchWriterFactory.h",
     ] + select({
         "DEFAULT": ["QuicGsoBatchWriters.h"],
+        "fbsource//tools/build_defs/config/apps/shared:quic-gso-batch-writer-enabled-android": [
+            "QuicGsoBatchWriters.h",
+        ],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
     }),
@@ -26,7 +33,6 @@ mvfst_cpp_library(
         "//quic/common:buf_accessor",
     ],
     exported_deps = [
-        "fbsource//third-party/glog:glog",
         "//folly:network_address",
         "//folly:portability",
         "//folly/io:iobuf",

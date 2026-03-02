@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#include <quic/api/QuicBatchWriterFactory.h>
+#include <quic/api/QuicGsoBatchWriters.h>
+
+namespace quic {
+
+void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
+  delete batchWriter;
+}
+
+BatchWriterPtr makeGsoBatchWriter(uint32_t batchSize) {
+  return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
+}
+
+BatchWriterPtr makeGsoInPlaceBatchWriter(
+    uint32_t batchSize,
+    QuicConnectionStateBase& conn) {
+  return BatchWriterPtr(new GSOInplacePacketBatchWriter(conn, batchSize));
+}
+
+BatchWriterPtr makeSendmmsgGsoBatchWriter(uint32_t) {
+  return nullptr;
+}
+
+BatchWriterPtr makeSendmmsgInplaceGsoInplaceBatchWriter(
+    uint32_t,
+    QuicConnectionStateBase&) {
+  return nullptr;
+}
+
+BatchWriterPtr BatchWriterFactory::makeBatchWriter(
+    const quic::QuicBatchingMode& batchingMode,
+    uint32_t batchSize,
+    DataPathType dataPathType,
+    QuicConnectionStateBase& conn,
+    bool gsoSupported) {
+  switch (batchingMode) {
+    case quic::QuicBatchingMode::BATCHING_MODE_GSO:
+      if (gsoSupported) {
+        if (dataPathType == DataPathType::ChainedMemory) {
+          return makeGsoBatchWriter(batchSize);
+        }
+        return makeGsoInPlaceBatchWriter(batchSize, conn);
+      }
+      // GSO unavailable on this device, fall through to single packet
+      [[fallthrough]];
+    case quic::QuicBatchingMode::BATCHING_MODE_NONE:
+    case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
+    case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO:
+    default:
+      if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
+        return BatchWriterPtr(new SinglePacketInplaceBatchWriter(conn));
+      }
+      return BatchWriterPtr(new SinglePacketBatchWriter());
+  }
+}
+
+} // namespace quic
