@@ -37,15 +37,10 @@ BaseXskContainer::createXskSender(
 }
 
 void BaseXskContainer::initializeQueueParams(const std::string& interfaceName) {
-  struct ethtool_channels ethChannels = {
-      .cmd = ETHTOOL_GCHANNELS,
-  };
-  struct ifreq ifr = {
-      .ifr_ifru =
-          {
-              .ifru_data = reinterpret_cast<char*>(&ethChannels),
-          },
-  };
+  struct ethtool_channels ethChannels{};
+  ethChannels.cmd = ETHTOOL_GCHANNELS;
+  struct ifreq ifr{};
+  ifr.ifr_ifru.ifru_data = reinterpret_cast<char*>(&ethChannels);
   strncpy(ifr.ifr_name, interfaceName.c_str(), IFNAMSIZ - 1);
 
   int sock = ::socket(AF_INET, SOCK_DGRAM, 0);
