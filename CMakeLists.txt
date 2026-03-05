@@ -151,16 +151,16 @@ include(MvfstCompatAliases)
 # =============================================================================
 
 # Collect all headers (.h and .hpp), excluding test/facebook/build directories
-file(GLOB_RECURSE MVFST_HEADERS
+file(GLOB_RECURSE MVFST_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/quic
   "${CMAKE_CURRENT_SOURCE_DIR}/quic/*.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/quic/*.hpp"
 )
-list(FILTER MVFST_HEADERS EXCLUDE REGEX "/test/")
-list(FILTER MVFST_HEADERS EXCLUDE REGEX "/facebook/")
-list(FILTER MVFST_HEADERS EXCLUDE REGEX "/build/")
+list(FILTER MVFST_HEADERS EXCLUDE REGEX "(^|/)test/")
+list(FILTER MVFST_HEADERS EXCLUDE REGEX "(^|/)facebook/")
+list(FILTER MVFST_HEADERS EXCLUDE REGEX "(^|/)build/")
 
 # Install headers preserving directory structure
-mvfst_install_headers(quic ${CMAKE_CURRENT_SOURCE_DIR}/quic ${MVFST_HEADERS})
+mvfst_install_headers(quic quic ${MVFST_HEADERS})
 
 # =============================================================================
 # Install and export configuration
