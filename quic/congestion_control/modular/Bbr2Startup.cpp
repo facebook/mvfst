@@ -11,6 +11,7 @@
 #include <quic/congestion_control/modular/Bbr2ProbeBw.h>
 #include <quic/congestion_control/modular/Bbr2ProbeRtt.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/state/QuicTransportStatsCallback.h>
 #include <chrono>
 #include <cstdint>
 
@@ -239,6 +240,7 @@ void Bbr2Startup::checkResumptionState() {
     }
 
     isResuming_ = true;
+    QUIC_STATS(conn_.statsCallback, onCongestionControllerResumed);
     QLOG(
         conn_,
         addCongestionStateUpdate,

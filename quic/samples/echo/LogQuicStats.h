@@ -188,6 +188,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     MVVLOG(2) << __func__ << " cwndHintBytes=" << cwndHintBytes;
   }
 
+  void onCongestionControllerResumed() override {
+    MVVLOG(2) << __func__;
+  }
+
   void onNewCongestionController(CongestionControlType type) override {
     MVVLOG(2) << prefix_ << __func__
               << " type=" << congestionControlTypeToString(type);

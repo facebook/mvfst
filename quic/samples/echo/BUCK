@@ -32,7 +32,6 @@ mvfst_cpp_library(
         "fbcode//quic/fizz/client/handshake:fizz_client_handshake",
         "fbcode//quic/server:server",
         "fbcode//quic/state:stats_callback",
-        "fbsource//third-party/glog:glog",
         "//quic/common:mvfst_logging",
     ],
 )
