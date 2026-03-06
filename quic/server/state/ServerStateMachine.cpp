@@ -715,14 +715,21 @@ void maybeUpdateTransportFromAppToken(
   if (maybeCwndHintBytes && maybeRttHintMs) {
     QUIC_STATS(conn.statsCallback, onCwndHintBytesSample, *maybeCwndHintBytes);
 
-    // Only use the cwndHint and rtt hints if the source address is included in
-    // the token
+    // Only use the cwndHint and rtt hints if the source address prefix matches
+    // one in the token (/24 for IPv4, /48 for IPv6)
     MVDCHECK(conn.peerAddress.isInitialized());
-    auto addressMatches =
-        std::find(
-            appToken->sourceAddresses.begin(),
-            appToken->sourceAddresses.end(),
-            conn.peerAddress.getIPAddress()) != appToken->sourceAddresses.end();
+    const auto& currentAddr = conn.peerAddress.getIPAddress();
+    bool addressMatches = false;
+    for (const auto& tokenAddr : appToken->sourceAddresses) {
+      if (currentAddr.isV4() && tokenAddr.isV4()) {
+        addressMatches = currentAddr.inSubnet(tokenAddr, 24);
+      } else if (currentAddr.isV6() && tokenAddr.isV6()) {
+        addressMatches = currentAddr.inSubnet(tokenAddr, 48);
+      }
+      if (addressMatches) {
+        break;
+      }
+    }
     if (addressMatches) {
       if (conn.congestionController) {
         conn.congestionController->setResumeHints(
