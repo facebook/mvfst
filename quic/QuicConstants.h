@@ -114,8 +114,11 @@ constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 
 // QUIC_ENUM expands to BETTER_ENUM on server (with ._to_string() support),
 // or plain enum class on mobile (to reduce binary size by ~6KB per enum).
-FOLLY_PUSH_WARNING
-FOLLY_CLANG_DISABLE_WARNING("-Wglobal-constructors")
+// clang-format off
+_Pragma("GCC diagnostic push")
+#ifdef __clang__
+    _Pragma("GCC diagnostic ignored \"-Wglobal-constructors\"")
+#endif
 
 QUIC_ENUM(
     PacketDropReason,
@@ -239,7 +242,7 @@ QUIC_ENUM(
     // (beforeInit,afterInit)
     RX_PACKETS_BEFORE_ACK = 0x10013)
 
-FOLLY_POP_WARNING
+_Pragma("GCC diagnostic pop")
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
@@ -290,6 +293,8 @@ enum class FrameType : uint64_t {
 inline constexpr uint16_t toFrameError(FrameType frame) {
   return 0x0100 | static_cast<uint8_t>(frame);
 }
+
+// clang-format on
 
 enum class ExtendedAckFeatureMask : uint8_t {
   // These should use mutually exclusive bits.
