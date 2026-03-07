@@ -15,6 +15,7 @@
 
 using namespace fizz;
 using namespace folly;
+using folly::io::Cursor;
 
 namespace quic::test {
 

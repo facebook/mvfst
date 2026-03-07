@@ -35,7 +35,7 @@ std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken) {
 
 Optional<AppToken> decodeAppToken(const folly::IOBuf& buf) {
   AppToken appToken;
-  Cursor cursor(&buf);
+  folly::io::Cursor cursor(&buf);
   std::vector<fizz::Extension> extensions;
   fizz::Extension ext;
   try {

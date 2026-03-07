@@ -16,7 +16,6 @@
 #endif // _WIN32
 
 #include <folly/chrono/Clock.h>
-#include <folly/io/Cursor.h>
 #include <quic/QuicEnum.h>
 #include <quic/QuicTypealiases.h>
 #include <sys/types.h>
@@ -43,14 +42,8 @@ using SystemClock = folly::chrono::SystemClock;
 
 } // namespace quic::chrono
 
-namespace folly {
-class SocketAddress;
-} // namespace folly
-
 namespace quic {
 
-using AddressRange = folly::Range<folly::SocketAddress const*>;
-using Cursor = folly::io::Cursor;
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
 using DurationRep = std::chrono::microseconds::rep;
@@ -192,7 +185,8 @@ QUIC_ENUM(
     STARTUP_RTT_FACTOR_KNOB = 0x1111,
     // Set pacing rtt factor used when not in startup
     DEFAULT_RTT_FACTOR_KNOB = 0x2222,
-    // Set max pacing rate in bytes per second to be used if pacing is enabled
+    // Set max pacing rate in bytes per second to be used if pacing
+    // is enabled
     MAX_PACING_RATE_KNOB = 0x4444,
     // Enable experimental pacer settings
     PACER_EXPERIMENTAL = 0x5557,
@@ -201,10 +195,10 @@ QUIC_ENUM(
     // Set fixed short header padding size
     FIXED_SHORT_HEADER_PADDING_KNOB = 0x6667,
     // Keepalive timer enabled. The value is interpreted as follows:
-    // - [1,4999] mean keep alive is enabled with the defaut interval of
-    // 0.85 * idle timeout
-    // - >= 5000 mean keep alive is enabled with the specified interval in
-    // milliseconds
+    // - [1,4999] mean keep alive is enabled with the defaut
+    // interval of 0.85 * idle timeout
+    // - >= 5000 mean keep alive is enabled with the specified
+    // interval in milliseconds
     KEEPALIVE_ENABLED = 0x7777,
     // Knob for setting max pacing rate, with sequence number
     MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999,
@@ -226,20 +220,23 @@ QUIC_ENUM(
     MAX_WRITE_CONN_DATA_PKT_LIM = 0x1000C,
     // Threshold for writer to send entire stream buffer
     MIN_STREAM_BUF_THRESH = 0x1000E,
-    // Controls how much excess CWND allowed on imminent stream completion.
+    // Controls how much excess CWND allowed on imminent stream
+    // completion.
     EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS = 0x1000F,
     // Controls whether the cloning scheduler should clone the same
     // packet repeatedly in the same write loop.
     ALLOW_DUPLICATE_PROBES = 0x10010,
     // Controls whether to send a ConnectionClose on idle timeout
     SEND_CLOSE_ON_IDLE_TIMEOUT = 0x10011,
-    // Controls the max number of PTOs to send before closing the connection
+    // Controls the max number of PTOs to send before closing the
+    // connection
     MAX_PTO = 0x10012,
     // Egress policer config: rate_bytes_per_sec,burst_ms,delay_ms
     EGRESS_POLICER_CONFIG = 0x20001,
     // Enable SCONE and set the rate signal from a bps value
     SCONE_KNOB = 0x5C0E,
-    // Controls rx packets before ack thresholds (beforeInit,afterInit)
+    // Controls rx packets before ack thresholds
+    // (beforeInit,afterInit)
     RX_PACKETS_BEFORE_ACK = 0x10013)
 
 FOLLY_POP_WARNING
@@ -253,8 +250,8 @@ enum class FrameType : uint64_t {
   STOP_SENDING = 0x05,
   CRYPTO_FRAME = 0x06, // librtmp has a #define CRYPTO
   NEW_TOKEN = 0x07,
-  // STREAM frame can have values from 0x08 to 0x0f which indicate which fields
-  // are present in the frame.
+  // STREAM frame can have values from 0x08 to 0x0f which
+  // indicate which fields are present in the frame.
   STREAM = 0x08,
   STREAM_FIN = 0x09,
   STREAM_LEN = 0x0a,
@@ -276,7 +273,8 @@ enum class FrameType : uint64_t {
   PATH_CHALLENGE = 0x1A,
   PATH_RESPONSE = 0x1B,
   CONNECTION_CLOSE = 0x1C,
-  // CONNECTION_CLOSE_APP_ERR frametype is use to indicate application errors
+  // CONNECTION_CLOSE_APP_ERR frametype is use to indicate
+  // application errors
   CONNECTION_CLOSE_APP_ERR = 0x1D,
   HANDSHAKE_DONE = 0x1E,
   RST_STREAM_AT = 0x24,

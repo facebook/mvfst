@@ -19,6 +19,7 @@ mvfst_cpp_library(
         "//folly/io:socket_option_map",
         "//folly/io/async:async_socket_exception",
         "//folly/portability:sockets",
+        "//quic:constants",
         "//quic:exception",
         "//quic/common:expected",
         "//quic/common:network_data",
@@ -84,6 +85,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",
+        "//quic:constants",
         "//quic:exception",
         "//quic/common:expected",
         "//quic/common:mvfst_logging",

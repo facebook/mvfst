@@ -9,8 +9,13 @@
 
 #include <folly/io/IOBuf.h>
 
+namespace folly {
+class SocketAddress;
+} // namespace folly
+
 namespace quic {
 
+using AddressRange = folly::Range<folly::SocketAddress const*>;
 using ByteRange = folly::ByteRange;
 using MutableByteRange = folly::MutableByteRange;
 using BufHelpers = folly::IOBuf; // For stuff like BufHelpers::create, etc.

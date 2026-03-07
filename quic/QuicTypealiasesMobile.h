@@ -11,8 +11,13 @@
 #include <quic/common/QuicRange.h>
 #include <memory>
 
+namespace folly {
+class SocketAddress;
+} // namespace folly
+
 namespace quic {
 
+using AddressRange = quic::Range<folly::SocketAddress const*>;
 using ByteRange = quic::ByteRange;
 using MutableByteRange = quic::MutableByteRange;
 using BufHelpers = quic::QuicBuffer; // For stuff like BufHelpers::create, etc.

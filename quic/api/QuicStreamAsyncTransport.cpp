@@ -417,7 +417,7 @@ void QuicStreamAsyncTransport::handleRead() {
           readCb_->readBufferAvailable(std::move(readData->first));
         } else {
           size_t readLen = readData->first->computeChainDataLength();
-          Cursor c(readData->first.get());
+          folly::io::Cursor c(readData->first.get());
           MVCHECK_NOTNULL(buf);
           c.pull(buf, readLen);
           readCb_->readDataAvailable(readLen);

@@ -217,7 +217,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   EXPECT_NE(it1, serverParams->parameters.end());
 
   // check that the values equal what we expect
-  Cursor cursor1 = Cursor(it1->value.get());
+  folly::io::Cursor cursor1 = folly::io::Cursor(it1->value.get());
   auto val = quic::follyutils::decodeQuicInteger(cursor1);
   EXPECT_EQ(val->first, 12);
 }

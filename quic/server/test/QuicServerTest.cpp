@@ -1931,7 +1931,7 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
         // the writtenData contains actual client address + time of ack + data
         EXPECT_FALSE(eq(*data, *writtenData));
         // extract and verify the encoded client address
-        Cursor cursor(writtenData.get());
+        folly::io::Cursor cursor(writtenData.get());
         uint32_t protocotVersion = (cursor.readBE<uint32_t>());
         EXPECT_EQ(protocotVersion, 0x0000001);
         uint16_t addrLen = (cursor.readBE<uint16_t>());

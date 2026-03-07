@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/QuicException.h>
+#include <quic/QuicTypealiases.h>
 #include <quic/common/Expected.h>
 #include <quic/common/MvfstLogging.h> // For QuicError
 #include <quic/common/NetworkData.h>
@@ -48,7 +49,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       size_t iovec_len) override;
 
   int writem(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       iovec* iov,
       size_t* numIovecsInBuffer,
       size_t count) override;
@@ -60,7 +61,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       WriteOptions options) override;
 
   int writemGSO(
-      folly::Range<folly::SocketAddress const*> /*addrs*/,
+      AddressRange /*addrs*/,
       const BufPtr* /*bufs*/,
       size_t /*count*/,
       const WriteOptions* /*options*/) override {
@@ -68,7 +69,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   }
 
   int writemGSO(
-      folly::Range<folly::SocketAddress const*> /* addrs */,
+      AddressRange /* addrs */,
       iovec* /* iov */,
       size_t* /* numIovecsInBuffer */,
       size_t /* count */,

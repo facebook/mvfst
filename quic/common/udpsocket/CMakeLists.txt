@@ -15,6 +15,7 @@ mvfst_add_library(mvfst_common_udpsocket_quic_async_udp_socket
     mvfst_common_expected
     mvfst_common_network_data
     mvfst_common_optional
+    mvfst_constants
     mvfst_exception
     Folly::folly_io_async_async_socket_exception
     Folly::folly_io_iobuf

@@ -18,6 +18,7 @@
 #include <quic/common/Expected.h>
 
 #include <quic/QuicException.h> // Include for existing QuicError and QuicErrorCode
+#include <quic/QuicTypealiases.h>
 #include <quic/common/NetworkData.h>
 #include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
@@ -186,7 +187,7 @@ class QuicAsyncUDPSocket {
    * iovecs per message is specified in numIovecsInBuffer.
    */
   virtual int writem(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       iovec* iov,
       size_t* numIovecsInBuffer,
       size_t count) = 0;
@@ -227,7 +228,7 @@ class QuicAsyncUDPSocket {
    *  verify GSO is supported on this platform by calling getGSO
    */
   virtual int writemGSO(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       const BufPtr* bufs,
       size_t count,
       const WriteOptions* options) = 0;
@@ -243,7 +244,7 @@ class QuicAsyncUDPSocket {
    * verify GSO is supported on this platform by calling getGSO
    */
   virtual int writemGSO(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       iovec* iov,
       size_t* numIovecsInBuffer,
       size_t count,

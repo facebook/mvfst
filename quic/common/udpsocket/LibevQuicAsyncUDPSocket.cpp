@@ -274,7 +274,7 @@ ssize_t LibevQuicAsyncUDPSocket::writeGSO(
 }
 
 int LibevQuicAsyncUDPSocket::writem(
-    folly::Range<folly::SocketAddress const*> /*addrs*/,
+    AddressRange /*addrs*/,
     iovec* /*iov*/,
     size_t* /*numIovecsInBuffer*/,
     size_t /*count*/) {

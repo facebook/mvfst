@@ -16,6 +16,7 @@
 using namespace std;
 using namespace folly;
 using namespace quic;
+using folly::io::Cursor;
 
 #define SCL(x) (x), sizeof(x) - 1
 
