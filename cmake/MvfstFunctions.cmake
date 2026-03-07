@@ -303,25 +303,20 @@ endfunction()
 # Header installation function
 # =============================================================================
 # Install headers preserving directory structure relative to rootDir
-# Usage: mvfst_install_headers(quic ${CMAKE_CURRENT_SOURCE_DIR} ${HEADERS})
+# Usage: mvfst_install_headers(quic quic ${HEADERS})
 function(mvfst_install_headers rootName rootDir)
   file(TO_CMAKE_PATH "${rootDir}" rootDir)
-  string(LENGTH "${rootDir}" rootDirLength)
   foreach(fil ${ARGN})
     file(TO_CMAKE_PATH "${fil}" filePath)
-    string(FIND "${filePath}" "/" rIdx REVERSE)
-    if(rIdx EQUAL -1)
+
+    # dirname $fil
+    string(FIND "${filePath}" "/" lastSlash REVERSE)
+    if(lastSlash EQUAL -1)
       continue()
     endif()
-    string(SUBSTRING "${filePath}" 0 ${rIdx} filePath)
+    string(SUBSTRING "${filePath}" 0 ${lastSlash} dirName)
 
-    string(LENGTH "${filePath}" filePathLength)
-    string(FIND "${filePath}" "${rootDir}" rIdx)
-    if(rIdx EQUAL 0)
-      math(EXPR filePathLength "${filePathLength} - ${rootDirLength}")
-      string(SUBSTRING "${filePath}" ${rootDirLength} ${filePathLength} fileGroup)
-      install(FILES ${fil}
-              DESTINATION ${INCLUDE_INSTALL_DIR}/${rootName}${fileGroup})
-    endif()
+    install(FILES ${rootDir}/${fil}
+        DESTINATION ${INCLUDE_INSTALL_DIR}/${rootName}/${dirName})
   endforeach()
 endfunction()
