@@ -28,7 +28,7 @@ struct Range {
       : begin_(vec.data()), end_(vec.data() + vec.size()) {}
 
   template <class T, class Alloc>
-  explicit Range(
+  /* implicit */ Range(
       const std::vector<T, Alloc>& vec,
       typename std::enable_if<
           std::is_convertible<const T*, Iter>::value>::type* = nullptr)
