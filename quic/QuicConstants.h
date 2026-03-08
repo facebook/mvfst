@@ -115,9 +115,11 @@ constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 // QUIC_ENUM expands to BETTER_ENUM on server (with ._to_string() support),
 // or plain enum class on mobile (to reduce binary size by ~6KB per enum).
 // clang-format off
+#if defined(__GNUC__) || defined(__clang__)
 _Pragma("GCC diagnostic push")
 #ifdef __clang__
     _Pragma("GCC diagnostic ignored \"-Wglobal-constructors\"")
+#endif
 #endif
 
 QUIC_ENUM(
@@ -242,7 +244,9 @@ QUIC_ENUM(
     // (beforeInit,afterInit)
     RX_PACKETS_BEFORE_ACK = 0x10013)
 
+#if defined(__GNUC__) || defined(__clang__)
 _Pragma("GCC diagnostic pop")
+#endif
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
