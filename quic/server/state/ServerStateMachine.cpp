@@ -1176,6 +1176,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           TransportErrorCode::PROTOCOL_VIOLATION, "Packet has no frames"));
     }
 
+    // A valid packet was successfully parsed from this datagram. Clear the
+    // firstPacketFromPeer flag so that trailing unparseable bytes (e.g.,
+    // random padding added by some implementations like picoquic) do not
+    // cause the connection to be abandoned.
+    firstPacketFromPeer = false;
+
     auto protectionLevel = regularOptional->header.getProtectionType();
     auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);
 

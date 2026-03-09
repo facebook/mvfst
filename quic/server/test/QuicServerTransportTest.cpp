@@ -2194,6 +2194,53 @@ TEST_F(QuicUnencryptedServerTransportTest, FirstPacketProcessedCallback) {
       clientNextInitialPacketNum));
 }
 
+TEST_F(QuicUnencryptedServerTransportTest, InitialWithTrailingRandomPadding) {
+  // Simulate picoquic-style datagram padding: a valid Initial packet followed
+  // by garbage bytes outside the QUIC packet but inside the UDP datagram.
+  // The server must process the Initial successfully and not abandon the
+  // connection when the trailing garbage bytes fail to parse as a coalesced
+  // packet. See RFC 9000 Section 12.2.
+  auto chlo = folly::IOBuf::copyBuffer("CHLO");
+  auto nextPacketNum = clientNextInitialPacketNum++;
+  auto aead = getInitialCipher();
+  auto headerCipher = getInitialHeaderCipher();
+  ChainedByteRangeHead chloRch(chlo);
+  auto initialPacket = packetToBufCleartext(
+      createInitialCryptoPacket(
+          *clientConnectionId,
+          *initialDestinationConnectionId,
+          nextPacketNum,
+          QuicVersion::MVFST,
+          chloRch,
+          *aead,
+          0 /* largestAcked */),
+      *aead,
+      *headerCipher,
+      nextPacketNum);
+
+  // Append padding bytes after the Initial packet. Use 0xcd as the first byte
+  // (long header form bit set) to trigger the parseLongHeaderInvariant path,
+  // followed by bytes that will fail invariant parsing.
+  size_t paddingLen = 800;
+  auto padding = folly::IOBuf::create(paddingLen);
+  padding->append(paddingLen);
+  memset(padding->writableData(), 0xAA, paddingLen);
+  // Set first byte to have long header form bit (0x80) set, which triggers
+  // the "Dropping packet, failed to parse invariant" path.
+  padding->writableData()[0] = 0xcd;
+  initialPacket->appendToChain(std::move(padding));
+  initialPacket->coalesce();
+
+  // This must not throw. Before the fix, the trailing garbage bytes would cause
+  // a parse failure that triggered CONNECTION_ABANDONED because
+  // firstPacketFromPeer was never cleared after the Initial was processed.
+  EXPECT_NO_THROW(deliverData(std::move(initialPacket)));
+
+  // Verify the server processed the Initial successfully.
+  EXPECT_NE(server->getConn().readCodec, nullptr);
+  EXPECT_FALSE(server->getConn().localConnectionError.has_value());
+}
+
 TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedStream) {
   auto data = IOBuf::copyBuffer("bad data");
   PacketNum nextPacket = clientNextInitialPacketNum++;
