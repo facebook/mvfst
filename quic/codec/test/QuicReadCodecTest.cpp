@@ -78,7 +78,7 @@ TEST_F(QuicReadCodecTest, TooSmallBuffer) {
   auto smallBuffer = folly::IOBuf::create(1);
   smallBuffer->append(1);
   folly::io::RWPrivateCursor wcursor(smallBuffer.get());
-  wcursor.writeBE<uint8_t>(0x01);
+  wcursor.writeBE<uint8_t>(static_cast<uint8_t>(0x01));
   AckStates ackStates;
   auto smallQueue = bufToQueue(std::move(smallBuffer));
   EXPECT_FALSE(

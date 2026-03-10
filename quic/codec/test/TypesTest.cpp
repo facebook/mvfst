@@ -114,12 +114,12 @@ TEST_F(TypesTest, LongHeaderSmallInput) {
   auto buf = folly::IOBuf::create(15);
   buf->append(15);
   folly::io::RWPrivateCursor wcursor(buf.get());
-  wcursor.writeBE<uint32_t>(789);
+  wcursor.writeBE<uint32_t>(static_cast<uint32_t>(789));
   auto connId = getTestConnectionId();
   wcursor.push(connId.data(), connId.size());
-  wcursor.writeBE<uint8_t>(1);
-  wcursor.writeBE<uint8_t>(2);
-  wcursor.writeBE<uint8_t>(3);
+  wcursor.writeBE<uint8_t>(static_cast<uint8_t>(1));
+  wcursor.writeBE<uint8_t>(static_cast<uint8_t>(2));
+  wcursor.writeBE<uint8_t>(static_cast<uint8_t>(3));
 
   ContiguousReadCursor cursor(buf->data(), buf->length());
   EXPECT_FALSE(parseLongHeader(clientCleartext, cursor).has_value());
@@ -135,7 +135,7 @@ TEST_F(TypesTest, LongHeaderInvalid) {
   folly::io::RWPrivateCursor wcursor(buf.get());
   auto connId = getTestConnectionId();
   wcursor.push(connId.data(), connId.size());
-  wcursor.writeBE<uint32_t>(1234);
+  wcursor.writeBE<uint32_t>(static_cast<uint32_t>(1234));
   wcursor.writeBE<QuicVersionType>(static_cast<QuicVersionType>(version));
 
   ContiguousReadCursor cursor(buf->data(), buf->length());

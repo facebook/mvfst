@@ -50,14 +50,14 @@ enum class TestFrameType : uint8_t {
 BufPtr encodeStreamBuffer(StreamId id, StreamBuffer data) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
-  appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM));
-  appender.writeBE(id);
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(TestFrameType::STREAM));
+  appender.writeBE<StreamId>(id);
   auto dataBuf = data.data.move();
   dataBuf->coalesce();
-  appender.writeBE<uint32_t>(dataBuf->length());
+  appender.writeBE<uint32_t>(static_cast<uint32_t>(dataBuf->length()));
   appender.push(dataBuf->coalesce());
   appender.writeBE<uint64_t>(data.offset);
-  appender.writeBE<uint8_t>(data.eof);
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(data.eof));
   buf->coalesce();
   return buf;
 }
@@ -65,10 +65,10 @@ BufPtr encodeStreamBuffer(StreamId id, StreamBuffer data) {
 BufPtr encodeCryptoBuffer(StreamBuffer data) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
-  appender.writeBE(static_cast<uint8_t>(TestFrameType::CRYPTO));
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(TestFrameType::CRYPTO));
   auto dataBuf = data.data.move();
   dataBuf->coalesce();
-  appender.writeBE<uint32_t>(dataBuf->length());
+  appender.writeBE<uint32_t>(static_cast<uint32_t>(dataBuf->length()));
   appender.push(dataBuf->coalesce());
   appender.writeBE<uint64_t>(data.offset);
   buf->coalesce();
@@ -79,8 +79,9 @@ BufPtr encodeCryptoBuffer(StreamBuffer data) {
 BufPtr encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
   auto buf = IOBuf::create(25);
   folly::io::Appender appender(buf.get(), 25);
-  appender.writeBE(static_cast<uint8_t>(TestFrameType::MAX_STREAMS));
-  appender.writeBE<uint8_t>(frame.isForBidirectionalStream() ? 1 : 0);
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(TestFrameType::MAX_STREAMS));
+  appender.writeBE<uint8_t>(
+      static_cast<uint8_t>(frame.isForBidirectionalStream() ? 1 : 0));
   appender.writeBE<uint64_t>(frame.maxStreams);
   return buf;
 }
@@ -89,10 +90,10 @@ BufPtr encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
 BufPtr encodeDatagramFrame(BufQueue data) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
-  appender.writeBE(static_cast<uint8_t>(TestFrameType::DATAGRAM));
+  appender.writeBE<uint8_t>(static_cast<uint8_t>(TestFrameType::DATAGRAM));
   auto dataBuf = data.move();
   dataBuf->coalesce();
-  appender.writeBE<uint32_t>(dataBuf->length());
+  appender.writeBE<uint32_t>(static_cast<uint32_t>(dataBuf->length()));
   appender.push(dataBuf->coalesce());
   buf->coalesce();
   return buf;
