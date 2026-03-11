@@ -354,6 +354,7 @@ struct TransportSettings {
   bool dropIngressOnStopSending{false};
   bool advertisedReliableResetStreamSupport{false};
   bool advertisedKnobFrameSupport{false};
+  Optional<uint16_t> quicExperimentId;
 
   // Extended ACK support to advertise to the peer. This is what we expect to
   // receive from the peer inside ACK_EXTENDED frames.

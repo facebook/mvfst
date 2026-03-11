@@ -715,6 +715,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   ExtendedAckFeatureMaskType peerAdvertisedExtendedAckFeatures{0};
 
+  Optional<uint16_t> peerQuicExperimentId;
+
   // Negotiated ACK related config. These don't change throughout the connection
   // so cache them once we've receive the relevant transport parameters.
   bool negotiatedAckReceiveTimestampSupport{false};

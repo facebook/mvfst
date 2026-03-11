@@ -356,6 +356,58 @@ TEST(ServerStateMachineTest, TestEncodeKnobFrameSupportedParamDisabled) {
               testing::Eq(TransportParameterId::knob_frames_supported)))));
 }
 
+TEST(ServerStateMachineTest, TestProcessQuicExperimentParamSet) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  auto encodeResult =
+      encodeIntegerParameter(TransportParameterId::quic_experiment, 42);
+  ASSERT_FALSE(encodeResult.hasError());
+  transportParams.push_back(encodeResult.value());
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(serverConn.peerQuicExperimentId.has_value());
+  EXPECT_EQ(*serverConn.peerQuicExperimentId, 42);
+}
+
+TEST(ServerStateMachineTest, TestProcessQuicExperimentParamNotSent) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_FALSE(serverConn.peerQuicExperimentId.has_value());
+}
+
+TEST(ServerStateMachineTest, TestEncodeQuicExperimentParamNonZero) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.quicExperimentId = 42;
+  auto customTransportParams = getSupportedExtTransportParams(serverConn);
+  auto quicExperimentParamResult = getIntegerParameter(
+      TransportParameterId::quic_experiment, customTransportParams);
+  ASSERT_FALSE(quicExperimentParamResult.hasError());
+  const auto& quicExperimentParam = quicExperimentParamResult.value();
+  ASSERT_TRUE(quicExperimentParam.has_value());
+  EXPECT_EQ(quicExperimentParam.value(), 42);
+}
+
+TEST(ServerStateMachineTest, TestEncodeQuicExperimentParamZero) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto customTransportParams = getSupportedExtTransportParams(serverConn);
+  EXPECT_THAT(
+      customTransportParams,
+      Not(Contains(
+          testing::Field(
+              &TransportParameter::parameter,
+              testing::Eq(TransportParameterId::quic_experiment)))));
+}
+
 TEST(ServerStateMachineTest, TestProcessExtendedAckSupportParam) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());

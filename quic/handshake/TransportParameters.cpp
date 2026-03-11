@@ -173,6 +173,14 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     customTps.push_back(encodeSconeSupportedParameter());
   }
 
+  if (ts.quicExperimentId.has_value()) {
+    auto quicExperimentResult =
+        encodeIntegerParameter(TpId::quic_experiment, *ts.quicExperimentId);
+    if (quicExperimentResult.has_value()) {
+      customTps.push_back(quicExperimentResult.value());
+    }
+  }
+
   return customTps;
 }
 

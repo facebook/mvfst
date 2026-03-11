@@ -321,6 +321,14 @@ quic::Expected<void, QuicError> processClientInitialParams(
   }
   auto extendedAckFeatures = extendedAckFeaturesResult.value();
 
+  auto quicExperimentResult = getIntegerParameter(
+      static_cast<TransportParameterId>(TransportParameterId::quic_experiment),
+      clientParams.parameters);
+  if (quicExperimentResult.hasError()) {
+    return quic::make_unexpected(quicExperimentResult.error());
+  }
+  auto quicExperiment = quicExperimentResult.value();
+
   auto reliableResetTpIter = findParameter(
       clientParams.parameters,
       static_cast<TransportParameterId>(
@@ -472,6 +480,9 @@ quic::Expected<void, QuicError> processClientInitialParams(
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
   conn.peerAdvertisedExtendedAckFeatures = extendedAckFeatures.value_or(0);
+  if (quicExperiment.has_value()) {
+    conn.peerQuicExperimentId = static_cast<uint16_t>(*quicExperiment);
+  }
 
   return {};
 }
