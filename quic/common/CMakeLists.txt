@@ -22,8 +22,6 @@ mvfst_add_library(mvfst_common_interval_set
     mvfst_common_circular_deque
     mvfst_common_expected
     mvfst_common_mvfst_logging
-    mvfst_common_optional
-    Folly::folly_likely
 )
 
 mvfst_add_library(mvfst_common_quic_buffer

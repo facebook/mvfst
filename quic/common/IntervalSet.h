@@ -11,8 +11,6 @@
 #include <cstdint>
 #include <limits>
 
-#include <folly/Likely.h>
-#include <glog/logging.h>
 #include <quic/common/CircularDeque.h>
 #include <quic/common/Expected.h>
 

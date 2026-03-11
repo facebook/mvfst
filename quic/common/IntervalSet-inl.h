@@ -6,7 +6,6 @@
  */
 
 #include <quic/common/MvfstLogging.h>
-#include <quic/common/Optional.h>
 
 namespace quic {
 

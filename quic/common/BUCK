@@ -54,12 +54,9 @@ mvfst_cpp_library(
         "IntervalSet-inl.h",
     ],
     exported_deps = [
-        "fbsource//third-party/glog:glog",
         ":circular_deque",
         ":expected",
         ":mvfst_logging",
-        ":optional",
-        "//folly:likely",
     ],
 )
 
