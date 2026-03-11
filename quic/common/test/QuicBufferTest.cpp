@@ -1242,4 +1242,29 @@ TEST(QuicBufferTest, TestPrependExhaustHeadroom) {
   EXPECT_EQ(memcmp(quicBuffer->data() + 8, "data", 4), 0);
 }
 
+TEST(QuicBufferTest, TrimStartExcessClamps) {
+  auto buf = QuicBuffer::copyBuffer("hello", 5);
+#if !defined(NDEBUG) && !defined(_WIN32)
+  // On Linux debug/ASAN builds, MVDCHECK_LE fires and aborts.
+  EXPECT_DEATH({ buf->trimStart(10); }, "");
+#else
+  // In opt builds (and Windows debug), MVDCHECK is compiled out or non-fatal.
+  // Verify fallback clamps to length_ instead of underflowing.
+  EXPECT_EQ(buf->length(), 5);
+  buf->trimStart(10);
+  EXPECT_EQ(buf->length(), 0);
+#endif
+}
+
+TEST(QuicBufferTest, TrimEndExcessClamps) {
+  auto buf = QuicBuffer::copyBuffer("hello", 5);
+#if !defined(NDEBUG) && !defined(_WIN32)
+  EXPECT_DEATH({ buf->trimEnd(10); }, "");
+#else
+  EXPECT_EQ(buf->length(), 5);
+  buf->trimEnd(10);
+  EXPECT_EQ(buf->length(), 0);
+#endif
+}
+
 } // namespace quic
