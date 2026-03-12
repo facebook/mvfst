@@ -11,9 +11,11 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/TransportKnobs.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/handshake/ServerHandshake.h>
+#include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/Mocks.h>
 
@@ -3339,6 +3341,139 @@ TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
           *getInitialCipher(),
           *getInitialHeaderCipher())),
       std::runtime_error);
+}
+
+// Verify that cwnd hints encoded by maybeWriteNewSessionTicket are only
+// applied when the resuming client's address matches the most recent one.
+TEST_F(QuicUnencryptedServerTransportTest, CwndHintEncodeDecodeRoundTrip) {
+  auto& conn = server->getNonConstConn();
+  conn.transportSettings.includeCwndHintsInSessionTicket = true;
+
+  // Simulate a previous connection that validated an old source token.
+  // clientAddr is 127.0.0.1 (set in SetUp), so maybeWriteNewSessionTicket
+  // will ensure 127.0.0.1 is at the back of the source addresses.
+  // Include an old address from a different subnet to test the negative case.
+  conn.tokenSourceAddresses = {folly::IPAddress("10.0.0.5")};
+
+  // Set a non-zero SRTT so the RTT hint is included in the token.
+  // Both cwnd and rtt hints must be present for hints to be applied.
+  conn.lossState.srtt = std::chrono::microseconds(50000); // 50ms
+
+  // Capture the AppToken written by the real maybeWriteNewSessionTicket.
+  // Encode immediately since AppToken is not copyable (unique_ptr member).
+  BufPtr tokenBuf;
+  uint64_t cwndHintBytes = 0;
+  bool tokenCaptured = false;
+  EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
+      .WillOnce([&](const AppToken& appToken) {
+        // Verify the token contains a cwnd hint.
+        auto cwndResult = getIntegerParameter(
+            TransportParameterId::cwnd_hint_bytes,
+            appToken.transportParams.parameters);
+        EXPECT_FALSE(cwndResult.hasError());
+        if (!cwndResult.hasError() && cwndResult.value().has_value()) {
+          cwndHintBytes = *cwndResult.value();
+        }
+        // Verify 10.0.0.5 is in the token (needed for the negative case
+        // to be meaningful — hints must not be applied even though this
+        // address shares a /24 with the resuming peer).
+        auto it = std::find(
+            appToken.sourceAddresses.begin(),
+            appToken.sourceAddresses.end(),
+            folly::IPAddress("10.0.0.5"));
+        EXPECT_NE(it, appToken.sourceAddresses.end())
+            << "Old address should be in the token for negative case";
+        tokenBuf = encodeAppToken(appToken);
+        tokenCaptured = true;
+        return quic::Expected<void, QuicError>{};
+      });
+
+  // Complete the handshake to trigger maybeWriteNewSessionTicket.
+  setupClientReadCodec();
+  recvClientHello();
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
+  recvClientFinished();
+  loopForWrites();
+
+  ASSERT_TRUE(tokenCaptured) << "Session ticket should have been written";
+  ASSERT_TRUE(tokenBuf) << "Token should have been encoded";
+  EXPECT_GT(cwndHintBytes, 0);
+
+  // A simple CC stub that records setResumeHints calls.
+  struct StubCC : public CongestionController {
+    void onRemoveBytesFromInflight(uint64_t) override {}
+
+    void onPacketSent(const OutstandingPacketWrapper&) override {}
+
+    void onPacketAckOrLoss(const AckEvent*, const LossEvent*) override {}
+
+    uint64_t getWritableBytes() const override {
+      return 0;
+    }
+
+    uint64_t getCongestionWindow() const override {
+      return 0;
+    }
+
+    CongestionControlType type() const override {
+      return CongestionControlType::None;
+    }
+
+    void setAppIdle(bool, TimePoint) override {}
+
+    void setAppLimited() override {}
+
+    bool isAppLimited() const override {
+      return false;
+    }
+
+    void getStats(CongestionControllerStats&) const override {}
+
+    void setResumeHints(uint64_t cwnd, std::chrono::milliseconds rtt) override {
+      called = true;
+      hintCwnd = cwnd;
+      hintRtt = rtt;
+    }
+
+    bool called{false};
+    uint64_t hintCwnd{0};
+    std::chrono::milliseconds hintRtt{0};
+  };
+
+  // Case 1: Client resumes from same /24 as the most recent address
+  // (127.0.0.x). Hints SHOULD be applied.
+  {
+    QuicServerConnectionState nextConn(
+        FizzServerQuicHandshakeContext::Builder().build());
+    nextConn.peerAddress = folly::SocketAddress("127.0.0.2", 4433);
+    auto cc = std::make_unique<StubCC>();
+    auto* rawCC = cc.get();
+    nextConn.congestionController = std::move(cc);
+
+    Optional<BufPtr> opt = tokenBuf->clone();
+    maybeUpdateTransportFromAppToken(nextConn, opt);
+
+    EXPECT_TRUE(rawCC->called)
+        << "Hints should apply: peer is in same /24 as most recent address";
+    EXPECT_EQ(rawCC->hintCwnd, cwndHintBytes);
+  }
+
+  // Case 2: Client resumes from a different network (10.0.0.x).
+  // Hints should NOT be applied, even though 10.0.0.5 is in the token.
+  {
+    QuicServerConnectionState nextConn(
+        FizzServerQuicHandshakeContext::Builder().build());
+    nextConn.peerAddress = folly::SocketAddress("10.0.0.6", 4433);
+    auto cc = std::make_unique<StubCC>();
+    auto* rawCC = cc.get();
+    nextConn.congestionController = std::move(cc);
+
+    Optional<BufPtr> opt = tokenBuf->clone();
+    maybeUpdateTransportFromAppToken(nextConn, opt);
+
+    EXPECT_FALSE(rawCC->called)
+        << "Hints should NOT apply: peer is on a different /24 from most recent";
+  }
 }
 
 struct FizzHandshakeParam {

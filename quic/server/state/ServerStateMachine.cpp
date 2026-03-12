@@ -727,18 +727,19 @@ void maybeUpdateTransportFromAppToken(
     QUIC_STATS(conn.statsCallback, onCwndHintBytesSample, *maybeCwndHintBytes);
 
     // Only use the cwndHint and rtt hints if the source address prefix matches
-    // one in the token (/24 for IPv4, /48 for IPv6)
+    // the most recent address in the token (/24 for IPv4, /48 for IPv6).
+    // We only check the last address because the cwnd hint was captured when
+    // the client was on that address; matching against older addresses could
+    // apply a hint from a different network (e.g., WiFi hint on cellular).
     MVDCHECK(conn.peerAddress.isInitialized());
     const auto& currentAddr = conn.peerAddress.getIPAddress();
     bool addressMatches = false;
-    for (const auto& tokenAddr : appToken->sourceAddresses) {
+    if (!appToken->sourceAddresses.empty()) {
+      const auto& tokenAddr = appToken->sourceAddresses.back();
       if (currentAddr.isV4() && tokenAddr.isV4()) {
         addressMatches = currentAddr.inSubnet(tokenAddr, 24);
       } else if (currentAddr.isV6() && tokenAddr.isV6()) {
         addressMatches = currentAddr.inSubnet(tokenAddr, 48);
-      }
-      if (addressMatches) {
-        break;
       }
     }
     if (addressMatches) {
