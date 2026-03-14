@@ -310,4 +310,120 @@ TEST_F(CubicTest, InitCwnd) {
   EXPECT_EQ(cubic.getWritableBytes(), 123456);
 }
 
+// Exercises the DCHECK fallback in Cubic::onPacketLoss: when
+// largestLostPacketNum or largestLostSentTime is std::nullopt,
+// the function should return early without crashing (DCHECK fires in debug
+// builds) or modifying cwnd (fallback path in optimized builds).
+TEST_F(CubicTest, LossEventWithEmptyOptionals) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  Cubic cubic(conn);
+
+  // Create a loss event with empty optionals (no packets added)
+  CongestionController::LossEvent loss;
+
+#if !defined(NDEBUG) && !defined(_WIN32)
+  EXPECT_DEATH(
+      {
+        quic::test::onPacketAckOrLossWrapper(&conn, &cubic, std::nullopt, loss);
+      },
+      "");
+#else
+  auto cwndBefore = cubic.getCongestionWindow();
+  auto writableBefore = cubic.getWritableBytes();
+  EXPECT_FALSE(loss.largestLostPacketNum.has_value());
+  EXPECT_FALSE(loss.largestLostSentTime.has_value());
+
+  // This should return early without crashing or modifying cwnd
+  quic::test::onPacketAckOrLossWrapper(&conn, &cubic, std::nullopt, loss);
+
+  EXPECT_EQ(cubic.getCongestionWindow(), cwndBefore);
+  EXPECT_EQ(cubic.getWritableBytes(), writableBefore);
+#endif
+}
+
+// Exercises the DCHECK fallback in Cubic::onPacketAckedInRecovery: when the
+// state machine transitions from FastRecovery to Steady but
+// steadyState_.lastMaxCwndBytes or
+// steadyState_.lastReductionTime is std::nullopt, the function should return
+// early without crashing (DCHECK fires in debug builds) and skip the cubic
+// cwnd pre-calculation (fallback path in optimized builds).
+TEST_F(CubicTest, RecoveryWithEmptyLastMaxCwndOrLastReductionTime) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.udpSendPacketLen = 200;
+  conn.transportSettings.minCwndInMss = 10;
+
+  TestingCubic cubic(conn, 0, 1000);
+
+  // Send one and get acked, moves to Steady
+  auto packet0 = makeTestingWritePacket(0, 1000, 1000);
+  conn.lossState.largestSent = 0;
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet0);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(0, 1000, Clock::now(), packet0.metadata.time),
+      std::nullopt);
+
+  // Send packets and cause a loss to enter FastRecovery.
+  auto packet1 = makeTestingWritePacket(1, 1000, 2000);
+  auto packet2 = makeTestingWritePacket(2, 1000, 3000);
+  conn.lossState.largestSent = 2;
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet2);
+
+  CongestionController::LossEvent loss;
+  loss.addLostPacket(packet1);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(loss));
+
+  // Persistent congestion resets lastMaxCwndBytes and lastReductionTime
+  auto packet3 = makeTestingWritePacket(3, 1000, 4000);
+  conn.lossState.largestSent = 3;
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet3);
+  CongestionController::LossEvent persistentLoss;
+  persistentLoss.addLostPacket(packet3);
+  persistentLoss.persistentCongestion = true;
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::nullopt, std::move(persistentLoss));
+
+  // Force state to FastRecovery with empty lastMaxCwndBytes/lastReductionTime
+  cubic.setStateForTest(CubicStates::FastRecovery);
+
+#if !defined(NDEBUG) && !defined(_WIN32)
+  EXPECT_DEATH(
+      {
+        auto laterTime = Clock::now() + std::chrono::seconds(5);
+        auto packet4 = makeTestingWritePacket(4, 1000, 5000, laterTime);
+        conn.lossState.largestSent = 4;
+        quic::test::onPacketsSentWrapper(&conn, &cubic, packet4);
+        quic::test::onPacketAckOrLossWrapper(
+            &conn,
+            &cubic,
+            makeAck(4, 1000, laterTime + 100ms, laterTime),
+            std::nullopt);
+      },
+      "");
+#else
+  auto cwndBeforeAck = cubic.getCongestionWindow();
+
+  // Ack a packet whose sent time is after endOfRecovery so isRecovered()
+  // returns true, triggering the transition to Steady and hitting the DCHECK
+  // fallback for empty lastMaxCwndBytes/lastReductionTime.
+  auto laterTime = Clock::now() + std::chrono::seconds(5);
+  auto packet4 = makeTestingWritePacket(4, 1000, 5000, laterTime);
+  conn.lossState.largestSent = 4;
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet4);
+  quic::test::onPacketAckOrLossWrapper(
+      &conn,
+      &cubic,
+      makeAck(4, 1000, laterTime + 100ms, laterTime),
+      std::nullopt);
+
+  // The DCHECK fallback returns early: state transitions to Steady but cwnd
+  // is not modified by the cubic pre-calculation.
+  EXPECT_EQ(CubicStates::Steady, cubic.state());
+  EXPECT_EQ(cubic.getCongestionWindow(), cwndBeforeAck);
+#endif
+}
+
 } // namespace quic::test

@@ -129,6 +129,11 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
   MVDCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());
+  if (!loss.largestLostPacketNum.has_value() ||
+      !loss.largestLostSentTime.has_value()) {
+    // TODO(Sandarsh) add protocol oops handling
+    return;
+  }
   onRemoveBytesFromInflight(loss.lostBytes);
   // If the loss occurred past the endOfRecovery then we need to move the
   // endOfRecovery back and invoke the state machine, otherwise ignore the loss
@@ -847,6 +852,11 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
     // should have happened, and set values to them.
     MVDCHECK(steadyState_.lastMaxCwndBytes.has_value());
     MVDCHECK(steadyState_.lastReductionTime.has_value());
+    if (!steadyState_.lastMaxCwndBytes.has_value() ||
+        !steadyState_.lastReductionTime.has_value()) {
+      // TODO(Sandarsh) add protocol oops handling
+      return;
+    }
     updateTimeToOrigin();
     cwndBytes_ = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
     QLOG(
