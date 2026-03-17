@@ -516,6 +516,10 @@ void parseAckReceiveTimestamps(
     return;
   }
   MVDCHECK(frame.maybeLatestRecvdPacketNum.has_value());
+  // TODO(Sandarsh) add protocol oops
+  if (!frame.maybeLatestRecvdPacketNum.has_value()) {
+    return;
+  }
 
   auto receivedPacketNum = frame.maybeLatestRecvdPacketNum.value();
 

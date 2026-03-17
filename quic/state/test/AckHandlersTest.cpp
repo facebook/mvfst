@@ -7469,6 +7469,87 @@ TEST_P(AckHandlersTest, InflightBytesDecrementOnAckIncludesLostBytes) {
   EXPECT_EQ(conn.lossState.inflightBytes, 0);
 }
 
+TEST_P(AckHandlersTest, ParseAckTimestampsWithNulloptLatestRecvdPacketNum) {
+  // When maybeLatestRecvdPacketNum is std::nullopt,
+  // parseAckReceiveTimestamps should crash via MVDCHECK (debug, server/desktop)
+  // or return early via the fallback guard (release or mobile).
+  // parseAckReceiveTimestamps is only called for AppData, so we hardcode it.
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+
+  auto packetSendTime = Clock::now();
+
+  // Send a packet in AppData space
+  auto packet = createNewPacket(5, PacketNumberSpace::AppData);
+  conn.outstandings.packetCount[PacketNumberSpace::AppData]++;
+  conn.outstandings.packets.emplace_back(
+      std::move(packet),
+      packetSendTime,
+      0,
+      1,
+      0,
+      5,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+
+  // Enable receive timestamps config so parseAckReceiveTimestamps is exercised
+  conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 3};
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 5;
+  ackFrame.ackBlocks.emplace_back(5, 5);
+
+  // Set timestamp ranges but leave maybeLatestRecvdPacketNum as nullopt
+  // This exercises the DCHECK fallback in parseAckReceiveTimestamps
+  ackFrame.maybeLatestRecvdPacketNum = std::nullopt;
+  ackFrame.maybeLatestRecvdPacketTime = 500ms;
+  RecvdPacketsTimestampsRange range;
+  range.gap = 0;
+  range.timestamp_delta_count = 1;
+  range.deltas.push_back(100);
+  ackFrame.recvdPacketsTimestampRanges.push_back(range);
+
+  auto ackReceiveTime = packetSendTime + 10ms;
+
+#if !defined(NDEBUG) && !defined(_WIN32)
+  // On server/desktop debug builds, MVDCHECK maps to DCHECK which aborts.
+  EXPECT_DEATH(
+      {
+        (void)processAckFrame(
+            conn,
+            PacketNumberSpace::AppData,
+            ackFrame,
+            [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+            [](const auto&, const auto&)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
+            [](auto&, auto, auto&, bool)
+                -> quic::Expected<void, quic::QuicError> { return {}; },
+            ackReceiveTime);
+      },
+      "");
+#else
+  // In release or mobile builds, MVDCHECK is a no-op;
+  // the fallback guard returns early without crashing.
+  auto result = processAckFrame(
+      conn,
+      PacketNumberSpace::AppData,
+      ackFrame,
+      [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+      [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      ackReceiveTime);
+  ASSERT_FALSE(result.hasError());
+#endif
+}
+
 INSTANTIATE_TEST_SUITE_P(
 
     AckHandlersTests,
