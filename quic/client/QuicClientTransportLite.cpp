@@ -1287,11 +1287,6 @@ QuicClientTransportLite::startCryptoHandshake() {
     customTransportParameters_.push_back(*maybeEncodedDirectEncapParam);
   }
 
-  if (conn_->transportSettings.enableScone) {
-    VLOG(4) << "Sending SCONE transport parameter";
-    customTransportParameters_.push_back(encodeSconeSupportedParameter());
-  }
-
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
       conn_->transportSettings.advertisedInitialConnectionFlowControlWindow,

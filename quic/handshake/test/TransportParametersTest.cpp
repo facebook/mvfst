@@ -307,4 +307,23 @@ TEST_F(TransportParametersTest, SconeSupportedParameter) {
   EXPECT_FALSE(getSconeSupportedParameter(paramListWithoutScone));
 }
 
+// Test SCONE parameter included when enabled.
+TEST_F(TransportParametersTest, SconeTPIncluded) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.enableScone = true;
+
+  auto customTransportParameters = getSupportedExtTransportParams(clientConn);
+
+  int sconeCount = 0;
+  for (const auto& param : customTransportParameters) {
+    if (param.parameter == TransportParameterId::scone_supported) {
+      sconeCount++;
+    }
+  }
+
+  EXPECT_EQ(sconeCount, 1) << "scone_supported transport parameter appears "
+                           << sconeCount << " times (expected exactly 1)";
+}
+
 } // namespace quic::test
