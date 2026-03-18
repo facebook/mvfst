@@ -206,15 +206,15 @@ ssize_t LibevQuicAsyncUDPSocket::writeGSO(
   if (ret < 0 && options.gso > 0) {
     int errnoCopy = errno;
     // On some platforms (e.g., Android kernel 6.1.x), the kernel may
-    // reject UDP GSO with EIO/EINVAL even though getsockopt(UDP_SEGMENT)
-    // succeeds. Fall back to sending each QUIC packet individually without GSO
-    // and mark GSO as unsupported so the transport layer switches to
-    // SinglePacketBatchWriter.
+    // reject UDP GSO with EIO/EINVAL/EMSGSIZE even though
+    // getsockopt(UDP_SEGMENT) succeeds. Fall back to sending each QUIC
+    // packet individually without GSO and mark GSO as unsupported so the
+    // transport layer switches to SinglePacketBatchWriter.
     //
     // We split by options.gso (the segment size) rather than by iovec,
     // because the ContinuousMemory path concatenates all packets into a
     // single iovec.
-    if (errnoCopy == EIO || errnoCopy == EINVAL) {
+    if (errnoCopy == EIO || errnoCopy == EINVAL || errnoCopy == EMSGSIZE) {
       gso_ = -1;
 
       auto gsoSize = static_cast<size_t>(options.gso);
