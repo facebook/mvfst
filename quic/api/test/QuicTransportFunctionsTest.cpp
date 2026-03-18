@@ -4106,7 +4106,7 @@ TEST_F(
       pathInfo.id, PathResponseFrame(12345));
   EXPECT_EQ(WriteDataReason::PATH_VALIDATION, shouldWriteData(*conn));
 
-  // There is a reponse but no writable bytes
+  // There is a response but no writable bytes
   conn->pathManager->onPathPacketSent(pathInfo.id, 1200);
   ASSERT_EQ(pathInfo.writableBytes, 0);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
