@@ -112,6 +112,9 @@ QuicStreamManager::QuicStreamManager(
     QuicNodeType nodeType,
     const TransportSettings& transportSettings)
     : conn_(conn), nodeType_(nodeType), transportSettings_(&transportSettings) {
+  // Pre-size the streams map to reduce F14 rehashing as peer streams arrive.
+  streams_.reserve(128);
+
   if (nodeType == QuicNodeType::Server) {
     nextAcceptablePeerBidirectionalStreamId_ = 0x00;
     nextAcceptablePeerUnidirectionalStreamId_ = 0x02;
