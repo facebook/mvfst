@@ -83,7 +83,7 @@ class QuicSocketLite {
 
     /**
      * Invoked when stream id's flow control state changes.  This is an edge
-     * triggred API and will be only invoked at the point that the flow control
+     * triggered API and will be only invoked at the point that the flow control
      * changes.
      */
     virtual void onFlowControlUpdate(StreamId /*id*/) noexcept {}
@@ -215,9 +215,9 @@ class QuicSocketLite {
     // Total number of stream bytes received on this stream.
     Optional<uint64_t> streamBytesReceived{0};
 
-    // Stream read error (if one occured)
+    // Stream read error (if one occurred)
     Optional<QuicErrorCode> streamReadError;
-    // Stream write error (if one occured)
+    // Stream write error (if one occurred)
     Optional<QuicErrorCode> streamWriteError;
   };
 
@@ -781,7 +781,7 @@ class QuicSocketLite {
   virtual StreamInitiator getStreamInitiator(StreamId stream) noexcept = 0;
 
   /**
-   * Returns varios stats of the connection.
+   * Returns various stats of the connection.
    */
   [[nodiscard]] virtual QuicConnectionStats getConnectionsStats() const = 0;
 
@@ -795,7 +795,7 @@ class QuicSocketLite {
    * function and return the socket observer list that they hold in memory.
    *
    * We have a default implementation to ensure that there is no risk of a
-   * pure-virtual function being called during constructon or destruction of
+   * pure-virtual function being called during construction or destruction of
    * the socket. If this was to occur the derived class which implements this
    * function may be unavailable leading to undefined behavior. While this is
    * true for any pure-virtual function, the potential for this issue is
