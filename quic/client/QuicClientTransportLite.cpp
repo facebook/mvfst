@@ -368,6 +368,24 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
   }
 
   if (auto* sp = parsedPacket.sconePacket()) {
+    // Validate SCID matches the server's connection ID.
+    // SCONE packets are unencrypted so we need explicit validation.
+    // A zero-length SCID is also invalid since the server must identify itself.
+    if (std::find_if(
+            conn_->peerConnectionIds.begin(),
+            conn_->peerConnectionIds.end(),
+            [&](const auto& cidData) {
+              return cidData.connId == sp->srcCid;
+            }) == conn_->peerConnectionIds.end()) {
+      VLOG(4) << "Dropping SCONE packet: SCID " << sp->srcCid.hex()
+              << " does not match any peer connection ID";
+      QUIC_STATS(
+          statsCallback_,
+          onPacketDropped,
+          PacketDropReason::PARSE_ERROR_CLIENT);
+      return {};
+    }
+
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(
           fmt::format("scone_received:rate={}", static_cast<int>(sp->rate)));
