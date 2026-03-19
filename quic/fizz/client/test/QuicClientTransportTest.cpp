@@ -604,6 +604,29 @@ TEST_F(
   // This verifies the uncovered code path is executed
 }
 
+TEST_F(
+    QuicClientTransportAfterStartTestBase,
+    StandaloneSconePacketRateSignalNotQueued) {
+  auto& conn = client->getNonConstConn();
+
+  conn.transportSettings.enableScone = true;
+  conn.scone.emplace();
+  conn.scone->negotiated = true;
+
+  // Deliver a standalone SCONE packet (not coalesced with encrypted data).
+  // The rate signal should NOT be queued because no subsequent encrypted
+  // packet was successfully processed in the same datagram.
+  uint8_t testRate = 42;
+  auto sconePacket = buildSconePacket(
+      testRate,
+      conn.clientConnectionId.value(),
+      conn.serverConnectionId.value());
+
+  deliverData(sconePacket.coalesce());
+
+  EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
+}
+
 TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
   expectTransportCallbacks();
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);

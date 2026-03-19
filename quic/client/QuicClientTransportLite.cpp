@@ -156,11 +156,19 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
     for (uint16_t processedPackets = 0;
          !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
          processedPackets++) {
+      bool hadPendingScone = pendingSconeRateSignal_.has_value();
       auto res = processUdpPacketData(localAddress, udpPacket, peerAddress);
       if (!res.has_value()) {
         return res;
       }
-      subsequentPacketProcessedSuccessfully = true;
+      // Only count non-SCONE packets as successful subsequent processing.
+      // SCONE packets are unencrypted, so a standalone spoofed SCONE datagram
+      // must not validate its own rate signal.
+      bool wasSconePacket =
+          !hadPendingScone && pendingSconeRateSignal_.has_value();
+      if (!wasSconePacket) {
+        subsequentPacketProcessedSuccessfully = true;
+      }
     }
     MVVLOG_IF(4, !udpData.empty())
         << "Leaving " << udpData.chainLength()
