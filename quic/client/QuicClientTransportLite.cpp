@@ -339,6 +339,34 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         std::move(codecError->error.message)));
   }
 
+  // Extract destination connection ID from the parsed packet for validation.
+  // This covers both regular packets and SCONE packets in one place.
+  const ConnectionId* packetDstCid = nullptr;
+  if (auto* regularOptional = parsedPacket.regularPacket()) {
+    if (auto* lh = regularOptional->header.asLong()) {
+      packetDstCid = &lh->getDestinationConnId();
+    } else if (auto* sh = regularOptional->header.asShort()) {
+      packetDstCid = &sh->getConnectionId();
+    }
+  } else if (auto* sp = parsedPacket.sconePacket()) {
+    packetDstCid = &sp->dstCid;
+  }
+
+  // Validate DCID if we extracted one. CipherUnavailable and Nothing packets
+  // may fall through without a DCID and are handled below.
+  if (packetDstCid &&
+      std::find_if(
+          conn_->selfConnectionIds.begin(),
+          conn_->selfConnectionIds.end(),
+          [&](const auto& cidData) {
+            return cidData.connId == *packetDstCid;
+          }) == conn_->selfConnectionIds.end()) {
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_CLIENT);
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::PROTOCOL_VIOLATION, "Invalid connection id"));
+  }
+
   if (auto* sp = parsedPacket.sconePacket()) {
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(
@@ -429,25 +457,6 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     }
   }
 
-  // Error out if the connection id on the packet is not the one that is
-  // expected.
-  bool connidMatched = true;
-  auto& destinationCidInPacket = longHeader ? longHeader->getDestinationConnId()
-                                            : shortHeader->getConnectionId();
-
-  if (std::find_if(
-          conn_->selfConnectionIds.begin(),
-          conn_->selfConnectionIds.end(),
-          [&](const auto& cidData) {
-            return cidData.connId == destinationCidInPacket;
-          }) == conn_->selfConnectionIds.end()) {
-    connidMatched = false;
-  }
-  if (!connidMatched) {
-    return quic::make_unexpected(QuicError(
-        TransportErrorCode::PROTOCOL_VIOLATION, "Invalid connection id"));
-  }
-
   auto readPath = conn_->pathManager->getPath(localAddress, peerAddress);
   if (!readPath) {
     // Drop packets that are not from known peers, i.e., current, probing, or
@@ -459,13 +468,13 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     return {};
   }
 
+  MVCHECK(packetDstCid, "regular packet must have a destination connection ID");
   if (conn_->currentPathId == readPath->id &&
-      destinationCidInPacket != conn_->clientConnectionId) {
+      *packetDstCid != conn_->clientConnectionId) {
     // The server is using a new CID for the current path.
-    conn_->clientConnectionId = destinationCidInPacket;
+    conn_->clientConnectionId = *packetDstCid;
     conn_->readCodec->setClientConnectionId(conn_->clientConnectionId.value());
-    MVVLOG(4) << "The server switched its dest cid to: "
-              << destinationCidInPacket.hex();
+    MVVLOG(4) << "The server switched its dest cid to: " << packetDstCid->hex();
   }
 
   // A packet arrived on the current path. If we recently migrated, clean up

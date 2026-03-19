@@ -2813,6 +2813,9 @@ TEST_F(QuicClientTransportAfterStartTest, ShortHeaderPacketWithNoFrames) {
   // Use large packet number to make sure packet is long enough to parse
   PacketNum nextPacket = 0x11111111;
   client->getNonConstConn().clientConnectionId = getTestConnectionId();
+  client->getNonConstConn().selfConnectionIds.clear();
+  client->getNonConstConn().selfConnectionIds.emplace_back(
+      *client->getNonConstConn().clientConnectionId, 0);
   auto aead = dynamic_cast<const MockAead*>(
       client->getNonConstConn().readCodec->getOneRttReadCipher());
   // Override the Aead mock to remove the 20 bytes of dummy data added below
