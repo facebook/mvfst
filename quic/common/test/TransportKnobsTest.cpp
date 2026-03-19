@@ -36,19 +36,21 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
 }
 
 TEST(QuicKnobsParsingTest, Simple) {
+  auto id1 = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  auto id2 =
+      static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB);
+  auto id3 = static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED);
+  auto id4 = static_cast<uint64_t>(TransportKnobParamId::PACING_TIMER_TICK);
+  std::string args = fmt::format(
+      R"({{"{}" : 1, "{}" : 5, "{}" : 6, "{}" : 3}})", id1, id2, id3, id4);
   QuicKnobsParsingTestFixture fixture = {
-      .serializedKnobs =
-          "{ \"0\": 1,"
-          "  \"11\": 5,"
-          "  \"19\": 6,"
-          "  \"2\": 3"
-          "  }",
+      .serializedKnobs = args,
       .expectError = false,
       .expectParams = {
-          {.id = 0, .val = uint64_t{1}},
-          {.id = 2, .val = uint64_t{3}},
-          {.id = 11, .val = uint64_t{5}},
-          {.id = 19, .val = uint64_t{6}}}};
+          {.id = id2, .val = uint64_t{5}},
+          {.id = id3, .val = uint64_t{6}},
+          {.id = id1, .val = uint64_t{1}},
+          {.id = id4, .val = uint64_t{3}}}};
   run(fixture);
 }
 
@@ -88,30 +90,21 @@ TEST(QuicKnobsParsingTest, Characters) {
 }
 
 TEST(QuicKnobsParsingTest, NegativeNumbers) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  std::string args = fmt::format(R"({{"{}" : -1}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      .serializedKnobs = "{ \"10\" : -1 }",
-      .expectError = true,
-      .expectParams = {}};
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, ValidCCAlgorithm) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
-  uint64_t val =
-      static_cast<uint64_t>(congestionControlStrToType("cubic").value());
+  std::string val = "cubic";
   std::string args = fmt::format(R"({{"{}" : "cubic"}})", key);
   QuicKnobsParsingTestFixture fixture = {
       .serializedKnobs = args,
       .expectError = false,
       .expectParams = {{.id = key, .val = val}}};
-  run(fixture);
-}
-
-TEST(QuicKnobsParsingTest, InvalidCCAlgorithm) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
-  std::string args = fmt::format(R"({{"{}" : "foo"}})", key);
-  QuicKnobsParsingTestFixture fixture = {
-      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
@@ -254,10 +247,12 @@ TEST(QuicKnobsParsingTest, MaxPacingRateWithSequenceNumber) {
 }
 
 TEST(QuicKnobsParsingTest, NonStringKey) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  std::string args = fmt::format(R"({{{} : 1}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      .serializedKnobs = "{ 10 : 1 }",
+      .serializedKnobs = args,
       .expectError = false,
-      .expectParams = {{.id = 10, .val = uint64_t{1}}}};
+      .expectParams = {{.id = key, .val = uint64_t{1}}}};
   run(fixture);
 }
 
@@ -270,15 +265,15 @@ TEST(QuicKnobsParsingTest, DoubleKey) {
 }
 
 TEST(QuicKnobsParsingTest, DoubleValue) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  std::string args = fmt::format(R"({{"{}" : 0.1}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      .serializedKnobs = "{  \"10\" : 0.1 }",
-      .expectError = true,
-      .expectParams = {}};
+      .serializedKnobs = args, .expectError = true, .expectParams = {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, UInt64Max) {
-  const uint64_t id = 10;
+  const auto id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
   const uint64_t val = std::numeric_limits<uint64_t>::max();
   std::string str = fmt::format("{{\"{}\" : {}}}", id, val);
   QuicKnobsParsingTestFixture fixture = {
