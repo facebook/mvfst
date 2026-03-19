@@ -258,8 +258,14 @@ uint64_t writeSconePacketIfNeeded(
   }
 
   // SCONE packets are only sent with AppData (short headers)
+  // DCID = client's CID (matches the coalesced short header's DCID)
+  // SCID = server's own CID
+  if (!connection.serverConnectionId) {
+    VLOG(3) << "SCONE: Cannot send, serverConnectionId not set";
+    return 0;
+  }
   auto sconeDstCid = header.asShort()->getConnectionId();
-  auto sconeSrcCid = ConnectionId::createZeroLength();
+  auto sconeSrcCid = *connection.serverConnectionId;
   uint8_t sconeRateSignal = connection.scone->configuredRateSignal;
   auto sconePacket =
       buildSconePacket(sconeRateSignal, sconeDstCid, sconeSrcCid);
@@ -469,10 +475,14 @@ iobufChainBasedBuildScheduleEncrypt(
       !connection.scone->sentThisLoop &&
       pnSpace == PacketNumberSpace::AppData &&
       connection.nodeType == QuicNodeType::Server;
+  if (needScone && !connection.serverConnectionId) {
+    VLOG(3) << "SCONE: Cannot send, serverConnectionId not set";
+    needScone = false;
+  }
   if (needScone) {
-    // AppData packets use short headers, so we get DCID from short header
+    // DCID = client's CID (from short header), SCID = server's own CID
     ConnectionId sconeDstCid = header.asShort()->getConnectionId();
-    ConnectionId sconeSrcCid = ConnectionId::createZeroLength();
+    ConnectionId sconeSrcCid = *connection.serverConnectionId;
     auto scone = buildSconePacket(
         connection.scone->configuredRateSignal, sconeDstCid, sconeSrcCid);
     preBuildSconePacket = std::make_unique<Buf>(std::move(scone));
