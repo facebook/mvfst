@@ -62,7 +62,7 @@ struct PathInfo {
   PathStatus status{PathStatus::NotValid};
 
   // If the path was validated through a path challenge, this is an RTT sample
-  // from the challenge-reponse pair
+  // from the challenge-response pair
   Optional<std::chrono::microseconds> rttSample;
 
   // If populated, this is the challenge we are scheduled to send to the peer
@@ -255,7 +255,7 @@ class QuicPathManager {
   void markPathValidated(PathIdType pathId);
 
   /*
-   * Functions to updating the writable bytes limit.
+   * Functions for updating the writable bytes limit.
    * These are only required for unvalidated paths.
    */
   void onPathPacketSent(PathIdType pathId, uint16_t encodedPacketSize);
