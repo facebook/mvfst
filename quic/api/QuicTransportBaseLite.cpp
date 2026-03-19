@@ -1444,10 +1444,6 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
       }
     };
 
-    if (conn_->scone && conn_->scone->negotiated) {
-      conn_->scone->sentThisLoop = false;
-    }
-
     // if we're starting to write from app limited, notify observers
     if (conn_->appLimitedTracker.isAppLimited() &&
         conn_->congestionController) {

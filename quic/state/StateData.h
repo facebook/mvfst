@@ -766,7 +766,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   struct SconeState {
     CircularDeque<SconeRateSignal> pendingRateSignals;
     bool negotiated{false};
-    bool sentThisLoop{false};
+    Optional<TimePoint> lastSconeSentTime;
     uint8_t configuredRateSignal{kSconeNoAdvice};
   };
 

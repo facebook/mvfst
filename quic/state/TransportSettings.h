@@ -493,6 +493,7 @@ struct TransportSettings {
   std::chrono::milliseconds keepAliveTimeout{0};
 
   bool enableScone{false};
+  std::chrono::seconds sconePacketInterval{20};
 
   EgressPolicerConfig egressPolicerConfig;
 

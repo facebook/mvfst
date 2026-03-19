@@ -242,28 +242,38 @@ void updateErrnoCount(
   }
 }
 
-// Helper function to write SCONE packet if needed.
+// Check if a SCONE packet should be sent based on negotiation state and
+// the configured send interval.
+bool shouldSendSconePacket(
+    const QuicConnectionStateBase& connection,
+    PacketNumberSpace pnSpace,
+    TimePoint sendTime) {
+  if (!connection.scone || !connection.scone->negotiated ||
+      pnSpace != PacketNumberSpace::AppData ||
+      connection.nodeType != QuicNodeType::Server ||
+      !connection.serverConnectionId) {
+    return false;
+  }
+  if (!connection.scone->lastSconeSentTime.has_value()) {
+    return true;
+  }
+  return sendTime - *connection.scone->lastSconeSentTime >=
+      connection.transportSettings.sconePacketInterval;
+}
+
+// Helper function to write SCONE packet if needed (continuous memory path).
 // Returns the size of the SCONE packet written, or 0 if no packet was written.
 uint64_t writeSconePacketIfNeeded(
     QuicConnectionStateBase& connection,
     const PacketHeader& header,
-    PacketNumberSpace pnSpace) {
-  bool needScone = connection.scone && connection.scone->negotiated &&
-      !connection.scone->sentThisLoop &&
-      pnSpace == PacketNumberSpace::AppData &&
-      connection.nodeType == QuicNodeType::Server;
-
-  if (!needScone) {
+    PacketNumberSpace pnSpace,
+    TimePoint sendTime) {
+  if (!shouldSendSconePacket(connection, pnSpace, sendTime)) {
     return 0;
   }
 
-  // SCONE packets are only sent with AppData (short headers)
   // DCID = client's CID (matches the coalesced short header's DCID)
   // SCID = server's own CID
-  if (!connection.serverConnectionId) {
-    VLOG(3) << "SCONE: Cannot send, serverConnectionId not set";
-    return 0;
-  }
   auto sconeDstCid = header.asShort()->getConnectionId();
   auto sconeSrcCid = *connection.serverConnectionId;
   uint8_t sconeRateSignal = connection.scone->configuredRateSignal;
@@ -278,7 +288,7 @@ uint64_t writeSconePacketIfNeeded(
 
   memcpy(connection.bufAccessor->writableTail(), sconePacket.data(), sconeSize);
   connection.bufAccessor->append(sconeSize);
-  connection.scone->sentThisLoop = true;
+  connection.scone->lastSconeSentTime = sendTime;
 
   VLOG(4) << "SCONE: Wrote " << sconeSize << " bytes to continuous buffer";
   if (connection.qLogger) {
@@ -321,10 +331,11 @@ continuousMemoryBuildScheduleEncrypt(
     uint64_t writableBytes,
     IOBufQuicBatch& ioBufBatch,
     const Aead& aead,
-    const PacketNumberCipher& headerCipher) {
+    const PacketNumberCipher& headerCipher,
+    TimePoint sendTime) {
   // SCONE: If needed, build the SCONE packet and write it to the buffer first.
   uint64_t sconePacketSize =
-      writeSconePacketIfNeeded(connection, header, pnSpace);
+      writeSconePacketIfNeeded(connection, header, pnSpace, sendTime);
 
   // Defensive check: ensure we have enough space for the regular packet
   if (connection.udpSendPacketLen < sconePacketSize) {
@@ -467,20 +478,13 @@ iobufChainBasedBuildScheduleEncrypt(
     uint64_t writableBytes,
     IOBufQuicBatch& ioBufBatch,
     const Aead& aead,
-    const PacketNumberCipher& headerCipher) {
+    const PacketNumberCipher& headerCipher,
+    TimePoint sendTime) {
   // SCONE: Pre-build SCONE packet and adjust max packet size to avoid overflow
   std::unique_ptr<Buf> preBuildSconePacket;
   uint64_t adjustedMaxPacketSize = connection.udpSendPacketLen;
-  bool needScone = connection.scone && connection.scone->negotiated &&
-      !connection.scone->sentThisLoop &&
-      pnSpace == PacketNumberSpace::AppData &&
-      connection.nodeType == QuicNodeType::Server;
-  if (needScone && !connection.serverConnectionId) {
-    VLOG(3) << "SCONE: Cannot send, serverConnectionId not set";
-    needScone = false;
-  }
+  bool needScone = shouldSendSconePacket(connection, pnSpace, sendTime);
   if (needScone) {
-    // DCID = client's CID (from short header), SCID = server's own CID
     ConnectionId sconeDstCid = header.asShort()->getConnectionId();
     ConnectionId sconeSrcCid = *connection.serverConnectionId;
     auto scone = buildSconePacket(
@@ -578,7 +582,7 @@ iobufChainBasedBuildScheduleEncrypt(
     preBuildSconePacket->appendChain(std::move(packetBuf));
     packetBuf = std::move(preBuildSconePacket);
     encodedSize = packetBuf->computeChainDataLength();
-    connection.scone->sentThisLoop = true;
+    connection.scone->lastSconeSentTime = sendTime;
     VLOG(4) << "SCONE: Prepended SCONE packet, total size=" << encodedSize;
 
     if (connection.qLogger) {
@@ -1890,7 +1894,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
         writableBytes,
         ioBufBatch,
         aead,
-        headerCipher);
+        headerCipher,
+        sentTime);
 
     // This is a fatal error vs. a build error.
     if (!ret.has_value()) {

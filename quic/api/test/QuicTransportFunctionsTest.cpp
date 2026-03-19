@@ -5445,7 +5445,7 @@ TEST_F(QuicTransportFunctionsTest, WriterCoalescesSconeAndShortHeader) {
 
   EXPECT_TRUE(conn->scone->negotiated);
 
-  EXPECT_FALSE(conn->scone->sentThisLoop);
+  EXPECT_FALSE(conn->scone->lastSconeSentTime.has_value());
 }
 
 TEST_F(QuicTransportFunctionsTest, SconePacketSizeValidation) {
@@ -5500,8 +5500,6 @@ TEST_F(QuicTransportFunctionsTest, SCONEWithContinuousMemory) {
 
   conn->scone.emplace();
   conn->scone->negotiated = true;
-  conn->scone->sentThisLoop = false;
-
   auto bufAccessor = std::make_unique<BufAccessor>(conn->udpSendPacketLen * 16);
   auto outputBuf = bufAccessor->obtain();
   auto bufPtr = outputBuf.get();
@@ -5549,7 +5547,7 @@ TEST_F(QuicTransportFunctionsTest, SCONEWithContinuousMemory) {
                    conn->transportSettings.writeConnectionDataPacketsLimit)
                    .hasError());
 
-  EXPECT_TRUE(conn->scone->sentThisLoop);
+  EXPECT_TRUE(conn->scone->lastSconeSentTime.has_value());
 }
 
 TEST_F(QuicTransportFunctionsTest, EgressPolicerNoPolicer) {
