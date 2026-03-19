@@ -5550,6 +5550,157 @@ TEST_F(QuicTransportFunctionsTest, SCONEWithContinuousMemory) {
   EXPECT_TRUE(conn->scone->lastSconeSentTime.has_value());
 }
 
+TEST_F(QuicTransportFunctionsTest, SconeFlowIndicatorOnInitialPackets) {
+  auto conn = createConn();
+  conn->transportSettings.enableScone = true;
+
+  auto cryptoStream = &conn->cryptoState->initialStream;
+  auto buf = buildRandomInputData(200);
+  writeDataToQuicStream(*cryptoStream, buf->clone());
+
+  EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  auto rawSocket = socket.get();
+  ON_CALL(*rawSocket, getGSO).WillByDefault(testing::Return(0));
+
+  // Capture the written datagram
+  std::vector<uint8_t> writtenData;
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillOnce(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            for (size_t i = 0; i < iovec_len; ++i) {
+              auto* data = static_cast<uint8_t*>(vec[i].iov_base);
+              writtenData.insert(
+                  writtenData.end(), data, data + vec[i].iov_len);
+            }
+            return getTotalIovecLen(vec, iovec_len);
+          });
+
+  auto res = writeCryptoAndAckDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      LongHeader::Types::Initial,
+      *conn->initialWriteCipher,
+      *conn->initialHeaderCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_GT(res->bytesWritten, 0);
+
+  // Last 2 bytes should be the SCONE flow indicator
+  ASSERT_GE(writtenData.size(), kSconeFlowIndicatorSize);
+  EXPECT_EQ(writtenData[writtenData.size() - 2], kSconeFlowIndicatorByte1);
+  EXPECT_EQ(writtenData[writtenData.size() - 1], kSconeFlowIndicatorByte2);
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    SconeFlowIndicatorNotSentAfterReceivingPackets) {
+  auto conn = createConn();
+  conn->transportSettings.enableScone = true;
+
+  auto cryptoStream = &conn->cryptoState->initialStream;
+  auto buf = buildRandomInputData(200);
+  writeDataToQuicStream(*cryptoStream, buf->clone());
+
+  // Simulate having received a server packet
+  conn->ackStates.initialAckState->largestRecvdPacketNum = 0;
+
+  EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  auto rawSocket = socket.get();
+  ON_CALL(*rawSocket, getGSO).WillByDefault(testing::Return(0));
+
+  std::vector<uint8_t> writtenData;
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillOnce(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            for (size_t i = 0; i < iovec_len; ++i) {
+              auto* data = static_cast<uint8_t*>(vec[i].iov_base);
+              writtenData.insert(
+                  writtenData.end(), data, data + vec[i].iov_len);
+            }
+            return getTotalIovecLen(vec, iovec_len);
+          });
+
+  auto res = writeCryptoAndAckDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      LongHeader::Types::Initial,
+      *conn->initialWriteCipher,
+      *conn->initialHeaderCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_GT(res->bytesWritten, 0);
+
+  // Last 2 bytes should NOT be the flow indicator since we already
+  // received packets
+  ASSERT_GE(writtenData.size(), kSconeFlowIndicatorSize);
+  bool hasIndicator =
+      writtenData[writtenData.size() - 2] == kSconeFlowIndicatorByte1 &&
+      writtenData[writtenData.size() - 1] == kSconeFlowIndicatorByte2;
+  EXPECT_FALSE(hasIndicator);
+}
+
+TEST_F(QuicTransportFunctionsTest, SconeFlowIndicatorNotSentOnShortHeader) {
+  auto conn = createConn();
+  conn->transportSettings.enableScone = true;
+
+  // Write app data (short header)
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = IOBuf::copyBuffer("test data");
+  ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
+
+  EventBase evb;
+  std::shared_ptr<FollyQuicEventBase> qEvb =
+      std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  auto rawSocket = socket.get();
+  ON_CALL(*rawSocket, getGSO).WillByDefault(testing::Return(0));
+
+  std::vector<uint8_t> writtenData;
+  EXPECT_CALL(*rawSocket, write(_, _, _))
+      .WillOnce(
+          [&](const SocketAddress&, const struct iovec* vec, size_t iovec_len) {
+            for (size_t i = 0; i < iovec_len; ++i) {
+              auto* data = static_cast<uint8_t*>(vec[i].iov_base);
+              writtenData.insert(
+                  writtenData.end(), data, data + vec[i].iov_len);
+            }
+            return getTotalIovecLen(vec, iovec_len);
+          });
+
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   *rawSocket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   QuicVersion::MVFST,
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
+
+  // Short header packets should never have the flow indicator
+  ASSERT_GE(writtenData.size(), kSconeFlowIndicatorSize);
+  bool hasIndicator =
+      writtenData[writtenData.size() - 2] == kSconeFlowIndicatorByte1 &&
+      writtenData[writtenData.size() - 1] == kSconeFlowIndicatorByte2;
+  EXPECT_FALSE(hasIndicator);
+}
+
 TEST_F(QuicTransportFunctionsTest, EgressPolicerNoPolicer) {
   auto conn = createConn();
   EventBase evb;

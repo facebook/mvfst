@@ -261,6 +261,25 @@ bool shouldSendSconePacket(
       connection.transportSettings.sconePacketInterval;
 }
 
+// Returns the number of bytes to reserve for the SCONE flow indicator.
+// The indicator (0xc8 0x13) is appended to every client datagram before the
+// first server response, telling on-path network elements the flow supports
+// SCONE (draft-ietf-scone-protocol Section 6.1).
+uint64_t sconeFlowIndicatorSize(
+    const QuicConnectionStateBase& connection,
+    const PacketHeader& header) {
+  if (!connection.transportSettings.enableScone) {
+    return 0;
+  }
+  if (!header.asLong()) {
+    return 0;
+  }
+  if (hasReceivedUdpPackets(connection)) {
+    return 0;
+  }
+  return kSconeFlowIndicatorSize;
+}
+
 // Helper function to write SCONE packet if needed (continuous memory path).
 // Returns the size of the SCONE packet written, or 0 if no packet was written.
 uint64_t writeSconePacketIfNeeded(
@@ -337,10 +356,12 @@ continuousMemoryBuildScheduleEncrypt(
   uint64_t sconePacketSize =
       writeSconePacketIfNeeded(connection, header, pnSpace, sendTime);
 
+  // SCONE flow indicator: reserve space for the 2-byte indicator appended
+  // after the encrypted packet (must check header before it's moved)
+  uint64_t flowIndSize = sconeFlowIndicatorSize(connection, header);
+
   // Defensive check: ensure we have enough space for the regular packet
-  if (connection.udpSendPacketLen < sconePacketSize) {
-    // This should never happen as writeSconePacketIfNeeded validates space,
-    // but adding defensive check for clarity
+  if (connection.udpSendPacketLen < sconePacketSize + flowIndSize) {
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         "Insufficient space after SCONE packet"));
@@ -356,7 +377,7 @@ continuousMemoryBuildScheduleEncrypt(
   // It's the scheduler's job to invoke encode header
   InplaceQuicPacketBuilder pktBuilder(
       *connection.bufAccessor,
-      connection.udpSendPacketLen - sconePacketSize,
+      connection.udpSendPacketLen - sconePacketSize - flowIndSize,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   pktBuilder.accountForCipherOverhead(cipherOverhead);
@@ -443,6 +464,15 @@ continuousMemoryBuildScheduleEncrypt(
         true, std::move(result.value()), encodedSize, encodedBodySize);
   }
   connection.bufAccessor->release(std::move(packetBuf));
+
+  // Append SCONE flow indicator as the last 2 bytes of the datagram
+  if (flowIndSize > 0) {
+    connection.bufAccessor->writableTail()[0] = kSconeFlowIndicatorByte1;
+    connection.bufAccessor->writableTail()[1] = kSconeFlowIndicatorByte2;
+    connection.bufAccessor->append(kSconeFlowIndicatorSize);
+    encodedSize += kSconeFlowIndicatorSize;
+  }
+
   if (encodedSize > connection.udpSendPacketLen) {
     MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
               << encodedSize;
@@ -501,6 +531,11 @@ iobufChainBasedBuildScheduleEncrypt(
     VLOG(4) << "SCONE: Reserved " << sconeSize
             << " bytes, adjusted max packet size to " << adjustedMaxPacketSize;
   }
+
+  // SCONE flow indicator: reserve space for the 2-byte indicator appended
+  // after the encrypted packet (must check header before it's moved)
+  uint64_t flowIndSize = sconeFlowIndicatorSize(connection, header);
+  adjustedMaxPacketSize -= flowIndSize;
 
   RegularQuicPacketBuilder pktBuilder(
       adjustedMaxPacketSize,
@@ -592,16 +627,27 @@ iobufChainBasedBuildScheduleEncrypt(
               static_cast<int>(connection.scone->configuredRateSignal)));
     }
   }
-  if (encodedSize > connection.udpSendPacketLen) {
-    MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
-              << encodedSize << " encodedBodySize=" << encodedBodySize;
-  }
 
   if (connection.transportSettings.isPriming && packetBuf) {
     packetBuf->coalesce();
     connection.primingData.emplace_back(std::move(packetBuf));
     return DataPathResult::makeWriteResult(
         true, std::move(result.value()), encodedSize, encodedBodySize);
+  }
+
+  // Append SCONE flow indicator as the last 2 bytes of the datagram
+  if (flowIndSize > 0) {
+    auto indicator = folly::IOBuf::create(kSconeFlowIndicatorSize);
+    indicator->writableData()[0] = kSconeFlowIndicatorByte1;
+    indicator->writableData()[1] = kSconeFlowIndicatorByte2;
+    indicator->append(kSconeFlowIndicatorSize);
+    packetBuf->appendChain(std::move(indicator));
+    encodedSize += kSconeFlowIndicatorSize;
+  }
+
+  if (encodedSize > connection.udpSendPacketLen) {
+    MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
+              << encodedSize << " encodedBodySize=" << encodedBodySize;
   }
   // Egress policer: drop packet if rate exceeded (treat as network loss).
   if (shouldPolicerDropPacket(connection, encodedSize)) {

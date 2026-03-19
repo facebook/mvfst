@@ -858,6 +858,12 @@ constexpr uint16_t kDistanceToClearSkippedPacketNumber = 1000;
 
 constexpr uint8_t kSconeNoAdvice = 0x7F;
 
+// SCONE flow indication bytes appended to client datagrams before server
+// response (draft-ietf-scone-protocol Section 6.1).
+constexpr uint8_t kSconeFlowIndicatorByte1 = 0xc8;
+constexpr uint8_t kSconeFlowIndicatorByte2 = 0x13;
+constexpr uint64_t kSconeFlowIndicatorSize = 2;
+
 // Convert a bits-per-second rate to the nearest SCONE rate signal (0-126).
 // Formula: rate_bps = 100000 * 10^(n/20), so n = 20 * log10(rate_bps / 100000)
 inline uint8_t bpsToSconeRateSignal(uint64_t bps) {
