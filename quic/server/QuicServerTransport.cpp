@@ -842,7 +842,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             static_cast<CongestionControlType>(std::get<uint64_t>(val));
         MVVLOG(3) << "Knob param received, set congestion control type to "
                   << congestionControlTypeToString(cctype);
-        if (cctype == server_conn->congestionController->type()) {
+        if (server_conn->congestionController &&
+            cctype == server_conn->congestionController->type()) {
           return {};
         }
         serverTransport.setCongestionControl(cctype);

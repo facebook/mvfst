@@ -3912,6 +3912,23 @@ TEST_F(
   server->handleKnobParams({{.id = knobParamId, .val = uint64_t{1234}}});
 }
 
+TEST_F(QuicServerTransportTest, TestCCAlgorithmKnobNoneThenCubicCrash) {
+  auto ccKnobId =
+      static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
+  auto noneVal = static_cast<uint64_t>(CongestionControlType::None);
+  auto cubicVal = static_cast<uint64_t>(CongestionControlType::Cubic);
+
+  // Setting CC to None via knob is valid and nulls out the controller
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
+  server->handleKnobParams({{.id = ccKnobId, .val = noneVal}});
+  EXPECT_EQ(server->getConn().congestionController.get(), nullptr);
+
+  // A subsequent CC knob should not crash even with null controller
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
+  server->handleKnobParams({{.id = ccKnobId, .val = cubicVal}});
+  EXPECT_NE(server->getConn().congestionController.get(), nullptr);
+}
+
 TEST_F(QuicServerTransportTest, TestSkipKnobsWhenNotAdvertisingSupport) {
   auto& conn = server->getNonConstConn();
   auto& transportSettings = conn.transportSettings;
