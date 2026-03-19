@@ -818,6 +818,12 @@ quic::Expected<void, QuicError> onConnectionMigration(
 
   QUIC_STATS(conn.statsCallback, onConnectionMigration);
 
+  // Reset SCONE timer so a fresh SCONE packet is sent on the new path.
+  // New network elements on the migrated path need to observe the rate signal.
+  if (conn.scone) {
+    conn.scone->lastSconeSentTime.reset();
+  }
+
   if (!isNATRebinding) {
     auto ccaRestored =
         conn.pathManager
