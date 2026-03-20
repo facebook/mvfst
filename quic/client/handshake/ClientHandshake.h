@@ -8,7 +8,6 @@
 #pragma once
 
 #include <folly/ExceptionWrapper.h>
-#include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
 
 #include <fizz/protocol/CertificateBase.h>
@@ -191,7 +190,7 @@ class ClientHandshake : public Handshake {
       Expected<Optional<CachedServerTransportParameters>, QuicError>
       connectImpl(Optional<std::string> hostname) = 0;
 
-  virtual void processSocketData(folly::IOBufQueue& queue) = 0;
+  virtual void processSocketData(quic::IOBufQueue& queue) = 0;
   virtual bool matchEarlyParameters() = 0;
   [[nodiscard]] virtual quic::Expected<std::unique_ptr<Aead>, QuicError>
   buildAead(CipherKind kind, ByteRange secret) = 0;
@@ -209,9 +208,9 @@ class ClientHandshake : public Handshake {
   bool waitForData_{false};
   bool earlyDataAttempted_{false};
 
-  folly::IOBufQueue initialReadBuf_{folly::IOBufQueue::cacheChainLength()};
-  folly::IOBufQueue handshakeReadBuf_{folly::IOBufQueue::cacheChainLength()};
-  folly::IOBufQueue appDataReadBuf_{folly::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue initialReadBuf_{quic::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue handshakeReadBuf_{quic::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue appDataReadBuf_{quic::IOBufQueue::cacheChainLength()};
 
   // This variable is incremented every time a read traffic secret is rotated,
   // and decremented for the write secret. Its value should be

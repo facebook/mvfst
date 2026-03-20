@@ -74,7 +74,7 @@ class FizzClientHandshake : public ClientHandshake {
       connectImpl(Optional<std::string> hostname) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
-  void processSocketData(folly::IOBufQueue& queue) override;
+  void processSocketData(quic::IOBufQueue& queue) override;
   bool matchEarlyParameters() override;
   [[nodiscard]] quic::Expected<std::unique_ptr<Aead>, QuicError> buildAead(
       CipherKind kind,

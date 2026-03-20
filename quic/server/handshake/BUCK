@@ -23,7 +23,6 @@ mvfst_cpp_library(
         "//fizz/server:fizz_server",
         "//fizz/server:fizz_server_context",
         "//folly:optional",
-        "//folly/io:iobuf",
         "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic:exception",

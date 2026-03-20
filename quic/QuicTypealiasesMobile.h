@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/common/QuicBuffer.h>
+#include <quic/common/QuicIOBufQueue.h>
 #include <quic/common/QuicRange.h>
 #include <memory>
 
@@ -25,5 +26,6 @@ using Buf = quic::QuicBuffer; // Used when we're not wrapping the buffer in an
                               // std::unique_ptr
 using BufPtr = std::unique_ptr<quic::QuicBuffer>;
 using BufEq = quic::QuicBufferEqualTo;
+using IOBufQueue = quic::QuicIOBufQueue;
 
 } // namespace quic

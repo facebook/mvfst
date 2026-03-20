@@ -370,7 +370,7 @@ class ServerHandshakeTest : public Test {
       ServerHandshakeTest,
       fizz::client::ClientStateMachine>>
       fizzClient;
-  folly::IOBufQueue clientReadBuffer{folly::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue clientReadBuffer{quic::IOBufQueue::cacheChainLength()};
   bool earlyHandshakeSuccess{false};
   bool handshakeSuccess{false};
   bool earlyWriteFailed{false};

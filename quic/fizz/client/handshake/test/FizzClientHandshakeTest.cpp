@@ -309,7 +309,7 @@ class ClientHandshakeTest : public Test {
   bool handshakeSuccess{false};
   bool earlyHandshakeSuccess{false};
   Optional<fizz::ReportError> handshakeError;
-  folly::IOBufQueue serverReadBuf{folly::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue serverReadBuf{quic::IOBufQueue::cacheChainLength()};
   std::unique_ptr<DelayedHolder, folly::DelayedDestruction::Destructor> dg;
   fizz::Aead::AeadOptions readAeadOptions;
 

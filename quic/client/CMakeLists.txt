@@ -89,7 +89,6 @@ mvfst_add_library(mvfst_client_state_and_handshake
     fizz::fizz
     Folly::folly_exception_wrapper
     Folly::folly_io_async_delayed_destruction
-    Folly::folly_io_iobuf
 )
 
 mvfst_add_library(mvfst_client_client_extension

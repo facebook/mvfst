@@ -404,7 +404,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     return alpn_;
   }
 
-  void processSocketData(folly::IOBufQueue&) override {
+  void processSocketData(quic::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
   }
 

@@ -10,6 +10,7 @@
 #include <folly/io/IOBuf.h>
 
 namespace folly {
+class IOBufQueue;
 class SocketAddress;
 } // namespace folly
 
@@ -23,5 +24,6 @@ using Buf = folly::IOBuf; // Used when we're not wrapping the buffer in an
                           // std::unique_ptr
 using BufPtr = std::unique_ptr<Buf>;
 using BufEq = folly::IOBufEqualTo;
+using IOBufQueue = folly::IOBufQueue;
 
 } // namespace quic

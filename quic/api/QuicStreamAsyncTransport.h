@@ -161,7 +161,7 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
   EOFState readEOF_{EOFState::NOT_SEEN};
   EOFState writeEOF_{EOFState::NOT_SEEN};
   AsyncTransport::ReadCallback* readCb_{nullptr};
-  folly::IOBufQueue writeBuf_{folly::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue writeBuf_{quic::IOBufQueue::cacheChainLength()};
   std::deque<std::pair<size_t, AsyncTransport::WriteCallback*>> writeCallbacks_;
   Optional<folly::AsyncSocketException> ex_;
 };

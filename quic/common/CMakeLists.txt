@@ -136,6 +136,13 @@ mvfst_add_library(mvfst_common_expected
     mvfst_common_third_party_expected
 )
 
+mvfst_add_library(mvfst_common_quic_iobuf_queue
+  SRCS
+    QuicIOBufQueue.cpp
+  EXPORTED_DEPS
+    mvfst_common_quic_buffer
+)
+
 add_subdirectory(events)
 add_subdirectory(testutil)
 add_subdirectory(third-party)

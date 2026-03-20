@@ -210,7 +210,7 @@ EncryptionLevel FizzClientHandshake::getReadRecordLayerEncryptionLevel() {
       state_.readRecordLayer()->getEncryptionLevel());
 }
 
-void FizzClientHandshake::processSocketData(folly::IOBufQueue& queue) {
+void FizzClientHandshake::processSocketData(quic::IOBufQueue& queue) {
   processActions(
       machine_.processSocketData(state_, queue, fizz::Aead::AeadOptions()));
 }

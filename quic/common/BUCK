@@ -262,3 +262,16 @@ mvfst_cpp_library(
         "//quic/common/third-party:expected",
     ],
 )
+
+mvfst_cpp_library(
+    name = "quic_iobuf_queue",
+    srcs = [
+        "QuicIOBufQueue.cpp",
+    ],
+    headers = [
+        "QuicIOBufQueue.h",
+    ],
+    exported_deps = [
+        ":quic_buffer",
+    ],
+)

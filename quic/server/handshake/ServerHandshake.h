@@ -12,7 +12,6 @@
 #include <fizz/server/FizzServerContext.h>
 
 #include <folly/Optional.h>
-#include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
 
 #include <quic/QuicConstants.h>
@@ -284,9 +283,9 @@ class ServerHandshake : public Handshake {
   bool inProcessPendingEvents_{false};
   bool waitForData_{false};
 
-  folly::IOBufQueue initialReadBuf_{folly::IOBufQueue::cacheChainLength()};
-  folly::IOBufQueue handshakeReadBuf_{folly::IOBufQueue::cacheChainLength()};
-  folly::IOBufQueue appDataReadBuf_{folly::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue initialReadBuf_{quic::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue handshakeReadBuf_{quic::IOBufQueue::cacheChainLength()};
+  quic::IOBufQueue appDataReadBuf_{quic::IOBufQueue::cacheChainLength()};
 
   HandshakeCallback* callback_{nullptr};
   Optional<std::pair<std::string, TransportErrorCode>> error_;
@@ -323,7 +322,7 @@ class ServerHandshake : public Handshake {
       folly::Optional<QuicVersion> quicVersion = folly::none) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
-  virtual void processSocketData(folly::IOBufQueue& queue) = 0;
+  virtual void processSocketData(quic::IOBufQueue& queue) = 0;
   virtual std::unique_ptr<Aead> buildAead(ByteRange secret) = 0;
   [[nodiscard]] virtual quic::
       Expected<std::unique_ptr<PacketNumberCipher>, QuicError>

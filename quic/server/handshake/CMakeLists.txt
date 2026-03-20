@@ -21,7 +21,6 @@ mvfst_add_library(mvfst_server_handshake
     mvfst_state_quic_state_machine
     fizz::fizz
     Folly::folly_io_async_delayed_destruction
-    Folly::folly_io_iobuf
     Folly::folly_optional
 )
 

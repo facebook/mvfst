@@ -95,7 +95,6 @@ mvfst_cpp_library(
     exported_deps = [
         "//fizz/protocol:certificate_base",
         "//folly:exception_wrapper",
-        "//folly/io:iobuf",
         "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic:exception",
