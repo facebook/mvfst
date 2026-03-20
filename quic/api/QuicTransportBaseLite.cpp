@@ -1590,7 +1590,9 @@ void QuicTransportBaseLite::closeImpl(
             conn_->connectionTime);
   }
 
-  [[maybe_unused]] auto tlsSummary = conn_->handshakeLayer->getTLSSummary();
+  [[maybe_unused]] auto tlsSummary = conn_->handshakeLayer
+      ? conn_->handshakeLayer->getTLSSummary()
+      : Handshake::TLSSummary{};
   QLOG(
       *conn_,
       addTransportSummary,
