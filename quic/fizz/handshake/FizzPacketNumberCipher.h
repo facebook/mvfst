@@ -7,48 +7,29 @@
 
 #pragma once
 
-#include <quic/codec/PacketNumberCipher.h>
-
-#include <folly/ssl/OpenSSLPtrTypes.h>
+#ifdef MVFST_MBED
+#include <quic/facebook/mbed/MbedPacketNumCipher.h> // @fb-only
 
 namespace quic {
 
-class Aes128PacketNumberCipher : public PacketNumberCipher {
+class Aes128PacketNumberCipher : public MbedPacketNumCipher {
  public:
-  ~Aes128PacketNumberCipher() override = default;
-
-  [[nodiscard]] quic::Expected<void, QuicError> setKey(ByteRange key) override;
-
-  [[nodiscard]] const BufPtr& getKey() const override;
-
-  [[nodiscard]] quic::Expected<HeaderProtectionMask, QuicError> mask(
-      ByteRange sample) const override;
-
-  [[nodiscard]] size_t keyLength() const override;
-
- private:
-  folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
-
-  BufPtr pnKey_;
+  Aes128PacketNumberCipher() : MbedPacketNumCipher(CipherType::AESGCM128) {}
 };
 
-class Aes256PacketNumberCipher : public PacketNumberCipher {
+class Aes256PacketNumberCipher : public MbedPacketNumCipher {
  public:
-  ~Aes256PacketNumberCipher() override = default;
-
-  [[nodiscard]] quic::Expected<void, QuicError> setKey(ByteRange key) override;
-
-  [[nodiscard]] const BufPtr& getKey() const override;
-
-  [[nodiscard]] quic::Expected<HeaderProtectionMask, QuicError> mask(
-      ByteRange sample) const override;
-
-  [[nodiscard]] size_t keyLength() const override;
-
- private:
-  folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
-
-  BufPtr pnKey_;
+  Aes256PacketNumberCipher() : MbedPacketNumCipher(CipherType::AESGCM256) {}
 };
 
 } // namespace quic
+
+#else
+#include <quic/fizz/handshake/FizzOpenSSLPacketNumberCipher.h>
+
+namespace quic {
+using Aes128PacketNumberCipher = FizzOpenSSLAes128PacketNumberCipher;
+using Aes256PacketNumberCipher = FizzOpenSSLAes256PacketNumberCipher;
+} // namespace quic
+
+#endif

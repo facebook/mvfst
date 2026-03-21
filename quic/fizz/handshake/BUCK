@@ -22,17 +22,26 @@ mvfst_cpp_library(
     name = "fizz_handshake",
     srcs = [
         "FizzCryptoFactory.cpp",
-        "FizzPacketNumberCipher.cpp",
         "FizzRetryIntegrityTagGenerator.cpp",
         "QuicFizzFactory.cpp",
-    ],
+    ] + select({
+        "DEFAULT": ["FizzOpenSSLPacketNumberCipher.cpp"],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
+    }),
     headers = [
         "FizzCryptoFactory.h",
         "FizzPacketNumberCipher.h",
         "FizzRetryIntegrityTagGenerator.h",
         "FizzTransportParameters.h",
         "QuicFizzFactory.h",
-    ],
+    ] + select({
+        "DEFAULT": ["FizzOpenSSLPacketNumberCipher.h"],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
+    }),
+    preprocessor_flags = select({
+        "DEFAULT": [],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["-DMVFST_MBED"],  # @fb-only
+    }),
     deps = [
         ":fizz_bridge",  # @manual included via QUIC_DEFAULT_AEAD_HEADER macro
         "//fizz/crypto:crypto",
@@ -43,7 +52,6 @@ mvfst_cpp_library(
     exported_deps = [
         "//fizz/protocol:default_factory",
         "//fizz/record:record",
-        "//folly/ssl:openssl_ptr_types",
         "//quic/codec:packet_number_cipher",
         "//quic/common:buf_util",
         "//quic/common:mvfst_logging",
@@ -52,6 +60,9 @@ mvfst_cpp_library(
         "//quic/handshake:retry_integrity_tag_generator",
         "//quic/handshake:transport_parameters",
     ] + select({
+        "DEFAULT": ["//folly/ssl:openssl_ptr_types"],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
+    }) + select({
         "DEFAULT": [],
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": [],  # @fb-only

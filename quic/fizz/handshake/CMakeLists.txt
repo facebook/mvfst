@@ -17,7 +17,7 @@ mvfst_add_library(mvfst_fizz_handshake_fizz_bridge
 mvfst_add_library(mvfst_fizz_handshake
   SRCS
     FizzCryptoFactory.cpp
-    FizzPacketNumberCipher.cpp
+    FizzOpenSSLPacketNumberCipher.cpp
     FizzRetryIntegrityTagGenerator.cpp
     QuicFizzFactory.cpp
   DEPS

@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#pragma once
+
+#include <quic/codec/PacketNumberCipher.h>
+
+#include <folly/ssl/OpenSSLPtrTypes.h>
+
+namespace quic {
+
+class FizzOpenSSLAes128PacketNumberCipher : public PacketNumberCipher {
+ public:
+  ~FizzOpenSSLAes128PacketNumberCipher() override = default;
+
+  [[nodiscard]] quic::Expected<void, QuicError> setKey(ByteRange key) override;
+
+  [[nodiscard]] const BufPtr& getKey() const override;
+
+  [[nodiscard]] quic::Expected<HeaderProtectionMask, QuicError> mask(
+      ByteRange sample) const override;
+
+  [[nodiscard]] size_t keyLength() const override;
+
+ private:
+  folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
+
+  BufPtr pnKey_;
+};
+
+class FizzOpenSSLAes256PacketNumberCipher : public PacketNumberCipher {
+ public:
+  ~FizzOpenSSLAes256PacketNumberCipher() override = default;
+
+  [[nodiscard]] quic::Expected<void, QuicError> setKey(ByteRange key) override;
+
+  [[nodiscard]] const BufPtr& getKey() const override;
+
+  [[nodiscard]] quic::Expected<HeaderProtectionMask, QuicError> mask(
+      ByteRange sample) const override;
+
+  [[nodiscard]] size_t keyLength() const override;
+
+ private:
+  folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
+
+  BufPtr pnKey_;
+};
+
+} // namespace quic
