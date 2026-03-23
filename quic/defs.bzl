@@ -24,7 +24,6 @@ CXXFLAGS = [
     "-frtti",
     "-fexceptions",
     "-Wno-nullability-completeness",
-    "-Wno-implicit-fallthrough",
 ]
 
 FBANDROID_CXXFLAGS = [
