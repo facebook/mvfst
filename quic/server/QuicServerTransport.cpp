@@ -816,9 +816,6 @@ void QuicServerTransport::verifiedClientAddress() {
 }
 
 void QuicServerTransport::registerAllTransportKnobParamHandlers() {
-  // Pre-size for the known handlers to avoid F14 rehashing during registration.
-  transportKnobParamHandlers_.reserve(32);
-
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
