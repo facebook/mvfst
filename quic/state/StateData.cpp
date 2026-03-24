@@ -96,7 +96,7 @@ PacingRate::Builder&& PacingRate::Builder::setBurstSize(
 }
 
 PacingRate PacingRate::Builder::build() && {
-  return PacingRate(interval_, burstSize_);
+  return {interval_, burstSize_};
 }
 
 Expected<ConnectionId, QuicError>
