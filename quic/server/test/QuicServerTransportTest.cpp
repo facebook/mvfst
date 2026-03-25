@@ -3407,15 +3407,15 @@ TEST_F(QuicUnencryptedServerTransportTest, CwndHintEncodeDecodeRoundTrip) {
 
     void onPacketAckOrLoss(const AckEvent*, const LossEvent*) override {}
 
-    uint64_t getWritableBytes() const override {
+    [[nodiscard]] uint64_t getWritableBytes() const override {
       return 0;
     }
 
-    uint64_t getCongestionWindow() const override {
+    [[nodiscard]] uint64_t getCongestionWindow() const override {
       return 0;
     }
 
-    CongestionControlType type() const override {
+    [[nodiscard]] CongestionControlType type() const override {
       return CongestionControlType::None;
     }
 
@@ -3423,7 +3423,7 @@ TEST_F(QuicUnencryptedServerTransportTest, CwndHintEncodeDecodeRoundTrip) {
 
     void setAppLimited() override {}
 
-    bool isAppLimited() const override {
+    [[nodiscard]] bool isAppLimited() const override {
       return false;
     }
 
