@@ -1,0 +1,16 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "oops_fields",
+    headers = ["OopsFields.h"],
+)
+
+mvfst_cpp_library(
+    name = "oops_logger",
+    headers = ["OopsLogger.h"],
+    exported_deps = [
+        ":oops_fields",
+    ],
+)

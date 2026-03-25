@@ -76,4 +76,6 @@ mvfst_add_library(mvfst_logging_qlogger_common
     mvfst_logging_qlogger_constants
 )
 
+add_subdirectory(oops_logger)
+
 add_subdirectory(test)
