@@ -181,8 +181,8 @@ This repo implements the QUIC transport. For an HTTP/3 implementation that uses 
 We'd love to have your help in making `mvfst` better. If you're interested, please
 read our guide to [guide to contributing](CONTRIBUTING.md)
 
-Please also join our
-[slack](https://mvfst.slack.com) to ask questions or start discussions.
+Please feel free to
+[open an issue](https://github.com/facebook/mvfst/issues) to ask questions or start discussions.
 
 ## License
 `mvfst` is MIT licensed, as found in the LICENSE file.
