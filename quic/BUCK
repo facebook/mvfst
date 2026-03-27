@@ -93,10 +93,16 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:iphoneos": ["facebook/QuicConstantsMobile.cpp"],
         "ovr_config//os/constraints:macos": ["facebook/QuicConstantsMobile.cpp"],
     }),
-    headers = [
-        "QuicConstants.h",
-        "QuicTypealiases.h",
-    ],
+    headers = select({
+        "DEFAULT": {
+            "QuicConstants.h": "QuicConstants.h",
+            "QuicTypealiases.h": "QuicTypealiases.h",
+        },
+        "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": {
+            "QuicConstants.h": "QuicConstants.h",
+            "QuicTypealiases.h": "QuicTypealiasesMobile.h",
+        },
+    }),
     deps = [
         "//folly/lang:assume",
     ],
@@ -109,7 +115,6 @@ mvfst_cpp_library(
         "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": [
             ":enum",
             "//folly/chrono:clock",
-            "//folly/io:iobuf",
             "//quic/common:quic_buffer",
             "//quic/common:quic_iobuf_queue",
         ],
