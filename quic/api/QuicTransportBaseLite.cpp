@@ -808,6 +808,27 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setReadCallback(
   return setReadCallbackInternal(id, cb, err);
 }
 
+quic::Expected<void, LocalErrorCode>
+QuicTransportBaseLite::setStopSendingCallback(
+    StreamId id,
+    StopSendingCallback* ss) noexcept {
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (ss != nullptr && closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (!conn_->streamManager->streamExists(id)) {
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  if (ss) {
+    stopSendingCallbacks_[id] = ss;
+  } else {
+    stopSendingCallbacks_.erase(id);
+  }
+  return {};
+}
+
 quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::pauseRead(
     StreamId id) {
   MVVLOG(4) << __func__ << " " << *this << " stream=" << id;
@@ -2173,10 +2194,18 @@ void QuicTransportBaseLite::handleStreamFlowControlUpdatedCallbacks(
 void QuicTransportBaseLite::handleStreamStopSendingCallbacks() {
   const auto stopSendingStreamsCopy =
       conn_->streamManager->consumeStopSending();
-  for (const auto& itr : stopSendingStreamsCopy) {
-    connCallback_->onStopSending(itr.first, itr.second);
+  for (auto [id, ec] : stopSendingStreamsCopy) {
+    connCallback_->onStopSending(id, ec);
     if (closeState_ != CloseState::OPEN) {
       return;
+    }
+    auto it = stopSendingCallbacks_.find(id);
+    if (it != stopSendingCallbacks_.end()) {
+      it->second->onStopSending(id, ec);
+      stopSendingCallbacks_.erase(it);
+      if (closeState_ != CloseState::OPEN) {
+        return;
+      }
     }
   }
 }
@@ -2558,6 +2587,8 @@ void QuicTransportBaseLite::cancelAllAppCallbacks(
 
   // Cancel peek/ping/datagram callbacks (virtual method overridden in Base)
   cancelPeekPingDatagramCallbacks(err);
+
+  stopSendingCallbacks_.clear();
 }
 
 void QuicTransportBaseLite::scheduleTimeout(

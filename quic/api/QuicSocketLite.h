@@ -332,6 +332,10 @@ class QuicSocketLite {
       Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) = 0;
 
+  virtual quic::Expected<void, LocalErrorCode> setStopSendingCallback(
+      StreamId id,
+      StopSendingCallback* ss) noexcept = 0;
+
   /**
    * Pause/Resume read callback being triggered when data is available.
    */

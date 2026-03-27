@@ -201,6 +201,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       Optional<ApplicationErrorCode> err =
           GenericApplicationErrorCode::NO_ERROR) override;
 
+  quic::Expected<void, LocalErrorCode> setStopSendingCallback(
+      StreamId id,
+      StopSendingCallback* ss) noexcept override;
+
   quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) override;
   quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) override;
 
@@ -883,6 +887,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   ConnectionWriteCallback* connWriteCallback_{nullptr};
   UnorderedMap<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
+  UnorderedMap<StreamId, StopSendingCallback*> stopSendingCallbacks_;
 
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)

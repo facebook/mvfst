@@ -21,8 +21,8 @@ class StreamReadCallback {
   virtual ~StreamReadCallback() = default;
 
   /**
-   * Called from the transport layer when there is data, EOF or an error
-   * available to read on the given stream ID
+   * Called from the transport layer when there is data or EOF available to read
+   * on the given stream ID
    */
   virtual void readAvailable(StreamId id) noexcept = 0;
 
@@ -30,6 +30,18 @@ class StreamReadCallback {
    * Called from the transport layer when there is an error on the stream.
    */
   virtual void readError(StreamId id, QuicError error) noexcept = 0;
+};
+
+/**
+ * Callback to be invoked when the quic transport recieves a stop_sending frame
+ * for a given stream id. Note that this may never be invoked if a stream is
+ * considered bidirectionally closed w/o having received a stop_sending frame
+ * from the peer.
+ */
+class StopSendingCallback {
+ public:
+  virtual ~StopSendingCallback() noexcept = default;
+  virtual void onStopSending(StreamId id, ApplicationErrorCode ec) noexcept = 0;
 };
 
 /**

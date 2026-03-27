@@ -144,6 +144,12 @@ class MockQuicSocket : public QuicSocket {
       setReadCallback,
       (StreamId, ReadCallback*, Optional<ApplicationErrorCode> err));
   MOCK_METHOD(
+      (quic::Expected<void, LocalErrorCode>),
+      setStopSendingCallback,
+      (StreamId, StopSendingCallback*),
+      (noexcept));
+
+  MOCK_METHOD(
       void,
       setConnectionSetupCallback,
       (folly::MaybeManagedPtr<ConnectionSetupCallback>));

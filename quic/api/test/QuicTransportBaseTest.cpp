@@ -4817,4 +4817,33 @@ TEST_F(
   ASSERT_FALSE(transport->setReadCallback(4, nullptr).hasError());
 }
 
+TEST_F(QuicTransportImplTestBase, StopSendingCallback) {
+  NiceMock<MockStopSendingCallback> ssCb;
+  // fail when non-existent stream
+  EXPECT_EQ(
+      transport->setStopSendingCallback(0, &ssCb).error(),
+      LocalErrorCode::STREAM_NOT_EXISTS);
+
+  // fail when rx only stream
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+  transport->addDataToStream(
+      2, StreamBuffer(folly::IOBuf::copyBuffer("data"), 0));
+  EXPECT_EQ(
+      transport->setStopSendingCallback(2, &ssCb).error(),
+      LocalErrorCode::INVALID_OPERATION);
+
+  // unset works
+  auto id = transport->createBidirectionalStream().value();
+  auto res = transport->setStopSendingCallback(id, nullptr);
+  EXPECT_FALSE(res.hasError());
+  // set works
+  res = transport->setStopSendingCallback(id, &ssCb);
+  EXPECT_FALSE(res.hasError());
+
+  EXPECT_CALL(ssCb, onStopSending(id, 0));
+  transport->getConnectionState().streamManager->addStopSending(
+      id, /*error=*/0);
+  transport->invokeProcessCallbacksAfterNetworkData();
+}
+
 } // namespace quic::test

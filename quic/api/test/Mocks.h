@@ -51,6 +51,16 @@ class MockReadCallback : public QuicSocket::ReadCallback {
   MOCK_METHOD((void), readError, (StreamId, QuicError), (noexcept));
 };
 
+class MockStopSendingCallback : public quic::StopSendingCallback {
+ public:
+  ~MockStopSendingCallback() override = default;
+  MOCK_METHOD(
+      (void),
+      onStopSending,
+      (StreamId, ApplicationErrorCode),
+      (noexcept));
+};
+
 class MockPeekCallback : public QuicSocket::PeekCallback {
  public:
   ~MockPeekCallback() override = default;
