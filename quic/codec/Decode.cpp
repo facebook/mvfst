@@ -43,6 +43,25 @@ quic::Expected<quic::PacketNum, quic::QuicError> nextAckedPacketLen(
   return packetNum - ackBlockLen;
 }
 
+// Helper to decode a frame using contiguousCursor, check for errors, trim the
+// queue, and wrap the result in QuicFrame. Eliminates repeated boilerplate in
+// the parseFrame switch. The cursor is always passed as the first argument to
+// the decode function, followed by any additional arguments.
+template <typename DecodeFn, typename... Args>
+quic::Expected<quic::QuicFrame, quic::QuicError> decodeFrameAndTrimBufQueue(
+    quic::BufQueue& queue,
+    quic::ContiguousReadCursor& cursor,
+    DecodeFn&& decodeFn,
+    Args&&... args) {
+  auto res =
+      std::forward<DecodeFn>(decodeFn)(cursor, std::forward<Args>(args)...);
+  if (!res.has_value()) {
+    return quic::make_unexpected(res.error());
+  }
+  queue.trimStart(cursor.getCurrentPosition());
+  return quic::QuicFrame(*res);
+}
+
 } // namespace
 
 namespace quic {
@@ -913,22 +932,12 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
 
   // No more try/catch, just use Expected/make_unexpected pattern
   switch (frameType) {
-    case FrameType::PADDING: {
-      auto paddingRes = decodePaddingFrame(contiguousCursor);
-      if (!paddingRes.has_value()) {
-        return quic::make_unexpected(paddingRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*paddingRes);
-    }
-    case FrameType::PING: {
-      auto pingRes = decodePingFrame(contiguousCursor);
-      if (!pingRes.has_value()) {
-        return quic::make_unexpected(pingRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*pingRes);
-    }
+    case FrameType::PADDING:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodePaddingFrame);
+    case FrameType::PING:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodePingFrame);
     case FrameType::ACK: {
       auto ackFrameRes = decodeAckFrame(contiguousCursor, header, params);
       if (ackFrameRes.hasError()) {
@@ -947,39 +956,21 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return ackFrameWithEcnRes;
     }
     case FrameType::RST_STREAM:
-    case FrameType::RST_STREAM_AT: {
-      auto rstRes = decodeRstStreamFrame(
-          contiguousCursor, frameType == FrameType::RST_STREAM_AT);
-      if (!rstRes.has_value()) {
-        return quic::make_unexpected(rstRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*rstRes);
-    }
-    case FrameType::STOP_SENDING: {
-      auto stopRes = decodeStopSendingFrame(contiguousCursor);
-      if (!stopRes.has_value()) {
-        return quic::make_unexpected(stopRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*stopRes);
-    }
-    case FrameType::CRYPTO_FRAME: {
-      auto cryptoRes = decodeCryptoFrame(contiguousCursor);
-      if (!cryptoRes.has_value()) {
-        return quic::make_unexpected(cryptoRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*cryptoRes);
-    }
-    case FrameType::NEW_TOKEN: {
-      auto tokenRes = decodeNewTokenFrame(contiguousCursor);
-      if (!tokenRes.has_value()) {
-        return quic::make_unexpected(tokenRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*tokenRes);
-    }
+    case FrameType::RST_STREAM_AT:
+      return decodeFrameAndTrimBufQueue(
+          queue,
+          contiguousCursor,
+          decodeRstStreamFrame,
+          frameType == FrameType::RST_STREAM_AT);
+    case FrameType::STOP_SENDING:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeStopSendingFrame);
+    case FrameType::CRYPTO_FRAME:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeCryptoFrame);
+    case FrameType::NEW_TOKEN:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeNewTokenFrame);
     case FrameType::STREAM:
     case FrameType::STREAM_FIN:
     case FrameType::STREAM_LEN:
@@ -995,128 +986,51 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       }
       return QuicFrame(*streamRes);
     }
-    case FrameType::MAX_DATA: {
-      auto maxDataRes = decodeMaxDataFrame(contiguousCursor);
-      if (!maxDataRes.has_value()) {
-        return quic::make_unexpected(maxDataRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*maxDataRes);
-    }
-    case FrameType::MAX_STREAM_DATA: {
-      auto maxStreamRes = decodeMaxStreamDataFrame(contiguousCursor);
-      if (!maxStreamRes.has_value()) {
-        return quic::make_unexpected(maxStreamRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*maxStreamRes);
-    }
-    case FrameType::MAX_STREAMS_BIDI: {
-      auto streamsBidiRes = decodeBiDiMaxStreamsFrame(contiguousCursor);
-      if (!streamsBidiRes.has_value()) {
-        return quic::make_unexpected(streamsBidiRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*streamsBidiRes);
-    }
-    case FrameType::MAX_STREAMS_UNI: {
-      auto streamsUniRes = decodeUniMaxStreamsFrame(contiguousCursor);
-      if (!streamsUniRes.has_value()) {
-        return quic::make_unexpected(streamsUniRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*streamsUniRes);
-    }
-    case FrameType::DATA_BLOCKED: {
-      auto blockedRes = decodeDataBlockedFrame(contiguousCursor);
-      if (!blockedRes.has_value()) {
-        return quic::make_unexpected(blockedRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*blockedRes);
-    }
-    case FrameType::STREAM_DATA_BLOCKED: {
-      auto streamBlockedRes = decodeStreamDataBlockedFrame(contiguousCursor);
-      if (!streamBlockedRes.has_value()) {
-        return quic::make_unexpected(streamBlockedRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*streamBlockedRes);
-    }
-    case FrameType::STREAMS_BLOCKED_BIDI: {
-      auto streamsBidiBlockedRes =
-          decodeBiDiStreamsBlockedFrame(contiguousCursor);
-      if (!streamsBidiBlockedRes.has_value()) {
-        return quic::make_unexpected(streamsBidiBlockedRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*streamsBidiBlockedRes);
-    }
-    case FrameType::STREAMS_BLOCKED_UNI: {
-      auto streamsUniBlockedRes =
-          decodeUniStreamsBlockedFrame(contiguousCursor);
-      if (!streamsUniBlockedRes.has_value()) {
-        return quic::make_unexpected(streamsUniBlockedRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*streamsUniBlockedRes);
-    }
-    case FrameType::NEW_CONNECTION_ID: {
-      auto newConnIdRes = decodeNewConnectionIdFrame(contiguousCursor);
-      if (!newConnIdRes.has_value()) {
-        return quic::make_unexpected(newConnIdRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*newConnIdRes);
-    }
-    case FrameType::RETIRE_CONNECTION_ID: {
-      auto retireConnIdRes = decodeRetireConnectionIdFrame(contiguousCursor);
-      if (!retireConnIdRes.has_value()) {
-        return quic::make_unexpected(retireConnIdRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*retireConnIdRes);
-    }
-    case FrameType::PATH_CHALLENGE: {
-      auto pathChallengeRes = decodePathChallengeFrame(contiguousCursor);
-      if (!pathChallengeRes.has_value()) {
-        return quic::make_unexpected(pathChallengeRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*pathChallengeRes);
-    }
-    case FrameType::PATH_RESPONSE: {
-      auto pathResponseRes = decodePathResponseFrame(contiguousCursor);
-      if (!pathResponseRes.has_value()) {
-        return quic::make_unexpected(pathResponseRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*pathResponseRes);
-    }
-    case FrameType::CONNECTION_CLOSE: {
-      auto connCloseRes = decodeConnectionCloseFrame(contiguousCursor);
-      if (!connCloseRes.has_value()) {
-        return quic::make_unexpected(connCloseRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*connCloseRes);
-    }
-    case FrameType::CONNECTION_CLOSE_APP_ERR: {
-      auto appCloseRes = decodeApplicationClose(contiguousCursor);
-      if (!appCloseRes.has_value()) {
-        return quic::make_unexpected(appCloseRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*appCloseRes);
-    }
-    case FrameType::HANDSHAKE_DONE: {
-      auto handshakeDoneRes = decodeHandshakeDoneFrame(contiguousCursor);
-      if (!handshakeDoneRes.has_value()) {
-        return quic::make_unexpected(handshakeDoneRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*handshakeDoneRes);
-    }
+    case FrameType::MAX_DATA:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeMaxDataFrame);
+    case FrameType::MAX_STREAM_DATA:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeMaxStreamDataFrame);
+    case FrameType::MAX_STREAMS_BIDI:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeBiDiMaxStreamsFrame);
+    case FrameType::MAX_STREAMS_UNI:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeUniMaxStreamsFrame);
+    case FrameType::DATA_BLOCKED:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeDataBlockedFrame);
+    case FrameType::STREAM_DATA_BLOCKED:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeStreamDataBlockedFrame);
+    case FrameType::STREAMS_BLOCKED_BIDI:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeBiDiStreamsBlockedFrame);
+    case FrameType::STREAMS_BLOCKED_UNI:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeUniStreamsBlockedFrame);
+    case FrameType::NEW_CONNECTION_ID:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeNewConnectionIdFrame);
+    case FrameType::RETIRE_CONNECTION_ID:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeRetireConnectionIdFrame);
+    case FrameType::PATH_CHALLENGE:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodePathChallengeFrame);
+    case FrameType::PATH_RESPONSE:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodePathResponseFrame);
+    case FrameType::CONNECTION_CLOSE:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeConnectionCloseFrame);
+    case FrameType::CONNECTION_CLOSE_APP_ERR:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeApplicationClose);
+    case FrameType::HANDSHAKE_DONE:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeHandshakeDoneFrame);
     case FrameType::DATAGRAM: {
       auto datagramRes = decodeDatagramFrame(queue, false /* hasLen */);
       if (!datagramRes.has_value()) {
@@ -1131,30 +1045,15 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       }
       return QuicFrame(*datagramRes);
     }
-    case FrameType::KNOB: {
-      auto knobRes = decodeKnobFrame(contiguousCursor);
-      if (knobRes.hasError()) {
-        return knobRes;
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*knobRes);
-    }
-    case FrameType::ACK_FREQUENCY: {
-      auto ackFreqRes = decodeAckFrequencyFrame(contiguousCursor);
-      if (!ackFreqRes.has_value()) {
-        return quic::make_unexpected(ackFreqRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*ackFreqRes);
-    }
-    case FrameType::IMMEDIATE_ACK: {
-      auto immediateAckRes = decodeImmediateAckFrame(contiguousCursor);
-      if (!immediateAckRes.has_value()) {
-        return quic::make_unexpected(immediateAckRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*immediateAckRes);
-    }
+    case FrameType::KNOB:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeKnobFrame);
+    case FrameType::ACK_FREQUENCY:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeAckFrequencyFrame);
+    case FrameType::IMMEDIATE_ACK:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeImmediateAckFrame);
     case FrameType::ACK_RECEIVE_TIMESTAMPS: {
       auto ackWithReceiveTiemstampsRes = decodeAckFrameWithReceivedTimestamps(
           contiguousCursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);
@@ -1164,14 +1063,9 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       queue.trimStart(contiguousCursor.getCurrentPosition());
       return ackWithReceiveTiemstampsRes;
     }
-    case FrameType::ACK_EXTENDED: {
-      auto ackExtRes = decodeAckExtendedFrame(contiguousCursor, header, params);
-      if (!ackExtRes.has_value()) {
-        return quic::make_unexpected(ackExtRes.error());
-      }
-      queue.trimStart(contiguousCursor.getCurrentPosition());
-      return QuicFrame(*ackExtRes);
-    }
+    case FrameType::ACK_EXTENDED:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeAckExtendedFrame, header, params);
   }
 
   return quic::make_unexpected(QuicError(
