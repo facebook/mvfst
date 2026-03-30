@@ -40,6 +40,7 @@ mvfst_cpp_library(
         "//folly/stats:histogram",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:static_cwnd_congestion_controller",
+        "//quic/logging/oops_logger:glog_oops_logger",
     ],
     exported_deps = [
         "//quic/common:mvfst_logging",
@@ -56,7 +57,6 @@ mvfst_cpp_binary(
         "tperf.cpp",
     ],
     deps = [
-        "fbsource//third-party/glog:glog",
         ":tperf_client",
         ":tperf_server",
         "//folly/init:init",

@@ -143,6 +143,7 @@ mvfst_cpp_library(
         "//quic/datagram:datagram_flow_manager",
         "//quic/handshake:handshake",
         "//quic/logging:qlogger",
+        "//quic/logging/oops_logger:oops_logger",
         "//quic/observer:socket_observer_types",
         "//quic/priority:priority_queue",
     ],

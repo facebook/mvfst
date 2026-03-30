@@ -85,6 +85,7 @@ mvfst_add_library(mvfst_api_transport_lite
     mvfst_congestion_control_ecn_l4s_tracker
     mvfst_congestion_control_pacer_factory
     mvfst_flowcontrol_flow_control
+    mvfst_logging_oops_logger_oops_fields
     mvfst_logging_qlogger_macros
     mvfst_loss
     mvfst_observer_socket_observer_macros

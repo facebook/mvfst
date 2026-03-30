@@ -84,6 +84,7 @@ mvfst_add_library(mvfst_state_quic_state_machine
     mvfst_constants
     mvfst_datagram_datagram_flow_manager
     mvfst_handshake
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger
     mvfst_observer_socket_observer_types
     mvfst_priority_priority_queue

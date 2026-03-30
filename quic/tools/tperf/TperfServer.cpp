@@ -11,6 +11,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/logging/FileQLogger.h>
+#include <quic/logging/oops_logger/GlogOopsLogger.h>
 #include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfServer.h>
 
@@ -440,6 +441,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<FileQLogger> qlogger = nullptr;
       setPacingObserver(qlogger, transport.get(), pacingObserver_);
     }
+    transport->setOopsLogger(std::make_shared<proto_oops::GlogOopsLogger>());
+
     serverHandler->setQuicSocket(transport);
     handlers_.push_back(std::move(serverHandler));
     return transport;

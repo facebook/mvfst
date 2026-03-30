@@ -11,3 +11,11 @@ mvfst_add_library(mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_logging_oops_logger_oops_fields
 )
+
+mvfst_add_library(mvfst_logging_oops_logger_glog_oops_logger
+  EXPORTED_DEPS
+    mvfst_common_mvfst_logging
+    mvfst_logging_oops_logger
+    Folly::folly_experimental_symbolizer_symbolizer
+    ${GLOG_LIBRARIES}
+)

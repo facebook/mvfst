@@ -23,6 +23,7 @@
 #include <quic/datagram/DatagramFlowManager.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/AckStates.h>
@@ -591,6 +592,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // QLogger for this connection
   std::shared_ptr<QLogger> qLogger;
+
+  // Protocol OOPS logger for this connection
+  std::shared_ptr<proto_oops::OopsLogger> oopsLogger;
 
   // Track stats for various server events
   QuicTransportStatsCallback* statsCallback{nullptr};

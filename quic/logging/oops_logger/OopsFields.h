@@ -15,7 +15,9 @@
 namespace proto_oops {
 
 struct OopsFields {
+  // Component that is emitting the log
   std::string component;
+
   std::string errorMessage;
   std::chrono::system_clock::time_point timestamp;
 

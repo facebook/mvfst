@@ -14,6 +14,7 @@
 #include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsFields.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -941,6 +942,11 @@ void QuicTransportBaseLite::setQLogger(std::shared_ptr<QLogger> qLogger) {
   }
 }
 
+void QuicTransportBaseLite::setOopsLogger(
+    std::shared_ptr<proto_oops::OopsLogger> oopsLogger) {
+  conn_->oopsLogger = std::move(oopsLogger);
+}
+
 const std::shared_ptr<QLogger> QuicTransportBaseLite::getQLogger() const {
   return conn_->qLogger;
 }
@@ -1791,6 +1797,19 @@ LocalErrorCode QuicTransportBaseLite::handleExceptionAndClose(
               << " " << *this;
   } else {
     MVVLOG(4) << contextMsg << " " << ex.what() << " " << *this;
+  }
+
+  // Log to Protocol OOPS if configured
+  if (conn_->oopsLogger) {
+    auto builder =
+        proto_oops::OopsFieldsBuilder()
+            .setComponent("quic")
+            .setErrorMessage(std::string(contextMsg) + ": " + ex.what())
+            .setExceptionType(typeid(ex).name());
+    if (streamId.has_value()) {
+      builder.setStreamId(*streamId);
+    }
+    conn_->oopsLogger->log(builder.build());
   }
 
   exceptionCloseWhat_ = ex.what();

@@ -15,6 +15,10 @@
 
 #include <folly/io/async/DelayedDestruction.h>
 
+namespace proto_oops {
+class OopsLogger;
+} // namespace proto_oops
+
 namespace quic {
 
 enum class LooperType : uint8_t {
@@ -215,6 +219,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
 
   [[nodiscard]] const std::shared_ptr<QLogger> getQLogger() const;
+
+  virtual void setOopsLogger(
+      std::shared_ptr<proto_oops::OopsLogger> oopsLogger);
 
   void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 
