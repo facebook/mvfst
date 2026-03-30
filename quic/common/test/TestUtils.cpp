@@ -144,6 +144,9 @@ std::shared_ptr<fizz::client::FizzClientContext> createClientCtx() {
   auto clientCtx = std::make_shared<fizz::client::FizzClientContext>();
   clientCtx->setClock(std::make_shared<NiceMock<fizz::test::MockClock>>());
   clientCtx->setSupportedAlpns({"quic_test"});
+  clientCtx->setSupportedGroups(
+      {fizz::NamedGroup::x25519, fizz::NamedGroup::secp256r1});
+  clientCtx->setDefaultShares({fizz::NamedGroup::x25519});
   return clientCtx;
 }
 
