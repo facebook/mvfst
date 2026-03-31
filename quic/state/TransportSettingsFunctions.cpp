@@ -7,6 +7,10 @@
 
 #include <quic/state/TransportSettingsFunctions.h>
 
+#include <cmath>
+#include <stdexcept>
+#include <string>
+
 namespace quic {
 
 void populateAckFrequencyConfig(
@@ -91,16 +95,42 @@ quic::CongestionControlConfig parseCongestionControlConfig(
     }
   }
 
-  // Parse optional float fields
-  const std::array<std::pair<std::string_view, float&>, 4> floatFields = {
-      {{"overrideCruisePacingGain", ccaConfig.overrideCruisePacingGain},
-       {"overrideCruiseCwndGain", ccaConfig.overrideCruiseCwndGain},
-       {"overrideStartupPacingGain", ccaConfig.overrideStartupPacingGain},
-       {"overrideBwShortBeta", ccaConfig.overrideBwShortBeta}}};
+  // Parse optional float fields with per-field range validation.
+  struct FloatFieldWithBounds {
+    std::string_view name;
+    float& field;
+    float minVal;
+    float maxVal;
+  };
 
-  for (const auto& [name, field] : floatFields) {
+  const std::array<FloatFieldWithBounds, 4> floatFields = {{
+      {.name = "overrideCruisePacingGain",
+       .field = ccaConfig.overrideCruisePacingGain,
+       .minVal = kMinGainOverride,
+       .maxVal = kMaxGainOverride},
+      {.name = "overrideCruiseCwndGain",
+       .field = ccaConfig.overrideCruiseCwndGain,
+       .minVal = kMinGainOverride,
+       .maxVal = kMaxGainOverride},
+      {.name = "overrideStartupPacingGain",
+       .field = ccaConfig.overrideStartupPacingGain,
+       .minVal = kMinGainOverride,
+       .maxVal = kMaxGainOverride},
+      {.name = "overrideBwShortBeta",
+       .field = ccaConfig.overrideBwShortBeta,
+       .minVal = 0.5f,
+       .maxVal = 1.0f},
+  }};
+
+  for (const auto& [name, field, minVal, maxVal] : floatFields) {
     if (auto val = ccaConfigDyn.get_ptr(name)) {
-      field = static_cast<float>(val->asDouble());
+      auto parsed = static_cast<float>(val->asDouble());
+      if (!std::isfinite(parsed) || parsed < minVal || parsed > maxVal) {
+        throw std::range_error(
+            std::string("CC_CONFIG field '") + std::string(name) +
+            "' value out of range");
+      }
+      field = parsed;
     }
   }
 

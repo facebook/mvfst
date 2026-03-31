@@ -38,13 +38,23 @@ TEST_F(TransportSettingsFunctionsTest, ParseFloats) {
   std::string testString =
       "{"
       "\"overrideCruisePacingGain\": 7.9, "
-      "\"overrideCruiseCwndGain\": -0.1, "
+      "\"overrideCruiseCwndGain\": 1.5, "
       "\"overrideStartupPacingGain\": 2.1 "
       "}";
   auto config = parseCongestionControlConfig(testString);
   EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
-  EXPECT_EQ(config.overrideCruiseCwndGain, -0.1f);
+  EXPECT_EQ(config.overrideCruiseCwndGain, 1.5f);
   EXPECT_EQ(config.overrideStartupPacingGain, 2.1f);
+
+  // Out-of-range values throw (T259274295)
+  std::string badString =
+      "{"
+      "\"overrideCruisePacingGain\": 1e30, "
+      "\"overrideCruiseCwndGain\": -0.1, "
+      "\"overrideStartupPacingGain\": -0.5 "
+      "}";
+  EXPECT_THROW(parseCongestionControlConfig(badString), std::range_error);
+  EXPECT_FALSE(tryParseCongestionControlConfig(badString).has_value());
 }
 
 TEST_F(TransportSettingsFunctionsTest, FullConfig) {
@@ -72,8 +82,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"enableRenoCoexistence\": true, "
       "\"paceInitCwnd\": false, "
       "\"overrideCruisePacingGain\": 7.9, "
-      "\"overrideCruiseCwndGain\": -0.1, "
-      "\"overrideStartupPacingGain\": -0.5, "
+      "\"overrideCruiseCwndGain\": 1.5, "
+      "\"overrideStartupPacingGain\": 2.1, "
       "\"overrideBwShortBeta\": 0.8 "
       "}";
   auto config = parseCongestionControlConfig(testString);
@@ -93,8 +103,8 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.enableRenoCoexistence, true);
   EXPECT_EQ(config.paceInitCwnd, false);
   EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
-  EXPECT_EQ(config.overrideCruiseCwndGain, -0.1f);
-  EXPECT_EQ(config.overrideStartupPacingGain, -0.5f);
+  EXPECT_EQ(config.overrideCruiseCwndGain, 1.5f);
+  EXPECT_EQ(config.overrideStartupPacingGain, 2.1f);
   EXPECT_EQ(config.overrideBwShortBeta, 0.8f);
 
   ASSERT_TRUE(config.ackFrequencyConfig.has_value());

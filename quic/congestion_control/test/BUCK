@@ -249,3 +249,20 @@ mvfst_cpp_test(
         "//quic/congestion_control:ecn_l4s_tracker",
     ],
 )
+
+mvfst_cpp_test(
+    name = "Bbr2GainValidationTest",
+    srcs = [
+        "Bbr2GainValidationTest.cpp",
+    ],
+    deps = [
+        ":test_utils",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bandwidth",
+        "//quic/congestion_control:bbr2",
+        "//quic/state:transport_settings_functions",
+        "//quic/state/test:mocks",
+    ],
+)

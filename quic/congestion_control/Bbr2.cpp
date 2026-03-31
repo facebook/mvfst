@@ -1070,11 +1070,13 @@ void Bbr2CongestionController::getStats(
 }
 
 void Bbr2CongestionController::updatePacingAndCwndGain() {
+  const auto& ccaCfg = conn_.transportSettings.ccaConfig;
+
   switch (state_) {
     case State::Startup:
-      pacingGain_ =
-          conn_.transportSettings.ccaConfig.overrideStartupPacingGain > 0
-          ? conn_.transportSettings.ccaConfig.overrideStartupPacingGain
+      pacingGain_ = (ccaCfg.overrideStartupPacingGain > 0 &&
+                     ccaCfg.overrideStartupPacingGain <= kMaxGainOverride)
+          ? ccaCfg.overrideStartupPacingGain
           : kStartupPacingGain;
       cwndGain_ = kStartupCwndGain;
       break;
@@ -1092,12 +1094,13 @@ void Bbr2CongestionController::updatePacingAndCwndGain() {
       break;
     case State::ProbeBw_Cruise:
     case State::ProbeBw_Refill:
-      pacingGain_ =
-          conn_.transportSettings.ccaConfig.overrideCruisePacingGain > 0
-          ? conn_.transportSettings.ccaConfig.overrideCruisePacingGain
+      pacingGain_ = (ccaCfg.overrideCruisePacingGain > 0 &&
+                     ccaCfg.overrideCruisePacingGain <= kMaxGainOverride)
+          ? ccaCfg.overrideCruisePacingGain
           : kProbeBwCruiseRefillPacingGain;
-      cwndGain_ = conn_.transportSettings.ccaConfig.overrideCruiseCwndGain > 0
-          ? conn_.transportSettings.ccaConfig.overrideCruiseCwndGain
+      cwndGain_ = (ccaCfg.overrideCruiseCwndGain > 0 &&
+                   ccaCfg.overrideCruiseCwndGain <= kMaxGainOverride)
+          ? ccaCfg.overrideCruiseCwndGain
           : kProbeBwCruiseRefillCwndGain;
       break;
     case State::ProbeRTT:

@@ -567,6 +567,14 @@ constexpr float kDefaultLastMaxReductionFactor = 0.85f;
 constexpr float kCubicTCPFriendlyEstimateIncreaseFactor =
     3 * (1 - kDefaultCubicReductionFactor) / (1 + kDefaultCubicReductionFactor);
 
+/* BBR2 */
+// Gain override validation bounds. Gains are bandwidth/cwnd multipliers;
+// anything below 0.01 (1%) would effectively zero out pacing or cwnd.
+// 10x is ~3.5x above the highest built-in gain (kStartupPacingGain = 2.89),
+// generous for tuning experiments while preventing unreasonable values.
+constexpr float kMinGainOverride = 0.01f;
+constexpr float kMaxGainOverride = 10.0f;
+
 /* Flow Control */
 // Default flow control window for HTTP/2 + 1K for headers
 constexpr uint64_t kDefaultStreamFlowControlWindow = (64 + 1) * 1024;
