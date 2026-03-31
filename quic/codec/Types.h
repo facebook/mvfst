@@ -189,9 +189,9 @@ struct ReadAckFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
-  uint32_t ecnECT0Count{0};
-  uint32_t ecnECT1Count{0};
-  uint32_t ecnCECount{0};
+  uint64_t ecnECT0Count{0};
+  uint64_t ecnECT1Count{0};
+  uint64_t ecnCECount{0};
 
   bool operator==(const ReadAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
@@ -210,9 +210,9 @@ struct WriteAckFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
-  uint32_t ecnECT0Count{0};
-  uint32_t ecnECT1Count{0};
-  uint32_t ecnCECount{0};
+  uint64_t ecnECT0Count{0};
+  uint64_t ecnECT1Count{0};
+  uint64_t ecnCECount{0};
 
   bool operator==(const WriteAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
@@ -274,9 +274,9 @@ struct WriteAckFrameState {
   // TODO: update this when we support out-of-order packets.
   CircularDeque<ReceivedPacket> recvdPacketInfos;
   // The count of ECN marks seen on received packets.
-  uint32_t ecnECT0CountReceived{0};
-  uint32_t ecnECT1CountReceived{0};
-  uint32_t ecnCECountReceived{0};
+  uint64_t ecnECT0CountReceived{0};
+  uint64_t ecnECT1CountReceived{0};
+  uint64_t ecnCECountReceived{0};
 };
 
 struct WriteAckFrameMetaData {

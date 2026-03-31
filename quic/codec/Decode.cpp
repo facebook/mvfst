@@ -13,7 +13,6 @@
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
 #include <chrono>
-#include <cstdint>
 
 namespace {
 

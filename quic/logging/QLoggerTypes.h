@@ -212,9 +212,9 @@ class ReadAckFrameLog : public QLogFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
-  uint32_t ecnECT0Count;
-  uint32_t ecnECT1Count;
-  uint32_t ecnCECount;
+  uint64_t ecnECT0Count;
+  uint64_t ecnECT1Count;
+  uint64_t ecnCECount;
 
   ReadAckFrameLog(
       ReadAckFrame::Vec ackBlocksIn,
@@ -223,9 +223,9 @@ class ReadAckFrameLog : public QLogFrame {
       OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
       OptionalIntegral<PacketNum> maybeLatestRecvdPacketNumIn = std::nullopt,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
-      uint32_t ecnECT0CountIn = 0,
-      uint32_t ecnECT1CountIn = 0,
-      uint32_t ecnCECountIn = 0)
+      uint64_t ecnECT0CountIn = 0,
+      uint64_t ecnECT1CountIn = 0,
+      uint64_t ecnCECountIn = 0)
       : ackBlocks{std::move(ackBlocksIn)},
         ackDelay{ackDelayIn},
         frameType{frameTypeIn},
@@ -248,9 +248,9 @@ class WriteAckFrameLog : public QLogFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
-  uint32_t ecnECT0Count;
-  uint32_t ecnECT1Count;
-  uint32_t ecnCECount;
+  uint64_t ecnECT0Count;
+  uint64_t ecnECT1Count;
+  uint64_t ecnCECount;
 
   WriteAckFrameLog(
       WriteAckFrame::AckBlockVec ackBlocksIn,
@@ -259,9 +259,9 @@ class WriteAckFrameLog : public QLogFrame {
       OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
       OptionalIntegral<PacketNum> maybeLatestRecvdPacketNumIn = std::nullopt,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
-      uint32_t ecnECT0CountIn = 0,
-      uint32_t ecnECT1CountIn = 0,
-      uint32_t ecnCECountIn = 0)
+      uint64_t ecnECT0CountIn = 0,
+      uint64_t ecnECT1CountIn = 0,
+      uint64_t ecnCECountIn = 0)
       : ackBlocks{std::move(ackBlocksIn)},
         ackDelay{ackDelayIn},
         frameType{frameTypeIn},

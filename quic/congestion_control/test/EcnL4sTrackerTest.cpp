@@ -34,7 +34,7 @@ class EcnL4sTrackerTest : public Test {
 };
 
 AckEvent
-buildAckEvent(TimePoint ackTime, uint32_t ect0, uint32_t ect1, uint32_t ce) {
+buildAckEvent(TimePoint ackTime, uint64_t ect0, uint64_t ect1, uint64_t ce) {
   return AckEvent::Builder()
       .setAckTime(ackTime)
       .setAdjustedAckTime(ackTime)

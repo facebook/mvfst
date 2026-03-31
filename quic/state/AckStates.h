@@ -49,11 +49,11 @@ struct AckState : WriteAckFrameState {
   // is correctly echoing the ECN marking in its ACKs. Note that this is a
   // minimum count because it only tracks ack-eliciting packets that we sent
   // (non-ack eliciting packets are not tracked as outstanding packets)
-  uint32_t minimumExpectedEcnMarksEchoed{0};
+  uint64_t minimumExpectedEcnMarksEchoed{0};
   // The counts of ECN counts echoed by the peer.
-  uint32_t ecnECT0CountEchoed{0};
-  uint32_t ecnECT1CountEchoed{0};
-  uint32_t ecnCECountEchoed{0};
+  uint64_t ecnECT0CountEchoed{0};
+  uint64_t ecnECT1CountEchoed{0};
+  uint64_t ecnCECountEchoed{0};
 };
 
 struct AckStates {

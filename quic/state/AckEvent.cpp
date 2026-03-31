@@ -161,9 +161,9 @@ AckEvent::Builder&& AckEvent::Builder::setIsImplicitAck(bool isImplicitAckIn) {
 }
 
 AckEvent::Builder&& AckEvent::Builder::setEcnCounts(
-    uint32_t ecnECT0CountIn,
-    uint32_t ecnECT1CountIn,
-    uint32_t ecnCECountIn) {
+    uint64_t ecnECT0CountIn,
+    uint64_t ecnECT1CountIn,
+    uint64_t ecnCECountIn) {
   ecnECT0Count = ecnECT0CountIn;
   ecnECT1Count = ecnECT1CountIn;
   ecnCECount = ecnCECountIn;

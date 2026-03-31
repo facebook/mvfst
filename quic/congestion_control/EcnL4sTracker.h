@@ -34,8 +34,8 @@ class EcnL4sTracker : public PacketProcessor {
 
   double l4sWeight_{0.0};
   TimePoint lastUpdateTime_{Clock::now()};
-  uint32_t lastECT1Echoed_{0};
-  uint32_t lastCEEchoed_{0};
+  uint64_t lastECT1Echoed_{0};
+  uint64_t lastCEEchoed_{0};
 };
 
 } // namespace quic

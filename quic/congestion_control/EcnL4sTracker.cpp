@@ -35,14 +35,17 @@ void EcnL4sTracker::onPacketAck(const AckEvent* ackEvent) {
   if (ackEvent->ackTime - lastUpdateTime_ >= rttVirt_ ||
       (ackEvent->ecnCECount > 0 && lastCEEchoed_ == 0)) {
     // It's time to update the l4s weight.
-    double newECT1Echoed = int64_t(ackEvent->ecnECT1Count) - lastECT1Echoed_;
-    double newCEEchoed = int64_t(ackEvent->ecnCECount) - lastCEEchoed_;
-
-    if (newCEEchoed < 0 || newECT1Echoed < 0) {
+    if (ackEvent->ecnECT1Count < lastECT1Echoed_ ||
+        ackEvent->ecnCECount < lastCEEchoed_) {
       throw QuicTransportException(
           "Number of ACKed packets with ECT1 or CE marking moved backwards.",
           TransportErrorCode::PROTOCOL_VIOLATION);
-    } else if (newCEEchoed + newECT1Echoed == 0) {
+    }
+
+    double newECT1Echoed = ackEvent->ecnECT1Count - lastECT1Echoed_;
+    double newCEEchoed = ackEvent->ecnCECount - lastCEEchoed_;
+
+    if (newCEEchoed + newECT1Echoed == 0) {
       // No new marks in the last rttVirt. Skip this ACK.
       return;
     }
