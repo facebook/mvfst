@@ -56,14 +56,11 @@ class FunctionRef<ReturnType(Args...)> final {
       : object_(reinterpret_cast<void*>(fn)), call_(&FunctionRef::callFnPtr) {}
 
   // Constructor for callable objects (lambdas, functors)
-  template <
-      typename Fun,
-      std::enable_if_t<
-          !std::is_same_v<FunctionRef, std::decay_t<Fun>> &&
-              !std::is_same_v<FnPtr, std::decay_t<Fun>> &&
-              std::is_invocable_r_v<ReturnType, Fun&, Args...>,
-          int> = 0>
+  template <typename Fun>
   /* implicit */ constexpr FunctionRef(Fun&& fun) noexcept
+    requires(!std::is_same_v<FunctionRef, std::decay_t<Fun>> &&
+             !std::is_same_v<FnPtr, std::decay_t<Fun>> &&
+             std::is_invocable_r_v<ReturnType, Fun&, Args...>)
       : object_(
             const_cast<void*>(static_cast<const void*>(std::addressof(fun)))),
         call_(&FunctionRef::template callObject<Fun>) {}
