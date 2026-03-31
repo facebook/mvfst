@@ -864,11 +864,10 @@ Expected<SCONEPacket, TransportErrorCode> decodeScone(
     ContiguousReadCursor& cursor) {
   // Initialize SCONEPacket with zero-length ConnectionIds
   SCONEPacket sconePacket{
-      0, // rate
-      0, // version
-      ConnectionId::createZeroLength(), // dstCid
-      ConnectionId::createZeroLength() // srcCid
-  };
+      .rate = 0,
+      .version = 0,
+      .dstCid = ConnectionId::createZeroLength(),
+      .srcCid = ConnectionId::createZeroLength()};
 
   if (!cursor.canAdvance(1)) {
     return quic::make_unexpected(TransportErrorCode::FRAME_ENCODING_ERROR);

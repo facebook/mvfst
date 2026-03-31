@@ -1532,12 +1532,30 @@ TEST_F(QuicReadCodecTest, SCONERateSignalEncoding) {
   };
 
   std::vector<TestCase> testCases = {
-      {0, 0, QuicVersion::SCONE_VERSION_1}, // 0b0000000 -> high=0, low=0
-      {1, 0, QuicVersion::SCONE_VERSION_2}, // 0b0000001 -> high=0, low=1
-      {64, 32, QuicVersion::SCONE_VERSION_1}, // 0b1000000 -> high=32, low=0
-      {65, 32, QuicVersion::SCONE_VERSION_2}, // 0b1000001 -> high=32, low=1
-      {126, 63, QuicVersion::SCONE_VERSION_1}, // 0b1111110 -> high=63, low=0
-      {127, 63, QuicVersion::SCONE_VERSION_2}, // 0b1111111 -> high=63, low=1
+      {.rate = 0,
+       .expectedByte0Bits = 0,
+       .expectedVersion =
+           QuicVersion::SCONE_VERSION_1}, // 0b0000000 -> high=0, low=0
+      {.rate = 1,
+       .expectedByte0Bits = 0,
+       .expectedVersion =
+           QuicVersion::SCONE_VERSION_2}, // 0b0000001 -> high=0, low=1
+      {.rate = 64,
+       .expectedByte0Bits = 32,
+       .expectedVersion =
+           QuicVersion::SCONE_VERSION_1}, // 0b1000000 -> high=32, low=0
+      {.rate = 65,
+       .expectedByte0Bits = 32,
+       .expectedVersion =
+           QuicVersion::SCONE_VERSION_2}, // 0b1000001 -> high=32, low=1
+      {.rate = 126,
+       .expectedByte0Bits = 63,
+       .expectedVersion =
+           QuicVersion::SCONE_VERSION_1}, // 0b1111110 -> high=63, low=0
+      {.rate = 127,
+       .expectedByte0Bits = 63,
+       .expectedVersion =
+           QuicVersion::SCONE_VERSION_2}, // 0b1111111 -> high=63, low=1
   };
 
   ConnectionId dstCid = getTestConnectionId(1);

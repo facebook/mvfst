@@ -685,7 +685,9 @@ writeReceiveTimestampFieldsToAck(
       builder.write(timeStampRangeCountInt);
     }
   }
-  return AckReceiveTimesStampsWritten{countTimestampRanges, countTimestamps};
+  return AckReceiveTimesStampsWritten{
+      .TimestampRangesWritten = countTimestampRanges,
+      .TimestampWritten = countTimestamps};
 }
 
 quic::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
