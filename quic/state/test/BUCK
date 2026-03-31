@@ -198,6 +198,24 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "EcnTruncationIntegrationTest",
+    srcs = [
+        "EcnTruncationIntegrationTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/googletest:gmock",
+        ":mocks",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:ecn_l4s_tracker",
+        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/server/state:server",
+        "//quic/state:ack_handler",
+        "//quic/state:outstanding_packet",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_test(
     name = "quic_path_manager_test",
     srcs = [
         "QuicPathManagerTest.cpp",

@@ -196,6 +196,23 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "EcnTruncationTest",
+    srcs = [
+        "EcnTruncationTest.cpp",
+    ],
+    deps = [
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common:buf_util",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:ecn_l4s_tracker",
+        "//quic/state:ack_event",
+    ],
+)
+
+mvfst_cpp_test(
     name = "server_connection_id_params_test",
     srcs = [
         "ServerConnectionIdParamsTest.cpp",

@@ -77,3 +77,14 @@ quic_add_test(TARGET QuicTransportSettingsFunctionsTest
   mvfst_test_utils
   mvfst_state_transport_settings_functions
 )
+
+quic_add_test(TARGET EcnTruncationIntegrationTest
+  SOURCES
+  EcnTruncationIntegrationTest.cpp
+  DEPENDS
+  mvfst_congestion_control_ecn_l4s_tracker
+  mvfst_server_server
+  mvfst_state_ack_handler
+  mvfst_state_quic_state_machine
+  mvfst_test_utils
+)

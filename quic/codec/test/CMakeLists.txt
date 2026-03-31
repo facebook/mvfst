@@ -124,3 +124,16 @@ quic_add_test(TARGET ServerConnectionIdParamsTest
   mvfst_codec_types
   mvfst_folly_utils
 )
+
+quic_add_test(TARGET EcnTruncationTest
+  SOURCES
+  EcnTruncationTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_codec_decode
+  mvfst_codec_types
+  mvfst_common_buf_util
+  mvfst_congestion_control_ecn_l4s_tracker
+  mvfst_state_ack_event
+  mvfst_test_utils
+)
