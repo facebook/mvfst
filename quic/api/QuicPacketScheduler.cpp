@@ -10,6 +10,7 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <algorithm>
 #include <cstdint>
 
 namespace {
@@ -1069,7 +1070,7 @@ CloningScheduler::scheduleFramesForPacket(
       const auto& frames = outstandingPacket.packet.frames;
       if (conn_.transportSettings.cloneAllPacketsWithCryptoFrame) {
         // Has CRYPTO frame
-        if (std::find_if(frames.begin(), frames.end(), [](const auto& frame) {
+        if (std::ranges::find_if(frames, [](const auto& frame) {
               return frame.type() == QuicWriteFrame::Type::WriteCryptoFrame;
             }) != frames.end()) {
           if (conn_.transportSettings.cloneCryptoPacketsAtMostOnce) {
