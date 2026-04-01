@@ -195,11 +195,7 @@ class MockQuicSocket : public QuicSocket {
       (bool));
   MOCK_METHOD(uint64_t, getNumOpenableBidirectionalStreams, (), (const));
   MOCK_METHOD(uint64_t, getNumOpenableUnidirectionalStreams, (), (const));
-  MOCK_METHOD(
-      (StreamInitiator),
-      getStreamInitiator,
-      (StreamId),
-      (const, noexcept));
+  MOCK_METHOD((QuicNodeType), getNodeType, (), (const, noexcept));
   MOCK_METHOD(
       (quic::Expected<void, LocalErrorCode>),
       notifyPendingWriteOnConnection,

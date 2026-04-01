@@ -600,7 +600,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void unbindConnection() = 0;
 
-  StreamInitiator getStreamInitiator(StreamId stream) const noexcept override;
+  [[nodiscard]] QuicNodeType getNodeType() const noexcept final;
 
   [[nodiscard]] QuicConnectionStats getConnectionsStats() const override;
 

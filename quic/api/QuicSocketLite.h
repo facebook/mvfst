@@ -783,10 +783,14 @@ class QuicSocketLite {
    */
   [[nodiscard]] virtual uint64_t maxWritableOnConn() const = 0;
 
+  virtual QuicNodeType getNodeType() const noexcept = 0;
+
   /**
    * Returns initiator (self or peer) of a stream by ID.
    */
-  virtual StreamInitiator getStreamInitiator(StreamId id) const noexcept = 0;
+  StreamInitiator getStreamInitiator(StreamId id) const noexcept {
+    return quic::getStreamInitiator(getNodeType(), id);
+  }
 
   /**
    * Returns various stats of the connection.

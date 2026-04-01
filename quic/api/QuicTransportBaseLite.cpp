@@ -2665,9 +2665,8 @@ void QuicTransportBaseLite::cancelByteEventCallbacks(
   }
 }
 
-StreamInitiator QuicTransportBaseLite::getStreamInitiator(
-    StreamId stream) const noexcept {
-  return quic::getStreamInitiator(conn_->nodeType, stream);
+QuicNodeType QuicTransportBaseLite::getNodeType() const noexcept {
+  return conn_->nodeType;
 }
 
 QuicConnectionStats QuicTransportBaseLite::getConnectionsStats() const {
