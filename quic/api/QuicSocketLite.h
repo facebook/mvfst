@@ -281,12 +281,16 @@ class QuicSocketLite {
   /**
    * Returns whether a stream ID represents a unidirectional stream.
    */
-  virtual bool isUnidirectionalStream(StreamId stream) noexcept = 0;
+  bool isUnidirectionalStream(StreamId stream) noexcept {
+    return quic::isUnidirectionalStream(stream);
+  }
 
   /**
    * Returns whether a stream ID represents a bidirectional stream.
    */
-  virtual bool isBidirectionalStream(StreamId stream) noexcept = 0;
+  bool isBidirectionalStream(StreamId stream) noexcept {
+    return quic::isBidirectionalStream(stream);
+  }
 
   /**
    * ===== Read API ====
@@ -782,7 +786,7 @@ class QuicSocketLite {
   /**
    * Returns initiator (self or peer) of a stream by ID.
    */
-  virtual StreamInitiator getStreamInitiator(StreamId stream) noexcept = 0;
+  virtual StreamInitiator getStreamInitiator(StreamId id) const noexcept = 0;
 
   /**
    * Returns various stats of the connection.

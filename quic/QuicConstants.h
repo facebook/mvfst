@@ -396,9 +396,10 @@ enum class LocalErrorCode : uint64_t {
   MIGRATION_FAILED = 0x40000022,
 };
 
-enum class QuicNodeType : bool {
-  Client,
-  Server,
+// value maps to lsb of stream id as per rfc9000
+enum class QuicNodeType : uint8_t {
+  Client = 0,
+  Server = 1,
 };
 
 enum class QuicVersion : uint32_t {

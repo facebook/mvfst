@@ -19,67 +19,67 @@ enum class StreamDirectionality : uint8_t { Unidirectional, Bidirectional };
 /**
  * Returns whether the given StreamId identifies a client stream.
  */
-bool isClientStream(StreamId stream);
+bool isClientStream(StreamId stream) noexcept;
 
 /**
  * Returns whether the given StreamId identifies a server stream.
  */
-bool isServerStream(StreamId stream);
+bool isServerStream(StreamId stream) noexcept;
 
 /**
  * Returns whether the given StreamId identifies a unidirectional stream.
  */
-bool isUnidirectionalStream(StreamId stream);
+bool isUnidirectionalStream(StreamId stream) noexcept;
 
 /**
  * Returns whether the given StreamId identifies a bidirectional stream.
  */
-bool isBidirectionalStream(StreamId stream);
+bool isBidirectionalStream(StreamId stream) noexcept;
 
 /**
  * Returns whether the given StreamId identifies a client bidirectional stream.
  */
-bool isClientBidirectionalStream(StreamId stream);
+bool isClientBidirectionalStream(StreamId stream) noexcept;
 
 /**
  * Returns whether the given StreamId identifies a server unidirectional stream.
  */
-bool isServerUnidirectionalStream(StreamId stream);
+bool isServerUnidirectionalStream(StreamId stream) noexcept;
 
 /**
  * Returns directionality (unidirectional or bidirectional) of a stream by ID.
  */
-StreamDirectionality getStreamDirectionality(StreamId stream);
+StreamDirectionality getStreamDirectionality(StreamId stream) noexcept;
 
 /**
  * Returns whether the given QuicNodeType and StreamId indicate a sending
  * stream, i.e., a stream which only sends data. Note that a bidirectional
  * stream is NOT considered a sending stream by this definition.
  */
-bool isSendingStream(QuicNodeType nodeType, StreamId stream);
+bool isSendingStream(QuicNodeType nodeType, StreamId stream) noexcept;
 
 /**
  * Returns whether the given QuicNodeType and StreamId indicate a receiving
  * stream, i.e., a stream which only receives data. Note that a bidirectional
  * stream is NOT considered a receiving stream by this definition.
  */
-bool isReceivingStream(QuicNodeType nodeType, StreamId stream);
+bool isReceivingStream(QuicNodeType nodeType, StreamId stream) noexcept;
 
 /**
  * Returns whether the given QuicNodeType and StreamId indicates the stream is
  * a local stream (i.e. the stream initiator matches the node type).
  */
-bool isLocalStream(QuicNodeType nodeType, StreamId stream);
+bool isLocalStream(QuicNodeType nodeType, StreamId stream) noexcept;
 
 /**
  * Returns whether the given QuicNodeType and StreamId indicates the stream is
  * a remote stream (i.e. the stream initiator doesn't match the node type).
  */
-bool isRemoteStream(QuicNodeType nodeType, StreamId stream);
+bool isRemoteStream(QuicNodeType nodeType, StreamId stream) noexcept;
 
 /**
  * Returns initiator (local or remote) of a stream by ID.
  */
-StreamInitiator getStreamInitiator(QuicNodeType nodeType, StreamId stream);
+StreamInitiator getStreamInitiator(QuicNodeType nodeType, StreamId id) noexcept;
 
 } // namespace quic

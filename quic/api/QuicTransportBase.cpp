@@ -403,19 +403,6 @@ QuicTransportBase::consume(StreamId id, uint64_t offset, size_t amount) {
   }
 }
 
-bool QuicTransportBase::isClientStream(StreamId stream) noexcept {
-  return quic::isClientStream(stream);
-}
-
-bool QuicTransportBase::isServerStream(StreamId stream) noexcept {
-  return quic::isServerStream(stream);
-}
-
-StreamDirectionality QuicTransportBase::getStreamDirectionality(
-    StreamId stream) noexcept {
-  return quic::getStreamDirectionality(stream);
-}
-
 quic::Expected<void, LocalErrorCode> QuicTransportBase::registerTxCallback(
     StreamId id,
     uint64_t offset,

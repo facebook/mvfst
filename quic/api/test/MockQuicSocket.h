@@ -195,16 +195,11 @@ class MockQuicSocket : public QuicSocket {
       (bool));
   MOCK_METHOD(uint64_t, getNumOpenableBidirectionalStreams, (), (const));
   MOCK_METHOD(uint64_t, getNumOpenableUnidirectionalStreams, (), (const));
-  MOCK_METHOD((bool), isClientStream, (StreamId), (noexcept));
-  MOCK_METHOD((bool), isServerStream, (StreamId), (noexcept));
-  MOCK_METHOD((StreamInitiator), getStreamInitiator, (StreamId), (noexcept));
-  MOCK_METHOD((bool), isBidirectionalStream, (StreamId), (noexcept));
-  MOCK_METHOD((bool), isUnidirectionalStream, (StreamId), (noexcept));
   MOCK_METHOD(
-      (StreamDirectionality),
-      getStreamDirectionality,
+      (StreamInitiator),
+      getStreamInitiator,
       (StreamId),
-      (noexcept));
+      (const, noexcept));
   MOCK_METHOD(
       (quic::Expected<void, LocalErrorCode>),
       notifyPendingWriteOnConnection,

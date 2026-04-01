@@ -467,14 +467,6 @@ uint64_t QuicTransportBaseLite::getNumOpenableUnidirectionalStreams() const {
   return conn_->streamManager->openableLocalUnidirectionalStreams();
 }
 
-bool QuicTransportBaseLite::isUnidirectionalStream(StreamId stream) noexcept {
-  return quic::isUnidirectionalStream(stream);
-}
-
-bool QuicTransportBaseLite::isBidirectionalStream(StreamId stream) noexcept {
-  return quic::isBidirectionalStream(stream);
-}
-
 QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
     StreamId id,
     BufPtr data,
@@ -2674,7 +2666,7 @@ void QuicTransportBaseLite::cancelByteEventCallbacks(
 }
 
 StreamInitiator QuicTransportBaseLite::getStreamInitiator(
-    StreamId stream) noexcept {
+    StreamId stream) const noexcept {
   return quic::getStreamInitiator(conn_->nodeType, stream);
 }
 

@@ -1269,6 +1269,45 @@ TEST_F(QuicStreamFunctionsTestBase, IsClientBidirectionalStream) {
   EXPECT_FALSE(isClientBidirectionalStream(0xff));
 }
 
+TEST_F(QuicStreamFunctionsTestBase, IsLocalRemoteStream) {
+  { // remote streams for client
+    auto nt = QuicNodeType::Client;
+    // bidi
+    EXPECT_TRUE(isRemoteStream(nt, 0x01));
+    EXPECT_TRUE(isRemoteStream(nt, 0x05));
+    // uni
+    EXPECT_TRUE(isRemoteStream(nt, 0x03));
+    EXPECT_TRUE(isRemoteStream(nt, 0x07));
+  }
+  { // remote streams for server
+    auto nt = QuicNodeType::Server;
+    // bidi
+    EXPECT_TRUE(isRemoteStream(nt, 0x00));
+    EXPECT_TRUE(isRemoteStream(nt, 0x04));
+    // uni
+    EXPECT_TRUE(isRemoteStream(nt, 0x02));
+    EXPECT_TRUE(isRemoteStream(nt, 0x06));
+  }
+  { // local streams for client
+    auto nt = QuicNodeType::Client;
+    // bidi
+    EXPECT_TRUE(isLocalStream(nt, 0x00));
+    EXPECT_TRUE(isLocalStream(nt, 0x04));
+    // uni
+    EXPECT_TRUE(isLocalStream(nt, 0x02));
+    EXPECT_TRUE(isLocalStream(nt, 0x06));
+  }
+  { // local streams for server
+    auto nt = QuicNodeType::Server;
+    // bidi
+    EXPECT_TRUE(isLocalStream(nt, 0x01));
+    EXPECT_TRUE(isLocalStream(nt, 0x05));
+    // uni
+    EXPECT_TRUE(isLocalStream(nt, 0x03));
+    EXPECT_TRUE(isLocalStream(nt, 0x07));
+  }
+}
+
 TEST_F(QuicStreamFunctionsTestBase, GetStreamDirectionality) {
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0x01));
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0xf0));

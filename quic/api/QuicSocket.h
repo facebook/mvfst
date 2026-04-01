@@ -254,18 +254,23 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Returns whether a stream ID represents a client-initiated stream.
    */
-  virtual bool isClientStream(StreamId stream) noexcept = 0;
+  bool isClientStream(StreamId stream) noexcept {
+    return quic::isClientStream(stream);
+  }
 
   /**
    * Returns whether a stream ID represents a server-initiated stream.
    */
-  virtual bool isServerStream(StreamId stream) noexcept = 0;
+  bool isServerStream(StreamId stream) noexcept {
+    return quic::isServerStream(stream);
+  }
 
   /**
    * Returns directionality (unidirectional or bidirectional) of a stream by ID.
    */
-  virtual StreamDirectionality getStreamDirectionality(
-      StreamId stream) noexcept = 0;
+  StreamDirectionality getStreamDirectionality(StreamId stream) noexcept {
+    return quic::getStreamDirectionality(stream);
+  }
 
   /**
    * Register a callback to be invoked when the stream offset was transmitted.

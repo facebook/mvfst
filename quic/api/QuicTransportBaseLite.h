@@ -107,8 +107,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool replaySafe = true) override;
   [[nodiscard]] uint64_t getNumOpenableBidirectionalStreams() const override;
   [[nodiscard]] uint64_t getNumOpenableUnidirectionalStreams() const override;
-  bool isUnidirectionalStream(StreamId stream) noexcept override;
-  bool isBidirectionalStream(StreamId stream) noexcept override;
 
   WriteResult writeChain(
       StreamId id,
@@ -602,7 +600,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void unbindConnection() = 0;
 
-  StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
+  StreamInitiator getStreamInitiator(StreamId stream) const noexcept override;
 
   [[nodiscard]] QuicConnectionStats getConnectionsStats() const override;
 

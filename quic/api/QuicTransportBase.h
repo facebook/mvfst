@@ -96,11 +96,6 @@ class QuicTransportBase : public QuicSocket,
   quic::Expected<void, std::pair<LocalErrorCode, Optional<uint64_t>>>
   consume(StreamId id, uint64_t offset, size_t amount) override;
 
-  bool isClientStream(StreamId stream) noexcept override;
-  bool isServerStream(StreamId stream) noexcept override;
-  StreamDirectionality getStreamDirectionality(
-      StreamId stream) noexcept override;
-
   quic::Expected<void, LocalErrorCode> maybeResetStreamFromReadError(
       StreamId id,
       QuicErrorCode error) override;
