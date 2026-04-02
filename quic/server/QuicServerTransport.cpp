@@ -173,6 +173,12 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
   if (readDataResult.hasError()) {
     return quic::make_unexpected(readDataResult.error());
   }
+  if (!quicExperimentApplied_ && quicExperimentHandlerFn_ &&
+      serverConn_->peerQuicExperimentId.has_value() &&
+      *serverConn_->peerQuicExperimentId != 0) {
+    quicExperimentHandlerFn_(*conn_, *serverConn_->peerQuicExperimentId);
+    quicExperimentApplied_ = true;
+  }
   processPendingData(true);
 
   if (closeState_ == CloseState::CLOSED) {
@@ -453,6 +459,12 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     if (handshakeResult.hasError()) {
       closeImpl(handshakeResult.error());
       return;
+    }
+    if (!quicExperimentApplied_ && quicExperimentHandlerFn_ &&
+        serverConn_->peerQuicExperimentId.has_value() &&
+        *serverConn_->peerQuicExperimentId != 0) {
+      quicExperimentHandlerFn_(*conn_, *serverConn_->peerQuicExperimentId);
+      quicExperimentApplied_ = true;
     }
     processPendingData(false);
     // pending data may contain connection close
@@ -749,6 +761,11 @@ void QuicServerTransport::maybeNotifyTransportReady() {
 void QuicServerTransport::setShouldRegisterKnobParamHandlerFn(
     ShouldRegisterKnobParamHandlerFn fn) {
   shouldRegisterKnobParamHandlerFn_ = std::move(fn);
+}
+
+void QuicServerTransport::setQuicExperimentHandlerFn(
+    QuicExperimentHandlerFn fn) {
+  quicExperimentHandlerFn_ = std::move(fn);
 }
 
 void QuicServerTransport::registerTransportKnobParamHandler(

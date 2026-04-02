@@ -37,6 +37,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   using ShouldRegisterKnobParamHandlerFn =
       std::function<bool(TransportKnobParamId)>;
 
+  using QuicExperimentHandlerFn =
+      std::function<void(QuicConnectionStateBase&, uint16_t)>;
+
   static std::shared_ptr<QuicServer> createQuicServer(
       TransportSettings transportSettings = TransportSettings()) {
     return std::shared_ptr<QuicServer>(
@@ -77,6 +80,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * is allowed to be registered.
    */
   void setShouldRegisterKnobParamHandlerFn(ShouldRegisterKnobParamHandlerFn fn);
+
+  void setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn);
 
   /*
    * Transport factory to create server-transport.
@@ -469,6 +474,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // Used to validate whether a transport knob parameter is allowed to be
   // registered
   ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
+  QuicExperimentHandlerFn quicExperimentHandlerFn_;
   // address that the server is bound to
   folly::SocketAddress boundAddress_;
   folly::SocketOptionMap socketOptions_;

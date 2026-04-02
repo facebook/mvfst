@@ -47,6 +47,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   using ShouldRegisterKnobParamHandlerFn =
       std::function<bool(TransportKnobParamId)>;
 
+  using QuicExperimentHandlerFn =
+      std::function<void(QuicConnectionStateBase&, uint16_t)>;
+
   class WorkerCallback {
    public:
     virtual ~WorkerCallback() = default;
@@ -84,6 +87,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * is allowed to be registered.
    */
   void setShouldRegisterKnobParamHandlerFn(ShouldRegisterKnobParamHandlerFn fn);
+
+  void setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn);
 
   /**
    * Sets the listening socket
@@ -559,6 +564,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // Used to validate whether a transport knob parameter is allowed to be
   // registered
   ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
+
+  QuicExperimentHandlerFn quicExperimentHandlerFn_;
 
   // Output buffer to be used for continuous memory GSO write
   std::unique_ptr<BufAccessor> bufAccessor_;

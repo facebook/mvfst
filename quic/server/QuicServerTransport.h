@@ -145,6 +145,10 @@ class QuicServerTransport
   virtual void setShouldRegisterKnobParamHandlerFn(
       ShouldRegisterKnobParamHandlerFn fn);
 
+  using QuicExperimentHandlerFn =
+      std::function<void(QuicConnectionStateBase&, uint16_t)>;
+  void setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn);
+
   void verifiedClientAddress();
 
   // From QuicTransportBase
@@ -282,6 +286,8 @@ class QuicServerTransport
           TransportKnobParam::Val)>>
       transportKnobParamHandlers_;
   ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
+  QuicExperimentHandlerFn quicExperimentHandlerFn_;
+  bool quicExperimentApplied_{false};
   mutable std::optional<QuicEventBaseAsFollyExecutor> eventBaseAsFollyExecutor_;
 
   // Container of observers for the socket / transport.

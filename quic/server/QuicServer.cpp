@@ -262,6 +262,7 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
   worker->setShouldRegisterKnobParamHandlerFn(
       shouldRegisterKnobParamHandlerFn_);
+  worker->setQuicExperimentHandlerFn(quicExperimentHandlerFn_);
   return worker;
 }
 
@@ -605,6 +606,12 @@ void QuicServer::setShouldRegisterKnobParamHandlerFn(
   checkRunningInThread(mainThreadId_);
   MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
   shouldRegisterKnobParamHandlerFn_ = std::move(fn);
+}
+
+void QuicServer::setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn) {
+  checkRunningInThread(mainThreadId_);
+  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
+  quicExperimentHandlerFn_ = std::move(fn);
 }
 
 void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
