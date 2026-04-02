@@ -187,7 +187,7 @@ struct CongestionController {
    */
   virtual void setResumeHints(
       uint64_t /*cwndHintBytes*/,
-      std::chrono::milliseconds /*rttHint*/) {}
+      const Optional<std::chrono::milliseconds>& /*rttHint*/ = std::nullopt) {}
 };
 
 } // namespace quic

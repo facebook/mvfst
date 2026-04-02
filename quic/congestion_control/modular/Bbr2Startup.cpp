@@ -114,7 +114,7 @@ void Bbr2Startup::onPacketAckOrLoss(
 
 void Bbr2Startup::setResumeHints(
     uint64_t cwndHintBytes,
-    std::chrono::milliseconds rttHint) {
+    const Optional<std::chrono::milliseconds>& rttHint) {
   if (!cwndHintBytes_.has_value()) {
     cwndHintBytes_ = cwndHintBytes;
     rttHint_ = rttHint;

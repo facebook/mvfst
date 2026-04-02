@@ -70,8 +70,10 @@ class Bbr2Startup : public CongestionController {
 
   void setAppIdle(bool, TimePoint) noexcept override {}
 
-  void setResumeHints(uint64_t cwndHintBytes, std::chrono::milliseconds rttHint)
-      override;
+  void setResumeHints(
+      uint64_t cwndHintBytes,
+      const Optional<std::chrono::milliseconds>& rttHint =
+          std::nullopt) override;
 
   void getStats(CongestionControllerStats& stats) const override {
     shared_->getStats(stats);

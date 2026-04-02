@@ -3429,10 +3429,13 @@ TEST_F(QuicUnencryptedServerTransportTest, CwndHintEncodeDecodeRoundTrip) {
 
     void getStats(CongestionControllerStats&) const override {}
 
-    void setResumeHints(uint64_t cwnd, std::chrono::milliseconds rtt) override {
+    void setResumeHints(
+        uint64_t cwnd,
+        const Optional<std::chrono::milliseconds>& rtt =
+            std::nullopt) override {
       called = true;
       hintCwnd = cwnd;
-      hintRtt = rtt;
+      hintRtt = rtt.value_or(std::chrono::milliseconds{0});
     }
 
     bool called{false};
