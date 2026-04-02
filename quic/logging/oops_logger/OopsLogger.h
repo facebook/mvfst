@@ -32,3 +32,14 @@ class OopsLogger {
 };
 
 } // namespace proto_oops
+
+// Convenience macro for OOPS logging with null-safety.
+// Checks if the logger is non-null before logging.
+// `loggerPtr` is any pointer-like type with bool conversion and operator->
+// (e.g., shared_ptr<OopsLogger>, OopsLogger*).
+#define PROTO_OOPS_LOG(loggerPtr, component, msg) \
+  do {                                            \
+    if (loggerPtr) {                              \
+      (loggerPtr)->log((component), (msg));       \
+    }                                             \
+  } while (0)
