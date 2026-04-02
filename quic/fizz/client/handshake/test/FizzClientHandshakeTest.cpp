@@ -348,7 +348,7 @@ TEST_F(ClientHandshakeTest, TestGetExportedKeyingMaterial) {
 }
 
 TEST_F(ClientHandshakeTest, TestHandshakeSuccess) {
-  EXPECT_CALL(*verifier, verify(_));
+  EXPECT_CALL(*verifier, _verify(_));
 
   clientServerRound();
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Initial);
@@ -417,7 +417,7 @@ TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
 }
 
 TEST_F(ClientHandshakeTest, TestNoErrorAfterAppClose) {
-  EXPECT_CALL(*verifier, verify(_));
+  EXPECT_CALL(*verifier, _verify(_));
 
   clientServerRound();
   serverClientRound();
@@ -434,7 +434,7 @@ TEST_F(ClientHandshakeTest, TestNoErrorAfterAppClose) {
 }
 
 TEST_F(ClientHandshakeTest, TestAppBytesInterpretedAsHandshake) {
-  EXPECT_CALL(*verifier, verify(_));
+  EXPECT_CALL(*verifier, _verify(_));
 
   clientServerRound();
   serverClientRound();
@@ -515,7 +515,7 @@ class ClientHandshakeHRRTest : public ClientHandshakeTest {
 };
 
 TEST_F(ClientHandshakeHRRTest, TestFullHRR) {
-  EXPECT_CALL(*verifier, verify(_));
+  EXPECT_CALL(*verifier, _verify(_));
 
   clientServerRound();
   expectHandshakeCipher(false);
@@ -538,7 +538,7 @@ TEST_F(ClientHandshakeHRRTest, TestFullHRR) {
 }
 
 TEST_F(ClientHandshakeHRRTest, TestHRROnlyOneRound) {
-  EXPECT_CALL(*verifier, verify(_)).Times(0);
+  EXPECT_CALL(*verifier, _verify(_)).Times(0);
 
   clientServerRound();
   serverClientRound();
