@@ -201,6 +201,7 @@ mvfst_add_library(mvfst_congestion_control_pacer_factory
 
 mvfst_add_library(mvfst_congestion_control_packet_processor
   EXPORTED_DEPS
+    mvfst_common_network_data
     mvfst_congestion_control_congestion_controller
     mvfst_state_cloned_packet_identifier
     mvfst_state_outstanding_packet

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/io/SocketOptionMap.h>
+#include <quic/common/NetworkData.h>
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/OutstandingPacket.h>
@@ -21,6 +22,21 @@ class PacketProcessor {
   };
 
   virtual ~PacketProcessor() = default;
+
+  /**
+   * Called before processing received network data.
+   */
+  virtual void preread() {}
+
+  /**
+   * Called for each received UDP packet during network data processing.
+   */
+  virtual void onPacketRead(const ReceivedUdpPacket& /* packet */) {}
+
+  /**
+   * Called after processing received network data.
+   */
+  virtual void postread() {}
 
   /**
    * Called before a write loop start. The returned PrewriteRequest

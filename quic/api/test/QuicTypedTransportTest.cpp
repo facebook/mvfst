@@ -1202,6 +1202,125 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
+/**
+ * Verify PacketProcessor preread and postread methods are invoked on all
+ * attached processors when a packet is received.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorPrereadPostreadInvoked) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // First packet processor
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  bool prereadFlagOne = false;
+  bool postreadFlagOne = false;
+  EXPECT_CALL(*rawPacketProcessor, preread())
+      .Times(1)
+      .WillOnce([&prereadFlagOne]() { prereadFlagOne = true; });
+  EXPECT_CALL(*rawPacketProcessor, postread())
+      .Times(1)
+      .WillOnce([&postreadFlagOne]() { postreadFlagOne = true; });
+
+  // Second packet processor
+  auto mockPacketProcessor2 = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor2 = mockPacketProcessor2.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor2));
+
+  bool prereadFlagTwo = false;
+  bool postreadFlagTwo = false;
+  EXPECT_CALL(*rawPacketProcessor2, preread())
+      .Times(1)
+      .WillOnce([&prereadFlagTwo]() { prereadFlagTwo = true; });
+  EXPECT_CALL(*rawPacketProcessor2, postread())
+      .Times(1)
+      .WillOnce([&postreadFlagTwo]() { postreadFlagTwo = true; });
+
+  // Send a packet so we can deliver an ACK
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(1000);
+  this->getTransport()->writeChain(streamId, std::move(buf), false);
+  const auto maybeWrittenPackets = this->loopForWrites();
+  ASSERT_TRUE(maybeWrittenPackets.has_value());
+
+  // Deliver an ACK packet — this triggers onNetworkData and the read path
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets),
+      std::chrono::steady_clock::time_point());
+
+  EXPECT_TRUE(prereadFlagOne);
+  EXPECT_TRUE(postreadFlagOne);
+  EXPECT_TRUE(prereadFlagTwo);
+  EXPECT_TRUE(postreadFlagTwo);
+  this->destroyTransport();
+}
+
+/**
+ * Verify PacketProcessor postread is still invoked even if onReadData
+ * encounters an error (guaranteed by SCOPE_EXIT).
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorPostreadInvokedOnError) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  bool postreadFlag = false;
+  EXPECT_CALL(*rawPacketProcessor, postread())
+      .Times(1)
+      .WillOnce([&postreadFlag]() { postreadFlag = true; });
+
+  // Deliver a garbage packet — it will fail to parse but postread should
+  // still be called via SCOPE_EXIT
+  this->deliverPacket(
+      IOBuf::copyBuffer("garbage"), std::chrono::steady_clock::time_point());
+
+  EXPECT_TRUE(postreadFlag);
+  this->destroyTransport();
+}
+
+/**
+ * Verify PacketProcessor onPacketRead is called for each received UDP packet.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorOnPacketReadInvoked) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketRead(_)).Times(1);
+
+  // Send a packet so we can deliver an ACK
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(1000);
+  this->getTransport()->writeChain(streamId, std::move(buf), false);
+  const auto maybeWrittenPackets = this->loopForWrites();
+  ASSERT_TRUE(maybeWrittenPackets.has_value());
+
+  // Deliver a single ACK packet
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets),
+      std::chrono::steady_clock::time_point());
+
+  this->destroyTransport();
+}
+
 TYPED_TEST(
     QuicTypedTransportAfterStartTest,
     StreamAckedIntervalsDeliveryCallbacks) {

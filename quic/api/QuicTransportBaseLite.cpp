@@ -293,6 +293,15 @@ void QuicTransportBaseLite::onNetworkData(
     }
   };
   try {
+    for (const auto& pp : conn_->packetProcessors) {
+      pp->preread();
+    }
+    SCOPE_EXIT {
+      for (const auto& pp : conn_->packetProcessors) {
+        pp->postread();
+      }
+    };
+
     conn_->lossState.totalBytesRecvd += networkData.getTotalData();
     auto originalAckVersion = currentAckStateVersion(*conn_);
 
@@ -330,6 +339,9 @@ void QuicTransportBaseLite::onNetworkData(
 
     auto packets = std::move(networkData).movePackets();
     for (auto& packet : packets) {
+      for (const auto& pp : conn_->packetProcessors) {
+        pp->onPacketRead(packet);
+      }
       auto res = onReadData(localAddress, std::move(packet), peerAddress);
       if (!res.has_value()) {
         MVVLOG(4) << __func__ << " " << res.error().message << " " << *this;

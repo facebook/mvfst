@@ -58,6 +58,9 @@ class MockPacketProcessor : public PacketProcessor {
       onPacketDestroyed,
       (const OutstandingPacketWrapper&),
       (override));
+  MOCK_METHOD(void, preread, (), (override));
+  MOCK_METHOD(void, onPacketRead, (const ReceivedUdpPacket&), (override));
+  MOCK_METHOD(void, postread, (), (override));
   MOCK_METHOD(Optional<PrewriteRequest>, prewrite, (), (override));
   MOCK_METHOD(void, postwrite, (), (override));
 };
