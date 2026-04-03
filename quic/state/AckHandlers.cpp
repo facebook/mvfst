@@ -291,17 +291,15 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
 
     {
       OutstandingPacketWrapper* wrapper = &(*ackedPacketIterator);
-      auto tmpIt = packetsWithHandlerContext.emplace(
-          std::find_if(
-              packetsWithHandlerContext.rbegin(),
-              packetsWithHandlerContext.rend(),
-              [&currentPacketNum](const auto& packetWithHandlerContext) {
-                return packetWithHandlerContext.outstandingPacket->packet.header
-                           .getPacketSequenceNum() > currentPacketNum;
-              })
-              .base(),
+      if (!packetsWithHandlerContext.empty()) {
+        MVCHECK_GE(
+            packetsWithHandlerContext.back()
+                .outstandingPacket->packet.header.getPacketSequenceNum(),
+            currentPacketNum);
+      }
+      packetsWithHandlerContext.emplace_back(
           OutstandingPacketWithHandlerContext(wrapper));
-      tmpIt->processAllFrames = needsProcess;
+      packetsWithHandlerContext.back().processAllFrames = needsProcess;
     }
     ackedPacketIterator.next();
   }
