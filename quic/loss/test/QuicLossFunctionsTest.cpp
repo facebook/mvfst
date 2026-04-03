@@ -932,7 +932,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();
   conn->outstandings.packets.emplace_back(
-      outstandingRegularPacket,
+      std::move(outstandingRegularPacket),
       now,
       0 /* pathId */,
       0,

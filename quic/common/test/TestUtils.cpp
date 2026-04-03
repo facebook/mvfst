@@ -598,7 +598,7 @@ OutstandingPacketWrapper makeTestingWritePacket(
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(longHeader));
   return OutstandingPacketWrapper(
-      packet,
+      std::move(packet),
       sentTime,
       pathId,
       desiredSize,

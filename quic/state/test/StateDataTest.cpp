@@ -145,7 +145,7 @@ TEST_F(StateDataTest, SingleLostPacketEvent) {
       100,
       kVersion));
   OutstandingPacketWrapper outstandingPacket(
-      packet,
+      std::move(packet),
       Clock::now(),
       0,
       1234,
@@ -169,7 +169,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       100,
       kVersion));
   OutstandingPacketWrapper outstandingPacket1(
-      packet1,
+      std::move(packet1),
       Clock::now(),
       0,
       1234,
@@ -187,7 +187,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       110,
       kVersion));
   OutstandingPacketWrapper outstandingPacket2(
-      packet2,
+      std::move(packet2),
       Clock::now(),
       0,
       1357,

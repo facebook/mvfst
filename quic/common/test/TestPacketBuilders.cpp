@@ -232,7 +232,7 @@ OutstandingPacketBuilder::setTotalAppLimitedTimeUsecs(
 
 OutstandingPacketWrapper OutstandingPacketBuilder::build() && {
   return OutstandingPacketWrapper{
-      (CHECK(maybePacket.has_value()), maybePacket.value()),
+      (CHECK(maybePacket.has_value()), std::move(maybePacket.value())),
       (CHECK(maybeTime.has_value()), maybeTime.value()),
       (CHECK(maybePathId.has_value()), maybePathId.value()),
       (CHECK(maybeEncodedSize.has_value()), maybeEncodedSize.value()),

@@ -202,7 +202,7 @@ struct OutstandingPacket {
 
  protected:
   OutstandingPacket(
-      RegularQuicWritePacket packetIn,
+      RegularQuicWritePacket&& packetIn,
       TimePoint timeIn,
       PathIdType pathIdIn,
       uint16_t encodedSizeIn,
@@ -247,7 +247,7 @@ struct OutstandingPacketWrapper : OutstandingPacket {
   PacketDestroyFn destroyFn_{nullptr};
 
   OutstandingPacketWrapper(
-      RegularQuicWritePacket packetIn,
+      RegularQuicWritePacket&& packetIn,
       TimePoint timeIn,
       PathIdType pathIdIn,
       uint16_t encodedSizeIn,
