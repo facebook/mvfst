@@ -235,7 +235,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           conn.ackStates.appDataAckState.nextPacketNum);
       break;
   }
-  PacketNumberSpace packetNumberSpace;
+  PacketNumberSpace packetNumberSpace{};
   auto shortHeader = header->asShort();
   if (shortHeader) {
     packetNumberSpace = shortHeader->getPacketNumberSpace();
@@ -1549,7 +1549,7 @@ TEST_F(QuicLossFunctionsTest, NoSkipLossVisitor) {
     return {};
   };
   // Send 5 packets, so when we ack the last one, we mark the first one loss
-  PacketNum lastSent;
+  PacketNum lastSent = 0;
   for (size_t i = 0; i < 5; i++) {
     lastSent =
         sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
@@ -1584,7 +1584,7 @@ TEST_F(QuicLossFunctionsTest, SkipLossVisitor) {
     return {};
   };
   // Send 5 packets, so when we ack the last one, we mark the first one loss
-  PacketNum lastSent;
+  PacketNum lastSent = 0;
   for (size_t i = 0; i < 5; i++) {
     lastSent = conn->ackStates.appDataAckState.nextPacketNum;
     ClonedPacketIdentifier clonedPacketIdentifier(
@@ -1623,8 +1623,8 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
   };
   // Send 6 packets, so when we ack the last one, we mark the first two loss
   EXPECT_EQ(1, conn->ackStates.appDataAckState.nextPacketNum);
-  PacketNum lastSent;
-  lastSent = sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
+  PacketNum lastSent =
+      sendPacket(*conn, Clock::now(), std::nullopt, PacketType::OneRtt);
   EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   ClonedPacketIdentifier clonedPacketIdentifier(
       PacketNumberSpace::AppData, lastSent);
