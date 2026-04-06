@@ -1599,7 +1599,7 @@ void writeCloseCommon(
   // best effort writing to the socket, ignore any errors.
 
   BufPtr packetBufPtr = packetBuf.clone();
-  iovec vec[kNumIovecBufferChains];
+  iovec vec[kNumIovecBufferChains]; // NOLINT(modernize-avoid-c-arrays)
   size_t iovec_len = fillIovec(packetBufPtr, vec);
   auto ret = sock.write(connection.peerAddress, vec, iovec_len);
   connection.lossState.totalBytesSent += packetSize;
