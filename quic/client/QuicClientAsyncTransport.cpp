@@ -8,7 +8,7 @@
 #include <quic/client/QuicClientAsyncTransport.h>
 #include <quic/common/MvfstLogging.h>
 
-#include <folly/debugging/symbolizer/Symbolizer.h>
+#include <folly/experimental/symbolizer/Symbolizer.h>
 
 namespace quic {
 
