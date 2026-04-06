@@ -1981,7 +1981,8 @@ class QuicClientTransportHappyEyeballsTest
 
     union {
       struct cmsghdr hdr;
-      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+      unsigned char buf[CMSG_SPACE(
+          sizeof(sock_extended_err))]; // NOLINT(modernize-avoid-c-arrays)
     } cmsgbuf;
 
     cmsgbuf.hdr.cmsg_level = SOL_IPV6;
@@ -2030,7 +2031,8 @@ class QuicClientTransportHappyEyeballsTest
 
     union {
       struct cmsghdr hdr;
-      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+      unsigned char buf[CMSG_SPACE(
+          sizeof(sock_extended_err))]; // NOLINT(modernize-avoid-c-arrays)
     } cmsgbuf;
 
     cmsgbuf.hdr.cmsg_level = SOL_IP;
@@ -2080,7 +2082,8 @@ class QuicClientTransportHappyEyeballsTest
 
     union {
       struct cmsghdr hdr;
-      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+      unsigned char buf[CMSG_SPACE(
+          sizeof(sock_extended_err))]; // NOLINT(modernize-avoid-c-arrays)
     } cmsgbuf;
 
     cmsgbuf.hdr.cmsg_level = SOL_IP;
