@@ -708,6 +708,7 @@ TEST_F(QuicTransportImplTestBase, IdleTimeoutExpiredDestroysTransport) {
 }
 
 TEST_F(QuicTransportImplTestBase, DelayConnCallback) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalBidirectionalStreams(0, /*force=*/true)
                    .hasError());
@@ -1660,6 +1661,7 @@ TEST_F(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalZero) {
 }
 
 TEST_F(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalFew) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalBidirectionalStreams(10, true)
                    .hasError());
@@ -1676,6 +1678,7 @@ TEST_F(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalFew) {
 }
 
 TEST_F(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalFew) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalUnidirectionalStreams(10, true)
                    .hasError());
@@ -1692,6 +1695,7 @@ TEST_F(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalFew) {
 }
 
 TEST_F(QuicTransportImplTestBase, onBidiStreamsAvailableCallback) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalBidirectionalStreams(0, /*force=*/true)
                    .hasError());
@@ -1710,6 +1714,7 @@ TEST_F(QuicTransportImplTestBase, onBidiStreamsAvailableCallback) {
 }
 
 TEST_F(QuicTransportImplTestBase, onBidiStreamsAvailableCallbackAfterExausted) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalBidirectionalStreams(0, /*force=*/true)
                    .hasError());
@@ -1730,6 +1735,7 @@ TEST_F(QuicTransportImplTestBase, onBidiStreamsAvailableCallbackAfterExausted) {
 }
 
 TEST_F(QuicTransportImplTestBase, oneUniStreamsAvailableCallback) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalUnidirectionalStreams(0, /*force=*/true)
                    .hasError());
@@ -1748,6 +1754,7 @@ TEST_F(QuicTransportImplTestBase, oneUniStreamsAvailableCallback) {
 }
 
 TEST_F(QuicTransportImplTestBase, onUniStreamsAvailableCallbackAfterExausted) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   ASSERT_FALSE(transport->transportConn->streamManager
                    ->setMaxLocalUnidirectionalStreams(0, /*force=*/true)
                    .hasError());

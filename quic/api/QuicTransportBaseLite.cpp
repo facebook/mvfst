@@ -472,11 +472,12 @@ QuicTransportBaseLite::createUnidirectionalStream(bool /*replaySafe*/) {
 }
 
 uint64_t QuicTransportBaseLite::getNumOpenableBidirectionalStreams() const {
-  return conn_->streamManager->openableLocalBidirectionalStreams();
+  return good() ? conn_->streamManager->openableLocalBidirectionalStreams() : 0;
 }
 
 uint64_t QuicTransportBaseLite::getNumOpenableUnidirectionalStreams() const {
-  return conn_->streamManager->openableLocalUnidirectionalStreams();
+  return good() ? conn_->streamManager->openableLocalUnidirectionalStreams()
+                : 0;
 }
 
 QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
