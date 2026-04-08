@@ -114,8 +114,6 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool eof,
       ByteEventCallback* cb = nullptr) override;
 
-  Optional<LocalErrorCode> shutdownWrite(StreamId id) override;
-
   quic::Expected<void, LocalErrorCode> registerDeliveryCallback(
       StreamId id,
       uint64_t offset,

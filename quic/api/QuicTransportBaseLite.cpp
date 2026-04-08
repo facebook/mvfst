@@ -554,13 +554,6 @@ QuicSocketLite::WriteResult QuicTransportBaseLite::writeChain(
   return {};
 }
 
-Optional<LocalErrorCode> QuicTransportBaseLite::shutdownWrite(StreamId id) {
-  if (isReceivingStream(conn_->nodeType, id)) {
-    return LocalErrorCode::INVALID_OPERATION;
-  }
-  return std::nullopt;
-}
-
 quic::Expected<void, LocalErrorCode>
 QuicTransportBaseLite::registerDeliveryCallback(
     StreamId id,

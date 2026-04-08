@@ -259,7 +259,6 @@ class MockQuicSocket : public QuicSocket {
       (quic::Expected<void, LocalErrorCode>),
       registerDeliveryCallback,
       (StreamId, uint64_t, ByteEventCallback*));
-  MOCK_METHOD(Optional<LocalErrorCode>, shutdownWrite, (StreamId));
   MOCK_METHOD(
       (quic::Expected<void, LocalErrorCode>),
       resetStream,

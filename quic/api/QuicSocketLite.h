@@ -458,11 +458,6 @@ class QuicSocketLite {
       ByteEventCallback* cb = nullptr) = 0;
 
   /**
-   * Close the stream for writing.  Equivalent to writeChain(id, nullptr, true).
-   */
-  virtual Optional<LocalErrorCode> shutdownWrite(StreamId id) = 0;
-
-  /**
    * Register a callback to be invoked when the peer has acknowledged the
    * given offset on the given stream.
    */
