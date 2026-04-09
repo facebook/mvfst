@@ -1,0 +1,16 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "DatagramFlowManagerTest",
+    srcs = [
+        "DatagramFlowManagerTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/datagram:datagram_flow_manager",
+        "//quic/priority:http_priority_queue",
+    ],
+)

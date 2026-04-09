@@ -13,6 +13,7 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic/common:buf_util",
         "//quic/common:circular_deque",
+        "//quic/common:expected",
         "//quic/priority:priority_queue",
     ],
 )

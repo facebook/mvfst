@@ -340,6 +340,31 @@ class MockQuicSocket : public QuicSocket {
   }
 
   MOCK_METHOD(WriteResult, writeDatagram, (SharedBuf));
+
+  MOCK_METHOD(
+      (quic::Expected<uint32_t, LocalErrorCode>),
+      createDatagramFlowId,
+      ());
+
+  quic::Expected<void, LocalErrorCode> writeDatagram(
+      uint32_t flowId,
+      BufPtr data) override {
+    SharedBuf sharedData(data.release());
+    return writeDatagramWithFlowId(flowId, sharedData);
+  }
+
+  MOCK_METHOD(WriteResult, writeDatagramWithFlowId, (uint32_t, SharedBuf));
+
+  MOCK_METHOD(
+      (quic::Expected<void, LocalErrorCode>),
+      setDatagramFlowPriority,
+      (uint32_t, PriorityQueue::Priority));
+
+  MOCK_METHOD(
+      (quic::Expected<void, LocalErrorCode>),
+      closeDatagramFlow,
+      (uint32_t));
+
   MOCK_METHOD(
       (quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>),
       readDatagrams,

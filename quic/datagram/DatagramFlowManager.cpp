@@ -47,9 +47,24 @@ void DatagramFlowManager::DatagramFlowQueue::pop() {
   }
 }
 
-void DatagramFlowManager::addDatagram(BufQueue buf, uint32_t flowId) {
-  writeBuffer_[flowId].push(std::move(buf));
+PriorityQueue::Priority DatagramFlowManager::addDatagram(
+    BufQueue buf,
+    uint32_t flowId) {
+  auto& flow = writeBuffer_[flowId];
+  flow.push(std::move(buf));
   ++datagramCount_;
+  return flow.priority;
+}
+
+quic::Expected<bool, LocalErrorCode> DatagramFlowManager::setFlowPriority(
+    uint32_t flowId,
+    PriorityQueue::Priority priority) {
+  auto it = writeBuffer_.find(flowId);
+  if (it == writeBuffer_.end()) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  it->second.priority = priority;
+  return it->second.empty();
 }
 
 DatagramFlowManager::DatagramPopResult DatagramFlowManager::popDatagramIfFits(
@@ -90,6 +105,23 @@ void DatagramFlowManager::popDatagram() {
 bool DatagramFlowManager::hasDatagramsForFlow(uint32_t flowId) const {
   auto it = writeBuffer_.find(flowId);
   return it != writeBuffer_.end() && !it->second.empty();
+}
+
+quic::Expected<void, LocalErrorCode> DatagramFlowManager::closeFlow(
+    uint32_t flowId) {
+  auto it = writeBuffer_.find(flowId);
+  if (it == writeBuffer_.end()) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+
+  // Update datagram count before removing the flow
+  size_t flowDatagramCount = it->second.size();
+  CHECK_GE(datagramCount_, flowDatagramCount);
+  datagramCount_ -= flowDatagramCount;
+
+  // Remove the flow and drop any queued datagrams
+  writeBuffer_.erase(it);
+  return {};
 }
 
 } // namespace quic

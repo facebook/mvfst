@@ -11,8 +11,11 @@ mvfst_add_library(mvfst_datagram_datagram_flow_manager
   EXPORTED_DEPS
     mvfst_common_buf_util
     mvfst_common_circular_deque
+    mvfst_common_expected
     mvfst_constants
     mvfst_priority_priority_queue
     Folly::folly_container_f14_hash
     Folly::folly_io_iobuf
 )
+
+add_subdirectory(test)

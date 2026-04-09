@@ -386,6 +386,33 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual WriteResult writeDatagram(BufPtr buf) = 0;
 
   /**
+   * Creates a new datagram flow ID that can be used to send datagrams
+   * with a specific priority.
+   */
+  virtual quic::Expected<uint32_t, LocalErrorCode> createDatagramFlowId() = 0;
+
+  /**
+   * Writes a Datagram frame to a specific flow. The flow's priority
+   * determines scheduling order relative to other flows and streams.
+   */
+  virtual WriteResult writeDatagram(uint32_t flowId, BufPtr buf) = 0;
+
+  /**
+   * Sets the priority for a datagram flow. Lower values = higher priority.
+   * Priority determines scheduling order when scheduleDatagramsWithStreams
+   * is enabled.
+   */
+  virtual quic::Expected<void, LocalErrorCode> setDatagramFlowPriority(
+      uint32_t flowId,
+      PriorityQueue::Priority priority) = 0;
+
+  /**
+   * Closes a datagram flow. Any queued datagrams in the flow will be dropped.
+   */
+  virtual quic::Expected<void, LocalErrorCode> closeDatagramFlow(
+      uint32_t flowId) = 0;
+
+  /**
    * Returns the currently available received Datagrams.
    * Returns all datagrams if atMost is 0.
    */

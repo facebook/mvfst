@@ -518,6 +518,28 @@ uint16_t QuicTransportBase::getDatagramSizeLimit() const {
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
     BufPtr buf) {
+  return writeDatagramInternal(std::move(buf), kDefaultDatagramFlowId);
+}
+
+quic::Expected<uint32_t, LocalErrorCode>
+QuicTransportBase::createDatagramFlowId() {
+  auto flowId = nextDatagramFlowId_++;
+  conn_->datagramState.flowManager.createFlow(flowId);
+  return flowId;
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
+    uint32_t flowId,
+    BufPtr buf) {
+  if (!conn_->datagramState.flowManager.hasFlow(flowId)) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  return writeDatagramInternal(std::move(buf), flowId);
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
+    BufPtr buf,
+    uint32_t flowId) {
   // TODO(lniccolini) update max datagram frame size
   // https://github.com/quicwg/datagram/issues/3
   // For now, max_datagram_size > 0 means the peer supports datagram frames
@@ -546,18 +568,57 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
       conn_->datagramState.flowManager.popDatagram();
     }
   }
-  conn_->datagramState.flowManager.addDatagram(std::move(buf));
+
+  auto flowPriority =
+      conn_->datagramState.flowManager.addDatagram(std::move(buf), flowId);
 
   // Add to PriorityQueue if scheduling with streams is enabled
   if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
       conn_->streamManager) {
-    auto id =
-        PriorityQueue::Identifier::fromDatagramFlowID(kDefaultDatagramFlowId);
-    conn_->streamManager->writeQueue().insertOrUpdate(
-        id, kDefaultDatagramPriority);
+    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
+    conn_->streamManager->writeQueue().insertOrUpdate(id, flowPriority);
   }
 
   updateWriteLooper(true);
+  return {};
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBase::setDatagramFlowPriority(
+    uint32_t flowId,
+    PriorityQueue::Priority priority) {
+  auto result =
+      conn_->datagramState.flowManager.setFlowPriority(flowId, priority);
+  if (result.hasError()) {
+    return quic::make_unexpected(result.error());
+  }
+
+  bool flowIsEmpty = result.value();
+
+  // Only update PriorityQueue if flow is non-empty and scheduling is enabled
+  if (!flowIsEmpty &&
+      conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
+      conn_->streamManager) {
+    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
+    conn_->streamManager->writeQueue().insertOrUpdate(id, priority);
+  }
+
+  return {};
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBase::closeDatagramFlow(
+    uint32_t flowId) {
+  auto result = conn_->datagramState.flowManager.closeFlow(flowId);
+  if (result.hasError()) {
+    return quic::make_unexpected(result.error());
+  }
+
+  // Remove from PriorityQueue if scheduling is enabled
+  if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
+      conn_->streamManager) {
+    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
+    conn_->streamManager->writeQueue().erase(id);
+  }
+
   return {};
 }
 

@@ -169,6 +169,19 @@ class QuicTransportBase : public QuicSocket,
    */
   quic::Expected<void, LocalErrorCode> writeDatagram(BufPtr buf) override;
 
+  quic::Expected<uint32_t, LocalErrorCode> createDatagramFlowId() override;
+
+  quic::Expected<void, LocalErrorCode> writeDatagram(
+      uint32_t flowId,
+      BufPtr buf) override;
+
+  quic::Expected<void, LocalErrorCode> setDatagramFlowPriority(
+      uint32_t flowId,
+      PriorityQueue::Priority priority) override;
+
+  quic::Expected<void, LocalErrorCode> closeDatagramFlow(
+      uint32_t flowId) override;
+
   /**
    * Returns the currently available received Datagrams.
    * Returns all datagrams if atMost is 0.
@@ -276,6 +289,18 @@ class QuicTransportBase : public QuicSocket,
   TransportLooper::Ptr peekLooper_;
 
   bool handshakeDoneNotified_{false};
+
+  // Next datagram flow ID to allocate (counts up from kDefaultDatagramFlowId +
+  // 1)
+  uint32_t nextDatagramFlowId_{kDefaultDatagramFlowId + 1};
+
+ private:
+  /**
+   * Internal helper for writing datagrams with common validation logic.
+   */
+  quic::Expected<void, LocalErrorCode> writeDatagramInternal(
+      BufPtr buf,
+      uint32_t flowId);
 };
 
 } // namespace quic
