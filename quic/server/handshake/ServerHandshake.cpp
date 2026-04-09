@@ -217,13 +217,19 @@ Optional<std::vector<uint8_t>> ServerHandshake::getExportedKeyingMaterial(
     return std::nullopt;
   }
 
-  auto ekm = fizz::Exporter::getExportedKeyingMaterial(
-      *state_.context()->getFactory(),
-      cipherSuite.value(),
-      ems.value()->coalesce(),
-      label,
-      context == std::nullopt ? nullptr : BufHelpers::wrapBuffer(*context),
-      keyLength);
+  BufPtr ekm;
+  fizz::Error fizzErr;
+  FIZZ_THROW_ON_ERROR(
+      fizz::Exporter::getExportedKeyingMaterial(
+          ekm,
+          fizzErr,
+          *state_.context()->getFactory(),
+          cipherSuite.value(),
+          ems.value()->coalesce(),
+          label,
+          context == std::nullopt ? nullptr : BufHelpers::wrapBuffer(*context),
+          keyLength),
+      fizzErr);
 
   std::vector<uint8_t> result(ekm->coalesce());
   return result;
