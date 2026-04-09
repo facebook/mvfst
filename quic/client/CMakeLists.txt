@@ -119,7 +119,7 @@ mvfst_add_library(mvfst_client_client_async_transport
     QuicClientAsyncTransport.cpp
   DEPS
     mvfst_common_mvfst_logging
-    Folly::folly_experimental_symbolizer_symbolizer
+    Folly::folly_debugging_symbolizer_symbolizer
   EXPORTED_DEPS
     mvfst_api_stream_async_transport
     mvfst_client_client
