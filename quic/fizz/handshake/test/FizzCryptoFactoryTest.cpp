@@ -22,8 +22,12 @@ class QuicFizzTestFactory : public QuicFizzFactory {
  public:
   ~QuicFizzTestFactory() override = default;
 
-  std::unique_ptr<fizz::Aead> makeAead(fizz::CipherSuite) const override {
-    return std::move(aead_);
+  fizz::Status makeAead(
+      std::unique_ptr<fizz::Aead>& ret,
+      fizz::Error& /* err */,
+      fizz::CipherSuite) const override {
+    ret = std::move(aead_);
+    return fizz::Status::Success;
   }
 
   void setMockAead(std::unique_ptr<fizz::Aead> aead) {

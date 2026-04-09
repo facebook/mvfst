@@ -47,7 +47,13 @@ FizzCryptoFactory::makeInitialAead(
 
   auto deriver =
       fizzFactory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto aead = fizzFactory_->makeAead(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+
+  std::unique_ptr<fizz::Aead> aead;
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(
+      fizzFactory_->makeAead(
+          aead, err, fizz::CipherSuite::TLS_AES_128_GCM_SHA256),
+      err);
   auto key = deriver->expandLabel(
       trafficSecret->coalesce(),
       kQuicKeyLabel,
