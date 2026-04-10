@@ -235,7 +235,7 @@ mvfst_cpp_library(
         # ARVR Android uses full stats callback
         "ovr_config//os/constraints:android": select({
             "DEFAULT": {"QuicTransportStatsCallback.h": "facebook/QuicTransportStatsCallbackMobile.h"},
-            "ovr_config//build_mode/constraints:arvr_mode_enabled": {"QuicTransportStatsCallback.h": "QuicTransportStatsCallback.h"},
+            "ovr_config//build_mode:arvr_mode[enabled]": {"QuicTransportStatsCallback.h": "QuicTransportStatsCallback.h"},
         }),
         "ovr_config//os/constraints:iphoneos": {"QuicTransportStatsCallback.h": "facebook/QuicTransportStatsCallbackMobile.h"},
     }),
@@ -252,7 +252,7 @@ mvfst_cpp_library(
                 "//quic:exception",
                 "//quic/common:optional",
             ],
-            "ovr_config//build_mode/constraints:arvr_mode_enabled": [
+            "ovr_config//build_mode:arvr_mode[enabled]": [
                 "//folly/functional:invoke",
                 "//quic:constants",
                 "//quic:exception",

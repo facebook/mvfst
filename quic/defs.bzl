@@ -121,7 +121,7 @@ def mvfst_cxx_library(
             "DEFAULT": force_static,
             "ovr_config//runtime:fbcode": False,
         }),
-        "ovr_config//build_mode:arvr_mode": force_static,
+        "ovr_config//build_mode:arvr_mode[enabled]": force_static,
     })
 
     fb_xplat_cxx_library(
@@ -302,7 +302,7 @@ def mu_cxx_library(
             "DEFAULT": force_static,
             "ovr_config//runtime:fbcode": False,
         }),
-        "ovr_config//build_mode:arvr_mode": force_static,
+        "ovr_config//build_mode:arvr_mode[enabled]": force_static,
     })
 
     fb_xplat_cxx_library(

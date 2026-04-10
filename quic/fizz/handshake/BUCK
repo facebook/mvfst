@@ -67,7 +67,7 @@ mvfst_cpp_library(
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": [],  # @fb-only
             "fbcode//quic:use_alt_crypto-enabled": ["fbcode//quic/facebook/handshake:xsec_crypto_bridge"],  # @fb-only
-            "ovr_config//build_mode:arvr_mode": [],  # @fb-only
+            "ovr_config//build_mode:arvr_mode[enabled]": [],  # @fb-only
             "ovr_config//runtime/constraints:android-host-test": [],  # @fb-only
         }),  # @fb-only
     }),

@@ -26,7 +26,7 @@ mvfst_cpp_library(
             "DEFAULT": {
                 "QuicEnum.h": "facebook/QuicEnumMobile.h",
             },
-            "ovr_config//build_mode/constraints:arvr_mode_enabled": {
+            "ovr_config//build_mode:arvr_mode[enabled]": {
                 "QuicEnum.h": "QuicEnum.h",
             },
         }),
@@ -41,7 +41,7 @@ mvfst_cpp_library(
         ],
         "ovr_config//os/constraints:android": select({
             "DEFAULT": [],
-            "ovr_config//build_mode/constraints:arvr_mode_enabled": [
+            "ovr_config//build_mode:arvr_mode[enabled]": [
                 "//folly/lang:assume",
                 "//quic/common/third-party:better_enums",
             ],
@@ -63,7 +63,7 @@ mvfst_cpp_library(
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": {"mvfst-config.h": "facebook/mvfst-config-fbcode.h"},  # @fb-only
             "fbcode//quic:use_alt_crypto-enabled": {"mvfst-config.h": "facebook/mvfst-config-alt-crypto.h"},  # @fb-only
-            "ovr_config//build_mode:arvr_mode": select({
+            "ovr_config//build_mode:arvr_mode[enabled]": select({
                 "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
                 "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
                 "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
@@ -154,7 +154,7 @@ mvfst_cpp_library(
         "DEFAULT": ["QuicTLSExceptionFizz.cpp"],
         "ovr_config//os/constraints:android": select({
             "DEFAULT": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
-            "ovr_config//build_mode/constraints:arvr_mode_enabled": ["QuicTLSExceptionFizz.cpp"],
+            "ovr_config//build_mode:arvr_mode[enabled]": ["QuicTLSExceptionFizz.cpp"],
         }),
         "ovr_config//os/constraints:iphoneos": ["facebook/mbed/QuicTLSExceptionMbed.cpp"],  # @fb-only
     }),
@@ -169,7 +169,7 @@ mvfst_cpp_library(
             "DEFAULT": [
                 "fbsource//xplat/mobilenetwork:tls_common",  # @manual
             ],
-            "ovr_config//build_mode/constraints:arvr_mode_enabled": [
+            "ovr_config//build_mode:arvr_mode[enabled]": [
                 "//fizz/record:record",
             ],
         }),
