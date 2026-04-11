@@ -194,7 +194,9 @@ class QuicClientTransportLite
 
   // Migrate to the path with the given id. The previous path is kept until a
   // packet is received on the new path, then cleaned up.
-  quic::Expected<void, QuicError> migrateConnection(PathIdType pathId);
+  quic::Expected<void, QuicError> migrateConnection(
+      PathIdType pathId,
+      bool resetCongestionControllerAndRtt = true);
 
   quic::Expected<void, QuicError> removePath(PathIdType pathId);
 

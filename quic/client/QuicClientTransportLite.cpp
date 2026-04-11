@@ -2076,12 +2076,36 @@ quic::Expected<void, QuicError> QuicClientTransportLite::removePath(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
-    PathIdType pathId) {
+    PathIdType pathId,
+    bool resetCongestionControllerAndRtt) {
   auto oldPathId = conn_->currentPathId;
+
+  auto prevPathCCType = conn_->congestionController
+      ? conn_->congestionController->type()
+      : CongestionControlType::None;
 
   auto switchPathResult = conn_->pathManager->switchCurrentPath(pathId);
   if (switchPathResult.hasError()) {
     return quic::make_unexpected(switchPathResult.error());
+  }
+
+  if (resetCongestionControllerAndRtt) {
+    // Create a fresh congestion controller for the new path.
+    if (conn_->congestionControllerFactory) {
+      conn_->congestionController =
+          conn_->congestionControllerFactory->makeCongestionController(
+              *conn_, prevPathCCType);
+    }
+    // Reset RTT state. Use the probe's RTT sample if available,
+    // otherwise leave RTT as-is so PTO timeouts remain functional.
+    auto* pathInfo = conn_->pathManager->getPath(pathId);
+    if (pathInfo && pathInfo->rttSample) {
+      auto rttSample = pathInfo->rttSample.value();
+      conn_->lossState.srtt = rttSample;
+      conn_->lossState.lrtt = rttSample;
+      conn_->lossState.rttvar = 0us;
+      conn_->lossState.mrtt = rttSample;
+    }
   }
 
   auto newSocket = std::move(switchPathResult.value());
