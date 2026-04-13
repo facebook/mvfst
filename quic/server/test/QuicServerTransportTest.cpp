@@ -3918,18 +3918,48 @@ TEST_F(
 TEST_F(QuicServerTransportTest, TestCCAlgorithmKnobNoneThenCubicCrash) {
   auto ccKnobId =
       static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
-  auto noneVal = static_cast<uint64_t>(CongestionControlType::None);
-  auto cubicVal = static_cast<uint64_t>(CongestionControlType::Cubic);
 
   // Setting CC to None via knob is valid and nulls out the controller
   EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
-  server->handleKnobParams({{.id = ccKnobId, .val = noneVal}});
+  server->handleKnobParams({{.id = ccKnobId, .val = std::string("none")}});
   EXPECT_EQ(server->getConn().congestionController.get(), nullptr);
 
   // A subsequent CC knob should not crash even with null controller
   EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
-  server->handleKnobParams({{.id = ccKnobId, .val = cubicVal}});
+  server->handleKnobParams({{.id = ccKnobId, .val = std::string("cubic")}});
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
+}
+
+TEST_F(QuicServerTransportTest, TestCCAlgorithmKnobString) {
+  auto ccKnobId =
+      static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
+
+  // parseTransportKnobs stores CC_ALGORITHM_KNOB as std::string.
+  // Verify the handler accepts string values (the real code path).
+  // Use NewReno to ensure it actually changes from the default (Cubic).
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
+  server->handleKnobParams({{.id = ccKnobId, .val = std::string("newreno")}});
+  EXPECT_NE(server->getConn().congestionController.get(), nullptr);
+  EXPECT_EQ(
+      server->getConn().congestionController->type(),
+      CongestionControlType::NewReno);
+
+  // Change back to Cubic via string
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
+  server->handleKnobParams({{.id = ccKnobId, .val = std::string("cubic")}});
+  EXPECT_EQ(
+      server->getConn().congestionController->type(),
+      CongestionControlType::Cubic);
+}
+
+TEST_F(QuicServerTransportTest, TestCCAlgorithmKnobInvalidString) {
+  auto ccKnobId =
+      static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
+
+  // Invalid CC algorithm string should be rejected gracefully
+  EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(ccKnobId))).Times(1);
+  server->handleKnobParams(
+      {{.id = ccKnobId, .val = std::string("not_a_real_cc")}});
 }
 
 TEST_F(QuicServerTransportTest, TestSkipKnobsWhenNotAdvertisingSupport) {

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/QuicConstants.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
@@ -852,8 +853,20 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
         auto server_conn = serverTransport.serverConn_;
-        auto cctype =
-            static_cast<CongestionControlType>(std::get<uint64_t>(val));
+        auto* strVal = std::get_if<std::string>(&val);
+        if (!strVal) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              "CC_ALGORITHM_KNOB: expected string value"));
+        }
+        auto maybeCctype = congestionControlStrToType(*strVal);
+        if (!maybeCctype) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              fmt::format(
+                  "Unknown congestion control algorithm: {}", *strVal)));
+        }
+        auto cctype = *maybeCctype;
         MVVLOG(3) << "Knob param received, set congestion control type to "
                   << congestionControlTypeToString(cctype);
         if (server_conn->congestionController &&
