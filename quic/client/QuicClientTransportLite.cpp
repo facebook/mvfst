@@ -1689,7 +1689,7 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
       return recvResult;
     }
 
-    if (!socket_) {
+    if (!socket_ || closeState_ == CloseState::CLOSED) {
       // Socket has been closed.
       return {};
     }
@@ -1709,7 +1709,7 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
       return processResult;
     }
 
-    if (!socket_) {
+    if (!socket_ || closeState_ == CloseState::CLOSED) {
       // Socket has been closed.
       return {};
     }

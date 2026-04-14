@@ -515,4 +515,119 @@ TEST_F(
       << "Error message should mention connection IDs or availability";
 }
 
+// Transport mock that triggers closeImpl with drain on the first processPackets
+// call, simulating an error that closes the connection while the read loop is
+// iterating on a probe socket.
+class QuicClientTransportLiteMockWithClose
+    : public QuicClientTransportLiteMock {
+ public:
+  QuicClientTransportLiteMockWithClose(
+      std::shared_ptr<quic::FollyQuicEventBase> evb,
+      std::unique_ptr<QuicAsyncUDPSocketMock> socket,
+      std::shared_ptr<MockClientHandshakeFactory> handshakeFactory)
+      : QuicTransportBaseLite(evb, std::move(socket)),
+        QuicClientTransportLiteMock(evb, nullptr, handshakeFactory) {}
+
+  quic::Expected<void, QuicError> processPackets(
+      const Optional<folly::SocketAddress>&,
+      NetworkData&&,
+      const Optional<folly::SocketAddress>&) override {
+    ++processPacketsCount;
+    if (processPacketsCount == 1) {
+      conn_->transportSettings.shouldDrain = true;
+      closeImpl(QuicError(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          "simulated error"));
+    }
+    return {};
+  }
+
+  using QuicClientTransportLite::readWithRecvmsgSinglePacketLoop;
+
+  int processPacketsCount{0};
+};
+
+// Verify readWithRecvmsgSinglePacketLoop exits when closeImpl with drain is
+// called during processPackets. dropAllSockets() destroys probe sockets in the
+// path manager but socket_ stays non-null in drain mode, so the loop must also
+// check closeState_.
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    ReadLoopExitsAfterCloseImplWithDrain) {
+  // Recreate the transport with the close-triggering mock.
+  auto socket = std::make_unique<QuicAsyncUDPSocketMock>();
+  sockPtr_ = socket.get();
+  ON_CALL(*socket, setAdditionalCmsgsFunc(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, close())
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, bind(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, connect(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, setReuseAddr(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, setReusePort(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, setRecvTos(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, getRecvTos()).WillByDefault(Return(false));
+  ON_CALL(*socket, getGSO()).WillByDefault(Return(0));
+  ON_CALL(*socket, setCmsgs(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, appendCmsgs(_))
+      .WillByDefault(Return(quic::Expected<void, QuicError>{}));
+  ON_CALL(*socket, address())
+      .WillByDefault(
+          Return(quic::Expected<folly::SocketAddress, QuicError>{localAddr_}));
+  auto mockFactory = std::make_shared<MockClientHandshakeFactory>();
+  EXPECT_CALL(*mockFactory, makeClientHandshakeImpl(_))
+      .WillRepeatedly(Invoke(
+          [&](QuicClientConnectionState* conn)
+              -> std::unique_ptr<quic::ClientHandshake> {
+            return std::make_unique<MockClientHandshake>(conn);
+          }));
+  auto client = std::make_shared<QuicClientTransportLiteMockWithClose>(
+      qEvb_, std::move(socket), mockFactory);
+  client->getConn()->oneRttWriteCipher = test::createNoOpAead();
+  client->getConn()->oneRttWriteHeaderCipher =
+      test::createNoOpHeaderCipher().value();
+
+  // Create a probe socket in the path manager.
+  folly::SocketAddress probeAddr("::", 12345);
+  auto probeSock = createProbeSocketMock(probeAddr);
+  auto* probeSockPtr = probeSock.get();
+  ON_CALL(*probeSockPtr, getGRO()).WillByDefault(Return(0));
+  ON_CALL(*probeSockPtr, getTimestamping()).WillByDefault(Return(0));
+  ON_CALL(*probeSockPtr, getRecvTos()).WillByDefault(Return(false));
+
+  auto res = client->startPathProbe(std::move(probeSock), nullptr);
+  ASSERT_TRUE(res.has_value()) << res.error();
+
+  // recvmsg returns data so recvMsg produces a packet for processPackets.
+  ON_CALL(*probeSockPtr, recvmsg(_, _))
+      .WillByDefault(Invoke([](struct msghdr* msg, int) -> ssize_t {
+        if (msg->msg_name) {
+          sockaddr_in6 addr{};
+          addr.sin6_family = AF_INET6;
+          addr.sin6_port = htons(4433);
+          memcpy(msg->msg_name, &addr, sizeof(addr));
+          msg->msg_namelen = sizeof(addr);
+        }
+        return 10;
+      }));
+
+  // Without the fix, the loop continues after closeImpl (socket_ is non-null
+  // in drain mode) and calls recvMsg on the destroyed probe socket (ASAN
+  // heap-use-after-free). With the fix, the loop exits after processPackets
+  // because closeState_ == CLOSED.
+  auto result = client->readWithRecvmsgSinglePacketLoop(*probeSockPtr, 1024);
+  EXPECT_FALSE(result.hasError());
+  EXPECT_EQ(client->processPacketsCount, 1);
+
+  // closeImpl already ran; prevent TearDown from calling closeNow on the
+  // fixture's quicClient_ with a stale socket.
+  quicClient_ = client;
+}
+
 } // namespace quic::test
