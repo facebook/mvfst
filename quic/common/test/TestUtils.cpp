@@ -888,8 +888,12 @@ std::unique_ptr<folly::IOBuf> getProtectionKey() {
       factory.makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   CHECK(!pnCipherResult.hasError()) << "Failed to make packet number cipher";
   auto& pnCipher = pnCipherResult.value();
-  auto deriver = factory.getFizzFactory()->makeKeyDeriver(
-      fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  std::unique_ptr<fizz::KeyDerivation> deriver;
+  fizz::Error fizzErr;
+  FIZZ_THROW_ON_ERROR(
+      factory.getFizzFactory()->makeKeyDeriver(
+          deriver, fizzErr, fizz::CipherSuite::TLS_AES_128_GCM_SHA256),
+      fizzErr);
   auto pnKey = deriver->expandLabel(
       quic::ByteRange(secret.data(), secret.size()),
       kQuicPNLabel,

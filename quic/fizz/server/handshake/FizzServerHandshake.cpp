@@ -127,8 +127,12 @@ FizzServerHandshake::buildHeaderCipher(ByteRange secret) {
 }
 
 BufPtr FizzServerHandshake::getNextTrafficSecret(ByteRange secret) const {
-  auto deriver =
-      state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
+  std::unique_ptr<fizz::KeyDerivation> deriver;
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(
+      state_.context()->getFactory()->makeKeyDeriver(
+          deriver, err, *state_.cipher()),
+      err);
   auto nextSecret = deriver->expandLabel(
       secret, kQuicKULabel, BufHelpers::create(0), secret.size());
   return nextSecret;

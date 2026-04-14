@@ -232,9 +232,14 @@ quic::Expected<std::unique_ptr<Aead>, QuicError> FizzClientHandshake::buildAead(
     bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
     fizz::CipherSuite cipher =
         isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
-    std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr = isEarlyTraffic
-        ? state_.context()->getFactory()->makeKeyScheduler(cipher)
-        : nullptr;
+    std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr;
+    if (isEarlyTraffic) {
+      fizz::Error fizzErr;
+      FIZZ_THROW_ON_ERROR(
+          state_.context()->getFactory()->makeKeyScheduler(
+              keySchedulerPtr, fizzErr, cipher),
+          fizzErr);
+    }
     fizz::KeyScheduler& keyScheduler =
         isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
 
@@ -268,8 +273,12 @@ FizzClientHandshake::buildHeaderCipher(ByteRange secret) {
 quic::Expected<BufPtr, QuicError> FizzClientHandshake::getNextTrafficSecret(
     ByteRange secret) const {
   try {
-    auto deriver =
-        state_.context()->getFactory()->makeKeyDeriver(*state_.cipher());
+    std::unique_ptr<fizz::KeyDerivation> deriver;
+    fizz::Error fizzErr;
+    FIZZ_THROW_ON_ERROR(
+        state_.context()->getFactory()->makeKeyDeriver(
+            deriver, fizzErr, *state_.cipher()),
+        fizzErr);
     auto nextSecret = deriver->expandLabel(
         secret, kQuicKULabel, BufHelpers::create(0), secret.size());
     return nextSecret;
