@@ -637,7 +637,7 @@ iobufChainBasedBuildScheduleEncrypt(
 
   // Append SCONE flow indicator as the last 2 bytes of the datagram
   if (flowIndSize > 0) {
-    auto indicator = folly::IOBuf::create(kSconeFlowIndicatorSize);
+    auto indicator = BufHelpers::create(kSconeFlowIndicatorSize);
     indicator->writableData()[0] = kSconeFlowIndicatorByte1;
     indicator->writableData()[1] = kSconeFlowIndicatorByte2;
     indicator->append(kSconeFlowIndicatorSize);

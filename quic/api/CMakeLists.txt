@@ -128,6 +128,7 @@ mvfst_add_library(mvfst_api_transport_helpers
   DEPS
     mvfst_common_buf_accessor
     mvfst_common_mvfst_logging
+    mvfst_common_quic_buffer
     mvfst_common_socket_util
     mvfst_common_string_utils
     mvfst_happyeyeballs
