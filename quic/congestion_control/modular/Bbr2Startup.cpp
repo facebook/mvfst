@@ -278,7 +278,6 @@ void Bbr2Startup::checkStartupHighLoss() {
   before a full RTT.
   */
   if (fullBwReached_ || !shared_->roundStart_ ||
-      shared_->lastAckedPacketAppLimited_ ||
       !conn_.transportSettings.ccaConfig.exitStartupOnLoss) {
     return; /* no need to check for a the loss exit condition now */
   }
