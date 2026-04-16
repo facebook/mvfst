@@ -117,7 +117,10 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
           ConnectionId::createZeroLength()),
       0);
   ext.getClientHelloExtensions();
-  ext.onEncryptedExtensions(getEncryptedExtensions().extensions);
+  fizz::Error err;
+  EXPECT_EQ(
+      ext.onEncryptedExtensions(err, getEncryptedExtensions().extensions),
+      fizz::Status::Success);
 }
 
 TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
@@ -142,14 +145,18 @@ TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
   ServerTransportParameters serverParams;
   ee.extensions.push_back(encodeExtension(serverParams, QuicVersion::MVFST));
 
-  EXPECT_THROW(ext.onEncryptedExtensions(ee.extensions), FizzException);
+  fizz::Error err;
+  EXPECT_THROW(
+      FIZZ_THROW_ON_ERROR(ext.onEncryptedExtensions(err, ee.extensions), err),
+      FizzException);
 
   auto validEE = TestMessages::encryptedExt();
   ServerTransportParameters validServerParams;
   validEE.extensions.push_back(
       encodeExtension(validServerParams, QuicVersion::QUIC_V1));
 
-  EXPECT_NO_THROW(ext.onEncryptedExtensions(validEE.extensions));
+  EXPECT_NO_THROW(FIZZ_THROW_ON_ERROR(
+      ext.onEncryptedExtensions(err, validEE.extensions), err));
 }
 
 TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
@@ -169,8 +176,12 @@ TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
           ConnectionId::createZeroLength()),
       0);
   ext.getClientHelloExtensions();
+  fizz::Error err;
   EXPECT_THROW(
-      ext.onEncryptedExtensions(TestMessages::encryptedExt().extensions),
+      FIZZ_THROW_ON_ERROR(
+          ext.onEncryptedExtensions(
+              err, TestMessages::encryptedExt().extensions),
+          err),
       FizzException);
 }
 
