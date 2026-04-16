@@ -58,7 +58,6 @@ mvfst_cpp_library(
             "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
             "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
             "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-            "ovr_config//os/constraints:macos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
         }),
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": {"mvfst-config.h": "facebook/mvfst-config-fbcode.h"},  # @fb-only
@@ -67,7 +66,6 @@ mvfst_cpp_library(
                 "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
                 "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
                 "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-                "ovr_config//os/constraints:macos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
             }),  # @fb-only
             "ovr_config//runtime/constraints:android-host-test": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
         }),  # @fb-only
@@ -81,7 +79,6 @@ mvfst_cpp_library(
         ],
         "ovr_config//os/constraints:android": [],  # @manual
         "ovr_config//os/constraints:iphoneos": [],  # @manual
-        "ovr_config//os/constraints:macos": [],  # @manual
     }),
 )
 
@@ -91,7 +88,6 @@ mvfst_cpp_library(
         "DEFAULT": ["QuicConstants.cpp"],
         "ovr_config//os/constraints:android": ["facebook/QuicConstantsMobile.cpp"],
         "ovr_config//os/constraints:iphoneos": ["facebook/QuicConstantsMobile.cpp"],
-        "ovr_config//os/constraints:macos": ["facebook/QuicConstantsMobile.cpp"],
     }),
     headers = select({
         "DEFAULT": {
@@ -127,7 +123,6 @@ mvfst_cpp_library(
         "DEFAULT": ["QuicException.cpp"],
         "ovr_config//os/constraints:android": ["facebook/QuicExceptionMobile.cpp"],
         "ovr_config//os/constraints:iphoneos": ["facebook/QuicExceptionMobile.cpp"],
-        "ovr_config//os/constraints:macos": ["facebook/QuicExceptionMobile.cpp"],
     }),
     headers = [
         "QuicException.h",
@@ -136,7 +131,6 @@ mvfst_cpp_library(
         "DEFAULT": ["//quic/common:mvfst_logging"],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
-        "ovr_config//os/constraints:macos": [],
     }) + [],
     exported_deps = [
         ":constants",
