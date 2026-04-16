@@ -4839,6 +4839,33 @@ TEST_F(QuicServerTransportTest, SconeKnobEnablesSconeAndSetsRateSignal) {
   ASSERT_TRUE(conn.scone.has_value());
   EXPECT_TRUE(conn.scone->negotiated);
   EXPECT_EQ(conn.scone->configuredRateSignal, 20);
+  // Timer should be reset so a SCONE packet is sent with the next outgoing
+  // packet.
+  EXPECT_FALSE(conn.scone->lastSconeSentTime.has_value());
+}
+
+TEST_F(QuicServerTransportTest, SconeKnobResetsTimerForImmediateSend) {
+  auto& conn = server->getNonConstConn();
+
+  // Set up SCONE state as if a SCONE packet was already sent
+  conn.scone.emplace();
+  conn.scone->negotiated = true;
+  conn.scone->configuredRateSignal = 10;
+  conn.scone->lastSconeSentTime = Clock::now();
+  ASSERT_TRUE(conn.scone->lastSconeSentTime.has_value());
+
+  // Receiving a new SCONE_KNOB should reset the timer
+  TransportKnobParams params;
+  params.push_back(
+      {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
+       uint64_t{10000000}}); // 10 Mbps -> signal 40
+  server->handleKnobParams(params);
+
+  ASSERT_TRUE(conn.scone.has_value());
+  EXPECT_TRUE(conn.scone->negotiated);
+  EXPECT_EQ(conn.scone->configuredRateSignal, 40);
+  // Timer must be reset so a SCONE packet goes out with the next packet
+  EXPECT_FALSE(conn.scone->lastSconeSentTime.has_value());
 }
 
 TEST_F(QuicServerTransportTest, SconeKnobRateConversion) {

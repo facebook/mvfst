@@ -1401,6 +1401,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         }
         conn.scone->negotiated = true;
         conn.scone->configuredRateSignal = rateSignal;
+        // Reset the send timer so a SCONE packet is sent with the very next
+        // outgoing packet, reflecting the new rate signal immediately.
+        conn.scone->lastSconeSentTime.reset();
         VLOG(3) << "SCONE_KNOB: Enabled SCONE with rate signal "
                 << static_cast<int>(rateSignal) << " from " << bps << " bps";
         return {};
