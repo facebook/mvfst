@@ -772,6 +772,16 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     bool negotiated{false};
     Optional<TimePoint> lastSconeSentTime;
     uint8_t configuredRateSignal{kSconeNoAdvice};
+
+    // Edge-triggered received signal. Set when a SCONE rate signal is received
+    // from the peer, cleared when consumed via consumePendingSconeRate().
+    struct PendingReceivedSignal {
+      uint8_t rate;
+      QuicVersion version;
+      uint64_t receivedTimeEpochSec;
+    };
+
+    Optional<PendingReceivedSignal> pendingReceivedSignal;
   };
 
   Optional<SconeState> scone;

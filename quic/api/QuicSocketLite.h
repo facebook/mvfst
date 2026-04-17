@@ -792,6 +792,26 @@ class QuicSocketLite {
    */
   [[nodiscard]] virtual QuicConnectionStats getConnectionsStats() const = 0;
 
+  /**
+   * Information about a received SCONE rate signal.
+   */
+  struct SconeRateInfo {
+    // SCONE rate converted to bits per second.
+    uint64_t bps;
+    // Wall-clock time when the signal was received, seconds since Unix epoch.
+    uint64_t receivedTimeEpochSec;
+  };
+
+  /**
+   * Returns and clears the pending SCONE rate signal received from the peer.
+   * The rate is converted from the SCONE logarithmic encoding to bps.
+   * Edge-triggered: subsequent calls return nullopt until a new signal arrives.
+   * Must be called from the event base thread.
+   */
+  [[nodiscard]] virtual Optional<SconeRateInfo> consumePendingSconeRate() {
+    return std::nullopt;
+  }
+
   virtual ~QuicSocketLite() = default;
 
  protected:

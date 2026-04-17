@@ -20,6 +20,7 @@
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <cmath>
 
 #include <folly/ScopeGuard.h>
 
@@ -2718,6 +2719,20 @@ QuicConnectionStats QuicTransportBaseLite::getConnectionsStats() const {
   return connStats;
 }
 
+Optional<QuicSocketLite::SconeRateInfo>
+QuicTransportBaseLite::consumePendingSconeRate() {
+  if (!conn_->scone || !conn_->scone->pendingReceivedSignal) {
+    return std::nullopt;
+  }
+  auto signal = conn_->scone->pendingReceivedSignal.value();
+  conn_->scone->pendingReceivedSignal.reset();
+  // Convert SCONE logarithmic rate (0-127) to bps: 100_000 * 10^(rate/20)
+  auto bps = static_cast<uint64_t>(
+      100000.0 * std::pow(10.0, static_cast<double>(signal.rate) / 20.0));
+  return SconeRateInfo{
+      .bps = bps, .receivedTimeEpochSec = signal.receivedTimeEpochSec};
+}
+
 const TransportSettings& QuicTransportBaseLite::getTransportSettings() const {
   return conn_->transportSettings;
 }
@@ -2783,7 +2798,7 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
     }
   }
 
-  if (self->conn_->scone && self->connCallback_) {
+  if (self->conn_->scone) {
     while (!self->conn_->scone->pendingRateSignals.empty()) {
       auto rateSignal = self->conn_->scone->pendingRateSignals.front();
       self->conn_->scone->pendingRateSignals.pop_front();
@@ -2795,8 +2810,20 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
             fmt::format("scone_rate_signal:{}", rateSignal.rate));
       }
 
-      self->connCallback_->onSconeRateSignal(
-          rateSignal.rate, rateSignal.version);
+      // Store as edge-triggered pending signal for consumePendingSconeRate().
+      // If multiple signals arrive in one loop, the latest one wins.
+      self->conn_->scone->pendingReceivedSignal = {
+          .rate = rateSignal.rate,
+          .version = rateSignal.version,
+          .receivedTimeEpochSec = static_cast<uint64_t>(
+              std::chrono::duration_cast<std::chrono::seconds>(
+                  std::chrono::system_clock::now().time_since_epoch())
+                  .count())};
+
+      if (self->connCallback_) {
+        self->connCallback_->onSconeRateSignal(
+            rateSignal.rate, rateSignal.version);
+      }
     }
   }
 

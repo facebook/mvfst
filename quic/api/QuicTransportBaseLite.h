@@ -602,6 +602,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   [[nodiscard]] QuicConnectionStats getConnectionsStats() const override;
 
+  Optional<SconeRateInfo> consumePendingSconeRate() override;
+
   /**
    * Returns a shared_ptr which can be used as a guard to keep this
    * object alive.

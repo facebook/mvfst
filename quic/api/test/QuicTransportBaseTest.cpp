@@ -4783,6 +4783,56 @@ TEST_F(QuicTransportImplTest, SconeRateSignalCallbackProcessingSync) {
   transport->setConnectionCallback(nullptr);
 }
 
+TEST_F(QuicTransportImplTest, ConsumePendingSconeRateEdgeTriggered) {
+  transport->transportConn->transportSettings.enableScone = true;
+  transport->transportConn->scone.emplace();
+  transport->transportConn->scone->negotiated = true;
+
+  // Before any signal, consume returns nullopt.
+  EXPECT_FALSE(transport->consumePendingSconeRate().has_value());
+
+  // Queue two signals and deliver them. Expected bps values are pre-computed
+  // from the SCONE formula 100_000 * 10^(rate/20) and used as literals to
+  // independently verify the conversion logic.
+  uint8_t rateA = 0x1B; // 27 -> 2238721 bps
+  uint8_t rateB = 0x2C; // 44 -> 15848931 bps
+  uint64_t expectedBpsA = 2238721;
+  uint64_t expectedBpsB = 15848931;
+  QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
+  transport->transportConn->scone->pendingRateSignals.push_back(
+      {.rate = rateA, .version = testVersion});
+  transport->transportConn->scone->pendingRateSignals.push_back(
+      {.rate = rateB, .version = testVersion});
+
+  MockConnectionCallback cb;
+  transport->setConnectionCallback(&cb);
+  EXPECT_CALL(cb, onSconeRateSignal(testing::_, testing::_))
+      .Times(testing::AnyNumber());
+  transport->invokeReadDataAndCallbacks();
+
+  // First consume should return the latest signal (rateB, last one delivered).
+  auto info = transport->consumePendingSconeRate();
+  ASSERT_TRUE(info.has_value());
+  EXPECT_EQ(info->bps, expectedBpsB);
+  EXPECT_GT(info->receivedTimeEpochSec, 0);
+
+  // Second consume should return nullopt (already consumed).
+  EXPECT_FALSE(transport->consumePendingSconeRate().has_value());
+
+  // A new signal should make it available again.
+  transport->transportConn->scone->pendingRateSignals.push_back(
+      {.rate = rateA, .version = testVersion});
+  transport->invokeReadDataAndCallbacks();
+  info = transport->consumePendingSconeRate();
+  ASSERT_TRUE(info.has_value());
+  EXPECT_EQ(info->bps, expectedBpsA);
+
+  // Consumed again.
+  EXPECT_FALSE(transport->consumePendingSconeRate().has_value());
+
+  transport->setConnectionCallback(nullptr);
+}
+
 // Test that we can call APIs on implicitly opened streams that don't have
 // materialized state yet. This is a regression test for a bug where
 // getStreamIfExists() was incorrectly using findStream() instead of the
