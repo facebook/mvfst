@@ -603,6 +603,28 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksOverflow) {
           .hasError());
 }
 
+TEST_F(DecodeTest, AckFrameBlockCountExceedsRemainingBytes) {
+  // Attacker-controlled additional-block count is the max QUIC varint but the
+  // wire only carries firstAckBlockLength and no block bytes. The decoder must
+  // reject the count up front ("Bad ack block count") rather than entering the
+  // unbounded ackBlocks growth loop and only failing later ("Bad gap").
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(kEightByteLimit);
+  QuicInteger firstAckBlockLength(10);
+
+  auto result = createAckFrame(
+      largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
+  ContiguousReadCursor cursor(result->data(), result->length());
+  auto res = decodeAckFrame(
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+  EXPECT_EQ(res.error().message, "Bad ack block count");
+}
+
 TEST_F(DecodeTest, AckFrameMissingFields) {
   QuicInteger largestAcked(1000);
   QuicInteger ackDelay(100);

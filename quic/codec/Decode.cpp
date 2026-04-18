@@ -197,7 +197,11 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack delay"));
   }
   auto additionalAckBlocks = quic::decodeQuicInteger(cursor);
-  if (!additionalAckBlocks) {
+  // Each additional block requires >=2 encoded bytes (gap + len varints).
+  // Bound the declared count by physically available bytes to reject
+  // maliciously large counts before unbounded ackBlocks growth (T259150635).
+  if (!additionalAckBlocks ||
+      additionalAckBlocks->first > cursor.remaining() / 2) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad ack block count"));
   }
