@@ -18,13 +18,11 @@ mvfst_cpp_library(
 mvfst_cpp_library(
     name = "glog_oops_logger",
     headers = ["GlogOopsLogger.h"],
+    deps = ["fbsource//third-party/glog:glog"],
     exported_deps = [
         "fbsource//third-party/fmt:fmt",
         ":oops_logger",
         "//folly/experimental/symbolizer:symbolizer",
         "//quic/common:mvfst_logging",
-    ],
-    external_deps = [
-        "glog",
     ],
 )
