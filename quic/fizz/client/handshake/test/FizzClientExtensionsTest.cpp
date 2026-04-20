@@ -42,7 +42,9 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsMvfst) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       0);
-  auto extensions = ext.getClientHelloExtensions();
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto clientParams = getClientExtension(extensions, QuicVersion::MVFST);
@@ -67,7 +69,9 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       0);
-  auto extensions = ext.getClientHelloExtensions();
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto clientParams = getClientExtension(extensions, QuicVersion::QUIC_V1);
@@ -91,7 +95,9 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       0);
-  auto extensions = ext.getClientHelloExtensions();
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto clientParams =
@@ -116,11 +122,12 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       0);
-  ext.getClientHelloExtensions();
-  fizz::Error err;
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
   EXPECT_EQ(
       ext.onEncryptedExtensions(err, getEncryptedExtensions().extensions),
-      fizz::Status::Success);
+      Status::Success);
 }
 
 TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
@@ -139,13 +146,14 @@ TEST(FizzClientHandshakeTest, TestV1RejectExtensionNumberMismatch) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       0);
-  ext.getClientHelloExtensions();
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
 
   auto ee = TestMessages::encryptedExt();
   ServerTransportParameters serverParams;
   ee.extensions.push_back(encodeExtension(serverParams, QuicVersion::MVFST));
 
-  fizz::Error err;
   EXPECT_THROW(
       FIZZ_THROW_ON_ERROR(ext.onEncryptedExtensions(err, ee.extensions), err),
       FizzException);
@@ -175,8 +183,9 @@ TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       0);
-  ext.getClientHelloExtensions();
-  fizz::Error err;
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
   EXPECT_THROW(
       FIZZ_THROW_ON_ERROR(
           ext.onEncryptedExtensions(
@@ -211,7 +220,9 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
           ConnectionId::createZeroLength(),
           customTransportParameters),
       0);
-  auto extensions = ext.getClientHelloExtensions();
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getClientExtension(extensions, QuicVersion::QUIC_V1);
@@ -250,7 +261,9 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsChloPadding) {
           kDefaultActiveConnectionIdLimit,
           ConnectionId::createZeroLength()),
       chloPaddingBytes);
-  auto extensions = ext.getClientHelloExtensions();
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(ext.getClientHelloExtensions(extensions, err), Status::Success);
 
   EXPECT_EQ(extensions.size(), 2);
   auto clientParams = getClientExtension(extensions, QuicVersion::MVFST);

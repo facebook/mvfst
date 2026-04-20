@@ -24,7 +24,9 @@ class FizzClientExtensions : public fizz::ClientExtensions {
 
   ~FizzClientExtensions() override = default;
 
-  std::vector<fizz::Extension> getClientHelloExtensions() const override {
+  fizz::Status getClientHelloExtensions(
+      std::vector<fizz::Extension>& ret,
+      fizz::Error& err) const override {
     std::vector<fizz::Extension> exts;
 
     ClientTransportParameters params;
@@ -42,12 +44,12 @@ class FizzClientExtensions : public fizz::ClientExtensions {
 
     if (chloPaddingBytes_ > 0) {
       fizz::extensions::Padding padding{chloPaddingBytes_};
-      fizz::Error err;
       fizz::Extension ext;
-      FIZZ_THROW_ON_ERROR(fizz::encodeExtension(ext, err, padding), err);
+      FIZZ_RETURN_ON_ERROR(fizz::encodeExtension(ext, err, padding));
       exts.push_back(std::move(ext));
     }
-    return exts;
+    ret = std::move(exts);
+    return fizz::Status::Success;
   }
 
   fizz::Status onEncryptedExtensions(

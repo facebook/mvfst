@@ -57,7 +57,11 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId::createZeroLength(),
       conn);
-  auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(
+      ext.getExtensions(extensions, err, getClientHello(QuicVersion::MVFST)),
+      Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getServerExtension(extensions, QuicVersion::MVFST);
@@ -85,7 +89,12 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId::createZeroLength(),
       conn);
-  EXPECT_THROW(ext.getExtensions(TestMessages::clientHello()), FizzException);
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_THROW(
+      FIZZ_THROW_ON_ERROR(
+          ext.getExtensions(extensions, err, TestMessages::clientHello()), err),
+      FizzException);
 }
 
 TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
@@ -109,9 +118,17 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDraftExtensionNumber) {
           std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
       ConnectionId::createZeroLength(),
       conn);
+  std::vector<Extension> extensions;
+  Error err;
   EXPECT_THROW(
-      ext.getExtensions(getClientHello(QuicVersion::MVFST)), FizzException);
-  EXPECT_NO_THROW(ext.getExtensions(getClientHello(QuicVersion::QUIC_V1)));
+      FIZZ_THROW_ON_ERROR(
+          ext.getExtensions(
+              extensions, err, getClientHello(QuicVersion::MVFST)),
+          err),
+      FizzException);
+  EXPECT_NO_THROW(FIZZ_THROW_ON_ERROR(
+      ext.getExtensions(extensions, err, getClientHello(QuicVersion::QUIC_V1)),
+      err));
 }
 
 TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
@@ -146,7 +163,11 @@ TEST(ServerTransportParametersTest, TestQuicV1RejectDuplicateExtensions) {
   chlo.extensions.push_back(
       encodeExtension(duplicateClientParams, QuicVersion::QUIC_V1));
 
-  EXPECT_THROW(ext.getExtensions(chlo), FizzException);
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_THROW(
+      FIZZ_THROW_ON_ERROR(ext.getExtensions(extensions, err, chlo), err),
+      FizzException);
 }
 
 TEST(ServerTransportParametersTest, TestQuicV1Fields) {
@@ -171,7 +192,11 @@ TEST(ServerTransportParametersTest, TestQuicV1Fields) {
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}),
       conn);
-  auto extensions = ext.getExtensions(getClientHello(QuicVersion::QUIC_V1));
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(
+      ext.getExtensions(extensions, err, getClientHello(QuicVersion::QUIC_V1)),
+      Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getServerExtension(extensions, QuicVersion::QUIC_V1);
@@ -217,7 +242,11 @@ TEST(ServerTransportParametersTest, TestMvfstFields) {
       ConnectionId::createAndMaybeCrash(
           std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}),
       conn);
-  auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
+  std::vector<Extension> extensions;
+  Error err;
+  EXPECT_EQ(
+      ext.getExtensions(extensions, err, getClientHello(QuicVersion::MVFST)),
+      Status::Success);
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getServerExtension(extensions, QuicVersion::MVFST);

@@ -93,7 +93,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
 
   ~ServerTransportParametersExtension() override = default;
 
-  std::vector<fizz::Extension> getExtensions(
+  fizz::Status getExtensions(
+      std::vector<fizz::Extension>& ret,
+      fizz::Error& /*err*/,
       const fizz::ClientHello& chlo) override {
     fizz::validateTransportExtensions(chlo.extensions, encodingVersion_);
     auto clientParams =
@@ -260,7 +262,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     }
 
     exts.push_back(encodeExtension(params, encodingVersion_));
-    return exts;
+    ret = std::move(exts);
+    return fizz::Status::Success;
   }
 
   const Optional<ClientTransportParameters>& getClientTransportParams() {
