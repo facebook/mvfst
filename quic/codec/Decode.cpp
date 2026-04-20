@@ -361,12 +361,11 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
     ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
-  ReadAckFrame frame;
   auto res = decodeAckFrame(cursor, header, params, FrameType::ACK_EXTENDED);
   if (res.hasError()) {
     return quic::make_unexpected(res.error());
   }
-  frame = *res;
+  ReadAckFrame frame = std::move(*res);
   auto extendedAckFeatures = quic::decodeQuicInteger(cursor);
   if (!extendedAckFeatures) {
     return quic::make_unexpected(QuicError(
@@ -404,13 +403,11 @@ quic::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
     const PacketHeader& header,
     const CodecParameters& params,
     FrameType frameType) {
-  ReadAckFrame frame;
-
   auto ack = decodeAckFrame(cursor, header, params, frameType);
   if (ack.hasError()) {
     return quic::make_unexpected(ack.error());
   }
-  frame = *ack;
+  ReadAckFrame frame = std::move(*ack);
   frame.frameType = frameType;
 
   auto ts = decodeReceiveTimestampsInAck(frame, cursor, params);
@@ -425,13 +422,11 @@ quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
     ContiguousReadCursor& cursor,
     const PacketHeader& header,
     const CodecParameters& params) {
-  ReadAckFrame readAckFrame;
-
   auto ack = decodeAckFrame(cursor, header, params);
   if (ack.hasError()) {
     return quic::make_unexpected(ack.error());
   }
-  readAckFrame = *ack;
+  ReadAckFrame readAckFrame = std::move(*ack);
   readAckFrame.frameType = FrameType::ACK_ECN;
 
   auto ecn = decodeEcnCountsInAck(readAckFrame, cursor);
