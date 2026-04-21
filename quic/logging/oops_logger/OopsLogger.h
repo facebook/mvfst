@@ -43,3 +43,16 @@ class OopsLogger {
       (loggerPtr)->log((component), (msg));       \
     }                                             \
   } while (0)
+
+// Convenience macro for conditional OOPS logging with null-safety.
+// Logs only when both `cond` is true and `loggerPtr` is non-null.
+// `component` is a string naming the subsystem emitting the oops.
+// It is written to Scribe metadata as metadata["component"].
+// `msg` is the human-readable error text for the oops event.
+// It’s written to Scribe metadata as metadata["error_message"]
+#define PROTO_OOPS_LOG_IF(cond, loggerPtr, component, msg) \
+  do {                                                     \
+    if ((cond) && (loggerPtr)) {                           \
+      (loggerPtr)->log((component), (msg));                \
+    }                                                      \
+  } while (0)
