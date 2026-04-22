@@ -798,8 +798,8 @@ class QuicSocketLite {
   struct SconeRateInfo {
     // SCONE rate converted to bits per second.
     uint64_t bps;
-    // Wall-clock time when the signal was received, seconds since Unix epoch.
-    uint64_t receivedTimeEpochSec;
+    // steady_clock time when the signal was received.
+    TimePoint receivedTime;
   };
 
   /**

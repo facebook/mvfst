@@ -2729,8 +2729,7 @@ QuicTransportBaseLite::consumePendingSconeRate() {
   // Convert SCONE logarithmic rate (0-127) to bps: 100_000 * 10^(rate/20)
   auto bps = static_cast<uint64_t>(
       100000.0 * std::pow(10.0, static_cast<double>(signal.rate) / 20.0));
-  return SconeRateInfo{
-      .bps = bps, .receivedTimeEpochSec = signal.receivedTimeEpochSec};
+  return SconeRateInfo{.bps = bps, .receivedTime = signal.receivedTime};
 }
 
 const TransportSettings& QuicTransportBaseLite::getTransportSettings() const {
@@ -2815,10 +2814,7 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
       self->conn_->scone->pendingReceivedSignal = {
           .rate = rateSignal.rate,
           .version = rateSignal.version,
-          .receivedTimeEpochSec = static_cast<uint64_t>(
-              std::chrono::duration_cast<std::chrono::seconds>(
-                  std::chrono::system_clock::now().time_since_epoch())
-                  .count())};
+          .receivedTime = Clock::now()};
 
       if (self->connCallback_) {
         self->connCallback_->onSconeRateSignal(

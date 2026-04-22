@@ -778,7 +778,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     struct PendingReceivedSignal {
       uint8_t rate;
       QuicVersion version;
-      uint64_t receivedTimeEpochSec;
+      TimePoint receivedTime;
     };
 
     Optional<PendingReceivedSignal> pendingReceivedSignal;

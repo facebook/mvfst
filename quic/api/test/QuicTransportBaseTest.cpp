@@ -4808,13 +4808,15 @@ TEST_F(QuicTransportImplTest, ConsumePendingSconeRateEdgeTriggered) {
   transport->setConnectionCallback(&cb);
   EXPECT_CALL(cb, onSconeRateSignal(testing::_, testing::_))
       .Times(testing::AnyNumber());
+  TimePoint beforeDelivery = Clock::now();
   transport->invokeReadDataAndCallbacks();
 
   // First consume should return the latest signal (rateB, last one delivered).
   auto info = transport->consumePendingSconeRate();
   ASSERT_TRUE(info.has_value());
   EXPECT_EQ(info->bps, expectedBpsB);
-  EXPECT_GT(info->receivedTimeEpochSec, 0);
+  EXPECT_GE(info->receivedTime, beforeDelivery);
+  EXPECT_LE(info->receivedTime, Clock::now());
 
   // Second consume should return nullopt (already consumed).
   EXPECT_FALSE(transport->consumePendingSconeRate().has_value());
