@@ -217,7 +217,6 @@ mvfst_cpp_library(
         "TransportKnobs.h",
     ],
     deps = [
-        "fbsource//third-party/glog:glog",
         ":mvfst_logging",
         "//folly:dynamic",
         "//quic:constants",

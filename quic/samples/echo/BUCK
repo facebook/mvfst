@@ -42,7 +42,6 @@ mvfst_cpp_binary(
         "main.cpp",
     ],
     deps = [
-        "fbsource//third-party/glog:glog",
         ":echo_handler",
         "//fizz/crypto:utils",
         "//folly/init:init",
