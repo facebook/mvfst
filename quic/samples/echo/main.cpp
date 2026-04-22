@@ -49,7 +49,8 @@ int main(int argc, char* argv[]) {
 #endif
   gflags::ParseCommandLineFlags(&argc, &argv, false);
   folly::Init init(&argc, &argv);
-  fizz::CryptoUtils::init();
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(fizz::CryptoUtils::init(err), err);
 
   std::vector<std::string> alpns;
   folly::split(',', FLAGS_alpns, alpns);

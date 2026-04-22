@@ -523,7 +523,8 @@ TPerfServer::TPerfServer(
       numServerWorkers_(numServerWorkers),
       burstDeadlineMs_(burstDeadlineMs),
       maxPacingRate_(maxPacingRate) {
-  fizz::CryptoUtils::init();
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(fizz::CryptoUtils::init(err), err);
   eventBase_.setName("tperf_server");
   quic::TransportSettings settings;
   if (useInplaceWrite && gso) {

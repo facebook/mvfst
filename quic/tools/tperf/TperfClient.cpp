@@ -51,7 +51,8 @@ TPerfClient::TPerfClient(
       useL4sEcn_(useL4sEcn),
       readEcn_(readEcn),
       dscp_(dscp) {
-  fizz::CryptoUtils::init();
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(fizz::CryptoUtils::init(err), err);
   fEvb_.setName("tperf_client");
 }
 
