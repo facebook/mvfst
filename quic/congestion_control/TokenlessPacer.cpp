@@ -44,8 +44,7 @@ void TokenlessPacer::refreshPacingRate(
     writeInterval_ = pacingRate.interval;
     batchSize_ = pacingRate.burstSize;
   }
-  maybeNotifyObservers(conn_, batchSize_, writeInterval_);
-  QLOG(conn_, addPacingMetricUpdate, batchSize_, writeInterval_);
+  maybeNotifyObservers();
 }
 
 // rate_bps is *bytes* per second
@@ -66,9 +65,7 @@ void TokenlessPacer::setPacingRate(uint64_t rateBps) {
         conn_.transportSettings.pacingTickInterval);
   }
 
-  maybeNotifyObservers(conn_, batchSize_, writeInterval_);
-
-  QLOG(conn_, addPacingMetricUpdate, batchSize_, writeInterval_);
+  maybeNotifyObservers();
 }
 
 void TokenlessPacer::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
@@ -195,22 +192,27 @@ void TokenlessPacer::setPacingRateCalculator(
   pacingRateCalculator_ = std::move(pacingRateCalculator);
 }
 
-// Static
-void TokenlessPacer::maybeNotifyObservers(
-    const QuicConnectionStateBase& conn,
-    uint64_t batchSize,
-    std::chrono::microseconds writeInterval) {
+void TokenlessPacer::maybeNotifyObservers() {
+  if (lastNotifiedBatchSize_ == batchSize_ &&
+      lastNotifiedWriteInterval_ == writeInterval_) {
+    return;
+  }
+  lastNotifiedBatchSize_ = batchSize_;
+  lastNotifiedWriteInterval_ = writeInterval_;
+
   // Inform observers
-  auto observerContainer = conn.getSocketObserverContainer();
+  auto observerContainer = conn_.getSocketObserverContainer();
   SOCKET_OBSERVER_IF(
       observerContainer,
       SocketObserverInterface::Events::pacingRateUpdatedEvents) {
     observerContainer->invokeInterfaceMethod<
         SocketObserverInterface::Events::pacingRateUpdatedEvents>(
         [event = quic::SocketObserverInterface::PacingRateUpdateEvent(
-             batchSize, writeInterval)](auto observer, auto observed) {
+             batchSize_, writeInterval_)](auto observer, auto observed) {
           observer->pacingRateUpdated(observed, event);
         });
   }
+
+  QLOG(conn_, addPacingMetricUpdate, batchSize_, writeInterval_);
 }
 } // namespace quic

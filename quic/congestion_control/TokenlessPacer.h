@@ -47,16 +47,17 @@ class TokenlessPacer : public Pacer {
   void onPacketsLoss() override;
 
  private:
-  static void maybeNotifyObservers(
-      const QuicConnectionStateBase& conn,
-      uint64_t batchSize,
-      std::chrono::microseconds writeInterval);
+  void maybeNotifyObservers();
 
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
   uint64_t batchSize_;
   uint64_t maxPacingRateBytesPerSec_{std::numeric_limits<uint64_t>::max()};
   std::chrono::microseconds writeInterval_{0};
+  // Track previously notified pacing rate to avoid redundant observer
+  // notifications and qlog entries when the rate hasn't changed.
+  Optional<uint64_t> lastNotifiedBatchSize_;
+  Optional<std::chrono::microseconds> lastNotifiedWriteInterval_;
   PacingRateCalculator pacingRateCalculator_;
   Optional<TimePoint> lastWriteTime_;
   uint8_t rttFactorNumerator_{1};

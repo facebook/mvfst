@@ -9,6 +9,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/congestion_control/TokenlessPacer.h>
+#include <quic/logging/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
@@ -420,6 +421,94 @@ TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsDefault) {
   // Interval should not change.
   pacer.refreshPacingRate(100, kDefaultMinRtt);
   EXPECT_EQ(tick, pacer.getTimeUntilNextWrite(timestamp));
+}
+
+TEST_F(TokenlessPacerTest, QlogNotifiedOnFirstPacingRateSet) {
+  auto qlogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+  conn.qLogger = qlogger;
+
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(_, _)).Times(1);
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+  pacer.refreshPacingRate(200000, 200us);
+}
+
+TEST_F(TokenlessPacerTest, QlogNotNotifiedWhenPacingRateUnchanged) {
+  auto qlogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+  conn.qLogger = qlogger;
+
+  // First call should notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(10, 1000us)).Times(1);
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+  pacer.refreshPacingRate(200000, 200us);
+  Mock::VerifyAndClearExpectations(qlogger.get());
+
+  // Second call with same rate should NOT notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(_, _)).Times(0);
+  pacer.refreshPacingRate(200000, 200us);
+}
+
+TEST_F(TokenlessPacerTest, QlogNotifiedWhenPacingRateChanges) {
+  auto qlogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+  conn.qLogger = qlogger;
+
+  // First call should notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(10, 1000us)).Times(1);
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+  pacer.refreshPacingRate(200000, 200us);
+  Mock::VerifyAndClearExpectations(qlogger.get());
+
+  // Second call with different rate should notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(20, 2000us)).Times(1);
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(2000us).setBurstSize(20).build();
+  });
+  pacer.refreshPacingRate(200000, 200us);
+}
+
+TEST_F(TokenlessPacerTest, SetPacingRateQlogNotNotifiedWhenUnchanged) {
+  auto qlogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+  conn.qLogger = qlogger;
+
+  // First call should notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(_, _)).Times(1);
+  pacer.setPacingRate(5000000); // 5 MBps
+  Mock::VerifyAndClearExpectations(qlogger.get());
+
+  // Second call with same rate should NOT notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(_, _)).Times(0);
+  pacer.setPacingRate(5000000);
+}
+
+TEST_F(TokenlessPacerTest, SetPacingRateQlogNotifiedWhenChanged) {
+  auto qlogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+  conn.qLogger = qlogger;
+
+  // First call should notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(_, _)).Times(1);
+  pacer.setPacingRate(5000000);
+  Mock::VerifyAndClearExpectations(qlogger.get());
+
+  // Second call with different rate should notify
+  EXPECT_CALL(*qlogger, addPacingMetricUpdate(_, _)).Times(1);
+  pacer.setPacingRate(10000000);
 }
 
 } // namespace quic::test

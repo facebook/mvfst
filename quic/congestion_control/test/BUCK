@@ -174,6 +174,7 @@ mvfst_cpp_test(
     deps = [
         "//folly/portability:gtest",
         "//quic/congestion_control:pacer",
+        "//quic/logging/test:mocks",
         "//quic/state/test:mocks",
     ],
 )
