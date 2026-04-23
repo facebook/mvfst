@@ -99,8 +99,6 @@ PacketNum rstStreamAndSendPacket(
     }
   }
   CHECK(false) << "no packet with reset stream";
-  // some compilers are weird.
-  return 0;
 }
 
 void writeStreamFrameData(
