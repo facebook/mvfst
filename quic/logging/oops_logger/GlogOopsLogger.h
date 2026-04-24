@@ -10,7 +10,7 @@
 #include <quic/logging/oops_logger/OopsLogger.h>
 
 #include <fmt/core.h>
-#include <folly/experimental/symbolizer/Symbolizer.h>
+#include <folly/debugging/symbolizer/Symbolizer.h>
 #include <quic/common/MvfstLogging.h>
 
 namespace proto_oops {
