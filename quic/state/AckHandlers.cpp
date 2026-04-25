@@ -34,6 +34,14 @@ struct OutstandingPacketWithHandlerContext {
   bool processAllFrames{false};
 };
 
+struct AckFrameProcessingStats {
+  uint64_t ackedPackets{0};
+  uint64_t spuriousLossPackets{0};
+  uint64_t processedFrames{0};
+  uint64_t processedWriteStreamFrames{0};
+  uint64_t contiguousWriteStreamFrames{0};
+};
+
 Optional<uint64_t> getAckIntervalSetVersion(
     QuicConnectionStateBase& conn,
     const QuicWriteFrame& ackedFrame) {
@@ -172,9 +180,11 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       quic,
       process_ack_frame_num_outstanding,
       conn.outstandings.numOutstanding());
+  FOLLY_SDT(quic, process_ack_frame_num_ack_blocks, frame.ackBlocks.size());
 
   // temporary storage to enable packets to be processed in sent order
   SmallVec<OutstandingPacketWithHandlerContext, 50> packetsWithHandlerContext;
+  AckFrameProcessingStats processingStats;
 
   // Store first outstanding packet number to ignore old receive timestamps.
   const auto& firstOutstandingPacket =
@@ -207,6 +217,7 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
 
   AckedPacketIterator ackedPacketIterator(frame.ackBlocks, conn, pnSpace);
   while (ackedPacketIterator.valid()) {
+    ++processingStats.ackedPackets;
     auto currentPacketNum =
         ackedPacketIterator->packet.header.getPacketSequenceNum();
     auto currentPacketNumberSpace =
@@ -218,6 +229,7 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
     // If we hit a packet which has been declared lost we need to count the
     // spurious loss and ignore all other processing.
     if (ackedPacketIterator->declaredLost) {
+      ++processingStats.spuriousLossPackets;
       auto modifyResult =
           modifyStateForSpuriousLoss(conn, *ackedPacketIterator);
       if (!modifyResult.has_value()) {
@@ -316,6 +328,9 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   // ClonedPacketIdentifier; or the ClonedPacketIdentifier is in
   // conn.outstandings.clonedPacketIdentifiers
   ack.ackedPackets.reserve(packetsWithHandlerContext.size());
+  Optional<StreamId> previousWriteStreamId;
+  Optional<uint64_t> previousWriteStreamNextOffset;
+  bool previousWriteStreamFin{false};
   for (auto packetWithHandlerContextItr = packetsWithHandlerContext.rbegin();
        packetWithHandlerContextItr != packetsWithHandlerContext.rend();
        packetWithHandlerContextItr++) {
@@ -337,6 +352,7 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
           packetFrame.type() != QuicWriteFrame::Type::WriteAckFrame) {
         continue; // skip processing this frame
       }
+      ++processingStats.processedFrames;
 
       // We do a few things here for ACKs of WriteStreamFrames:
       //  1. To understand whether the ACK of this frame changes the
@@ -357,6 +373,24 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       // Part 1: Record delivery offset prior to running ackVisitor.
       Optional<uint64_t> maybePreAckIntervalSetVersion =
           getAckIntervalSetVersion(conn, packetFrame);
+      auto ackedWriteFrame = packetFrame.asWriteStreamFrame();
+      if (ackedWriteFrame) {
+        ++processingStats.processedWriteStreamFrames;
+        if (previousWriteStreamId && previousWriteStreamNextOffset &&
+            *previousWriteStreamId == ackedWriteFrame->streamId &&
+            !previousWriteStreamFin &&
+            *previousWriteStreamNextOffset == ackedWriteFrame->offset) {
+          ++processingStats.contiguousWriteStreamFrames;
+        }
+        previousWriteStreamId = ackedWriteFrame->streamId;
+        previousWriteStreamNextOffset =
+            ackedWriteFrame->offset + ackedWriteFrame->len;
+        previousWriteStreamFin = ackedWriteFrame->fin;
+      } else {
+        previousWriteStreamId = std::nullopt;
+        previousWriteStreamNextOffset = std::nullopt;
+        previousWriteStreamFin = false;
+      }
 
       // run the ACKed frame visitor
       auto result = ackedFrameVisitor(*outstandingPacket, packetFrame);
@@ -365,7 +399,6 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       }
 
       if (maybePreAckIntervalSetVersion.has_value()) {
-        auto ackedWriteFrame = packetFrame.asWriteStreamFrame();
         Optional<uint64_t> maybePostAckIntervalSetVersion =
             getAckIntervalSetVersion(conn, packetFrame);
         MVCHECK(
@@ -401,6 +434,24 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
                 : std::nullopt)
         .buildInto(ack.ackedPackets);
   }
+  FOLLY_SDT(
+      quic, process_ack_frame_num_acked_packets, processingStats.ackedPackets);
+  FOLLY_SDT(
+      quic,
+      process_ack_frame_num_spurious_loss_packets,
+      processingStats.spuriousLossPackets);
+  FOLLY_SDT(
+      quic,
+      process_ack_frame_num_frames_processed,
+      processingStats.processedFrames);
+  FOLLY_SDT(
+      quic,
+      process_ack_frame_num_write_stream_frames_processed,
+      processingStats.processedWriteStreamFrames);
+  FOLLY_SDT(
+      quic,
+      process_ack_frame_num_contiguous_write_stream_frames,
+      processingStats.contiguousWriteStreamFrames);
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
