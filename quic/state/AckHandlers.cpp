@@ -9,12 +9,10 @@
 #include <folly/tracing/StaticTracepoint.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
-#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/AckedPacketIterator.h>
-#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <iterator>
@@ -567,14 +565,8 @@ void parseAckReceiveTimestamps(
     return;
   }
   MVDCHECK(frame.maybeLatestRecvdPacketNum.has_value());
+  // TODO(Sandarsh) add protocol oops
   if (!frame.maybeLatestRecvdPacketNum.has_value()) {
-    PROTO_OOPS_LOG_BUILDER_IF(
-        conn.nodeType == QuicNodeType::Server,
-        conn.oopsLogger,
-        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
-        "quic_ack_handlers",
-        "invariant_violation: ACK receive timestamps missing latest received "
-        "packet number");
     return;
   }
 
