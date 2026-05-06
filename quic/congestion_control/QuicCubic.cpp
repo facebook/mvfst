@@ -12,6 +12,8 @@
 #include <quic/congestion_control/EcnL4sTracker.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 
 #include <folly/Chrono.h>
@@ -131,7 +133,13 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
       loss.largestLostSentTime.has_value());
   if (!loss.largestLostPacketNum.has_value() ||
       !loss.largestLostSentTime.has_value()) {
-    // TODO(Sandarsh) add protocol oops handling
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server,
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+        "quic_congestion_control",
+        "invariant_violation: Cubic loss event missing largest lost packet "
+        "metadata");
     return;
   }
   onRemoveBytesFromInflight(loss.lostBytes);
@@ -854,7 +862,13 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
     MVDCHECK(steadyState_.lastReductionTime.has_value());
     if (!steadyState_.lastMaxCwndBytes.has_value() ||
         !steadyState_.lastReductionTime.has_value()) {
-      // TODO(Sandarsh) add protocol oops handling
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server,
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+          "quic_congestion_control",
+          "invariant_violation: Cubic recovery missing steady-state "
+          "reduction metadata");
       return;
     }
     updateTimeToOrigin();
