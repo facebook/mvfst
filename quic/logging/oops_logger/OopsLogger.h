@@ -56,31 +56,3 @@ class OopsLogger {
       (loggerPtr)->log((component), (msg));                \
     }                                                      \
   } while (0)
-
-// Convenience macro for OOPS logging when the caller already has an
-// OopsFieldsBuilder with additional context populated.
-// `builderExpr` should evaluate to an OopsFieldsBuilder; this macro adds the
-// common component and error message fields before building and logging.
-#define PROTO_OOPS_LOG_BUILDER(loggerPtr, builderExpr, component, msg) \
-  do {                                                                 \
-    if (loggerPtr) {                                                   \
-      (loggerPtr)->log((builderExpr)                                   \
-                           .setComponent((component))                  \
-                           .setErrorMessage((msg))                     \
-                           .build());                                  \
-    }                                                                  \
-  } while (0)
-
-// Convenience macro for conditional OOPS logging with a pre-populated
-// OopsFieldsBuilder.
-// Logs only when both `cond` is true and `loggerPtr` is non-null.
-#define PROTO_OOPS_LOG_BUILDER_IF(                    \
-    cond, loggerPtr, builderExpr, component, msg)     \
-  do {                                                \
-    if ((cond) && (loggerPtr)) {                      \
-      (loggerPtr)->log((builderExpr)                  \
-                           .setComponent((component)) \
-                           .setErrorMessage((msg))    \
-                           .build());                 \
-    }                                                 \
-  } while (0)

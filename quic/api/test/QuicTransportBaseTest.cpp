@@ -18,7 +18,6 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/QLoggerConstants.h>
-#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/DatagramHandlers.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -197,17 +196,6 @@ class TestByteEventCallback : public ByteEventCallback {
       /* bucket count */ 4,
       hash,
       comparator};
-};
-
-class CapturingOopsLogger : public proto_oops::OopsLogger {
- public:
-  void log(proto_oops::OopsFields fields) override {
-    lastFields = std::move(fields);
-    ++numLogs;
-  }
-
-  std::optional<proto_oops::OopsFields> lastFields;
-  size_t numLogs{0};
 };
 
 static auto
@@ -609,13 +597,6 @@ class TestQuicTransport
         std::move(error), drainConnection, sendCloseImmediately);
   }
 
-  LocalErrorCode invokeHandleExceptionAndClose(
-      const std::exception& ex,
-      folly::StringPiece contextMsg,
-      Optional<StreamId> streamId = std::nullopt) {
-    return handleExceptionAndClose(ex, contextMsg, std::move(streamId));
-  }
-
   void onSocketWritable() noexcept override {
     QuicTransportBase::onSocketWritable();
   }
@@ -718,34 +699,6 @@ class QuicTransportImplTestBase : public QuicTransportImplTest {};
 TEST_F(QuicTransportImplTestBase, AckTimeoutExpiredWillResetTimeoutFlag) {
   transport->invokeAckTimeout();
   EXPECT_FALSE(transport->transportConn->pendingEvents.scheduleAckTimeout);
-}
-
-TEST_F(QuicTransportImplTestBase, HandleExceptionAndClosePopulatesOopsFields) {
-  auto logger = std::make_shared<CapturingOopsLogger>();
-  transport->setOopsLogger(logger);
-  transport->setServerConnectionId();
-
-  QuicInternalException ex("boom", LocalErrorCode::INVALID_OPERATION);
-  auto result = transport->invokeHandleExceptionAndClose(
-      ex, "writeChain() error", StreamId(7));
-
-  EXPECT_EQ(result, LocalErrorCode::INVALID_OPERATION);
-  ASSERT_EQ(logger->numLogs, 1);
-  ASSERT_TRUE(logger->lastFields.has_value());
-  EXPECT_EQ(logger->lastFields->component, "mvfst_transport");
-  EXPECT_EQ(logger->lastFields->errorMessage, "writeChain() error: boom");
-  EXPECT_EQ(
-      logger->lastFields->exceptionType.value_or(""),
-      typeid(QuicInternalException).name());
-  EXPECT_EQ(logger->lastFields->streamId, StreamId(7));
-  EXPECT_EQ(
-      logger->lastFields->errorCode,
-      static_cast<uint64_t>(LocalErrorCode::INVALID_OPERATION));
-  EXPECT_EQ(
-      logger->lastFields->version, static_cast<uint32_t>(QuicVersion::MVFST));
-  EXPECT_EQ(
-      logger->lastFields->connectionId,
-      transport->transportConn->serverConnectionId->hex());
 }
 
 TEST_F(QuicTransportImplTestBase, IdleTimeoutExpiredDestroysTransport) {

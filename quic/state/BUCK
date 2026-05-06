@@ -150,17 +150,6 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
-    name = "connection_oops_fields",
-    headers = [
-        "ConnectionOopsFields.h",
-    ],
-    exported_deps = [
-        ":quic_state_machine",
-        "//quic/logging/oops_logger:oops_fields",
-    ],
-)
-
-mvfst_cpp_library(
     name = "ack_handler",
     srcs = [
         "AckHandlers.cpp",

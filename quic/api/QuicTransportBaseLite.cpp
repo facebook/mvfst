@@ -14,9 +14,9 @@
 #include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsFields.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
-#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
@@ -1798,44 +1798,33 @@ LocalErrorCode QuicTransportBaseLite::handleExceptionAndClose(
     MVVLOG(4) << contextMsg << " " << ex.what() << " " << *this;
   }
 
-  const auto* transportEx = dynamic_cast<const QuicTransportException*>(&ex);
-  const auto* internalEx = dynamic_cast<const QuicInternalException*>(&ex);
-  const auto* appEx = dynamic_cast<const QuicApplicationException*>(&ex);
-  exceptionCloseWhat_ = ex.what();
-
   // Log to Protocol OOPS if configured
   if (conn_->oopsLogger) {
-    auto builder = proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_)
-                       .setExceptionType(typeid(ex).name());
+    auto builder =
+        proto_oops::OopsFieldsBuilder()
+            .setComponent("quic")
+            .setErrorMessage(std::string(contextMsg) + ": " + ex.what())
+            .setExceptionType(typeid(ex).name());
     if (streamId.has_value()) {
       builder.setStreamId(*streamId);
     }
-    if (transportEx) {
-      builder.setErrorCode(static_cast<uint64_t>(transportEx->errorCode()));
-    } else if (internalEx) {
-      builder.setErrorCode(static_cast<uint64_t>(internalEx->errorCode()));
-    } else if (appEx) {
-      builder.setErrorCode(static_cast<uint64_t>(appEx->errorCode()));
-    }
-    PROTO_OOPS_LOG_BUILDER(
-        conn_->oopsLogger,
-        std::move(builder),
-        "mvfst_transport",
-        std::string(contextMsg) + ": " + exceptionCloseWhat_.value_or(""));
+    conn_->oopsLogger->log(builder.build());
   }
 
+  exceptionCloseWhat_ = ex.what();
+
   // Determine error code and return value based on exception type
-  if (transportEx) {
+  if (auto* transportEx = dynamic_cast<const QuicTransportException*>(&ex)) {
     closeImpl(QuicError(
         QuicErrorCode(transportEx->errorCode()), std::string(contextMsg)));
     return LocalErrorCode::TRANSPORT_ERROR;
   }
-  if (internalEx) {
+  if (auto* internalEx = dynamic_cast<const QuicInternalException*>(&ex)) {
     closeImpl(QuicError(
         QuicErrorCode(internalEx->errorCode()), std::string(contextMsg)));
     return internalEx->errorCode();
   }
-  if (appEx) {
+  if (auto* appEx = dynamic_cast<const QuicApplicationException*>(&ex)) {
     closeImpl(
         QuicError(QuicErrorCode(appEx->errorCode()), std::string(contextMsg)));
     return LocalErrorCode::TRANSPORT_ERROR;
