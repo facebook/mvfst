@@ -126,6 +126,14 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     client->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
     client->setHostname(hostname);
+    switch (serverAddr.getFamily()) {
+      case AF_INET6:
+        client->setLocalAddress(folly::SocketAddress("::1", 0));
+        break;
+      case AF_INET:
+        client->setLocalAddress(folly::SocketAddress("127.0.0.1", 0));
+        break;
+    }
     client->addNewPeerAddress(serverAddr);
     auto transportSettings = client->getTransportSettings();
     transportSettings.attemptEarlyData = true;
@@ -458,7 +466,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   // Point the client to a bad server.
-  client->addNewPeerAddress(SocketAddress("127.0.0.1", 14114));
+  client->addNewPeerAddress(SocketAddress("::1", 1));
   auto tp = client->getTransportSettings();
   tp.maxNumPTOs = 4;
   client->setTransportSettings(tp);
