@@ -103,6 +103,12 @@ mvfst_add_library(mvfst_state_quic_state_machine
     Folly::folly_token_bucket
 )
 
+mvfst_add_library(mvfst_state_connection_oops_fields
+  EXPORTED_DEPS
+    mvfst_logging_oops_logger_oops_fields
+    mvfst_state_quic_state_machine
+)
+
 mvfst_add_library(mvfst_state_ack_handler
   SRCS
     AckHandlers.cpp
