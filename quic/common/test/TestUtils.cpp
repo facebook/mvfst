@@ -133,9 +133,15 @@ static std::shared_ptr<fizz::SelfCert> readCert() {
   auto privKey = fizz::test::getPrivateKey(fizz::test::kP256Key);
   std::vector<folly::ssl::X509UniquePtr> certs;
   certs.emplace_back(std::move(certificate));
-  return std::make_shared<
-      fizz::openssl::OpenSSLSelfCertImpl<fizz::openssl::KeyType::P256>>(
-      std::move(privKey), std::move(certs));
+  std::unique_ptr<
+      fizz::openssl::OpenSSLSelfCertImpl<fizz::openssl::KeyType::P256>>
+      cert;
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(
+      fizz::openssl::OpenSSLSelfCertImpl<fizz::openssl::KeyType::P256>::create(
+          cert, err, std::move(privKey), std::move(certs)),
+      err);
+  return cert;
 }
 
 std::shared_ptr<fizz::client::FizzClientContext> createClientCtx() {
