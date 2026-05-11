@@ -139,6 +139,8 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
         "//quic/state:state_functions",
     ],
     exported_deps = [
