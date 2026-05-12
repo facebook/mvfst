@@ -1274,6 +1274,60 @@ class MockAcceptObserver : public AcceptObserver {
   MOCK_METHOD(void, observerDetach, (QuicServerWorker*), (noexcept));
 };
 
+struct SelfOwningAcceptObserverState {
+  size_t acceptorDestroyCalls{0};
+  size_t observerDetachCalls{0};
+  size_t destructorCalls{0};
+};
+
+class ThreadCheckingAcceptObserver final : public AcceptObserver {
+ public:
+  explicit ThreadCheckingAcceptObserver(folly::EventBase* expectedEvb)
+      : expectedEvb_(expectedEvb) {}
+
+  void accept(QuicTransportBase* const) noexcept override {}
+
+  void acceptorDestroy(QuicServerWorker*) noexcept override {}
+
+  void observerAttach(QuicServerWorker*) noexcept override {
+    attachRanOnExpectedEvb = expectedEvb_->isInEventBaseThread();
+  }
+
+  void observerDetach(QuicServerWorker*) noexcept override {}
+
+  bool attachRanOnExpectedEvb{false};
+
+ private:
+  folly::EventBase* expectedEvb_;
+};
+
+class SelfOwningAcceptObserver final : public AcceptObserver {
+ public:
+  explicit SelfOwningAcceptObserver(SelfOwningAcceptObserverState& state)
+      : state_(state) {}
+
+  ~SelfOwningAcceptObserver() override {
+    ++state_.destructorCalls;
+  }
+
+  void accept(QuicTransportBase* const) noexcept override {}
+
+  void acceptorDestroy(QuicServerWorker*) noexcept override {
+    ++state_.acceptorDestroyCalls;
+    delete this;
+  }
+
+  void observerAttach(QuicServerWorker*) noexcept override {}
+
+  void observerDetach(QuicServerWorker*) noexcept override {
+    ++state_.observerDetachCalls;
+    delete this;
+  }
+
+ private:
+  SelfOwningAcceptObserverState& state_;
+};
+
 TEST_F(QuicServerWorkerTest, AcceptObserver) {
   auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
   EXPECT_CALL(*cb, observerAttach(worker_.get()));
@@ -1418,6 +1472,33 @@ TEST_F(QuicServerWorkerTest, AcceptObserverRemoveCallbackThenDestroyWorker) {
   Mock::VerifyAndClearExpectations(cb.get());
 
   worker_ = nullptr;
+}
+
+TEST_F(QuicServerWorkerTest, SelfOwningAcceptObserverRemoveThenDestroyWorker) {
+  SelfOwningAcceptObserverState state;
+  auto* cb = new SelfOwningAcceptObserver(state);
+  worker_->addAcceptObserver(cb);
+
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb));
+  EXPECT_EQ(state.observerDetachCalls, 1);
+  EXPECT_EQ(state.acceptorDestroyCalls, 0);
+  EXPECT_EQ(state.destructorCalls, 1);
+
+  worker_ = nullptr;
+  EXPECT_EQ(state.observerDetachCalls, 1);
+  EXPECT_EQ(state.acceptorDestroyCalls, 0);
+  EXPECT_EQ(state.destructorCalls, 1);
+}
+
+TEST_F(QuicServerWorkerTest, SelfOwningAcceptObserverDestroyWorker) {
+  SelfOwningAcceptObserverState state;
+  auto* cb = new SelfOwningAcceptObserver(state);
+  worker_->addAcceptObserver(cb);
+
+  worker_ = nullptr;
+  EXPECT_EQ(state.observerDetachCalls, 0);
+  EXPECT_EQ(state.acceptorDestroyCalls, 1);
+  EXPECT_EQ(state.destructorCalls, 1);
 }
 
 TEST_F(QuicServerWorkerTest, PacketWithZeroHostIdFromExistingConnection) {
@@ -2321,6 +2402,18 @@ TEST_F(QuicServerTest, OtherEvbs) {
   auto evb = evbThread.getEventBase();
   std::vector<folly::EventBase*> evbs{evb};
   runTest(evbs);
+}
+
+TEST_F(QuicServerTest, AddAcceptObserverAttachesOnWorkerEventBaseThread) {
+  folly::ScopedEventBaseThread evbThread;
+  auto* evb = evbThread.getEventBase();
+  initializeServer({evb});
+  ThreadCheckingAcceptObserver observer(evb);
+
+  EXPECT_TRUE(server_->addAcceptObserver(evb, &observer));
+  EXPECT_TRUE(observer.attachRanOnExpectedEvb);
+  EXPECT_TRUE(server_->removeAcceptObserver(evb, &observer));
+  server_->shutdown();
 }
 
 TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {

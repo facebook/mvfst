@@ -9,6 +9,7 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "oops_logger",
+    srcs = ["OopsLogger.cpp"],
     headers = ["OopsLogger.h"],
     exported_deps = [
         ":oops_fields",
@@ -18,7 +19,7 @@ mvfst_cpp_library(
 mvfst_cpp_library(
     name = "glog_oops_logger",
     headers = ["GlogOopsLogger.h"],
-    deps = ["fbsource//third-party/glog:glog"],
+    deps = [],
     exported_deps = [
         "fbsource//third-party/fmt:fmt",
         ":oops_logger",

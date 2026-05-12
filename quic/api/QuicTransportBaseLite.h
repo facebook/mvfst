@@ -216,8 +216,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   [[nodiscard]] const std::shared_ptr<QLogger> getQLogger() const;
 
-  virtual void setOopsLogger(
-      std::shared_ptr<proto_oops::OopsLogger> oopsLogger);
+  virtual void setOopsLogger(proto_oops::OopsLogger* oopsLogger);
 
   void setReceiveWindow(StreamId, size_t /*recvWindowSize*/) override {}
 

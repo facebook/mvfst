@@ -441,7 +441,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<FileQLogger> qlogger = nullptr;
       setPacingObserver(qlogger, transport.get(), pacingObserver_);
     }
-    transport->setOopsLogger(std::make_shared<proto_oops::GlogOopsLogger>());
+    transport->setOopsLogger(oopsLogger_.get());
 
     serverHandler->setQuicSocket(transport);
     handlers_.push_back(std::move(serverHandler));
@@ -466,6 +466,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     }
   }
 
+  std::unique_ptr<proto_oops::GlogOopsLogger> oopsLogger_{
+      std::make_unique<proto_oops::GlogOopsLogger>()};
   std::vector<std::unique_ptr<ServerStreamHandler>> handlers_;
   uint64_t blockSize_;
   uint32_t numStreams_;

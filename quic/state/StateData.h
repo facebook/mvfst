@@ -593,8 +593,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // QLogger for this connection
   std::shared_ptr<QLogger> qLogger;
 
-  // Protocol OOPS logger for this connection
-  std::shared_ptr<proto_oops::OopsLogger> oopsLogger;
+  // Non-owning protocol OOPS logger for this connection. The worker thread's
+  // thread-local storage owns the logger.
+  proto_oops::OopsLogger* oopsLogger{nullptr};
 
   // Track stats for various server events
   QuicTransportStatsCallback* statsCallback{nullptr};

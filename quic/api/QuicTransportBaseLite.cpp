@@ -941,9 +941,8 @@ void QuicTransportBaseLite::setQLogger(std::shared_ptr<QLogger> qLogger) {
   }
 }
 
-void QuicTransportBaseLite::setOopsLogger(
-    std::shared_ptr<proto_oops::OopsLogger> oopsLogger) {
-  conn_->oopsLogger = std::move(oopsLogger);
+void QuicTransportBaseLite::setOopsLogger(proto_oops::OopsLogger* oopsLogger) {
+  conn_->oopsLogger = oopsLogger;
 }
 
 const std::shared_ptr<QLogger> QuicTransportBaseLite::getQLogger() const {
@@ -2509,6 +2508,9 @@ void QuicTransportBaseLite::pathValidationTimeoutExpired() noexcept {
 }
 
 void QuicTransportBaseLite::drainTimeoutExpired() noexcept {
+  // Drop the non-owning logger pointer before the transport leaves the worker
+  // lifecycle. The worker thread-local storage owns the actual logger.
+  conn_->oopsLogger = nullptr;
   closeUdpSocket();
   unbindConnection();
 }

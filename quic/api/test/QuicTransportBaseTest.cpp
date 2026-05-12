@@ -721,8 +721,8 @@ TEST_F(QuicTransportImplTestBase, AckTimeoutExpiredWillResetTimeoutFlag) {
 }
 
 TEST_F(QuicTransportImplTestBase, HandleExceptionAndClosePopulatesOopsFields) {
-  auto logger = std::make_shared<CapturingOopsLogger>();
-  transport->setOopsLogger(logger);
+  CapturingOopsLogger logger;
+  transport->setOopsLogger(&logger);
   transport->setServerConnectionId();
 
   QuicInternalException ex("boom", LocalErrorCode::INVALID_OPERATION);
@@ -730,21 +730,21 @@ TEST_F(QuicTransportImplTestBase, HandleExceptionAndClosePopulatesOopsFields) {
       ex, "writeChain() error", StreamId(7));
 
   EXPECT_EQ(result, LocalErrorCode::INVALID_OPERATION);
-  ASSERT_EQ(logger->numLogs, 1);
-  ASSERT_TRUE(logger->lastFields.has_value());
-  EXPECT_EQ(logger->lastFields->component, "mvfst_transport");
-  EXPECT_EQ(logger->lastFields->errorMessage, "writeChain() error: boom");
+  ASSERT_EQ(logger.numLogs, 1);
+  ASSERT_TRUE(logger.lastFields.has_value());
+  EXPECT_EQ(logger.lastFields->component, "mvfst_transport");
+  EXPECT_EQ(logger.lastFields->errorMessage, "writeChain() error: boom");
   EXPECT_EQ(
-      logger->lastFields->exceptionType.value_or(""),
+      logger.lastFields->exceptionType.value_or(""),
       typeid(QuicInternalException).name());
-  EXPECT_EQ(logger->lastFields->streamId, StreamId(7));
+  EXPECT_EQ(logger.lastFields->streamId, StreamId(7));
   EXPECT_EQ(
-      logger->lastFields->errorCode,
+      logger.lastFields->errorCode,
       static_cast<uint64_t>(LocalErrorCode::INVALID_OPERATION));
   EXPECT_EQ(
-      logger->lastFields->version, static_cast<uint32_t>(QuicVersion::MVFST));
+      logger.lastFields->version, static_cast<uint32_t>(QuicVersion::MVFST));
   EXPECT_EQ(
-      logger->lastFields->connectionId,
+      logger.lastFields->connectionId,
       transport->transportConn->serverConnectionId->hex());
 }
 

@@ -9,6 +9,8 @@
 
 #include <quic/logging/oops_logger/OopsFields.h>
 
+#include <memory>
+
 namespace proto_oops {
 
 class OopsLogger {
@@ -31,12 +33,19 @@ class OopsLogger {
   }
 };
 
+// Installs a logger for the current thread if none exists yet. Existing
+// loggers are never replaced because accepted connections may hold raw
+// pointers to the thread-local instance.
+[[nodiscard]] OopsLogger* setThreadLocalOopsLoggerIfAbsent(
+    std::unique_ptr<OopsLogger> logger);
+
+[[nodiscard]] OopsLogger* getThreadLocalOopsLogger();
+
 } // namespace proto_oops
 
 // Convenience macro for OOPS logging with null-safety.
 // Checks if the logger is non-null before logging.
-// `loggerPtr` is any pointer-like type with bool conversion and operator->
-// (e.g., shared_ptr<OopsLogger>, OopsLogger*).
+// `loggerPtr` is any pointer-like type with bool conversion and operator->.
 #define PROTO_OOPS_LOG(loggerPtr, component, msg) \
   do {                                            \
     if (loggerPtr) {                              \
