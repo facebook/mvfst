@@ -1194,6 +1194,63 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientPortChangeNATRebinding) {
   EXPECT_EQ(conn.congestionController.get(), congestionController);
 }
 
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    PathChallengeNotBlockedByStreamData) {
+  auto& conn = server->getNonConstConn();
+
+  // Queue a large stream payload (much larger than a single packet) so
+  // that every packet build during/after the migration has stream data
+  // competing for wrapper space. We do NOT loopForWrites here — we want
+  // the rebound packet to be the trigger that drives the next write loop.
+  StreamId streamId = server->createBidirectionalStream().value();
+  auto bigData = folly::IOBuf::create(64 * 1024);
+  bigData->append(64 * 1024);
+  memset(bigData->writableData(), 'A', 64 * 1024);
+  ASSERT_FALSE(
+      server->writeChain(streamId, std::move(bigData), false).hasError());
+
+  serverWrites.clear();
+
+  // Construct a small stream packet from a new peer port to trigger
+  // NAT-rebinding migration.
+  auto rebindData = folly::IOBuf::copyBuffer("ping");
+  auto rebindPacket = packetToBuf(createStreamPacket(
+      *clientConnectionId,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++,
+      2,
+      *rebindData,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  folly::SocketAddress newPeer(
+      clientAddr.getIPAddress(), clientAddr.getPort() + 1);
+  deliverData(std::move(rebindPacket), /*writes=*/true, &newPeer);
+
+  // Migration happened.
+  auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
+  ASSERT_TRUE(newPath);
+  EXPECT_EQ(conn.currentPathId, newPath->id);
+  EXPECT_EQ(conn.peerAddress, newPeer);
+
+  // Sanity: server actually wrote at least one packet on the new path.
+  ASSERT_FALSE(serverWrites.empty());
+
+  // Per RFC 9000 §8.2 the server MUST send a PATH_CHALLENGE on the new
+  // path. status==Validating means the challenge was actually written;
+  // pendingEvents.pathChallenges no longer holding the entry means it
+  // was consumed by the writer (see updateSimpleFrameOnPacketSent).
+  //
+  // This ensures that the PATH_CHALLENGE was written to the packet and fit it
+  // before stream data.
+  EXPECT_EQ(newPath->status, PathStatus::Validating)
+      << "PATH_CHALLENGE was queued but never written; stream frames "
+         "packed the wrapper full before pathValidationFrameScheduler ran.";
+  EXPECT_FALSE(conn.pendingEvents.pathChallenges.contains(newPath->id))
+      << "PATH_CHALLENGE for new path is still pending in pendingEvents.";
+}
+
 TEST_P(QuicServerTransportAllowMigrationTest, ClientAddressChangeNATRebinding) {
   auto& conn = server->getNonConstConn();
 

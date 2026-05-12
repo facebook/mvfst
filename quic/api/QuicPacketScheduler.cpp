@@ -335,14 +335,22 @@ FrameScheduler::scheduleFramesForPacket(
       return quic::make_unexpected(result.error());
     }
   }
-  // Simple frames should be scheduled before stream frames and retx frames
-  // because those frames might fill up all available bytes for writing.
-  // If we are trying to send a PathChallenge frame it may be blocked by those,
-  // causing a connection to proceed slowly because of path validation rate
-  // limiting.
+  // Simple frames and path validation frames should be scheduled before
+  // stream frames and retx frames because stream/datagram writes can fill
+  // up all available bytes for writing. PATH_CHALLENGE/PATH_RESPONSE for
+  // the current path are routed through pathValidationFrameScheduler_
+  // (not simpleFrameScheduler_), so they need their own ordering guarantee
+  // here.
   if (simpleFrameScheduler_ &&
       simpleFrameScheduler_->hasPendingSimpleFrames()) {
     simpleFrameScheduler_->writeSimpleFrames(wrapper);
+  }
+  bool hasPathProbingFrame = false;
+  if (pathValidationFrameScheduler_) {
+    if (pathValidationFrameScheduler_->hasPendingPathValidationFrames()) {
+      pathValidationFrameScheduler_->writePathValidationFrames(wrapper);
+      hasPathProbingFrame = true;
+    }
   }
   if (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame()) {
     pingFrameScheduler_->writePing(wrapper);
@@ -361,14 +369,6 @@ FrameScheduler::scheduleFramesForPacket(
     auto datagramRes = datagramFrameScheduler_->writeDatagramFrames(wrapper);
     if (!datagramRes.has_value()) {
       return quic::make_unexpected(datagramRes.error());
-    }
-  }
-
-  bool hasPathProbingFrame = false;
-  if (pathValidationFrameScheduler_) {
-    if (pathValidationFrameScheduler_->hasPendingPathValidationFrames()) {
-      pathValidationFrameScheduler_->writePathValidationFrames(wrapper);
-      hasPathProbingFrame = true;
     }
   }
 
