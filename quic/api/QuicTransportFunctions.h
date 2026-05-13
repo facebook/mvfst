@@ -329,7 +329,6 @@ writeConnectionDataToSocket(
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     TimePoint writeLoopBeginTime,
-    bool flushOnImminentStreamCompletion = false,
     const std::string& token = std::string());
 
 [[nodiscard]] quic::Expected<WriteQuicDataResult, QuicError>

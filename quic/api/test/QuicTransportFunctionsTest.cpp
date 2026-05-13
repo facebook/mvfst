@@ -5383,6 +5383,20 @@ TEST_F(QuicTransportFunctionsTest, UpdatePacketLimitForImminentStreams) {
   // sendableBytes = min(5000, 1000) = 1000, which is < threshold 2000
   EXPECT_TRUE(conn->imminentStreamCompletion);
   EXPECT_EQ(packetLimit, 2); // ceil(1000 / 1232) + 1 = 2
+
+  // Skip optimization when there is pending loss data.
+  conn->transportSettings.minStreamBufThresh = 2000;
+  conn->transportSettings.minBurstPackets = 2;
+  conn->flowControlState.sumCurStreamBufferLen = 5000;
+  conn->flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn->flowControlState.sumCurWriteOffset = 0;
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  conn->streamManager->addLoss(stream->id);
+  packetLimit = 3;
+  conn->imminentStreamCompletion = false;
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  EXPECT_FALSE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 3); // Unchanged — loss recovery in progress
 }
 
 TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {
@@ -5416,8 +5430,8 @@ TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {
   conn->transportSettings.excessCwndPctForImminentStreams = 25;
   writableBytes = congestionControlWritableBytes(*conn);
   EXPECT_EQ(writableBytes, 7392); // 5000 * 1.25, rounded up to nearest packet
-  // Flag should be cleared
-  EXPECT_FALSE(conn->imminentStreamCompletion);
+  // Flag persists — cleared by writeQuicDataToSocketImpl after the write
+  EXPECT_TRUE(conn->imminentStreamCompletion);
 
   // With imminent completion but zero excess setting
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -5426,7 +5440,7 @@ TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {
   conn->transportSettings.excessCwndPctForImminentStreams = 0;
   writableBytes = congestionControlWritableBytes(*conn);
   EXPECT_EQ(writableBytes, 6160);
-  EXPECT_FALSE(conn->imminentStreamCompletion);
+  EXPECT_TRUE(conn->imminentStreamCompletion);
 }
 
 TEST_F(QuicTransportFunctionsTest, WriterCoalescesSconeAndShortHeader) {

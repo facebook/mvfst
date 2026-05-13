@@ -202,6 +202,10 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
     schedulerBuilder.cryptoFrames();
   }
   FrameScheduler scheduler = std::move(schedulerBuilder).build();
+  if (connection.transportSettings.minStreamBufThresh > 0 ||
+      connection.transportSettings.excessCwndPctForImminentStreams > 0) {
+    updatePacketLimitForImminentStreams(packetLimit, connection);
+  }
   auto connectionDataResult = writeConnectionDataToSocket(
       sock,
       connection,
@@ -216,8 +220,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
       aead,
       headerCipher,
       version,
-      writeLoopBeginTime,
-      true);
+      writeLoopBeginTime);
+  connection.imminentStreamCompletion = false;
   if (!connectionDataResult.has_value()) {
     return quic::make_unexpected(connectionDataResult.error());
   }
@@ -1181,7 +1185,6 @@ uint64_t congestionControlWritableBytes(QuicConnectionStateBase& conn) {
       // specified percentage.
       ccWritableBytes += ccWritableBytes *
           conn.transportSettings.excessCwndPctForImminentStreams / 100;
-      conn.imminentStreamCompletion = false;
     }
 
     writableBytes = std::min<uint64_t>(writableBytes, ccWritableBytes);
@@ -1318,7 +1321,6 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
       headerCipher,
       version,
       Clock::now(),
-      false,
       token);
 
   if (!writeResult.has_value()) {
@@ -1715,6 +1717,9 @@ quic::Expected<void, QuicError> encryptPacketHeader(
 void updatePacketLimitForImminentStreams(
     uint64_t& packetLimit,
     QuicConnectionStateBase& conn) {
+  if (conn.streamManager->hasLoss()) {
+    return;
+  }
   auto sendableBytes = std::min(
       conn.flowControlState.sumCurStreamBufferLen,
       getSendConnFlowControlBytesWire(conn));
@@ -1808,7 +1813,6 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     TimePoint writeLoopBeginTime,
-    bool flushOnImminentStreamCompletion,
     const std::string& token) {
   if (connection.version == QuicVersion::MVFST_PRIMING &&
       connection.nodeType == QuicNodeType::Server) {
@@ -1902,11 +1906,6 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     }
   };
 
-  if (flushOnImminentStreamCompletion &&
-      (connection.transportSettings.minStreamBufThresh > 0 ||
-       connection.transportSettings.excessCwndPctForImminentStreams > 0)) {
-    updatePacketLimitForImminentStreams(packetLimit, connection);
-  }
   quic::TimePoint sentTime = Clock::now();
 
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
@@ -2081,7 +2080,6 @@ quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(
       headerCipher,
       version,
       writeLoopBeginTime,
-      false,
       token);
   if (!cloningResult.has_value()) {
     return quic::make_unexpected(cloningResult.error());
