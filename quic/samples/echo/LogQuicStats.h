@@ -303,6 +303,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     MVVLOG(2) << prefix_ << __func__;
   }
 
+  void onSconePacketSent() override {
+    MVVLOG(2) << prefix_ << __func__;
+  }
+
  private:
   std::string prefix_;
 };

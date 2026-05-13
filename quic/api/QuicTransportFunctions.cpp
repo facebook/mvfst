@@ -308,6 +308,7 @@ uint64_t writeSconePacketIfNeeded(
   memcpy(connection.bufAccessor->writableTail(), sconePacket.data(), sconeSize);
   connection.bufAccessor->append(sconeSize);
   connection.scone->lastSconeSentTime = sendTime;
+  QUIC_STATS(connection.statsCallback, onSconePacketSent);
 
   VLOG(4) << "SCONE: Wrote " << sconeSize << " bytes to continuous buffer";
   if (connection.qLogger) {
@@ -618,6 +619,7 @@ iobufChainBasedBuildScheduleEncrypt(
     packetBuf = std::move(preBuildSconePacket);
     encodedSize = packetBuf->computeChainDataLength();
     connection.scone->lastSconeSentTime = sendTime;
+    QUIC_STATS(connection.statsCallback, onSconePacketSent);
     VLOG(4) << "SCONE: Prepended SCONE packet, total size=" << encodedSize;
 
     if (connection.qLogger) {

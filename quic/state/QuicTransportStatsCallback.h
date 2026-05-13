@@ -208,6 +208,8 @@ class QuicTransportStatsCallback {
 
   virtual void onKeyUpdateAttemptSucceeded() = 0;
 
+  virtual void onSconePacketSent() = 0;
+
   static const char* toString(SocketErrorType errorType) {
     switch (errorType) {
       case SocketErrorType::AGAIN:
