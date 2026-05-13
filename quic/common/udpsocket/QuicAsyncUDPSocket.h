@@ -55,9 +55,14 @@ class QuicAsyncUDPSocket {
       // Make control message space for ToS
       static constexpr size_t kCmsgSpace = CMSG_SPACE(sizeof(INT));
 #elif defined(FOLLY_HAVE_MSG_ERRQUEUE)
-      // Make control message space for GRO, timestamp, and ToS
+      // Make control message space for GRO, timestamp, ToS, and PKTINFO
+      // (v6+v4). Must stay equal to
+      // folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace
+      // — FollyQuicAsyncUDPSocket runtime-checks the two are identical.
       static constexpr size_t kCmsgSpace = CMSG_SPACE(sizeof(uint16_t)) +
-          CMSG_SPACE(sizeof(Timestamp)) + CMSG_SPACE(sizeof(uint8_t));
+          CMSG_SPACE(sizeof(Timestamp)) + CMSG_SPACE(sizeof(uint8_t)) +
+          CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+          CMSG_SPACE(sizeof(struct in_pktinfo));
 #endif
     };
 
