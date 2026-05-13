@@ -155,7 +155,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   }
 
   void handleError(QuicError error) noexcept {
-    connectionError_ = std::move(error);
+    connectionError_ = error;
     quicClient_->closeNow(std::move(error));
     connectionBaton_.post();
   }
@@ -281,7 +281,11 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       folly::readFile(clientCertPath_.c_str(), certData);
       std::string keyData;
       folly::readFile(clientKeyPath_.c_str(), keyData);
-      auto cert = fizz::openssl::CertUtils::makeSelfCert(certData, keyData);
+      std::unique_ptr<fizz::SelfCert> cert;
+      fizz::Error err;
+      FIZZ_THROW_ON_ERROR(
+          fizz::openssl::CertUtils::makeSelfCert(cert, err, certData, keyData),
+          err);
 
       auto certManager = std::make_shared<fizz::client::CertManager>();
       certManager->addCert(std::move(cert));
