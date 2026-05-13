@@ -5342,7 +5342,7 @@ TEST_F(QuicTransportFunctionsTest, UpdatePacketLimitForImminentStreams) {
   packetLimit = 3; // Would leave 1304 bytes in buffer (< threshold)
   updatePacketLimitForImminentStreams(packetLimit, *conn);
   EXPECT_TRUE(conn->imminentStreamCompletion);
-  EXPECT_EQ(packetLimit, 5); // Increased to send everything
+  EXPECT_EQ(packetLimit, 6); // ceil(1304/1232)=2, +1 for overhead = 3 extra
 
   // Zero threshold means not imminent completion
   conn->transportSettings.minStreamBufThresh = 0;

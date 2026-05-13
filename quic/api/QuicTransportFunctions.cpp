@@ -1725,9 +1725,11 @@ void updatePacketLimitForImminentStreams(
                         conn.transportSettings.minBurstPackets *
                             conn.udpSendPacketLen);
   if (conn.imminentStreamCompletion && remainingBufLen > 0) {
-    // Add the remaining bytes and round up to the nearest packet.
+    // +1 accounts for per-packet overhead (headers, AEAD tag) that reduces
+    // the actual stream payload below udpSendPacketLen.
     packetLimit +=
-        (remainingBufLen + conn.udpSendPacketLen - 1) / conn.udpSendPacketLen;
+        (remainingBufLen + conn.udpSendPacketLen - 1) / conn.udpSendPacketLen +
+        1;
   }
 }
 
