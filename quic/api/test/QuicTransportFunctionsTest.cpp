@@ -5369,6 +5369,20 @@ TEST_F(QuicTransportFunctionsTest, UpdatePacketLimitForImminentStreams) {
   updatePacketLimitForImminentStreams(packetLimit, *conn);
   EXPECT_TRUE(conn->imminentStreamCompletion);
   EXPECT_EQ(packetLimit, 5);
+
+  // Connection flow control caps sendable bytes below buffer length.
+  // Buffer has 5000 bytes but FC only allows 1000.
+  conn->transportSettings.minStreamBufThresh = 2000;
+  conn->transportSettings.minBurstPackets = 2;
+  conn->flowControlState.sumCurStreamBufferLen = 5000;
+  conn->flowControlState.peerAdvertisedMaxOffset = 2000;
+  conn->flowControlState.sumCurWriteOffset = 1000; // FC allows 1000 bytes
+  packetLimit = 0;
+  conn->imminentStreamCompletion = false;
+  updatePacketLimitForImminentStreams(packetLimit, *conn);
+  // sendableBytes = min(5000, 1000) = 1000, which is < threshold 2000
+  EXPECT_TRUE(conn->imminentStreamCompletion);
+  EXPECT_EQ(packetLimit, 2); // ceil(1000 / 1232) + 1 = 2
 }
 
 TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {

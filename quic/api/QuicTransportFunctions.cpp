@@ -1715,8 +1715,10 @@ quic::Expected<void, QuicError> encryptPacketHeader(
 void updatePacketLimitForImminentStreams(
     uint64_t& packetLimit,
     QuicConnectionStateBase& conn) {
-  int64_t remainingBufLen =
-      static_cast<int64_t>(conn.flowControlState.sumCurStreamBufferLen) -
+  auto sendableBytes = std::min(
+      conn.flowControlState.sumCurStreamBufferLen,
+      getSendConnFlowControlBytesWire(conn));
+  int64_t remainingBufLen = static_cast<int64_t>(sendableBytes) -
       static_cast<int64_t>(packetLimit) *
           static_cast<int64_t>(conn.udpSendPacketLen); // can be negative
   // Don't empty out the buffer if remainingBufLen > minBurstPackets.
