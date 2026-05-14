@@ -120,6 +120,20 @@ mvfst_add_library(mvfst_api_transport_lite
     Folly::folly_maybe_managed_ptr
 )
 
+mvfst_add_library(mvfst_api_shared_threaded_packet_writer
+  SRCS
+    SharedThreadedPacketWriter.cpp
+  DEPS
+    mvfst_common_mvfst_logging
+  EXPORTED_DEPS
+    mvfst_api_quic_packet_writer
+    mvfst_codec_types
+    mvfst_common_event_fd_queue
+    mvfst_common_events_eventbase
+    Folly::folly
+    Folly::folly_io_async_async_udp_socket
+)
+
 mvfst_add_library(mvfst_api_ack_scheduler
   SRCS
     QuicAckScheduler.cpp
