@@ -33,6 +33,7 @@ mvfst_add_library(mvfst_common_quic_buffer
     QuicBuffer.cpp
   DEPS
     mvfst_common_mvfst_logging
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     Folly::folly_portability_sys_uio
 )

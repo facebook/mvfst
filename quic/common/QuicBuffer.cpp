@@ -7,6 +7,7 @@
 
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/QuicBuffer.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 
 #include <algorithm>
 #include <utility>
@@ -354,7 +355,11 @@ bool QuicBuffer::empty() const noexcept {
 void QuicBuffer::trimStart(std::size_t amount) noexcept {
   MVDCHECK_LE(amount, length_);
   if (amount > length_) {
-    // TODO(sandarsh) add protocol oops
+    auto logger = proto_oops::getThreadLocalOopsLogger();
+    PROTO_OOPS_LOG(
+        logger,
+        "quic_buffer",
+        "invariant_violation: QuicBuffer::trimStart amount exceeds length");
     amount = length_;
   }
   data_ += amount;
@@ -364,7 +369,11 @@ void QuicBuffer::trimStart(std::size_t amount) noexcept {
 void QuicBuffer::trimEnd(std::size_t amount) noexcept {
   MVDCHECK_LE(amount, length_);
   if (amount > length_) {
-    // TODO(sandarsh) add protocol oops
+    auto logger = proto_oops::getThreadLocalOopsLogger();
+    PROTO_OOPS_LOG(
+        logger,
+        "quic_buffer",
+        "invariant_violation: QuicBuffer::trimEnd amount exceeds length");
     amount = length_;
   }
   length_ -= amount;

@@ -71,6 +71,7 @@ mvfst_cpp_library(
     ],
     deps = [
         ":mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
     ],
     exported_deps = [
         "//folly/portability:sys_uio",
