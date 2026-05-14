@@ -8,6 +8,7 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
+#include <quic/api/QuicPacketWriter.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicReadCodec.h>
 #include <quic/codec/QuicWriteCodec.h>
@@ -786,6 +787,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   };
 
   Optional<SconeState> scone;
+
+  // If set, encrypted packets are handed to this writer instead of the inline
+  // IOBufQuicBatch. Only valid when DataPathType::ChainedMemory is in use.
+  std::unique_ptr<QuicPacketWriter> packetWriter;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

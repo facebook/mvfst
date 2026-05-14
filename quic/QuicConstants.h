@@ -805,6 +805,7 @@ enum class NoWriteReason {
   NO_FRAME,
   NO_BODY,
   SOCKET_FAILURE,
+  WRITER_BACKPRESSURE, // async writer SPSC queue full
 };
 
 enum class NoReadReason {
