@@ -701,9 +701,15 @@ class ClientHandshakeECHPolicyTest : public ClientHandshakeCallbackTest {
     fizz::ech::ParsedECHConfig parsedECHConfig;
     parsedECHConfig.key_config.config_id = 0xFB;
     parsedECHConfig.key_config.kem_id = fizz::hpke::KEMId::secp256r1;
-    parsedECHConfig.key_config.public_key =
+    std::unique_ptr<folly::IOBuf> publicKeyBuf;
+    fizz::Error err;
+    FIZZ_THROW_ON_ERROR(
         fizz::openssl::detail::encodeECPublicKey(
-            ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey));
+            publicKeyBuf,
+            err,
+            ::fizz::test::getPublicKey(::fizz::test::kP256PublicKey)),
+        err);
+    parsedECHConfig.key_config.public_key = std::move(publicKeyBuf);
     parsedECHConfig.key_config.cipher_suites = {suite};
     parsedECHConfig.maximum_name_length = 50;
     parsedECHConfig.public_name = "public.dummy.com";
