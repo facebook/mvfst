@@ -103,9 +103,11 @@ bool SharedThreadedPacketWriter::write(
   if (!queue_.enqueue(std::move(entry))) {
     wasEverFull_.store(true, std::memory_order_release);
     FOLLY_SDT(quic, shared_packet_writer_queue_full);
+    QUIC_STATS(stats_, onThreadedWriterQueueFull);
     return false;
   }
   FOLLY_SDT(quic, shared_packet_writer_enqueue, queue_.sizeGuess());
+  QUIC_STATS(stats_, onThreadedWriterPacketEnqueued);
   return true;
 }
 
@@ -289,6 +291,21 @@ ssize_t SharedThreadedPacketWriter::sendBatch() {
     writableHandler_->registerHandler(
         folly::EventHandler::WRITE | folly::EventHandler::PERSIST);
     return -1;
+  }
+
+  // Report segments sent. On the common all-sent path use the pre-computed
+  // total; on partial sends sum only the delivered slots.
+  if (stats_) {
+    size_t segs;
+    if (sent == n) {
+      segs = totalSegsInBatch_;
+    } else {
+      segs = 0;
+      for (size_t i = 0; i < sent; i++) {
+        segs += segCounts_[i];
+      }
+    }
+    QUIC_STATS(stats_, onThreadedWriterPacketsSent, static_cast<uint32_t>(segs));
   }
 
   // All sent: release IOBufs. addrs_/opts_/connIds_/segCounts_ stay at

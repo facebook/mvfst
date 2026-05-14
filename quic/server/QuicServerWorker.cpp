@@ -226,6 +226,9 @@ void QuicServerWorker::start() {
                 ? transportSettings_.maxBatchSize
                 : 1),
         /*maxMsgsPerCall=*/16);
+    if (statsCallback_) {
+      sharedWriter_->setStats(statsCallback_.get());
+    }
     sharedWriter_->setOnFatalError(
         [this](const ConnectionId& connId, const QuicError& err) {
           // Runs on producer EVB thread.

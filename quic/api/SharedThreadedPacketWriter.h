@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include <folly/io/async/EventBase.h>
@@ -19,6 +20,7 @@
 #include <quic/api/QuicPacketWriter.h>
 #include <quic/codec/Types.h>
 #include <quic/common/EventFdQueue.h>
+#include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
 
@@ -108,6 +110,12 @@ class SharedThreadedPacketWriter {
   // Called by QuicServer::shutdown(). After this, enqueues return false.
   void close();
 
+  // Attach a stats callback. Must outlive this writer. May be called before
+  // start(); the pointer is non-owning.
+  void setStats(QuicTransportStatsCallback* stats) {
+    stats_ = stats;
+  }
+
   // Set callbacks invoked on the producer EVB when errors occur or the queue
   // drains after backpressure. Both are called on the producer EVB thread.
   // onFatalError is called once per affected connection; onResumeProducer is
@@ -176,6 +184,7 @@ class SharedThreadedPacketWriter {
   void doFlush();
 
   std::atomic<bool> closed_{false};
+  QuicTransportStatsCallback* stats_{nullptr};
   EventFdQueue<PacketEntry> queue_;
   size_t maxSegmentsPerMsg_;
   size_t maxMsgsPerCall_;
