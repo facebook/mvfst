@@ -1,12 +1,11 @@
 # Copyright 2017 Facebook
 
-""" build mode definitions for quic """
+"""build mode definitions for quic"""
 
 load("@fbcode//:BUILD_MODE.bzl", get_parent_modes = "get_empty_modes")
 load("@fbcode_macros//build_defs:create_build_mode.bzl", "extend_build_modes")
 
-_extra_cflags = [
-]
+_extra_cflags = []
 
 _common_flags = [
     "-Wextra-semi",
@@ -50,5 +49,5 @@ _modes = extend_build_modes(
 )
 
 def get_modes():
-    """ Return modes for this file """
+    """Return modes for this file"""
     return _modes

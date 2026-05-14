@@ -30,9 +30,13 @@ FBANDROID_CXXFLAGS = [
     "-ffunction-sections",
     "-Wno-nullability-completeness",
     "-fstack-protector-strong",
-] + ([
-    "-flazy-init-all",
-] if read_bool("ndk", "flazy_init_all", False) else [])
+] + (
+    [
+        "-flazy-init-all",
+    ]
+    if read_bool("ndk", "flazy_init_all", False)
+    else []
+)
 
 FBOBJC_CXXFLAGS = [
     "-Wno-global-constructors",
@@ -68,14 +72,13 @@ def _compute_header_namespace():
     base_path = native.package_name()
     return base_path[6:]
 
-def mvfst_cpp_library(
-        name,
-        compiler_flags = [],
-        **kwargs):
+def mvfst_cpp_library(name, compiler_flags = [], **kwargs):
     fb_dirsync_cpp_library(
         name = name,
         compiler_flags = select({
-            "DEFAULT": compiler_flags + CXXFLAGS + select({
+            "DEFAULT": compiler_flags
+            + CXXFLAGS
+            + select({
                 "DEFAULT": [],
                 "ovr_config//os:android": FBANDROID_CXXFLAGS,
                 "ovr_config//os:iphoneos": FBOBJC_CXXFLAGS,
@@ -85,26 +88,27 @@ def mvfst_cpp_library(
             "ovr_config//compiler:msvc": WINDOWS_MSVC_CXXFLAGS,
         }),
         feature = Infra_Networking_Core,
-        **kwargs
+        **kwargs,
     )
 
 # TODO: Turn this into an internal implementation detail
 def mvfst_cxx_library(
-        name,
-        srcs = (),
-        headers = (),
-        exported_headers = (),
-        raw_headers = (),
-        deps = (),
-        exported_deps = (),
-        force_static = False,
-        apple_sdks = None,
-        platforms = None,
-        enable_static_variant = False,
-        compiler_flags = [],
-        labels = (),
-        header_namespace = "",
-        **kwargs):
+    name,
+    srcs = (),
+    headers = (),
+    exported_headers = (),
+    raw_headers = (),
+    deps = (),
+    exported_deps = (),
+    force_static = False,
+    apple_sdks = None,
+    platforms = None,
+    enable_static_variant = False,
+    compiler_flags = [],
+    labels = (),
+    header_namespace = "",
+    **kwargs,
+):
     """Translate a simpler declartion into the more complete library target"""
 
     # Set default platform settings. `()` means empty, whereas None
@@ -140,7 +144,9 @@ def mvfst_cxx_library(
         enable_static_variant = enable_static_variant,
         labels = list(labels),
         compiler_flags = select({
-            "DEFAULT": compiler_flags + CXXFLAGS + select({
+            "DEFAULT": compiler_flags
+            + CXXFLAGS
+            + select({
                 "DEFAULT": [],
                 "ovr_config//os:android": FBANDROID_CXXFLAGS,
                 "ovr_config//os:iphoneos": FBOBJC_CXXFLAGS,
@@ -153,42 +159,19 @@ def mvfst_cxx_library(
         visibility = kwargs.pop("visibility", ["PUBLIC"]),
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
         feature = Infra_Networking_Core,
-        **kwargs
+        **kwargs,
     )
 
-def mvfst_cpp_test(
-        name,
-        deps = (),
-        external_deps = (),
-        header_namespace = None,
-        **kwargs):
+def mvfst_cpp_test(name, deps = (), external_deps = (), header_namespace = None, **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
-        cpp_unittest(
-            name = name,
-            deps = deps,
-            external_deps = external_deps,
-            header_namespace = header_namespace,
-            **kwargs
-        )
+        cpp_unittest(name = name, deps = deps, external_deps = external_deps, header_namespace = header_namespace, **kwargs)
 
     else:
         deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
-        mvfst_cxx_test(
-            name,
-            deps = deps,
-            header_namespace = header_namespace or _compute_header_namespace(),
-            visibility = ["PUBLIC"],
-            **kwargs
-        )
+        mvfst_cxx_test(name, deps = deps, header_namespace = header_namespace or _compute_header_namespace(), visibility = ["PUBLIC"], **kwargs)
 
-def mvfst_cxx_test(
-        name,
-        srcs,
-        headers = [],
-        deps = [],
-        header_namespace = "",
-        **kwargs):
+def mvfst_cxx_test(name, srcs, headers = [], deps = [], header_namespace = "", **kwargs):
     fb_xplat_cxx_test(
         name = name,
         srcs = srcs,
@@ -200,43 +183,18 @@ def mvfst_cxx_test(
         platforms = (FBCODE,),
         mangled_keys = ["deps"],
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
-        **kwargs
+        **kwargs,
     )
 
-def mvfst_cpp_binary(
-        name,
-        deps = (),
-        external_deps = (),
-        header_namespace = None,
-        **kwargs):
+def mvfst_cpp_binary(name, deps = (), external_deps = (), header_namespace = None, **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
-        cpp_binary(
-            name = name,
-            deps = deps,
-            external_deps = external_deps,
-            header_namespace = header_namespace,
-            **kwargs
-        )
+        cpp_binary(name = name, deps = deps, external_deps = external_deps, header_namespace = header_namespace, **kwargs)
     else:
         deps = deps_map_utils.convert_to_fbsource_fp_deps(deps) + deps_map_utils.convert_to_fbsource_tp_deps(external_deps)
-        mvfst_cxx_binary(
-            name,
-            deps = deps,
-            header_namespace = header_namespace or _compute_header_namespace(),
-            visibility = ["PUBLIC"],
-            **kwargs
-        )
+        mvfst_cxx_binary(name, deps = deps, header_namespace = header_namespace or _compute_header_namespace(), visibility = ["PUBLIC"], **kwargs)
 
-def mvfst_cxx_binary(
-        name,
-        srcs,
-        headers = [],
-        compatible_with = [],
-        compiler_flags = [],
-        deps = [],
-        header_namespace = "",
-        **kwargs):
+def mvfst_cxx_binary(name, srcs, headers = [], compatible_with = [], compiler_flags = [], deps = [], header_namespace = "", **kwargs):
     fb_xplat_cxx_binary(
         name = name,
         srcs = srcs,
@@ -247,45 +205,35 @@ def mvfst_cxx_binary(
         deps = deps,
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
         platforms = (CXX,),
-        **kwargs
+        **kwargs,
     )
 
-def mvfst_cpp_benchmark(
-        name,
-        deps = (),
-        external_deps = (),
-        header_namespace = None,
-        **kwargs):
+def mvfst_cpp_benchmark(name, deps = (), external_deps = (), header_namespace = None, **kwargs):
     # Convert deps and external_deps
     if get_fbsource_cell() == "fbcode":
-        cpp_benchmark(
-            name = name,
-            deps = deps,
-            external_deps = external_deps,
-            header_namespace = header_namespace,
-            **kwargs
-        )
+        cpp_benchmark(name = name, deps = deps, external_deps = external_deps, header_namespace = header_namespace, **kwargs)
     else:
         # Don't generate xplat benchmark targets
         pass
 
 def mu_cxx_library(
-        name,
-        srcs = (),
-        headers = (),
-        exported_headers = (),
-        raw_headers = (),
-        deps = (),
-        exported_deps = (),
-        force_static = False,
-        apple_sdks = None,
-        platforms = None,
-        enable_static_variant = False,
-        labels = (),
-        fbandroid_labels = (),
-        fbobjc_labels = (),
-        header_namespace = "",
-        **kwargs):
+    name,
+    srcs = (),
+    headers = (),
+    exported_headers = (),
+    raw_headers = (),
+    deps = (),
+    exported_deps = (),
+    force_static = False,
+    apple_sdks = None,
+    platforms = None,
+    enable_static_variant = False,
+    labels = (),
+    fbandroid_labels = (),
+    fbobjc_labels = (),
+    header_namespace = "",
+    **kwargs,
+):
     """Translate a simpler declartion into the more complete library target"""
 
     # Set default platform settings. `()` means empty, whereas None
@@ -327,23 +275,17 @@ def mu_cxx_library(
             "config//compiler:msvc": WINDOWS_MSVC_CXXFLAGS,
         }),
         windows_compiler_flags = kwargs.pop("windows_compiler_flags", []) + CXXFLAGS + WINDOWS_CLANG_CXX_FLAGS,
-        fbobjc_compiler_flags = kwargs.pop("fbobjc_compiler_flags", []) +
-                                FBOBJC_CXXFLAGS,
+        fbobjc_compiler_flags = kwargs.pop("fbobjc_compiler_flags", []) + FBOBJC_CXXFLAGS,
         fbcode_compiler_flags_override = kwargs.pop("fbcode_compiler_flags", []),
-        fbandroid_compiler_flags = kwargs.pop("fbandroid_compiler_flags", []) +
-                                   FBANDROID_CXXFLAGS,
+        fbandroid_compiler_flags = kwargs.pop("fbandroid_compiler_flags", []) + FBANDROID_CXXFLAGS,
         windows_preferred_linkage = "static",
         visibility = kwargs.pop("visibility", ["PUBLIC"]),
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
         feature = Infra_Networking_Core,
-        **kwargs
+        **kwargs,
     )
 
-def mu_cxx_test(
-        name,
-        srcs,
-        raw_headers = [],
-        deps = []):
+def mu_cxx_test(name, srcs, raw_headers = [], deps = []):
     fb_xplat_cxx_test(
         name = name,
         srcs = srcs,
@@ -356,12 +298,7 @@ def mu_cxx_test(
         contacts = ["oncall+traffic_protocols@xmail.facebook.com"],
     )
 
-def mu_cxx_binary(
-        name,
-        srcs,
-        raw_headers = [],
-        deps = [],
-        **kwargs):
+def mu_cxx_binary(name, srcs, raw_headers = [], deps = [], **kwargs):
     fb_xplat_cxx_binary(
         name = name,
         srcs = srcs,
