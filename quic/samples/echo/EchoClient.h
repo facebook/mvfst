@@ -20,6 +20,7 @@
 #include <fizz/backend/openssl/OpenSSL.h>
 #include <fizz/compression/ZlibCertificateDecompressor.h>
 #include <fizz/compression/ZstdCertificateDecompressor.h>
+#include <fizz/util/Status.h>
 
 #include <quic/api/QuicSocket.h>
 #include <quic/client/QuicClientTransport.h>
@@ -156,7 +157,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
   void handleError(QuicError error) noexcept {
     connectionError_ = error;
-    quicClient_->closeNow(std::move(error));
+    quicClient_->closeNow(connectionError_.value());
     connectionBaton_.post();
   }
 
