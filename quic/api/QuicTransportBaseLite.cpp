@@ -1103,6 +1103,11 @@ QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
       stream->flowControlState.advertisedMaxOffset);
 }
 
+void QuicTransportBaseLite::setPacketWriter(
+    std::unique_ptr<QuicPacketWriter> writer) {
+  conn_->packetWriter = std::move(writer);
+}
+
 void QuicTransportBaseLite::scheduleWrite() {
   runOnEvbAsyncOp({.type = AsyncOpType::ConnectionWriteReady});
 }

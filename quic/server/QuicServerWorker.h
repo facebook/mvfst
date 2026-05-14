@@ -32,6 +32,8 @@
 namespace quic {
 
 class AcceptObserver;
+class FollyQuicEventBase;
+class SharedThreadedPacketWriter;
 
 class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
                          public QuicServerTransport::RoutingCallback,
@@ -268,6 +270,11 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
 
+  // Enable the SharedThreadedPacketWriter for this worker. Must be called
+  // before start(). The caller owns drainEvb and must ensure it outlives this
+  // worker.
+  void setDrainEventBase(folly::EventBase* drainEvb);
+
   /**
    * Set the rate limiter which will be used to rate limit new connections.
    */
@@ -502,6 +509,13 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   std::unique_ptr<FollyAsyncUDPSocketAlias> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
+  // Wrapper around evb_; initialized in setSocket(). Shared with
+  // listenerQuicSock_ and used wherever a FollyQuicEventBase* is needed.
+  std::shared_ptr<FollyQuicEventBase> workerQuicEvb_;
+
+  // Threaded packet writer — set when drainEvb_ is provided.
+  folly::EventBase* drainEvb_{nullptr};
+  std::unique_ptr<SharedThreadedPacketWriter> sharedWriter_;
   std::shared_ptr<WorkerCallback> callback_;
   folly::Executor::KeepAlive<folly::EventBase> evb_;
 
