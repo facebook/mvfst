@@ -8,6 +8,7 @@
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
 #include <fizz/backend/openssl/OpenSSL.h>
+#include <fizz/crypto/Crypto.h>
 #include <fizz/util/Status.h>
 #include <folly/Range.h>
 

@@ -9,6 +9,7 @@
 #include <quic/common/test/TestUtils.h>
 
 #include <fizz/backend/openssl/certificate/OpenSSLSelfCertImpl.h>
+#include <fizz/crypto/Crypto.h>
 #include <fizz/crypto/test/TestUtil.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <fizz/protocol/test/Mocks.h>
