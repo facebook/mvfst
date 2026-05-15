@@ -162,6 +162,22 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "linux_kernel_version",
+    srcs = [
+        "LinuxKernelVersion.cpp",
+    ],
+    headers = [
+        "LinuxKernelVersion.h",
+    ],
+    deps = [
+        "//folly/synchronization:call_once",
+    ],
+    exported_deps = [
+        ":optional",
+    ],
+)
+
+mvfst_cpp_library(
     # @autodeps-skip
     name = "circular_deque",
     headers = [

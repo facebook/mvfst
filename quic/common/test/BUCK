@@ -247,3 +247,13 @@ mvfst_cpp_test(
         "//quic/common:string_utils",
     ],
 )
+
+mvfst_cpp_test(
+    name = "LinuxKernelVersionTest",
+    srcs = [
+        "LinuxKernelVersionTest.cpp",
+    ],
+    deps = [
+        "//quic/common:linux_kernel_version",
+    ],
+)

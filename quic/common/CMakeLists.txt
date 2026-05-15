@@ -86,6 +86,15 @@ mvfst_add_library(mvfst_common_string_utils
     mvfst_exception
 )
 
+mvfst_add_library(mvfst_common_linux_kernel_version
+  SRCS
+    LinuxKernelVersion.cpp
+  DEPS
+    Folly::folly_synchronization_call_once
+  EXPORTED_DEPS
+    mvfst_common_optional
+)
+
 mvfst_add_library(mvfst_common_circular_deque
   EXPORTED_DEPS
     mvfst_common_mvfst_logging
