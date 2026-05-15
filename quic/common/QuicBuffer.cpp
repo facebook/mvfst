@@ -355,9 +355,8 @@ bool QuicBuffer::empty() const noexcept {
 void QuicBuffer::trimStart(std::size_t amount) noexcept {
   MVDCHECK_LE(amount, length_);
   if (amount > length_) {
-    auto logger = proto_oops::getThreadLocalOopsLogger();
     PROTO_OOPS_LOG(
-        logger,
+        proto_oops::getThreadLocalOopsLogger(),
         "quic_buffer",
         "invariant_violation: QuicBuffer::trimStart amount exceeds length");
     amount = length_;
@@ -369,9 +368,8 @@ void QuicBuffer::trimStart(std::size_t amount) noexcept {
 void QuicBuffer::trimEnd(std::size_t amount) noexcept {
   MVDCHECK_LE(amount, length_);
   if (amount > length_) {
-    auto logger = proto_oops::getThreadLocalOopsLogger();
     PROTO_OOPS_LOG(
-        logger,
+        proto_oops::getThreadLocalOopsLogger(),
         "quic_buffer",
         "invariant_violation: QuicBuffer::trimEnd amount exceeds length");
     amount = length_;

@@ -43,6 +43,29 @@ class OopsLogger {
 
 } // namespace proto_oops
 
+#if defined(FOLLY_MOBILE) && FOLLY_MOBILE
+
+// Protocol OOPS are server-side signals. Mobile builds compile shared QUIC
+// sources, but should not emit OOPS or pay for callsite builders and strings.
+#define PROTO_OOPS_LOG(loggerPtr, component, msg) \
+  do {                                            \
+  } while (0)
+
+#define PROTO_OOPS_LOG_IF(cond, loggerPtr, component, msg) \
+  do {                                                     \
+  } while (0)
+
+#define PROTO_OOPS_LOG_BUILDER(loggerPtr, builderExpr, component, msg) \
+  do {                                                                 \
+  } while (0)
+
+#define PROTO_OOPS_LOG_BUILDER_IF(                \
+    cond, loggerPtr, builderExpr, component, msg) \
+  do {                                            \
+  } while (0)
+
+#else
+
 // Convenience macro for OOPS logging with null-safety.
 // Checks if the logger is non-null before logging.
 // `loggerPtr` is any pointer-like type with bool conversion and operator->.
@@ -56,9 +79,7 @@ class OopsLogger {
 // Convenience macro for conditional OOPS logging with null-safety.
 // Logs only when both `cond` is true and `loggerPtr` is non-null.
 // `component` is a string naming the subsystem emitting the oops.
-// It is written to Scribe metadata as metadata["component"].
 // `msg` is the human-readable error text for the oops event.
-// It’s written to Scribe metadata as metadata["error_message"]
 #define PROTO_OOPS_LOG_IF(cond, loggerPtr, component, msg) \
   do {                                                     \
     if ((cond) && (loggerPtr)) {                           \
@@ -93,3 +114,5 @@ class OopsLogger {
                            .build());                 \
     }                                                 \
   } while (0)
+
+#endif
