@@ -53,6 +53,7 @@ mvfst_add_library(mvfst_server_server
     Folly::folly_token_bucket
     fmt::fmt
   EXPORTED_DEPS
+    mvfst_api_shared_threaded_packet_writer
     mvfst_api_transport
     mvfst_api_transport_helpers
     mvfst_codec_types

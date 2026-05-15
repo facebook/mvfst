@@ -26,6 +26,9 @@
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
+#include <quic/api/SharedThreadedPacketWriter.h>
+#include <quic/common/events/FollyQuicEventBase.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
@@ -84,14 +87,14 @@ void QuicServerWorker::setSocket(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket) {
   socket_ = std::move(socket);
   evb_ = folly::ExecutorKeepAlive(socket_->getEventBase());
+  workerQuicEvb_ = std::make_shared<FollyQuicEventBase>(evb_.get());
 }
 
 void QuicServerWorker::bind(
     const folly::SocketAddress& address,
     FollyAsyncUDPSocketAlias::BindOptions bindOptions) {
   // TODO get rid of the temporary wrapper
-  FollyQuicAsyncUDPSocket tmpSock(
-      std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
+  FollyQuicAsyncUDPSocket tmpSock(workerQuicEvb_, *socket_);
   MVDCHECK(!supportedVersions_.empty());
   MVCHECK(socket_);
   // TODO this totally doesn't work, we can't apply socket options before
@@ -137,8 +140,7 @@ void QuicServerWorker::bind(
 void QuicServerWorker::applyAllSocketOptions() {
   MVCHECK(socket_);
   // TODO get rid of the temporary wrapper
-  FollyQuicAsyncUDPSocket tmpSock(
-      std::make_shared<FollyQuicEventBase>(evb_.get()), *socket_);
+  FollyQuicAsyncUDPSocket tmpSock(workerQuicEvb_, *socket_);
   if (socketOptions_) {
     (void)applySocketOptions(
         tmpSock,
@@ -200,11 +202,48 @@ void QuicServerWorker::setUnfinishedHandshakeLimit(
   unfinishedHandshakeLimitFn_ = std::move(limitFn);
 }
 
+void QuicServerWorker::setDrainEventBase(folly::EventBase* drainEvb) {
+  drainEvb_ = drainEvb;
+}
+
 void QuicServerWorker::start() {
   MVCHECK(socket_);
   if (!pacingTimer_) {
     pacingTimer_ = std::make_unique<HighResQuicTimer>(
         evb_.get(), transportSettings_.pacingTimerResolution);
+  }
+  if (drainEvb_) {
+    sharedWriter_ = std::make_unique<SharedThreadedPacketWriter>(
+        *socket_,
+        evb_.get(),
+        drainEvb_,
+        /*queueCapacity=*/4096,
+        /*maxSegmentsPerMsg=*/(
+            transportSettings_.batchingMode ==
+                    QuicBatchingMode::BATCHING_MODE_GSO ||
+                transportSettings_.batchingMode ==
+                    QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO
+                ? transportSettings_.maxBatchSize
+                : 1),
+        /*maxMsgsPerCall=*/16);
+    sharedWriter_->setOnFatalError(
+        [this](const ConnectionId& connId, const QuicError& err) {
+          // Runs on producer EVB thread.
+          auto it = connectionIdMap_.find(connId);
+          if (it != connectionIdMap_.end()) {
+            it->second->close(err);
+          }
+        });
+    sharedWriter_->setOnResumeProducer(
+        [this](const std::vector<ConnectionId>& ids) {
+          // Runs on producer EVB thread.
+          for (const auto& connId : ids) {
+            auto it = connectionIdMap_.find(connId);
+            if (it != connectionIdMap_.end()) {
+              it->second->scheduleWrite();
+            }
+          }
+        });
   }
   socket_->resumeRead(this);
   MVVLOG(10) << fmt::format(
@@ -691,6 +730,10 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     // parameters to create server chosen connection id
     trans->setServerConnectionIdParams(ServerConnectionIdParams(
         cidVersion_, hostId_, static_cast<uint8_t>(processId_), workerId_));
+    if (sharedWriter_) {
+      trans->setPacketWriter(
+          std::make_unique<ConnectionPacketWriter>(sharedWriter_.get(), dstConnId));
+    }
     trans->accept(quicVersion);
     auto result = sourceAddressMap_.emplace(
         std::make_pair(std::make_pair(client, dstConnId), trans));
@@ -1415,6 +1458,9 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     return;
   }
   shutdown_ = true;
+  if (sharedWriter_) {
+    sharedWriter_->close();
+  }
   if (socket_) {
     socket_->pauseRead();
   }

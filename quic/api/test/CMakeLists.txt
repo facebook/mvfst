@@ -100,6 +100,16 @@ quic_add_test(TARGET QuicBatchWriterTest
   mvfst_test_utils
 )
 
+quic_add_test(TARGET SharedThreadedPacketWriterTest
+  SOURCES
+  SharedThreadedPacketWriterTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_api_shared_threaded_packet_writer
+  mvfst_common_events_folly_eventbase
+  ${LIBGMOCK_LIBRARY}
+)
+
 quic_add_test(TARGET QuicStreamAsyncTransportTest
   SOURCES
   QuicStreamAsyncTransportTest.cpp
