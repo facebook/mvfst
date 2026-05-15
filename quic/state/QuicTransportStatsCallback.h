@@ -210,6 +210,14 @@ class QuicTransportStatsCallback {
 
   virtual void onSconePacketSent() = 0;
 
+  // SharedThreadedPacketWriter send-path events. Default no-ops so existing
+  // implementations need not override unless they track these counters.
+  // onThreadedWriterPacketEnqueued / onThreadedWriterQueueFull: producer EVB.
+  // onThreadedWriterPacketsSent: drain EVB.
+  virtual void onThreadedWriterPacketEnqueued() {}
+  virtual void onThreadedWriterQueueFull() {}
+  virtual void onThreadedWriterPacketsSent(uint32_t /*n*/) {}
+
   static const char* toString(SocketErrorType errorType) {
     switch (errorType) {
       case SocketErrorType::AGAIN:

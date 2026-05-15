@@ -9,6 +9,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicBatchWriterFactory.h>
+#include <quic/api/QuicPacketWriter.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
@@ -235,10 +236,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
   return result;
 }
 
-void updateErrnoCount(
-    QuicConnectionStateBase& connection,
-    IOBufQuicBatch& ioBufBatch) {
-  int lastErrno = ioBufBatch.getLastRetryableErrno();
+void updateErrnoCount(QuicConnectionStateBase& connection, int lastErrno) {
   if (lastErrno == EAGAIN || lastErrno == EWOULDBLOCK) {
     connection.eagainOrEwouldblockCount++;
   } else if (lastErrno == ENOBUFS) {
@@ -400,7 +398,7 @@ continuousMemoryBuildScheduleEncrypt(
     if (!flushResult.has_value()) {
       return quic::make_unexpected(flushResult.error());
     }
-    updateErrnoCount(connection, ioBufBatch);
+    updateErrnoCount(connection, ioBufBatch.getLastRetryableErrno());
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
     }
@@ -413,7 +411,7 @@ continuousMemoryBuildScheduleEncrypt(
     if (!flushResult.has_value()) {
       return quic::make_unexpected(flushResult.error());
     }
-    updateErrnoCount(connection, ioBufBatch);
+    updateErrnoCount(connection, ioBufBatch.getLastRetryableErrno());
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
     }
@@ -494,7 +492,7 @@ continuousMemoryBuildScheduleEncrypt(
   if (!writeResult.has_value()) {
     return quic::make_unexpected(writeResult.error());
   }
-  updateErrnoCount(connection, ioBufBatch);
+  updateErrnoCount(connection, ioBufBatch.getLastRetryableErrno());
   return DataPathResult::makeWriteResult(
       writeResult.value(),
       std::move(result.value()),
@@ -514,7 +512,9 @@ iobufChainBasedBuildScheduleEncrypt(
     IOBufQuicBatch& ioBufBatch,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
-    TimePoint sendTime) {
+    TimePoint sendTime,
+    const folly::SocketAddress& peerAddr,
+    QuicPacketWriter* packetWriter) {
   // SCONE: Pre-build SCONE packet and adjust max packet size to avoid overflow
   std::unique_ptr<Buf> preBuildSconePacket;
   uint64_t adjustedMaxPacketSize = connection.udpSendPacketLen;
@@ -556,11 +556,14 @@ iobufChainBasedBuildScheduleEncrypt(
   }
   auto& packet = result->packet;
   if (!packet || packet->packet.frames.empty()) {
-    auto flushResult = ioBufBatch.flush();
+    auto flushResult = packetWriter ? packetWriter->flush() : ioBufBatch.flush();
     if (!flushResult.has_value()) {
       return quic::make_unexpected(flushResult.error());
     }
-    updateErrnoCount(connection, ioBufBatch);
+    updateErrnoCount(
+        connection,
+        packetWriter ? packetWriter->getLastRetryableErrno()
+                     : ioBufBatch.getLastRetryableErrno());
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
     }
@@ -568,11 +571,14 @@ iobufChainBasedBuildScheduleEncrypt(
   }
   if (packet->body.empty()) {
     // No more space remaining.
-    auto flushResult = ioBufBatch.flush();
+    auto flushResult = packetWriter ? packetWriter->flush() : ioBufBatch.flush();
     if (!flushResult.has_value()) {
       return quic::make_unexpected(flushResult.error());
     }
-    updateErrnoCount(connection, ioBufBatch);
+    updateErrnoCount(
+        connection,
+        packetWriter ? packetWriter->getLastRetryableErrno()
+                     : ioBufBatch.getLastRetryableErrno());
     if (connection.loopDetectorCallback) {
       connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
     }
@@ -660,11 +666,16 @@ iobufChainBasedBuildScheduleEncrypt(
     return DataPathResult::makeWriteResult(
         true, std::move(result.value()), encodedSize, encodedBodySize);
   }
-  auto writeResult = ioBufBatch.write(std::move(packetBuf), encodedSize);
+  auto writeResult = packetWriter
+      ? packetWriter->write(std::move(packetBuf), encodedSize, peerAddr)
+      : ioBufBatch.write(std::move(packetBuf), encodedSize);
   if (!writeResult.has_value()) {
     return quic::make_unexpected(writeResult.error());
   }
-  updateErrnoCount(connection, ioBufBatch);
+  updateErrnoCount(
+      connection,
+      packetWriter ? packetWriter->getLastRetryableErrno()
+                   : ioBufBatch.getLastRetryableErrno());
   return DataPathResult::makeWriteResult(
       writeResult.value(),
       std::move(result.value()),
@@ -1891,8 +1902,34 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
   uint64_t bytesWritten = 0;
   uint64_t shortHeaderPadding = 0;
   [[maybe_unused]] uint64_t shortHeaderPaddingCount = 0;
+  // Capture baseline so pktSentFn() counts packets sent *this call*, not
+  // lifetime total. ConnectionPacketWriter::result_.packetsSent accumulates
+  // across calls; ioBufBatch is fresh each call so needs no adjustment.
+  const uint64_t pktSentBaseline = connection.packetWriter
+      ? connection.packetWriter->getResult().packetsSent
+      : 0;
+  auto pktSentFn = [&]() -> uint64_t {
+    return connection.packetWriter
+        ? connection.packetWriter->getResult().packetsSent - pktSentBaseline
+        : static_cast<uint64_t>(ioBufBatch.getPktSent());
+  };
+  MVDCHECK(
+      !connection.packetWriter ||
+          connection.transportSettings.dataPathType ==
+              DataPathType::ChainedMemory,
+      "packetWriter requires ChainedMemory data path");
+  auto flushFn = [&]() {
+    return connection.packetWriter ? connection.packetWriter->flush()
+                                   : ioBufBatch.flush();
+  };
+  auto errnoFn = [&]() {
+    return connection.packetWriter
+        ? connection.packetWriter->getLastRetryableErrno()
+        : ioBufBatch.getLastRetryableErrno();
+  };
+
   SCOPE_EXIT {
-    auto nSent = ioBufBatch.getPktSent();
+    auto nSent = pktSentFn();
     if (nSent > 0) {
       QUIC_STATS(connection.statsCallback, onPacketsSent, nSent);
       QUIC_STATS(connection.statsCallback, onWrite, bytesWritten);
@@ -1908,8 +1945,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
 
   quic::TimePoint sentTime = Clock::now();
 
-  while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
-         ((ioBufBatch.getPktSent() < batchSize) ||
+  while (scheduler.hasData() && pktSentFn() < packetLimit &&
+         ((pktSentFn() < batchSize) ||
           writeLoopTimeLimit(writeLoopBeginTime, connection))) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
     auto header = builder(srcConnId, dstConnId, packetNum, version, token);
@@ -1931,22 +1968,38 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
 
     bool useChainedMemory = connection.transportSettings.dataPathType ==
         DataPathType::ChainedMemory;
-    const auto& dataPlaneFunc = useChainedMemory
-        ? iobufChainBasedBuildScheduleEncrypt
-        : continuousMemoryBuildScheduleEncrypt;
 
-    auto ret = dataPlaneFunc(
-        connection,
-        std::move(header),
-        pnSpace,
-        packetNum,
-        cipherOverhead,
-        scheduler,
-        writableBytes,
-        ioBufBatch,
-        aead,
-        headerCipher,
-        sentTime);
+    auto ret = [&]() {
+      if (useChainedMemory) {
+        return iobufChainBasedBuildScheduleEncrypt(
+            connection,
+            std::move(header),
+            pnSpace,
+            packetNum,
+            cipherOverhead,
+            scheduler,
+            writableBytes,
+            ioBufBatch,
+            aead,
+            headerCipher,
+            sentTime,
+            peerAddress,
+            connection.packetWriter.get());
+      } else {
+        return continuousMemoryBuildScheduleEncrypt(
+            connection,
+            std::move(header),
+            pnSpace,
+            packetNum,
+            cipherOverhead,
+            scheduler,
+            writableBytes,
+            ioBufBatch,
+            aead,
+            headerCipher,
+            sentTime);
+      }
+    }();
 
     // This is a fatal error vs. a build error.
     if (!ret.has_value()) {
@@ -1955,12 +2008,12 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     if (!ret->buildSuccess) {
       // If we're returning because we couldn't schedule more packets,
       // make sure we flush the buffer in this function.
-      auto flushResult = ioBufBatch.flush();
+      auto flushResult = flushFn();
       if (!flushResult.has_value()) {
         return quic::make_unexpected(flushResult.error());
       }
-      updateErrnoCount(connection, ioBufBatch);
-      return WriteQuicDataResult{ioBufBatch.getPktSent(), 0, bytesWritten};
+      updateErrnoCount(connection, errnoFn());
+      return WriteQuicDataResult{pktSentFn(), 0, bytesWritten};
     }
     // If we build a packet, we updateConnection(), even if write might have
     // been failed. Because if it builds, a lot of states need to be updated no
@@ -1993,14 +2046,15 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
     connection.streamManager->writeQueue().commitTransaction(
         std::move(writeQueueTransaction));
 
-    // if ioBufBatch.write returns false
-    // it is because a flush() call failed
+    // writeSuccess == false means flush() failed (inline) or SPSC queue full
+    // (async writer backpressure).
     if (!ret->writeSuccess) {
       if (connection.loopDetectorCallback) {
-        connection.writeDebugState.noWriteReason =
-            NoWriteReason::SOCKET_FAILURE;
+        connection.writeDebugState.noWriteReason = connection.packetWriter
+            ? NoWriteReason::WRITER_BACKPRESSURE
+            : NoWriteReason::SOCKET_FAILURE;
       }
-      return WriteQuicDataResult{ioBufBatch.getPktSent(), 0, bytesWritten};
+      return WriteQuicDataResult{pktSentFn(), 0, bytesWritten};
     }
 
     if ((connection.transportSettings.batchingMode ==
@@ -2009,21 +2063,24 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
             connection.transportSettings.maxBatchSize,
             connection.transportSettings.dataPathType)) {
       // With SinglePacketInplaceBatchWriter we always write one packet, and so
-      // ioBufBatch needs a flush.
+      // ioBufBatch needs a flush. This path requires ContinuousMemory, so
+      // connection.packetWriter is always null here.
       auto flushResult = ioBufBatch.flush();
       if (!flushResult.has_value()) {
         return quic::make_unexpected(flushResult.error());
       }
-      updateErrnoCount(connection, ioBufBatch);
+      updateErrnoCount(connection, ioBufBatch.getLastRetryableErrno());
     }
   }
 
-  // Ensure that the buffer is flushed before returning
-  auto flushResult = ioBufBatch.flush();
+  // Ensure that the buffer is flushed before returning.
+  // On the async path this flush() writes the eventfd to wake the drain thread
+  // — it must not be skipped.
+  auto flushResult = flushFn();
   if (!flushResult.has_value()) {
     return quic::make_unexpected(flushResult.error());
   }
-  updateErrnoCount(connection, ioBufBatch);
+  updateErrnoCount(connection, errnoFn());
 
   if (connection.transportSettings.dataPathType ==
       DataPathType::ContinuousMemory) {
@@ -2032,7 +2089,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
         connection.bufAccessor->length() == 0 &&
         connection.bufAccessor->headroom() == 0);
   }
-  return WriteQuicDataResult{ioBufBatch.getPktSent(), 0, bytesWritten};
+  return WriteQuicDataResult{pktSentFn(), 0, bytesWritten};
 }
 
 quic::Expected<WriteQuicDataResult, QuicError> writeProbingDataToSocket(

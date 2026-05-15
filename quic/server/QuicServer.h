@@ -325,6 +325,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory);
 
   /**
+   * Enable offloading sendmsg calls to the given EventBase thread.
+   * The caller owns the EventBase and must ensure it outlives this server.
+   * The same EventBase may be shared across multiple QuicServer instances.
+   * Requires DataPathType::ChainedMemory — fails at start() otherwise.
+   * Must be called before start() or initialize().
+   */
+  void setDrainEventBase(folly::EventBase* drainEvb);
+
+  /**
    * Returns vector of running eventbases.
    * This is useful if QuicServer is initialized with a 'default' mode by just
    * specifying number of workers.
@@ -491,6 +500,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   Optional<RateLimit> rateLimit_;
 
   std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1048576; }};
+
+  // Drain EventBase for SharedThreadedPacketWriter; null = inline path.
+  folly::EventBase* drainEvb_{nullptr};
 
   // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
   FollyAsyncUDPSocketAlias::BindOptions bindOptions_;

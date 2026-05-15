@@ -8,15 +8,11 @@
 #pragma once
 #include <quic/QuicException.h>
 #include <quic/api/QuicBatchWriter.h>
+#include <quic/api/QuicPacketWriter.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
-
-struct BufQuicBatchResult {
-  uint64_t packetsSent{0};
-  uint64_t bytesSent{0};
-};
 
 class IOBufQuicBatch {
  public:

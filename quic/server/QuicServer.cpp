@@ -134,6 +134,12 @@ bool QuicServer::isInitialized() const noexcept {
   return initialized_;
 }
 
+void QuicServer::setDrainEventBase(folly::EventBase* drainEvb) {
+  checkRunningInThread(mainThreadId_);
+  drainEvb_ = drainEvb;
+}
+
+
 void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   checkRunningInThread(mainThreadId_);
   MVCHECK(ctx_, "Must set a TLS context for the Quic server");
@@ -197,6 +203,11 @@ void QuicServer::initializeImpl(
           << std::numeric_limits<uint16_t>::max() << " workers");
   MVCHECK(shutdown_);
   shutdown_ = false;
+
+  MVCHECK(
+      !drainEvb_ ||
+          transportSettings_.dataPathType == DataPathType::ChainedMemory,
+      "setDrainEventBase requires DataPathType::ChainedMemory");
 
   // it the connid algo factory is not set, use default impl
   if (!connIdAlgoFactory_) {
@@ -263,6 +274,9 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->setShouldRegisterKnobParamHandlerFn(
       shouldRegisterKnobParamHandlerFn_);
   worker->setQuicExperimentHandlerFn(quicExperimentHandlerFn_);
+  if (drainEvb_) {
+    worker->setDrainEventBase(drainEvb_);
+  }
   return worker;
 }
 
