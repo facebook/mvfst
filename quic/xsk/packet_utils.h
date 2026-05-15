@@ -49,6 +49,20 @@ void writeChecksum(
     char* packet,
     uint16_t len);
 
+// Computes only the UDP pseudo-header partial sum and writes it to the UDP
+// header's checksum field. This is the form expected by the kernel for
+// `CHECKSUM_PARTIAL` (i.e. when XDP_TXMD_FLAGS_CHECKSUM is requested):
+// HW or skb_checksum_help() will then add the data checksum to produce the
+// final value on the wire.
+//
+// `len` is the value in the UDP length header (UDP header + UDP payload),
+// in host byte order.
+void writePseudoHeaderChecksum(
+    const folly::IPAddress& dstAddr,
+    const folly::IPAddress& srcAddr,
+    char* packet,
+    uint16_t len);
+
 } // namespace facebook::xdpsocket
 
 #endif

@@ -7,6 +7,7 @@
 
 #if defined(__linux__) && !defined(ANDROID)
 
+#include <folly/net/NetOps.h>
 #include <net/if.h>
 #include <quic/xsk/xsk_lib.h>
 #include <sys/mman.h>
@@ -42,20 +43,27 @@ int close_xsk(int fd) {
   return close(fd);
 }
 
-void* create_umem(int xsk_fd, __u32 num_frames, __u32 frame_size) {
+void* FOLLY_NULLABLE create_umem(int xsk_fd, const UmemConfig& cfg) {
+  // Widen one operand to size_t before multiplying so the product doesn't
+  // overflow __u32 for large UMEMs (e.g. 1M frames * 4KiB = 4 GiB).
+  const size_t umemSize = static_cast<size_t>(cfg.numFrames) * cfg.frameSize;
+
   void* umem_area = mmap(
       nullptr,
-      num_frames * frame_size,
+      umemSize,
       PROT_READ | PROT_WRITE,
       MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
       -1,
       0);
 
-  struct xdp_umem_reg mr;
-  memset(&mr, 0, sizeof(mr));
+  folly::netops::xdp_umem_reg mr{};
   mr.addr = (uintptr_t)umem_area;
-  mr.len = num_frames * frame_size;
-  mr.chunk_size = frame_size;
+  mr.len = umemSize;
+  mr.chunk_size = cfg.frameSize;
+  if (cfg.txMetadataLen > 0) {
+    mr.flags = XDP_UMEM_TX_METADATA_LEN;
+    mr.tx_metadata_len = cfg.txMetadataLen;
+  }
 
   int err = setsockopt(xsk_fd, SOL_XDP, XDP_UMEM_REG, &mr, sizeof(mr));
   if (err) {

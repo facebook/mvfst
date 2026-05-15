@@ -8,15 +8,25 @@
 #if defined(__linux__) && !defined(ANDROID)
 
 #include <folly/Benchmark.h>
+#include <folly/net/NetOps.h>
+#include <netinet/udp.h>
+#include <quic/common/LinuxKernelVersion.h>
 #include <quic/common/StringUtils.h>
 #include <quic/xsk/XskSender.h>
 #include <quic/xsk/packet_utils.h>
+#include <cstddef>
 #include <stdexcept>
 
 namespace facebook::xdpsocket {
 
 const static int kDefaultTos = 0;
 const static int kDefaultTtl = 64;
+
+// Minimum kernel version that supports AF_XDP TX metadata: Linux kernel 6.8.
+// On older kernels XDP_UMEM_REG silently strips the trailing
+// tx_metadata_len field, so the natural setsockopt-based probe is
+// unreliable; we use uname() instead.
+constexpr std::pair<int, int> kMinKernelForTxMetadata{6, 8};
 
 XskSender::~XskSender() {
   if (xskFd_ >= 0) {
@@ -54,8 +64,9 @@ quic::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
 
   XskBuffer xskBuffer;
   char* buffer = (char*)umemArea_ +
-      size_t(*maybeFreeUmemLoc * xskSenderConfig_.frameSize) + sizeof(udphdr) +
-      (isIpV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr);
+      size_t(*maybeFreeUmemLoc * xskSenderConfig_.frameSize) + txMetadataLen_ +
+      sizeof(udphdr) + (isIpV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) +
+      sizeof(ethhdr);
   xskBuffer.buffer = buffer;
   xskBuffer.frameIndex = *maybeFreeUmemLoc;
   xskBuffer.payloadLength = 0;
@@ -69,17 +80,24 @@ void XskSender::writeXskBuffer(
     const folly::SocketAddress& src) {
   bool isIpV6 = peer.getIPAddress().isV6();
 
-  char* buffer = (char*)umemArea_ +
+  char* frameStart = (char*)umemArea_ +
       size_t(xskBuffer.frameIndex * xskSenderConfig_.frameSize);
-  writeUdpPacketScaffoldingToBuffer(buffer, peer, src, xskBuffer.payloadLength);
+  char* packetStart = frameStart + txMetadataLen_;
+
+  if (checksumOffloadEnabled_) {
+    writeTxMetadata(frameStart, peer, xskBuffer.payloadLength);
+  }
+  writeUdpPacketScaffoldingToBuffer(
+      packetStart, peer, src, xskBuffer.payloadLength);
 
   auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
                                              : std::unique_lock<std::mutex>(m_);
   xdp_desc* descriptor = getTxDescriptor();
-  descriptor->addr = __u64(xskBuffer.frameIndex * xskSenderConfig_.frameSize);
+  descriptor->addr =
+      __u64(xskBuffer.frameIndex * xskSenderConfig_.frameSize) + txMetadataLen_;
   descriptor->len = xskBuffer.payloadLength + sizeof(udphdr) +
       (isIpV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr);
-  descriptor->options = 0;
+  descriptor->options = checksumOffloadEnabled_ ? XDP_TX_METADATA : 0;
 
   numPacketsSentInBatch_++;
   if (numPacketsSentInBatch_ >= xskSenderConfig_.batchSize) {
@@ -127,8 +145,25 @@ void XskSender::writeUdpPacketScaffoldingToBuffer(
   writeUdpHeader(
       src.getPort(), peer.getPort(), 0 /* checksum */, ipPayloadLen, buffer);
 
-  writeChecksum(
-      peer.getIPAddress(), src.getIPAddress(), bufferCopy, ipPayloadLen);
+  if (checksumOffloadEnabled_) {
+    writePseudoHeaderChecksum(
+        peer.getIPAddress(), src.getIPAddress(), bufferCopy, ipPayloadLen);
+  } else {
+    writeChecksum(
+        peer.getIPAddress(), src.getIPAddress(), bufferCopy, ipPayloadLen);
+  }
+}
+
+void XskSender::writeTxMetadata(
+    char* frameStart,
+    const folly::SocketAddress& peer,
+    uint16_t /*udpPayloadLength*/) {
+  auto* meta = reinterpret_cast<folly::netops::xsk_tx_metadata*>(frameStart);
+  *meta = {};
+  meta->flags = XDP_TXMD_FLAGS_CHECKSUM;
+  meta->request.csum_start = sizeof(ethhdr) +
+      (peer.getIPAddress().isV6() ? sizeof(ipv6hdr) : sizeof(iphdr));
+  meta->request.csum_offset = offsetof(struct udphdr, check);
 }
 
 SendResult XskSender::writeUdpPacket(
@@ -153,20 +188,24 @@ SendResult XskSender::writeUdpPacket(
     return SendResult::NO_FREE_DESCRIPTORS;
   }
 
-  // Just write to the first slot in the umem for the time being
-  char* buffer =
+  char* frameStart =
       (char*)umemArea_ + size_t(*freeUmemLoc * xskSenderConfig_.frameSize);
+  char* packetStart = frameStart + txMetadataLen_;
 
-  writeUdpPacketToBuffer(buffer, peer, src, (const char*)data, len);
+  if (checksumOffloadEnabled_) {
+    writeTxMetadata(frameStart, peer, len);
+  }
+  writeUdpPacketToBuffer(packetStart, peer, src, (const char*)data, len);
 
   guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
                                         : std::unique_lock<std::mutex>(m_);
 
   xdp_desc* descriptor = getTxDescriptor();
-  descriptor->addr = __u64(*freeUmemLoc * xskSenderConfig_.frameSize);
+  descriptor->addr =
+      __u64(*freeUmemLoc * xskSenderConfig_.frameSize) + txMetadataLen_;
   descriptor->len = len + sizeof(udphdr) +
       (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) + sizeof(ethhdr);
-  descriptor->options = 0;
+  descriptor->options = checksumOffloadEnabled_ ? XDP_TX_METADATA : 0;
 
   folly::doNotOptimizeAway(descriptor->addr);
   folly::doNotOptimizeAway(descriptor->len);
@@ -191,6 +230,11 @@ SendResult XskSender::writeUdpPacket(
 }
 
 quic::Expected<void, std::runtime_error> XskSender::init() {
+  checksumOffloadEnabled_ = xskSenderConfig_.useChecksumOffload &&
+      quic::isLinuxKernelAtLeast(kMinKernelForTxMetadata);
+  txMetadataLen_ =
+      checksumOffloadEnabled_ ? sizeof(folly::netops::xsk_tx_metadata) : 0;
+
   auto xdpSocketInitResult = initXdpSocket();
   if (xdpSocketInitResult.hasError()) {
     return quic::make_unexpected(xdpSocketInitResult.error());
@@ -273,11 +317,13 @@ void XskSender::writeUdpPacketToBuffer(
   // Write the payload
   writeUdpPayload((const char*)data, len, buffer);
 
-  writeChecksum(
-      peer.getIPAddress(),
-      src.getIPAddress(),
-      bufferCopy,
-      len + sizeof(udphdr));
+  if (checksumOffloadEnabled_) {
+    writePseudoHeaderChecksum(
+        peer.getIPAddress(), src.getIPAddress(), bufferCopy, ipPayloadLen);
+  } else {
+    writeChecksum(
+        peer.getIPAddress(), src.getIPAddress(), bufferCopy, ipPayloadLen);
+  }
 }
 
 quic::Expected<void, std::runtime_error> XskSender::initXdpSocket() {
@@ -295,7 +341,12 @@ quic::Expected<void, std::runtime_error> XskSender::initXdpSocket() {
   // Create umem
   if (isPrimaryOwner()) {
     umemArea_ = create_umem(
-        xskFd_, xskSenderConfig_.numFrames, xskSenderConfig_.frameSize);
+        xskFd_,
+        UmemConfig{
+            .numFrames = xskSenderConfig_.numFrames,
+            .frameSize = xskSenderConfig_.frameSize,
+            .txMetadataLen = txMetadataLen_,
+        });
     xskSenderConfig_.sharedState->sharedUmemAddr = umemArea_;
   } else {
     umemArea_ = xskSenderConfig_.sharedState->sharedUmemAddr;

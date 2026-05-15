@@ -9,6 +9,7 @@
 
 #if defined(__linux__) && !defined(ANDROID)
 
+#include <folly/CppAttributes.h>
 #include <linux/if_xdp.h>
 #include <stdint.h>
 
@@ -18,8 +19,19 @@ int create_xsk();
 // Returns 0 on success, negative value on failure
 int close_xsk(int fd);
 
-// Returns nullptr on failure
-void* create_umem(int xsk_fd, __u32 num_frames, __u32 frame_size);
+// UMEM sizing parameters. Grouped into a struct (rather than positional
+// args) so that the same-typed __u32 fields can't be mixed up at callsites.
+// `txMetadataLen` reserves that many bytes in front of every TX descriptor
+// for an `xsk_tx_metadata` header (see linux/if_xdp.h). Leave at 0 if not
+// using AF_XDP TX metadata.
+struct UmemConfig {
+  __u32 numFrames;
+  __u32 frameSize;
+  __u32 txMetadataLen;
+};
+
+// Returns nullptr on failure.
+void* FOLLY_NULLABLE create_umem(int xsk_fd, const UmemConfig& cfg);
 
 // Returns 0 on success, negative value on failure
 int free_umem(void* umem, __u32 num_frames, __u32 frame_size);

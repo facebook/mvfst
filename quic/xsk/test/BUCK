@@ -1,0 +1,14 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "PacketUtilsTest",
+    srcs = [
+        "PacketUtilsTest.cpp",
+    ],
+    deps = [
+        "//folly:network_address",
+        "//quic/xsk:xsk_lib",
+    ],
+)

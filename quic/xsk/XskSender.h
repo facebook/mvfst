@@ -81,6 +81,13 @@ struct XskSenderConfig {
   bool zeroCopyEnabled;
   bool useNeedWakeup;
 
+  // Request HW UDP checksum offload via XDP_TXMD_FLAGS_CHECKSUM. The actual
+  // behavior is gated on the running kernel supporting AF_XDP TX metadata
+  // (Linux kernel >= 6.8); on older kernels this is silently a no-op. Set
+  // this knob to false to A/B test against the software-checksum baseline
+  // at runtime.
+  bool useChecksumOffload{false};
+
   std::shared_ptr<SharedState> sharedState;
 
   // Set this to true if we're using one AF_XDP socket per thread. This
@@ -162,6 +169,13 @@ class XskSender {
       const void* data,
       uint16_t len);
 
+  // Writes the xsk_tx_metadata header at the start of `frameStart`. Must
+  // only be called when checksumOffloadEnabled_ is true.
+  void writeTxMetadata(
+      char* frameStart,
+      const folly::SocketAddress& peer,
+      uint16_t udpPayloadLength);
+
   quic::Expected<void, std::runtime_error> initXdpSocket();
 
   xdp_desc* getTxDescriptor();
@@ -181,6 +195,14 @@ class XskSender {
   std::queue<uint32_t> freeUmemIndices_;
 
   XskSenderConfig xskSenderConfig_;
+
+  // True if the running kernel and configuration both support requesting
+  // XDP_TXMD_FLAGS_CHECKSUM. Determined at init() time.
+  bool checksumOffloadEnabled_{false};
+
+  // Bytes reserved at the head of every UMEM frame for an xsk_tx_metadata
+  // header. 0 when checksumOffloadEnabled_ is false.
+  uint32_t txMetadataLen_{0};
 
   uint32_t numPacketsSentInBatch_{0};
 

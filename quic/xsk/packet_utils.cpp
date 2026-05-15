@@ -99,6 +99,35 @@ void writeUdpPayload(const char* data, uint32_t len, char*& buffer) {
   buffer += len;
 }
 
+void writePseudoHeaderChecksum(
+    const folly::IPAddress& dstAddr,
+    const folly::IPAddress& srcAddr,
+    char* packet,
+    uint16_t len) {
+  bool isV6 = dstAddr.isV6();
+
+  // Pseudo-header proto (17 = UDP) and length contribution. The shape mirrors
+  // the existing writeChecksum() arithmetic so it works under the same
+  // little-endian-host assumption.
+  uint64_t sum = (uint64_t(len) + 17) << 8;
+
+  const auto* srcPtr = (const uint16_t*)srcAddr.bytes();
+  const auto* dstPtr = (const uint16_t*)dstAddr.bytes();
+  int numWords = isV6 ? 8 : 2;
+  for (int i = 0; i < numWords; i++) {
+    sum += srcPtr[i];
+    sum += dstPtr[i];
+  }
+
+  while (sum >> 16) {
+    sum = (sum & 0xffff) + (sum >> 16);
+  }
+
+  auto* udpHdr = (udphdr*)(packet + (isV6 ? sizeof(ipv6hdr) : sizeof(iphdr)) +
+                           sizeof(ethhdr));
+  udpHdr->check = (uint16_t)sum;
+}
+
 void writeChecksum(
     const folly::IPAddress& dstAddr,
     const folly::IPAddress& srcAddr,

@@ -14,8 +14,10 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:benchmark",
+        "//folly/net:net_ops",
     ],
     exported_deps = [
+        "//folly:cpp_attributes",
         "//folly:network_address",
     ],
     external_deps = [
@@ -53,6 +55,8 @@ mvfst_cpp_library(
     ],
     deps = [
         "//folly:benchmark",
+        "//folly/net:net_ops",
+        "//quic/common:linux_kernel_version",
         "//quic/common:string_utils",
     ],
     exported_deps = [

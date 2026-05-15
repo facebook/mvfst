@@ -10,8 +10,10 @@ mvfst_add_library(mvfst_xsk_xsk_lib
     packet_utils.cpp
     xsk_lib.cpp
   DEPS
+    Folly::folly_net_net_ops
     Folly::follybenchmark
   EXPORTED_DEPS
+    Folly::folly_cpp_attributes
     Folly::folly_network_address
 )
 
@@ -32,7 +34,9 @@ mvfst_add_library(mvfst_xsk_xsk_sender
   SRCS
     XskSender.cpp
   DEPS
+    mvfst_common_linux_kernel_version
     mvfst_common_string_utils
+    Folly::folly_net_net_ops
     Folly::follybenchmark
   EXPORTED_DEPS
     mvfst_common_expected
