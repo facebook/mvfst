@@ -64,6 +64,7 @@ mvfst_add_library(mvfst_state_quic_state_machine
     QuicStreamManager.cpp
     StateData.cpp
   DEPS
+    mvfst_api_quic_packet_writer
     mvfst_logging_qlogger_macros
     mvfst_priority_http_priority_queue
   EXPORTED_DEPS
