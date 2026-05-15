@@ -307,6 +307,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   virtual void cancelAllAppCallbacks(const QuicError& error) noexcept;
 
+  // Schedule a write loop iteration on the connection's EventBase. Safe to
+  // call from any thread; the write will execute on the EventBase thread.
+  void scheduleWrite();
+
   void scheduleTimeout(
       QuicTimerCallback* callback,
       std::chrono::milliseconds timeout);
