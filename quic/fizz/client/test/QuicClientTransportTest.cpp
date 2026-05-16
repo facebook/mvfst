@@ -147,7 +147,8 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<QuicServer> createServer(
       ProcessId processId,
       bool withRetryPacket = false,
-      bool enableScone = false) {
+      bool enableScone = false,
+      bool enableSconeSendOnly = false) {
     quic::TransportSettings transportSettings;
     transportSettings.zeroRttSourceTokenMatchingPolicy =
         ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
@@ -155,7 +156,11 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     folly::Random::secureRandom(secret.data(), secret.size());
     transportSettings.retryTokenSecret = secret;
     if (enableScone) {
-      transportSettings.enableScone = true;
+      transportSettings.advertiseSconeSupport = true;
+      transportSettings.enableSconeSend = true;
+    }
+    if (enableSconeSendOnly) {
+      transportSettings.enableSconeSend = true;
     }
     auto server = QuicServer::createQuicServer(transportSettings);
 
@@ -514,27 +519,22 @@ TEST_P(QuicClientTransportIntegrationTest, SconeNegotiationClientSide) {
       true // enableScone
   );
   serverAddr = server_->getAddress();
-  // Update client peer address to new server address
   client->getNonConstConn().peerAddress = serverAddr;
 
-  // client->getTransportSettings().enableScone = true
   TransportSettings clientSettings;
-  clientSettings.enableScone = true;
+  clientSettings.advertiseSconeSupport = true;
   client->setTransportSettings(clientSettings);
 
   expectTransportCallbacks();
 
-  // Connect as in NetworkTest
   client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  // In onTransportReady():
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
 
-    // ASSERT_TRUE(client->getConn().scone);
     ASSERT_TRUE(client->getConn().scone);
+    EXPECT_TRUE(client->getConn().peerAdvertisedSconeSupport);
 
-    // Check peer transport params for SCONE support
     auto peerTps = client->getPeerTransportParams();
     if (peerTps.has_value()) {
       auto it =
@@ -542,32 +542,62 @@ TEST_P(QuicClientTransportIntegrationTest, SconeNegotiationClientSide) {
       EXPECT_TRUE(it != peerTps->end());
     }
 
-    // Terminate loop
     eventbase_.terminateLoopSoon();
   }));
 
   eventbase_.loopForever();
 }
 
-TEST_P(QuicClientTransportIntegrationTest, NegativePeerNotSupported) {
-  // Server enableScone=false (default), client=true → connection should succeed
-  // but SCONE should not be negotiated (graceful fallback)
-  // Note: server_ is already created with enableScone=false by default in
-  // SetUp()
+// Per draft-ietf-scone-protocol §6, scone_supported is a unilateral
+// receive-willingness advertisement. When the local endpoint advertises but
+// the peer does not, SconeState must still exist (so the local endpoint can
+// receive SCONE injected by an in-path network element); only the send side
+// is gated by peerAdvertisedSconeSupport=false.
+TEST_P(
+    QuicClientTransportIntegrationTest,
+    ClientReceiveSetUpEvenWhenPeerDoesNotAdvertise) {
+  // server_ from SetUp() has advertiseSconeSupport=false by default.
 
   TransportSettings clientSettings;
-  clientSettings.enableScone = true;
+  clientSettings.advertiseSconeSupport = true;
   client->setTransportSettings(clientSettings);
 
   expectTransportCallbacks();
 
-  // Connection should succeed even when server doesn't support SCONE
   EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
 
-    // SCONE should NOT be negotiated when server doesn't support it
-    EXPECT_FALSE(client->getConn().scone.has_value());
+    // SconeState exists because the client advertised - this is what enables
+    // receiving SCONE injected by an in-path network element.
+    ASSERT_TRUE(client->getConn().scone.has_value());
+    // Server didn't advertise, so the client may not send SCONE to the server.
+    EXPECT_FALSE(client->getConn().peerAdvertisedSconeSupport);
 
+    eventbase_.terminateLoopSoon();
+  }));
+
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+  eventbase_.loopForever();
+}
+
+TEST_P(
+    QuicClientTransportIntegrationTest,
+    ServerSendsSconeWhenClientAdvertises) {
+  server_->shutdown();
+  server_ = createServer(ProcessId::ZERO, false, false, true);
+  serverAddr = server_->getAddress();
+  client->getNonConstConn().peerAddress = serverAddr;
+
+  TransportSettings clientSettings;
+  clientSettings.advertiseSconeSupport = true;
+  client->setTransportSettings(clientSettings);
+
+  expectTransportCallbacks();
+
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    ASSERT_TRUE(client->getConn().scone.has_value());
+    EXPECT_FALSE(client->getConn().peerAdvertisedSconeSupport);
     eventbase_.terminateLoopSoon();
   }));
 
@@ -583,9 +613,10 @@ TEST_F(
   auto& conn = client->getNonConstConn();
 
   // Enable SCONE and set up qLogger to capture logs
-  conn.transportSettings.enableScone = true;
+  conn.transportSettings.advertiseSconeSupport = true;
+  conn.transportSettings.enableSconeSend = true;
   conn.scone.emplace();
-  conn.scone->negotiated = true;
+  conn.peerAdvertisedSconeSupport = true;
 
   // Create a mock qLogger to capture the SCONE logging
   auto qLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
@@ -617,9 +648,10 @@ TEST_F(
     StandaloneSconePacketRateSignalNotQueued) {
   auto& conn = client->getNonConstConn();
 
-  conn.transportSettings.enableScone = true;
+  conn.transportSettings.advertiseSconeSupport = true;
+  conn.transportSettings.enableSconeSend = true;
   conn.scone.emplace();
-  conn.scone->negotiated = true;
+  conn.peerAdvertisedSconeSupport = true;
 
   // Deliver a standalone SCONE packet (not coalesced with encrypted data).
   // The rate signal should NOT be queued because no subsequent encrypted
@@ -633,6 +665,43 @@ TEST_F(
   deliverData(sconePacket.coalesce());
 
   EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
+}
+
+// Per draft-ietf-scone-protocol §6: receive-willingness is unilateral. Even
+// when the peer didn't advertise scone_supported, the client must still
+// process injected SCONE packets if it advertised. This is the asymmetric
+// case observed when an in-path network element injects SCONE on a flow to
+// a server that doesn't itself support SCONE.
+TEST_F(
+    QuicClientTransportAfterStartTestBase,
+    SconeRateSignalQueuedEvenWhenPeerDidNotAdvertise) {
+  auto& conn = client->getNonConstConn();
+
+  conn.transportSettings.advertiseSconeSupport = true;
+  conn.scone.emplace();
+  // Peer (server) did NOT advertise scone_supported.
+  conn.peerAdvertisedSconeSupport = false;
+
+  uint8_t testRate = 0x21;
+  auto sconePacket = buildSconePacket(
+      testRate,
+      conn.clientConnectionId.value(),
+      conn.serverConnectionId.value());
+
+  // Coalesce SCONE with a valid subsequent packet so the anti-spoof guard
+  // accepts the rate signal.
+  AckBlocks acks = {{1, 1}};
+  auto ackPacket = createAckPacket(conn, 2, acks, PacketNumberSpace::AppData);
+  auto ackPacketBuf = packetToBuf(ackPacket);
+
+  auto coalesced = folly::IOBuf::create(0);
+  coalesced->prependChain(folly::IOBuf::copyBuffer(sconePacket.coalesce()));
+  coalesced->prependChain(std::move(ackPacketBuf));
+
+  deliverData(coalesced->coalesce());
+
+  ASSERT_EQ(conn.scone->pendingRateSignals.size(), 1);
+  EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {

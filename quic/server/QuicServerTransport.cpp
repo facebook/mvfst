@@ -1396,15 +1396,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto& conn = *serverTransport.conn_;
         uint64_t bps = *valPtr;
         uint8_t rateSignal = bpsToSconeRateSignal(bps);
+        conn.transportSettings.enableSconeSend = true;
         if (!conn.scone) {
           conn.scone.emplace();
         }
-        conn.scone->negotiated = true;
         conn.scone->configuredRateSignal = rateSignal;
         // Reset the send timer so a SCONE packet is sent with the very next
         // outgoing packet, reflecting the new rate signal immediately.
         conn.scone->lastSconeSentTime.reset();
-        VLOG(3) << "SCONE_KNOB: Enabled SCONE with rate signal "
+        VLOG(3) << "SCONE_KNOB: Enabled SCONE send with rate signal "
                 << static_cast<int>(rateSignal) << " from " << bps << " bps";
         return {};
       });

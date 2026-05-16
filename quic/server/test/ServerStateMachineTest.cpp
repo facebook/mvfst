@@ -543,38 +543,5 @@ TEST(ServerStateMachineTest, TestProcessActiveConnectionIdLimitSet) {
       serverConn.peerActiveConnectionIdLimit, kMaxActiveConnectionIdLimit + 1);
 }
 
-TEST(ServerStateMachineTest, ServerEmitsRateSignal) {
-  // Create ServerStateMachine, set enableScone=true
-  QuicServerConnectionState serverConn(
-      FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.enableScone = true;
-
-  // Set up SCONE state
-  serverConn.scone.emplace();
-  serverConn.scone->negotiated = true;
-
-  // Initialize other required state
-  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 443);
-  quic::MockQuicStats mockQuicStats;
-  serverConn.statsCallback = &mockQuicStats;
-
-  // Verify initial state
-  EXPECT_TRUE(serverConn.scone->pendingRateSignals.empty());
-
-  // Drive congestion-event that triggers rate signal generation
-  // This simulates the kind of event that would cause a rate signal to be
-  // produced (In a real scenario, this would be triggered by congestion control
-  // logic)
-  uint8_t testRate = 0x25;
-  QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
-  serverConn.scone->pendingRateSignals.push_back(
-      {.rate = testRate, .version = testVersion});
-
-  // Verify rate signal was generated
-  EXPECT_GT(serverConn.scone->pendingRateSignals.size(), 0);
-  EXPECT_EQ(serverConn.scone->pendingRateSignals.front().rate, testRate);
-  EXPECT_EQ(serverConn.scone->pendingRateSignals.front().version, testVersion);
-}
-
 } // namespace test
 } // namespace quic

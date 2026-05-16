@@ -108,19 +108,10 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     }
     clientTransportParameters_ = std::move(clientParams);
 
-    // SCONE negotiation - simple presence check
-    if (conn_.transportSettings.enableScone) {
-      bool clientSupportsScone =
-          getSconeSupportedParameter(clientTransportParameters_->parameters);
-      if (clientSupportsScone) {
-        // Both sides support SCONE - enable it
-        // const_cast is safe here as we're modifying conn state during
-        // handshake
-        auto& mutableConn = const_cast<QuicConnectionStateBase&>(conn_);
-        mutableConn.scone.emplace();
-        mutableConn.scone->negotiated = true;
-      }
-    }
+    // const_cast is safe here as we're modifying conn state during handshake.
+    auto& mutableConn = const_cast<QuicConnectionStateBase&>(conn_);
+    mutableConn.peerAdvertisedSconeSupport =
+        getSconeSupportedParameter(clientTransportParameters_->parameters);
 
     std::vector<fizz::Extension> exts;
 

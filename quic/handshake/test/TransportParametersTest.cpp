@@ -246,7 +246,7 @@ TEST_F(TransportParametersTest, EncodeIPAddressParameterIPv6) {
 TEST_F(TransportParametersTest, EncodeSconeTPWhenEnabled) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.enableScone = true;
+  serverConn.transportSettings.advertiseSconeSupport = true;
 
   auto params = getSupportedExtTransportParams(serverConn);
 
@@ -260,7 +260,7 @@ TEST_F(TransportParametersTest, EncodeSconeTPWhenEnabled) {
 TEST_F(TransportParametersTest, OmitSconeTPWhenDisabled) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.enableScone = false;
+  serverConn.transportSettings.advertiseSconeSupport = false;
 
   auto params = getSupportedExtTransportParams(serverConn);
 
@@ -311,7 +311,7 @@ TEST_F(TransportParametersTest, SconeSupportedParameter) {
 TEST_F(TransportParametersTest, SconeTPIncluded) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
-  clientConn.transportSettings.enableScone = true;
+  clientConn.transportSettings.advertiseSconeSupport = true;
 
   auto customTransportParameters = getSupportedExtTransportParams(clientConn);
 

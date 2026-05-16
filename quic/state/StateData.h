@@ -770,7 +770,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   struct SconeState {
     CircularDeque<SconeRateSignal> pendingRateSignals;
-    bool negotiated{false};
     Optional<TimePoint> lastSconeSentTime;
     uint8_t configuredRateSignal{kSconeNoAdvice};
 
@@ -785,7 +784,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     Optional<PendingReceivedSignal> pendingReceivedSignal;
   };
 
+  // Set when transportSettings.advertiseSconeSupport is true. Existence
+  // gates SCONE packet receive processing.
   Optional<SconeState> scone;
+
+  // Peer advertised scone_supported. Gates SCONE send.
+  bool peerAdvertisedSconeSupport{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

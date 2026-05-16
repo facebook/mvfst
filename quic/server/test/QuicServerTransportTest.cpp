@@ -4719,61 +4719,11 @@ TEST_F(QuicServerTransportTest, TestRxPacketsBeforeAckKnobHandler) {
   EXPECT_EQ(transportSettings.rxPacketsBeforeAckAfterInit, 30);
 }
 
-TEST_F(QuicServerTransportTest, SconeNegotiationServerSide) {
-  // In transportSettings passed to server, set enableScone=true
-  server->getNonConstConn().transportSettings.enableScone = true;
-  auto& conn = server->getNonConstConn();
-
-  // Simulate handshake completion with SCONE enabled
-  conn.scone.emplace();
-  conn.scone->negotiated = true;
-
-  // After handshake, EXPECT_TRUE(serverTransport->getConn().scone)
-  EXPECT_TRUE(server->getConn().scone);
-  EXPECT_TRUE(server->getConn().scone->negotiated);
-
-  // Verify server can handle SCONE transport parameter
-  // (In a real scenario, this would be set during handshake)
-  // For now, we're verifying server-side SCONE state setup
-  EXPECT_TRUE(server->getConn().scone);
-}
-
-TEST_F(QuicServerTransportTest, SconeRateSignalFlushedOnWrite) {
-  // Set up server with SCONE enabled
-  server->getNonConstConn().transportSettings.enableScone = true;
-  auto& conn = server->getNonConstConn();
-
-  // Set up SCONE state
-  conn.scone.emplace();
-  conn.scone->negotiated = true;
-
-  // Push value into server->getConn().scone->pendingRateSignals
-  uint8_t testRate = 0x42;
-  QuicVersion testVersion = QuicVersion::SCONE_VERSION_2;
-  conn.scone->pendingRateSignals.push_back(
-      {.rate = testRate, .version = testVersion});
-
-  // Verify rate signal is queued
-  EXPECT_EQ(conn.scone->pendingRateSignals.size(), 1);
-  EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
-  EXPECT_EQ(conn.scone->pendingRateSignals.front().version, testVersion);
-
-  // For this test, we're verifying that rate signals can be queued
-  // In a real scenario, the rate signals would be flushed during packet writes
-  // Clear the signals to simulate flushing
-  conn.scone->pendingRateSignals.clear();
-
-  // Verify signals are cleared
-  EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
-}
-
 TEST_F(QuicServerTransportTest, SconeRateSignalProcessingE2E) {
-  // Set up server with SCONE enabled and negotiated
-  server->getNonConstConn().transportSettings.enableScone = true;
+  server->getNonConstConn().transportSettings.advertiseSconeSupport = true;
   auto& conn = server->getNonConstConn();
 
   conn.scone.emplace();
-  conn.scone->negotiated = true;
 
   // Test the specific uncovered code path by directly using the server
   // infrastructure This simulates the scenario where a SCONE packet is
@@ -4822,26 +4772,29 @@ TEST_F(QuicServerTransportTest, SconeRateSignalProcessingE2E) {
   EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
 }
 
-TEST_F(QuicServerTransportTest, SconeKnobEnablesSconeAndSetsRateSignal) {
+TEST_F(QuicServerTransportTest, SconeRateSignalDroppedWhenNotAdvertised) {
   auto& conn = server->getNonConstConn();
+  conn.transportSettings.advertiseSconeSupport = false;
 
-  // SCONE should not be active before knob
+  uint8_t testRate = 0x25;
+  auto coalescedBuffer = folly::IOBuf::create(1024);
+  auto sconePacket = buildSconePacket(
+      testRate,
+      conn.serverConnectionId.value(),
+      conn.clientConnectionId.value());
+  coalescedBuffer->append(sconePacket.length());
+  memcpy(
+      coalescedBuffer->writableData(),
+      sconePacket.data(),
+      sconePacket.length());
+
+  AckBlocks acks = {{1, 1}};
+  auto ackPacket = createAckPacket(conn, 2, acks, PacketNumberSpace::AppData);
+  coalescedBuffer->appendChain(packetToBuf(ackPacket));
+
+  deliverData(std::move(coalescedBuffer));
+
   EXPECT_FALSE(conn.scone.has_value());
-
-  // Send SCONE_KNOB with 1 Mbps (1000000 bps)
-  // Expected signal: 20 * log10(1000000 / 100000) = 20 * 1 = 20
-  TransportKnobParams params;
-  params.push_back(
-      {static_cast<uint64_t>(TransportKnobParamId::SCONE_KNOB),
-       uint64_t{1000000}});
-  server->handleKnobParams(params);
-
-  ASSERT_TRUE(conn.scone.has_value());
-  EXPECT_TRUE(conn.scone->negotiated);
-  EXPECT_EQ(conn.scone->configuredRateSignal, 20);
-  // Timer should be reset so a SCONE packet is sent with the next outgoing
-  // packet.
-  EXPECT_FALSE(conn.scone->lastSconeSentTime.has_value());
 }
 
 TEST_F(QuicServerTransportTest, SconeKnobResetsTimerForImmediateSend) {
@@ -4849,7 +4802,7 @@ TEST_F(QuicServerTransportTest, SconeKnobResetsTimerForImmediateSend) {
 
   // Set up SCONE state as if a SCONE packet was already sent
   conn.scone.emplace();
-  conn.scone->negotiated = true;
+  conn.transportSettings.enableSconeSend = true;
   conn.scone->configuredRateSignal = 10;
   conn.scone->lastSconeSentTime = Clock::now();
   ASSERT_TRUE(conn.scone->lastSconeSentTime.has_value());
@@ -4862,7 +4815,7 @@ TEST_F(QuicServerTransportTest, SconeKnobResetsTimerForImmediateSend) {
   server->handleKnobParams(params);
 
   ASSERT_TRUE(conn.scone.has_value());
-  EXPECT_TRUE(conn.scone->negotiated);
+  EXPECT_TRUE(conn.transportSettings.enableSconeSend);
   EXPECT_EQ(conn.scone->configuredRateSignal, 40);
   // Timer must be reset so a SCONE packet goes out with the next packet
   EXPECT_FALSE(conn.scone->lastSconeSentTime.has_value());

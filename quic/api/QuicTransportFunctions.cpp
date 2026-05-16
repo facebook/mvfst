@@ -252,7 +252,8 @@ bool shouldSendSconePacket(
     const QuicConnectionStateBase& connection,
     PacketNumberSpace pnSpace,
     TimePoint sendTime) {
-  if (!connection.scone || !connection.scone->negotiated ||
+  if (!connection.scone || !connection.peerAdvertisedSconeSupport ||
+      !connection.transportSettings.enableSconeSend ||
       pnSpace != PacketNumberSpace::AppData ||
       connection.nodeType != QuicNodeType::Server ||
       !connection.serverConnectionId) {
@@ -272,7 +273,7 @@ bool shouldSendSconePacket(
 uint64_t sconeFlowIndicatorSize(
     const QuicConnectionStateBase& connection,
     const PacketHeader& header) {
-  if (!connection.transportSettings.enableScone) {
+  if (!connection.transportSettings.advertiseSconeSupport) {
     return 0;
   }
   if (!header.asLong()) {

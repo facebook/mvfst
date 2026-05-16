@@ -492,7 +492,11 @@ struct TransportSettings {
   // TODO(T239869314): Remove this after experiment is done.
   std::chrono::milliseconds keepAliveTimeout{0};
 
-  bool enableScone{false};
+  // Advertise the scone_supported transport parameter and flow-indicator bytes.
+  // Required to receive SCONE packets.
+  bool advertiseSconeSupport{false};
+  // Emit SCONE packets when shouldSendSconePacket allows. Set by SCONE_KNOB.
+  bool enableSconeSend{false};
   std::chrono::seconds sconePacketInterval{20};
 
   EgressPolicerConfig egressPolicerConfig;

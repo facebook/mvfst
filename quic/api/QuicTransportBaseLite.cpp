@@ -3091,6 +3091,10 @@ void QuicTransportBaseLite::setTransportSettings(
         conn_->bufAccessor ||
         transportSettings.dataPathType != DataPathType::ContinuousMemory);
     conn_->transportSettings = std::move(transportSettings);
+    if (conn_->transportSettings.advertiseSconeSupport ||
+        conn_->transportSettings.enableSconeSend) {
+      conn_->scone.emplace(QuicConnectionStateBase::SconeState{});
+    }
     auto result = conn_->streamManager->refreshTransportSettings(
         conn_->transportSettings);
     LOG_IF(FATAL, !result.has_value()) << result.error().message;

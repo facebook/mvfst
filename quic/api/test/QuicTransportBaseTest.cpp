@@ -4804,10 +4804,29 @@ TEST_F(
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, SetTransportSettingsEmplacesSconeState) {
+  TransportSettings ts;
+
+  ts.advertiseSconeSupport = false;
+  ts.enableSconeSend = false;
+  transport->setTransportSettings(ts);
+  EXPECT_FALSE(transport->transportConn->scone.has_value());
+
+  ts.advertiseSconeSupport = true;
+  ts.enableSconeSend = false;
+  transport->setTransportSettings(ts);
+  EXPECT_TRUE(transport->transportConn->scone.has_value());
+
+  transport->transportConn->scone.reset();
+  ts.advertiseSconeSupport = false;
+  ts.enableSconeSend = true;
+  transport->setTransportSettings(ts);
+  EXPECT_TRUE(transport->transportConn->scone.has_value());
+}
+
 TEST_F(QuicTransportImplTest, SconeRateSignalCallbackProcessingSync) {
-  transport->transportConn->transportSettings.enableScone = true;
+  transport->transportConn->transportSettings.advertiseSconeSupport = true;
   transport->transportConn->scone.emplace();
-  transport->transportConn->scone->negotiated = true;
 
   uint8_t rateA = 0x1B; // 27
   uint8_t rateB = 0x2C; // 44
@@ -4831,9 +4850,8 @@ TEST_F(QuicTransportImplTest, SconeRateSignalCallbackProcessingSync) {
 }
 
 TEST_F(QuicTransportImplTest, ConsumePendingSconeRateEdgeTriggered) {
-  transport->transportConn->transportSettings.enableScone = true;
+  transport->transportConn->transportSettings.advertiseSconeSupport = true;
   transport->transportConn->scone.emplace();
-  transport->transportConn->scone->negotiated = true;
 
   // Before any signal, consume returns nullopt.
   EXPECT_FALSE(transport->consumePendingSconeRate().has_value());

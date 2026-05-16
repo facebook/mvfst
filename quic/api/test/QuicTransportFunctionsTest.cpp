@@ -5445,9 +5445,9 @@ TEST_F(QuicTransportFunctionsTest, CongestionControlWithImminentStream) {
 
 TEST_F(QuicTransportFunctionsTest, WriterCoalescesSconeAndShortHeader) {
   auto conn = createConn();
-  conn->transportSettings.enableScone = true;
+  conn->transportSettings.enableSconeSend = true;
   conn->scone.emplace();
-  conn->scone->negotiated = true;
+  conn->peerAdvertisedSconeSupport = true;
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("test data");
@@ -5473,17 +5473,13 @@ TEST_F(QuicTransportFunctionsTest, WriterCoalescesSconeAndShortHeader) {
       getEncodedBodySize(packet));
   ASSERT_FALSE(result.hasError());
 
-  EXPECT_TRUE(conn->scone->negotiated);
+  EXPECT_TRUE(conn->peerAdvertisedSconeSupport);
 
   EXPECT_FALSE(conn->scone->lastSconeSentTime.has_value());
 }
 
 TEST_F(QuicTransportFunctionsTest, SconePacketSizeValidation) {
-  // Instead of complex socket mocking, let's test size calculation directly
   auto conn = createConn();
-  conn->transportSettings.enableScone = true;
-  conn->scone.emplace();
-  conn->scone->negotiated = true;
 
   auto sconePacket = buildSconePacket(
       kSconeNoAdvice,
@@ -5526,10 +5522,9 @@ TEST_F(QuicTransportFunctionsTest, SconePacketSizeValidation) {
 TEST_F(QuicTransportFunctionsTest, SCONEWithContinuousMemory) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  conn->transportSettings.enableScone = true;
-
+  conn->transportSettings.enableSconeSend = true;
   conn->scone.emplace();
-  conn->scone->negotiated = true;
+  conn->peerAdvertisedSconeSupport = true;
   auto bufAccessor = std::make_unique<BufAccessor>(conn->udpSendPacketLen * 16);
   auto outputBuf = bufAccessor->obtain();
   auto bufPtr = outputBuf.get();
@@ -5582,7 +5577,7 @@ TEST_F(QuicTransportFunctionsTest, SCONEWithContinuousMemory) {
 
 TEST_F(QuicTransportFunctionsTest, SconeFlowIndicatorOnInitialPackets) {
   auto conn = createConn();
-  conn->transportSettings.enableScone = true;
+  conn->transportSettings.advertiseSconeSupport = true;
 
   auto cryptoStream = &conn->cryptoState->initialStream;
   auto buf = buildRandomInputData(200);
@@ -5632,7 +5627,7 @@ TEST_F(
     QuicTransportFunctionsTest,
     SconeFlowIndicatorNotSentAfterReceivingPackets) {
   auto conn = createConn();
-  conn->transportSettings.enableScone = true;
+  conn->transportSettings.advertiseSconeSupport = true;
 
   auto cryptoStream = &conn->cryptoState->initialStream;
   auto buf = buildRandomInputData(200);
@@ -5685,7 +5680,7 @@ TEST_F(
 
 TEST_F(QuicTransportFunctionsTest, SconeFlowIndicatorNotSentOnShortHeader) {
   auto conn = createConn();
-  conn->transportSettings.enableScone = true;
+  conn->transportSettings.advertiseSconeSupport = true;
 
   // Write app data (short header)
   auto stream = conn->streamManager->createNextBidirectionalStream().value();

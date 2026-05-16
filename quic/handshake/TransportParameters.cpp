@@ -169,7 +169,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     }
   }
 
-  if (ts.enableScone) {
+  if (ts.advertiseSconeSupport) {
     customTps.push_back(encodeSconeSupportedParameter());
   }
 

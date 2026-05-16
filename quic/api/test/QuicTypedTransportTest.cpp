@@ -141,7 +141,8 @@ class QuicTypedTransportSconeTest : public QuicTypedTransportAfterStartTest<T> {
 
   void SetUp() override {
     QuicTypedTransportAfterStartTest<T>::SetUp();
-    this->getNonConstConn().transportSettings.enableScone = true;
+    this->getNonConstConn().transportSettings.advertiseSconeSupport = true;
+    this->getNonConstConn().transportSettings.enableSconeSend = true;
   }
 };
 
@@ -6337,7 +6338,8 @@ TYPED_TEST_SUITE(
     ::TransportTypeNames);
 
 TYPED_TEST(QuicTypedTransportSconeTest, TestSconeFlag) {
-  EXPECT_TRUE(this->getNonConstConn().transportSettings.enableScone);
+  EXPECT_TRUE(this->getNonConstConn().transportSettings.advertiseSconeSupport);
+  EXPECT_TRUE(this->getNonConstConn().transportSettings.enableSconeSend);
 }
 
 } // namespace quic::test

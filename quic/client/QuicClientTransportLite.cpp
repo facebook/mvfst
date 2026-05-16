@@ -938,15 +938,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
           return quic::make_unexpected(maxStreamsUni.error());
         }
 
-        if (conn_->transportSettings.enableScone) {
-          bool serverSupportsScone =
-              getSconeSupportedParameter(serverParams->parameters);
-          if (serverSupportsScone) {
-            conn_->scone.emplace(QuicConnectionStateBase::SconeState{});
-            conn_->scone->negotiated = true;
-            VLOG(4) << "SCONE negotiated successfully with server " << *this;
-          }
-        }
+        conn_->peerAdvertisedSconeSupport =
+            getSconeSupportedParameter(serverParams->parameters);
 
         auto processResult = processServerInitialParams(
             *clientConn_, serverParams.value(), packetNum);
