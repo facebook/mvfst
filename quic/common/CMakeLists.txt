@@ -160,6 +160,12 @@ mvfst_add_library(mvfst_common_quic_iobuf_queue
     mvfst_common_quic_buffer
 )
 
+mvfst_add_library(mvfst_common_event_fd_queue
+  EXPORTED_DEPS
+    Folly::folly
+    mvfst_common_events_eventbase
+)
+
 add_subdirectory(events)
 add_subdirectory(testutil)
 add_subdirectory(third-party)
