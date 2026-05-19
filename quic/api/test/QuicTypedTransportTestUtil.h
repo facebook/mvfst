@@ -240,7 +240,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
-        ++peerPacketNumStore.nextAppDataPacketNum,
+        peerPacketNumStore.nextAppDataPacketNum++,
         streamId,
         *data /* stream data */,
         0 /* cipherOverhead */,
@@ -264,7 +264,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
-        ++peerPacketNumStore.nextAppDataPacketNum,
+        peerPacketNumStore.nextAppDataPacketNum++,
         streamId,
         *data /* stream data */,
         0 /* cipherOverhead */,
