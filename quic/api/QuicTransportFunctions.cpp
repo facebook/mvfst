@@ -20,8 +20,10 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 
 #include <quic/state/AckHandlers.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicAckFrequencyFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -387,6 +389,12 @@ continuousMemoryBuildScheduleEncrypt(
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   pktBuilder.accountForCipherOverhead(cipherOverhead);
+  PROTO_OOPS_LOG_BUILDER_IF(
+      connection.nodeType == QuicNodeType::Server && !scheduler.hasData(),
+      connection.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(connection),
+      "quic_transport_functions",
+      "invariant_violation: packet scheduler selected with no data");
   MVCHECK(scheduler.hasData());
   auto result =
       scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
@@ -596,6 +604,13 @@ iobufChainBasedBuildScheduleEncrypt(
     return quic::make_unexpected(encryptResult.error());
   }
   auto packetBuf = std::move(encryptResult.value());
+  PROTO_OOPS_LOG_BUILDER_IF(
+      connection.nodeType == QuicNodeType::Server &&
+          packetBuf->headroom() != headerLen,
+      connection.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(connection),
+      "quic_transport_functions",
+      "invariant_violation: packet headroom mismatch after encryption");
   MVDCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
   auto headerCursor =
@@ -898,6 +913,12 @@ quic::Expected<void, QuicError> updateConnection(
       }
       case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& writeAckFrame = *frame.asWriteAckFrame();
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server && ackFrameCounter != 0,
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_transport_functions",
+            "invariant_violation: packet contains more than one ACK frame");
         MVDCHECK(
             !ackFrameCounter++, "Send more than one WriteAckFrame " << conn);
         auto largestAckedPacketWritten = writeAckFrame.ackBlocks.front().end;
@@ -925,6 +946,15 @@ quic::Expected<void, QuicError> updateConnection(
         if (resetIter != conn.pendingEvents.resets.end()) {
           conn.pendingEvents.resets.erase(resetIter);
         } else {
+          PROTO_OOPS_LOG_BUILDER_IF(
+              conn.nodeType == QuicNodeType::Server &&
+                  !clonedPacketIdentifier.has_value(),
+              conn.oopsLogger,
+              proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn)
+                  .setStreamId(rstStreamFrame.streamId),
+              "quic_transport_functions",
+              "invariant_violation: reset stream missing from pending "
+              "events for non-clone packet");
           MVDCHECK(
               clonedPacketIdentifier.has_value(),
               " reset missing from pendingEvents for non-clone packet");
@@ -1066,6 +1096,13 @@ quic::Expected<void, QuicError> updateConnection(
           DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
 
   if (!retransmittable && !isPing && !hasDatagramAndShouldTrack) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server && clonedPacketIdentifier,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_transport_functions",
+        "invariant_violation: non-ack-eliciting packet has cloned packet "
+        "identifier");
     MVDCHECK(!clonedPacketIdentifier);
     return {};
   }
@@ -1115,6 +1152,15 @@ quic::Expected<void, QuicError> updateConnection(
         conn.lossState.totalBytesAckedAtLastAck);
   }
   if (clonedPacketIdentifier) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server &&
+            conn.outstandings.clonedPacketIdentifiers.count(
+                *clonedPacketIdentifier) == 0,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_transport_functions",
+        "invariant_violation: cloned packet identifier missing from "
+        "outstanding clone set");
     MVDCHECK(conn.outstandings.clonedPacketIdentifiers.count(
         *clonedPacketIdentifier));
     pkt.maybeClonedPacketIdentifier = std::move(clonedPacketIdentifier);

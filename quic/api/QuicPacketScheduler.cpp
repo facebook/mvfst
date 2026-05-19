@@ -10,6 +10,8 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <cstdint>
 
 namespace {
@@ -517,6 +519,13 @@ quic::Expected<StreamId, QuicError> StreamFrameScheduler::writeStreamsHelper(
   // writing at the next stream when building the next packet.
   while (writableStreamItr != wrapper.cend()) {
     auto stream = conn_.streamManager->findStream(*writableStreamItr);
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && !stream,
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_).setStreamId(
+            *writableStreamItr),
+        "quic_packet_scheduler",
+        "invariant_violation: writable control stream missing stream state");
     MVCHECK(stream);
     auto writeResult = writeSingleStream(builder, *stream, connWritableBytes);
     if (!writeResult.has_value()) {
@@ -600,9 +609,25 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
       }
     } else {
       // Handle streams
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server && !id.isStreamID(),
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+          "quic_packet_scheduler",
+          "invariant_violation: priority write queue scheduled non-stream "
+          "identifier");
       MVCHECK(id.isStreamID());
       auto streamId = id.asStreamID();
-      auto stream = MVCHECK_NOTNULL(conn_.streamManager->findStream(streamId));
+      auto stream = conn_.streamManager->findStream(streamId);
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server && !stream,
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_)
+              .setStreamId(streamId),
+          "quic_packet_scheduler",
+          "invariant_violation: priority write queue stream missing stream "
+          "state");
+      MVCHECK_NOTNULL(stream);
       MVCHECK(stream, "streamId=" << streamId);
       // TODO: this is counting STREAM frame overhead against the stream itself
       auto lastWriteBytes = builder.remainingSpaceInPkt();
@@ -637,6 +662,13 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
 
 quic::Expected<void, QuicError> StreamFrameScheduler::writeStreams(
     PacketBuilderInterface& builder) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          !conn_.streamManager->hasWritable(),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_scheduler",
+      "invariant_violation: stream write scheduler missing writable streams");
   MVDCHECK(conn_.streamManager->hasWritable());
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
   // Write the control streams first as a naive binary priority mechanism.
@@ -683,6 +715,13 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
 
   // hasWritableData is the condition which has to be satisfied for the
   // stream to be in writableList
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && !stream.hasWritableData(),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_).setStreamId(
+          stream.id),
+      "quic_packet_scheduler",
+      "invariant_violation: writable stream missing writable data");
   MVCHECK(stream.hasWritableData());
 
   uint64_t flowControlLen =
@@ -730,6 +769,13 @@ quic::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
     auto streamId = resetStream.first;
     QuicStreamState* streamState =
         conn_.streamManager->getStream(streamId).value_or(nullptr);
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && !streamState,
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_).setStreamId(
+            streamId),
+        "quic_packet_scheduler",
+        "invariant_violation: reset stream missing stream state");
     MVCHECK(
         streamState,
         "Stream " << streamId << " not found when going through resets");

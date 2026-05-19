@@ -215,8 +215,10 @@ mvfst_cpp_library(
         "//quic/common:string_utils",
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/logging:qlogger_macros",
+        "//quic/logging/oops_logger:oops_logger",
         "//quic/state:ack_frequency_functions",
         "//quic/state:ack_handler",
+        "//quic/state:connection_oops_fields",
         "//quic/state:simple_frame_functions",
     ],
     exported_deps = [

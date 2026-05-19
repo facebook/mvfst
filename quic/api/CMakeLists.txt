@@ -133,9 +133,11 @@ mvfst_add_library(mvfst_api_transport_helpers
     mvfst_common_socket_util
     mvfst_common_string_utils
     mvfst_happyeyeballs
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_macros
     mvfst_state_ack_frequency_functions
     mvfst_state_ack_handler
+    mvfst_state_connection_oops_fields
     mvfst_state_simple_frame_functions
     Folly::folly_tracing_static_tracepoint
   EXPORTED_DEPS
