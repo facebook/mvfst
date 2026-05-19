@@ -563,7 +563,7 @@ void updateAckState(
     MVLOG_FATAL << "Failed to add packet to ack state in test: "
                 << static_cast<int>(addResult.error());
   }
-  uint64_t distance = addResult.value();
+  uint64_t distance = addResult.value().distanceFromExpected;
   updateAckSendStateOnRecvPacket(
       conn,
       getAckState(conn, pnSpace),

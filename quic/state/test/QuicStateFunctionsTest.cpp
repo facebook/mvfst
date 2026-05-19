@@ -80,7 +80,8 @@ TEST_P(AddPacketToAckStateTest, FirstPacketNotOutOfOrder) {
   auto result = addPacketToAckState(
       conn, getAckState(conn, GetParam()), firstPacket, buildPacketMinimal());
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 0);
+  EXPECT_EQ(result.value().distanceFromExpected, 0);
+  EXPECT_FALSE(result.value().isDuplicate);
 }
 
 TEST_P(AddPacketToAckStateTest, ReceiveNew) {
@@ -93,7 +94,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveNew) {
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   ASSERT_TRUE(distance.has_value());
-  EXPECT_EQ(distance.value(), 0);
+  EXPECT_EQ(distance.value().distanceFromExpected, 0);
+  EXPECT_FALSE(distance.value().isDuplicate);
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -109,7 +111,9 @@ TEST_P(AddPacketToAckStateTest, ReceiveNewWithGap) {
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   ASSERT_TRUE(distance.has_value());
-  EXPECT_EQ(distance.value(), 2); // newReceived is 2 after the expected pkt num
+  // newReceived is 2 after the expected pkt num
+  EXPECT_EQ(distance.value().distanceFromExpected, 2);
+  EXPECT_FALSE(distance.value().isDuplicate);
   EXPECT_GT(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -125,8 +129,9 @@ TEST_P(AddPacketToAckStateTest, ReceiveOld) {
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   ASSERT_TRUE(distance.has_value());
-  EXPECT_EQ(
-      distance.value(), 2); // newReceived is 2 before the expected pkt num
+  // newReceived is 2 before the expected pkt num
+  EXPECT_EQ(distance.value().distanceFromExpected, 2);
+  EXPECT_FALSE(distance.value().isDuplicate);
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -142,8 +147,9 @@ TEST_P(AddPacketToAckStateTest, ReceiveOldWithGap) {
   auto distance = addPacketToAckState(
       conn, getAckState(conn, GetParam()), newReceived, buildPacketMinimal());
   ASSERT_TRUE(distance.has_value());
-  EXPECT_EQ(
-      distance.value(), 6); // newReceived is 6 before the expected pkt num
+  // newReceived is 6 before the expected pkt num
+  EXPECT_EQ(distance.value().distanceFromExpected, 6);
+  EXPECT_FALSE(distance.value().isDuplicate);
   EXPECT_EQ(
       *getAckState(conn, GetParam()).largestRecvdPacketNum,
       currentLargestReceived);
@@ -168,7 +174,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
     ASSERT_TRUE(distance.has_value());
-    EXPECT_EQ(distance.value(), 0);
+    EXPECT_EQ(distance.value().distanceFromExpected, 0);
+    EXPECT_FALSE(distance.value().isDuplicate);
 
     // Seen 1 ECT0, 0 ECT1, 0 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
@@ -182,7 +189,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
     ASSERT_TRUE(distance.has_value());
-    EXPECT_EQ(distance.value(), 0);
+    EXPECT_EQ(distance.value().distanceFromExpected, 0);
+    EXPECT_FALSE(distance.value().isDuplicate);
 
     // Seen 1 ECT0, 1 ECT1, 0 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 0);
@@ -196,7 +204,8 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
     ASSERT_TRUE(distance.has_value());
-    EXPECT_EQ(distance.value(), 0);
+    EXPECT_EQ(distance.value().distanceFromExpected, 0);
+    EXPECT_FALSE(distance.value().isDuplicate);
 
     // Seen 1 ECT0, 1 ECT1, 1 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 1);
@@ -210,13 +219,96 @@ TEST_P(AddPacketToAckStateTest, ReceiveWithECN) {
     auto distance = addPacketToAckState(
         conn, getAckState(conn, GetParam()), ++nextPacketNum, packet);
     ASSERT_TRUE(distance.has_value());
-    EXPECT_EQ(distance.value(), 0);
+    EXPECT_EQ(distance.value().distanceFromExpected, 0);
+    EXPECT_FALSE(distance.value().isDuplicate);
 
     // Seen 1 ECT0, 1 ECT1, 2 CE.
     EXPECT_EQ(getAckState(conn, GetParam()).ecnCECountReceived, 2);
     EXPECT_EQ(getAckState(conn, GetParam()).ecnECT0CountReceived, 1);
     EXPECT_EQ(getAckState(conn, GetParam()).ecnECT1CountReceived, 1);
   }
+}
+
+TEST_P(AddPacketToAckStateTest, ReceiveDuplicateDetected) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ackState = getAckState(conn, GetParam());
+  ackState.largestRecvdPacketNum = 50;
+  PacketNum dupTarget = 100;
+
+  // First reception: not a duplicate.
+  auto first =
+      addPacketToAckState(conn, ackState, dupTarget, buildPacketMinimal());
+  ASSERT_TRUE(first.has_value());
+  EXPECT_FALSE(first.value().isDuplicate);
+  EXPECT_EQ(first.value().distanceFromExpected, 49); // 100 - (50 + 1)
+  EXPECT_EQ(*ackState.largestRecvdPacketNum, dupTarget);
+
+  // Second reception of the same packet number: duplicate.
+  auto second =
+      addPacketToAckState(conn, ackState, dupTarget, buildPacketMinimal());
+  ASSERT_TRUE(second.has_value());
+  EXPECT_TRUE(second.value().isDuplicate);
+  // Distance computed from the (now-updated) expected next packet (101) and
+  // the duplicate's pn (100): 101 - 100 = 1.
+  EXPECT_EQ(second.value().distanceFromExpected, 1);
+  // largestRecvdPacketNum unchanged after the duplicate.
+  EXPECT_EQ(*ackState.largestRecvdPacketNum, dupTarget);
+}
+
+TEST_P(AddPacketToAckStateTest, ReceiveDuplicateDoesNotDoubleCountECN) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ackState = getAckState(conn, GetParam());
+
+  // Insert a non-CE packet.
+  auto firstPacket = buildPacketMinimal();
+  firstPacket.tosValue = kEcnECT0;
+  auto first = addPacketToAckState(conn, ackState, 100, firstPacket);
+  ASSERT_TRUE(first.has_value());
+  EXPECT_FALSE(first.value().isDuplicate);
+  EXPECT_EQ(ackState.ecnCECountReceived, 0);
+  EXPECT_EQ(ackState.ecnECT0CountReceived, 1);
+
+  // Now insert a duplicate of pn 100 with CE bits set. Counts must not change.
+  auto dupPacket = buildPacketMinimal();
+  dupPacket.tosValue = kEcnCE;
+  auto dup = addPacketToAckState(conn, ackState, 100, dupPacket);
+  ASSERT_TRUE(dup.has_value());
+  EXPECT_TRUE(dup.value().isDuplicate);
+  EXPECT_EQ(ackState.ecnCECountReceived, 0);
+  EXPECT_EQ(ackState.ecnECT0CountReceived, 1);
+  EXPECT_EQ(ackState.ecnECT1CountReceived, 0);
+}
+
+TEST_P(
+    AddPacketToAckStateTest,
+    ReceiveDuplicateDoesNotUpdateLastRecvdPacketInfo) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ackState = getAckState(conn, GetParam());
+
+  auto t1 = Clock::now();
+  auto t2 = t1 + std::chrono::milliseconds(50);
+
+  ReceivedUdpPacket firstPacket;
+  firstPacket.timings.receiveTimePoint = t1;
+  auto first = addPacketToAckState(conn, ackState, 100, firstPacket);
+  ASSERT_TRUE(first.has_value());
+  EXPECT_FALSE(first.value().isDuplicate);
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->timings.receiveTimePoint, t1);
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, 100);
+
+  ReceivedUdpPacket dupPacket;
+  dupPacket.timings.receiveTimePoint = t2;
+  auto dup = addPacketToAckState(conn, ackState, 100, dupPacket);
+  ASSERT_TRUE(dup.has_value());
+  EXPECT_TRUE(dup.value().isDuplicate);
+  // lastRecvdPacketInfo must reflect the original receipt, not the duplicate.
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->timings.receiveTimePoint, t1);
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, 100);
 }
 
 INSTANTIATE_TEST_SUITE_P(

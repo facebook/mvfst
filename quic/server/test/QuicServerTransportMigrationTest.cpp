@@ -1161,7 +1161,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientPortChangeNATRebinding) {
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
       *server->getConn().serverConnectionId,
-      clientNextAppDataPacketNum++,
+      ++clientNextAppDataPacketNum,
       2,
       *data,
       0 /* cipherOverhead */,
@@ -1276,7 +1276,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientAddressChangeNATRebinding) {
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
       *server->getConn().serverConnectionId,
-      clientNextAppDataPacketNum++,
+      ++clientNextAppDataPacketNum,
       2,
       *data,
       0 /* cipherOverhead */,
@@ -1334,7 +1334,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientAddressChangeOutOfSubnet) {
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
       *server->getConn().serverConnectionId,
-      clientNextAppDataPacketNum++,
+      ++clientNextAppDataPacketNum,
       2,
       *data,
       0 /* cipherOverhead */,

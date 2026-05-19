@@ -518,7 +518,15 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         TransportErrorCode::INTERNAL_ERROR,
         "Failed to add packet to ack state"));
   }
-  uint64_t distanceFromExpectedPacketNum = addResult.value();
+  if (addResult.value().isDuplicate) {
+    // RFC 9000 §12.3 — drop duplicates without further frame processing.
+    QLOG(*conn_, addPacketDrop, packetSize, "DUPLICATE_PACKET");
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::DUPLICATE_PACKET);
+    return {};
+  }
+  uint64_t distanceFromExpectedPacketNum =
+      addResult.value().distanceFromExpected;
   if (distanceFromExpectedPacketNum > 0) {
     QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
   }

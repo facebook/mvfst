@@ -3416,7 +3416,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   auto packet = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
       *originalConnId /* dest */,
-      appDataPacketNum++,
+      ++appDataPacketNum,
       streamId,
       *expected,
       0 /* cipherOverhead */,
@@ -4219,7 +4219,7 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
   auto packet = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
       *originalConnId /* dest */,
-      appDataPacketNum++,
+      ++appDataPacketNum,
       streamId,
       *data,
       0 /* cipherOverhead */,

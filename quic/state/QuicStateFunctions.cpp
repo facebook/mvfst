@@ -406,29 +406,44 @@ uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn) {
   return maximumIdsToIssue;
 }
 
-Expected<uint64_t, IntervalSetError> addPacketToAckState(
+Expected<AddPacketToAckStateResult, IntervalSetError> addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
-    const PacketNum packetNum,
+    PacketNum packetNum,
     const ReceivedUdpPacket& udpPacket) {
+  static_assert(Clock::is_steady, "Needs steady clock");
+
   PacketNum expectedNextPacket = 0;
   if (ackState.largestRecvdPacketNum) {
     expectedNextPacket = *ackState.largestRecvdPacketNum + 1;
   }
-  ackState.largestRecvdPacketNum = std::max<PacketNum>(
-      ackState.largestRecvdPacketNum.value_or(packetNum), packetNum);
+  uint64_t distanceFromExpected = 0;
+  if (expectedNextPacket) {
+    distanceFromExpected = (packetNum > expectedNextPacket)
+        ? packetNum - expectedNextPacket
+        : expectedNextPacket - packetNum;
+  }
+
   auto preInsertVersion = ackState.acks.insertVersion();
   auto insertResult = ackState.acks.tryInsert(packetNum);
   if (!insertResult.has_value()) {
     return quic::make_unexpected(insertResult.error());
   }
   if (preInsertVersion == ackState.acks.insertVersion()) {
+    // Per RFC 9000 §12.3, duplicates must not be processed further. Skip all
+    // mutations so the duplicate cannot influence ECN counts, last-receive
+    // timing, or ack ranges.
     QUIC_STATS(conn.statsCallback, onDuplicatedPacketReceived);
+    return AddPacketToAckStateResult{
+        .distanceFromExpected = distanceFromExpected,
+        /*isDuplicate=*/.isDuplicate = true};
   }
+
+  ackState.largestRecvdPacketNum = std::max<PacketNum>(
+      ackState.largestRecvdPacketNum.value_or(packetNum), packetNum);
   if (ackState.largestRecvdPacketNum == packetNum) {
     ackState.largestRecvdPacketTime = udpPacket.timings.receiveTimePoint;
   }
-  static_assert(Clock::is_steady, "Needs steady clock");
 
   ackState.lastRecvdPacketInfo = {packetNum, udpPacket.timings};
 
@@ -465,12 +480,9 @@ Expected<uint64_t, IntervalSetError> addPacketToAckState(
       break;
   }
 
-  if (expectedNextPacket) {
-    return (packetNum > expectedNextPacket) ? packetNum - expectedNextPacket
-                                            : expectedNextPacket - packetNum;
-  } else {
-    return uint64_t{0};
-  }
+  return AddPacketToAckStateResult{
+      .distanceFromExpected = distanceFromExpected,
+      /*isDuplicate=*/.isDuplicate = false};
 }
 
 /**

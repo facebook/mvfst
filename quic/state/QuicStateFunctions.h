@@ -62,14 +62,25 @@ void increaseNextPacketNum(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept;
 
+struct AddPacketToAckStateResult {
+  uint64_t distanceFromExpected;
+  bool isDuplicate;
+};
+
 /**
  * Update largestReceivedUdpPacketNum in ackState with packetNum. Return the
- * distance from the next packet number we expect to receive.
+ * distance from the next packet number we expect to receive, plus a flag
+ * indicating whether the packet was a duplicate (already present in the
+ * ack interval set). Per RFC 9000 §12.3, callers MUST discard duplicates
+ * without further processing; on duplicate, this function does not update
+ * largestRecvdPacketNum, lastRecvdPacketInfo, recvdPacketInfos, or ECN
+ * counters.
  */
-[[nodiscard]] Expected<uint64_t, IntervalSetError> addPacketToAckState(
+[[nodiscard]] Expected<AddPacketToAckStateResult, IntervalSetError>
+addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
-    const PacketNum packetNum,
+    PacketNum packetNum,
     const ReceivedUdpPacket& udpPacket);
 
 std::deque<OutstandingPacketWrapper>::iterator getNextOutstandingPacket(

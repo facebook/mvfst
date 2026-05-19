@@ -243,6 +243,38 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
   EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    DuplicatePacketDroppedAndStreamDataNotReprocessed) {
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  StreamId streamId = server->createBidirectionalStream().value();
+  auto expected = IOBuf::copyBuffer("hello");
+
+  // First delivery: stream data buffered, no duplicate drop expected.
+  auto packet = recvEncryptedStream(streamId, *expected);
+
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto* stream = streamResult.value();
+  // The stream should have buffered exactly the original payload.
+  size_t readBufferSizeBeforeDup = stream->readBuffer.size();
+  uint64_t maxOffsetObservedBeforeDup = stream->maxOffsetObserved;
+  EXPECT_EQ(readBufferSizeBeforeDup, 1);
+
+  // Re-delivering the same packet must drop with reason DUPLICATE_PACKET and
+  // must not mutate the stream's read state.
+  EXPECT_CALL(
+      *quicStats_,
+      onPacketDropped(Eq(PacketDropReason(PacketDropReason::DUPLICATE_PACKET))))
+      .Times(1);
+  deliverData(packet->clone(), false);
+
+  EXPECT_EQ(stream->readBuffer.size(), readBufferSizeBeforeDup);
+  EXPECT_EQ(stream->maxOffsetObserved, maxOffsetObservedBeforeDup);
+  EXPECT_CALL(*quicStats_, onQuicStreamClosed());
+}
+
 TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   // Clear the receivedNewPacketBeforeWrite flag, since we may reveice from
   // client during the SetUp of the test case.
