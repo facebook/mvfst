@@ -7,6 +7,9 @@
 
 #include <quic/api/QuicAckScheduler.h>
 
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
+
 namespace quic {
 
 bool hasAcksToSchedule(const AckState& ackState) {
@@ -44,6 +47,14 @@ quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
       : conn_.transportSettings.ackDelayExponent;
   auto largestAckedPacketNum = *largestAckToSend(ackState_);
   auto ackingTime = Clock::now();
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          !ackState_.largestRecvdPacketTime.has_value(),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_ack_scheduler",
+      "invariant_violation: ACK scheduler missing largest received packet "
+      "time");
   MVDCHECK(
       ackState_.largestRecvdPacketTime.has_value(),
       "Missing received time for the largest acked packet");

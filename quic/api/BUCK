@@ -94,7 +94,6 @@ mvfst_cpp_library(
         "//quic/loss:loss",
         "//quic/observer:socket_observer_macros",
         "//quic/state:pacing_functions",
-        "//quic/state:quic_stream_utilities",
         "//quic/state:state_functions",
         "//quic/state:stream_functions",
     ],
@@ -185,6 +184,10 @@ mvfst_cpp_library(
     ],
     headers = [
         "QuicAckScheduler.h",
+    ],
+    deps = [
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
     ],
     exported_deps = [
         "//quic:constants",

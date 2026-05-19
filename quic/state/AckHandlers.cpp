@@ -71,6 +71,14 @@ void updateCongestionControllerForAck(
   if (conn.congestionController &&
       (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server &&
+              (!lossEvent->largestLostSentTime ||
+               !lossEvent->smallestLostSentTime),
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+          "quic_ack_handlers",
+          "invariant_violation: ACK loss event missing sent time metadata");
       MVCHECK(
           lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       // TODO it's not clear that we should be using the smallest and largest
@@ -151,6 +159,13 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
                  .build();
 
   if (frame.largestAcked >= getAckState(conn, pnSpace).nextPacketNum) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
+            static_cast<uint64_t>(TransportErrorCode::PROTOCOL_VIOLATION)),
+        "quic_ack_handlers",
+        "protocol_violation: future packet number acked");
     return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Future packet number acked"));
   }
@@ -165,6 +180,15 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
               return block.startPacket <= skippedPacketNum.value() &&
                   block.endPacket >= skippedPacketNum.value();
             }) != frame.ackBlocks.end()) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server,
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn)
+              .setErrorCode(
+                  static_cast<uint64_t>(
+                      TransportErrorCode::PROTOCOL_VIOLATION)),
+          "quic_ack_handlers",
+          "protocol_violation: skipped packet number acked");
       return quic::make_unexpected(QuicError(
           TransportErrorCode::PROTOCOL_VIOLATION,
           "Skipped packet number acked"));
@@ -235,6 +259,14 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       auto modifyResult =
           modifyStateForSpuriousLoss(conn, *ackedPacketIterator);
       if (!modifyResult.has_value()) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server,
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn)
+                .setErrorCode(
+                    static_cast<uint64_t>(TransportErrorCode::INTERNAL_ERROR)),
+            "quic_ack_handlers",
+            "invariant_violation: failed to modify state for spurious loss");
         return quic::make_unexpected(QuicError(
             TransportErrorCode::INTERNAL_ERROR,
             "Failed to modify state for spurious loss"));
@@ -261,11 +293,25 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         conn.outstandings.clonedPacketIdentifiers.count(
             *ackedPacketIterator->maybeClonedPacketIdentifier);
     if (needsProcess) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server &&
+              !conn.outstandings.packetCount[currentPacketNumberSpace],
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+          "quic_ack_handlers",
+          "invariant_violation: ACK processing packet count underflow");
       MVCHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
       --conn.outstandings.packetCount[currentPacketNumberSpace];
     }
     ack.ackedBytes += ackedPacketIterator->metadata.encodedSize;
     if (ackedPacketIterator->maybeClonedPacketIdentifier) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server &&
+              !conn.outstandings.clonedPacketCount[currentPacketNumberSpace],
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+          "quic_ack_handlers",
+          "invariant_violation: ACK processing cloned packet count underflow");
       MVCHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
       --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
     }
@@ -306,6 +352,15 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
     {
       OutstandingPacketWrapper* wrapper = &(*ackedPacketIterator);
       if (!packetsWithHandlerContext.empty()) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server &&
+                packetsWithHandlerContext.back()
+                        .outstandingPacket->packet.header
+                        .getPacketSequenceNum() < currentPacketNum,
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_ack_handlers",
+            "invariant_violation: ACK processing packet order regressed");
         MVCHECK_GE(
             packetsWithHandlerContext.back()
                 .outstandingPacket->packet.header.getPacketSequenceNum(),
@@ -403,6 +458,15 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       if (maybePreAckIntervalSetVersion.has_value()) {
         Optional<uint64_t> maybePostAckIntervalSetVersion =
             getAckIntervalSetVersion(conn, packetFrame);
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server &&
+                !maybePostAckIntervalSetVersion.has_value(),
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn)
+                .setStreamId(ackedWriteFrame->streamId),
+            "quic_ack_handlers",
+            "invariant_violation: ACK processing missing post-ack interval "
+            "set version");
         MVCHECK(
             maybePostAckIntervalSetVersion.has_value(),
             "Unable to get post-ack interval set version, even though "
@@ -457,10 +521,30 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          conn.outstandings.packets.size() <
+              conn.outstandings.declaredLostCount,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: ACK processing declared lost count exceeds "
+      "outstanding packet list size");
   MVCHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();
   const auto& packetCount = conn.outstandings.packetCount;
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          updatedOustandingPacketsCount <
+              packetCount[PacketNumberSpace::Handshake] +
+                  packetCount[PacketNumberSpace::Initial] +
+                  packetCount[PacketNumberSpace::AppData],
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: ACK processing packet count exceeds num "
+      "outstanding");
   LOG_IF(
       DFATAL,
       updatedOustandingPacketsCount <
@@ -477,6 +561,14 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       << originalPacketCount[PacketNumberSpace::Initial] << ","
       << originalPacketCount[PacketNumberSpace::Handshake] << ","
       << originalPacketCount[PacketNumberSpace::AppData] << "}";
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          updatedOustandingPacketsCount < conn.outstandings.numClonedPackets(),
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: ACK processing cloned packet count exceeds num "
+      "outstanding");
   MVCHECK_GE(
       updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEventExpected = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
@@ -537,6 +629,14 @@ void clearOldOutstandingPackets(
       auto timeSinceSent = time - opItr->metadata.time;
       if (opItr->declaredLost && timeSinceSent > threshold) {
         opItr++;
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server &&
+                conn.outstandings.declaredLostCount == 0,
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_ack_handlers",
+            "invariant_violation: clearing old outstanding lost packet with "
+            "empty declared lost count");
         MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.outstandings.declaredLostCount--;
       } else {
@@ -566,15 +666,16 @@ void parseAckReceiveTimestamps(
       frame.recvdPacketsTimestampRanges[0].deltas.empty()) {
     return;
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          !frame.maybeLatestRecvdPacketNum.has_value(),
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: ACK receive timestamps missing latest received "
+      "packet number");
   MVDCHECK(frame.maybeLatestRecvdPacketNum.has_value());
   if (!frame.maybeLatestRecvdPacketNum.has_value()) {
-    PROTO_OOPS_LOG_BUILDER_IF(
-        conn.nodeType == QuicNodeType::Server,
-        conn.oopsLogger,
-        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
-        "quic_ack_handlers",
-        "invariant_violation: ACK receive timestamps missing latest received "
-        "packet number");
     return;
   }
 
@@ -624,6 +725,12 @@ void parseAckReceiveTimestamps(
       // sent by peer.
       if (packetReceiveTimeStamps.size() >=
           maxReceiveTimestampsRequestedFromPeer) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server,
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_ack_handlers",
+            "protocol_violation: ACK receive timestamps exceed requested limit");
         MVLOG_ERROR << " Received more timestamps "
                     << packetReceiveTimeStamps.size()
                     << " than requested timestamps from peer: "
@@ -704,11 +811,25 @@ void updateRttForLargestAckedPacket(
     OutstandingPacketWrapper& packet,
     const ReadAckFrame& frame,
     const TimePoint& ackReceiveTime) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          packet.packet.header.getPacketSequenceNum() != frame.largestAcked,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: RTT sample packet number does not match largest "
+      "acked");
   MVCHECK_EQ(
       packet.packet.header.getPacketSequenceNum(),
       frame.largestAcked,
       "An RTT sample is generated using only the largest acknowledged packet "
           << "in the received ACK frame.");
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server && ackEvent.implicit,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: RTT sample generated for implicit ACK");
   MVCHECK(
       !ackEvent.implicit,
       "An RTT sample cannot be generated for an implicit ACK.");
@@ -740,7 +861,21 @@ void updateRttForLargestAckedPacket(
     }
 
     // update AckEvent RTTs, which are used by CCA and other processing
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server && ackEvent.rttSample.has_value(),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_ack_handlers",
+        "invariant_violation: RTT sample already set before ACK processing");
     MVCHECK(!ackEvent.rttSample.has_value());
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server &&
+            ackEvent.rttSampleNoAckDelay.has_value(),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_ack_handlers",
+        "invariant_violation: RTT sample without ACK delay already set before "
+        "ACK processing");
     MVCHECK(!ackEvent.rttSampleNoAckDelay.has_value());
     ackEvent.rttSample = rttSample;
     ackEvent.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
@@ -783,6 +918,14 @@ void updateEcnCountEchoed(
 Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
     QuicConnectionStateBase& conn,
     OutstandingPacketWrapper& spuriouslyLostPacket) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          conn.outstandings.declaredLostCount == 0,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: modifying spurious loss with empty declared lost "
+      "count");
   MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
   conn.lossState.totalPacketsSpuriouslyMarkedLost++;
   if (conn.transportSettings.useAdaptiveLossReorderingThresholds) {
@@ -801,6 +944,14 @@ Expected<void, IntervalSetError> modifyStateForSpuriousLoss(
           spuriouslyLostPacket.metadata.lossTimeoutDividend.value();
     }
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          conn.outstandings.declaredLostCount == 0,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_ack_handlers",
+      "invariant_violation: decrementing spurious loss with empty declared "
+      "lost count");
   MVCHECK_GT(conn.outstandings.declaredLostCount, 0);
   conn.outstandings.declaredLostCount--;
   return {};

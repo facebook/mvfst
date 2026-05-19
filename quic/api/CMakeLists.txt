@@ -47,7 +47,6 @@ mvfst_add_library(mvfst_api_transport
     mvfst_loss
     mvfst_observer_socket_observer_macros
     mvfst_state_pacing_functions
-    mvfst_state_quic_stream_utilities
     mvfst_state_state_functions
     mvfst_state_stream_functions
     Folly::folly_chrono
@@ -115,6 +114,9 @@ mvfst_add_library(mvfst_api_transport_lite
 mvfst_add_library(mvfst_api_ack_scheduler
   SRCS
     QuicAckScheduler.cpp
+  DEPS
+    mvfst_logging_oops_logger
+    mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_constants
     mvfst_state_quic_state_machine
