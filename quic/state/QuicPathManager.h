@@ -74,10 +74,9 @@ struct PathInfo {
   // from the challenge-response pair
   Optional<std::chrono::microseconds> rttSample;
 
-  // If populated, this is the challenge we are scheduled to send to the peer
-  Optional<uint64_t> challengePayloadToSend;
-  // PATH_CHALLENGE transmissions awaiting a response. One entry per
-  // `onPathChallengeSent` call.
+  // Challenges we have written to the wire and are still awaiting a response
+  // for. Each entry is a unique payload; retransmissions append a new entry
+  // rather than reusing the existing one.
   SmallVec<InFlightPathChallenge, kDefaultInFlightChallengesPerPath>
       outstandingChallenges;
   // If validating, this is when we'd timeout and mark the path as not valid
@@ -189,31 +188,18 @@ class QuicPathManager {
       const folly::SocketAddress& peerAddress);
 
   /**
-   * Get new path challenge data for the given path.
-   * Returns a uint64_t containing the challenge data or an error if the path
-   * doesn't exist. If there is a pending challenge, the outstanding challenge
-   * data is discarded.
-   */
-  Expected<uint64_t, QuicError> getNewPathChallengeData(PathIdType pathId);
-
-  /**
    * Mint a fresh PATH_CHALLENGE for the given path, record it as in-flight
-   * with a Clock::now() timestamp, and return the frame to be sent. Intended
-   * to be called at write time by the scheduler so that every PATH_CHALLENGE
-   * on the wire carries a unique payload (including retransmissions). On the
-   * path's first in-flight challenge this also sets the path's response
-   * deadline and transitions it to Validating. Returns an error if the path
-   * doesn't exist.
+   * with a Clock::now() timestamp, and return the frame to be sent. This is
+   * the single mint site for path challenges: every PATH_CHALLENGE that
+   * reaches the wire originates here, which guarantees that no two emissions
+   * carry the same payload. On the path's first in-flight challenge, this
+   * also sets the path's response deadline and transitions it to
+   * Validating. Returns an error if the path doesn't exist.
    */
   Expected<PathChallengeFrame, QuicError> prepareChallengeForSending(
       PathIdType pathId);
 
   const PathInfo* getPathByChallengeData(uint64_t challengeData);
-
-  /**
-   * Update the state with a PathChallengeFrame that was sent
-   */
-  void onPathChallengeSent(const PathChallengeFrame& frame);
 
   /**
    * Update the state when the path validation timeout expires.
