@@ -20,6 +20,8 @@
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/events/HighResQuicTimer.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
+#include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerTransportFactory.h>
@@ -329,6 +331,50 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   void onReadClosed() noexcept override;
 
+  // Adapter for the QuicAsyncUDPSocket::ReadCallback (shouldOnlyNotify)
+  // interface. Forwards onNotifyDataAvailable to onSocketReadable on the
+  // worker; delegates onReadError / onReadClosed to the worker.
+  class QuicReadCallbackAdapter : public QuicAsyncUDPSocket::ReadCallback {
+   public:
+    explicit QuicReadCallbackAdapter(QuicServerWorker* worker)
+        : worker_(worker) {}
+
+    bool shouldOnlyNotify() override {
+      return true;
+    }
+
+    void getReadBuffer(void** /*buf*/, size_t* /*len*/) noexcept override {
+      folly::terminate_with<std::runtime_error>(
+          "QuicServerWorker::QuicReadCallbackAdapter::getReadBuffer "
+          "unsupported on shouldOnlyNotify path");
+    }
+
+    void onDataAvailable(
+        const folly::SocketAddress& /*client*/,
+        size_t /*len*/,
+        bool /*truncated*/,
+        OnDataAvailableParams /*params*/) noexcept override {
+      folly::terminate_with<std::runtime_error>(
+          "QuicServerWorker::QuicReadCallbackAdapter::onDataAvailable "
+          "unsupported on shouldOnlyNotify path");
+    }
+
+    void onNotifyDataAvailable(QuicAsyncUDPSocket& sock) noexcept override {
+      worker_->onSocketReadable(sock);
+    }
+
+    void onReadError(const folly::AsyncSocketException& ex) noexcept override {
+      worker_->onReadError(ex);
+    }
+
+    void onReadClosed() noexcept override {
+      worker_->onReadClosed();
+    }
+
+   private:
+    QuicServerWorker* worker_;
+  };
+
   void dispatchPacketData(
       const folly::SocketAddress& client,
       RoutingData&& routingData,
@@ -499,6 +545,10 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   PacketDropReason isDstConnIdMisrouted(
       const ConnectionId& dstConnId,
       const folly::SocketAddress& client);
+
+  // Read handler for the shouldOnlyNotify path. Calls recvmmsgNetworkData,
+  // then dispatches each packet to handleNetworkData using its peerAddress.
+  void onSocketReadable(QuicAsyncUDPSocket& sock) noexcept;
 
   std::unique_ptr<FollyAsyncUDPSocketAlias> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};

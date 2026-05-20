@@ -440,6 +440,82 @@ void QuicServerWorker::onDataAvailable(
   }
 }
 
+void QuicServerWorker::onSocketReadable(QuicAsyncUDPSocket& sock) noexcept {
+  const uint64_t readBufferSize = std::max(
+                                      transportSettings_.maxRecvPacketSize,
+                                      uint64_t(kDefaultUDPReadBufferSize)) *
+      numGROBuffers_;
+  const uint16_t numPackets = transportSettings_.maxRecvBatchSize;
+
+  NetworkData networkData;
+  networkData.reserve(numPackets);
+  size_t totalData = 0;
+
+  auto recvResult = sock.recvmmsgNetworkData(
+      readBufferSize, numPackets, networkData, totalData);
+  if (!recvResult.has_value()) {
+    onReadError(
+        folly::AsyncSocketException(
+            folly::AsyncSocketException::INTERNAL_ERROR,
+            recvResult.error().message));
+    return;
+  }
+  if (recvResult->maybeNoReadReason) {
+    switch (recvResult->maybeNoReadReason.value()) {
+      case NoReadReason::NONRETRIABLE_ERROR:
+        // pauseRead has already been called inside the wrapper.
+        onReadError(
+            folly::AsyncSocketException(
+                folly::AsyncSocketException::INTERNAL_ERROR,
+                "::recvmmsg() failed"));
+        return;
+      case NoReadReason::RETRIABLE_ERROR:
+      case NoReadReason::READ_OK:
+      case NoReadReason::EMPTY_DATA:
+      case NoReadReason::TRUNCATED:
+      case NoReadReason::STALE_DATA:
+        return;
+    }
+  }
+
+  const auto batchReceiveTime = Clock::now();
+  for (auto& udpPacket : std::move(networkData).movePackets()) {
+    if (udpPacket.buf.empty()) {
+      continue;
+    }
+    auto packetReceiveTime = batchReceiveTime;
+    if (udpPacket.timings.maybeSoftwareTs) {
+      auto packetRxEpochUs =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              udpPacket.timings.maybeSoftwareTs->rawDuration);
+      if (packetRxEpochUs != 0us) {
+        auto now = std::chrono::system_clock::now();
+        auto nowEpochUs = std::chrono::duration_cast<std::chrono::microseconds>(
+            now.time_since_epoch());
+        auto rxDelayUs = nowEpochUs - packetRxEpochUs;
+        if (rxDelayUs >= 0us) {
+          packetReceiveTime -= rxDelayUs;
+          QUIC_STATS(statsCallback_, onRxDelaySample, rxDelayUs.count());
+        } else {
+          MVVLOG(10) << "Negative rx delay: " << rxDelayUs.count() << "us";
+        }
+      }
+    }
+    if (packetReceiveTime < largestPacketReceiveTime_) {
+      packetReceiveTime = batchReceiveTime;
+    }
+    largestPacketReceiveTime_ =
+        std::max(largestPacketReceiveTime_, packetReceiveTime);
+    udpPacket.timings.receiveTimePoint = packetReceiveTime;
+
+    QUIC_STATS(statsCallback_, onPacketReceived);
+    QUIC_STATS(statsCallback_, onRead, udpPacket.buf.chainLength());
+
+    MVCHECK(udpPacket.peerAddress.has_value());
+    handleNetworkData(*udpPacket.peerAddress, udpPacket);
+  }
+}
+
 void QuicServerWorker::handleNetworkData(
     const folly::SocketAddress& client,
     ReceivedUdpPacket& udpPacket,

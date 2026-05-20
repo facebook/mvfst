@@ -61,6 +61,7 @@ mvfst_add_library(mvfst_server_server
     mvfst_common_events_highres_quic_timer
     mvfst_common_transport_knobs
     mvfst_common_udpsocket_folly_async_udp_socket
+    mvfst_common_udpsocket_quic_async_udp_socket
     mvfst_congestion_control_congestion_controller_factory
     mvfst_congestion_control_server_congestion_controller_factory
     mvfst_constants
