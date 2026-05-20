@@ -17,7 +17,6 @@ class QuicAsyncUDPSocketImpl : public QuicAsyncUDPSocket {
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,
-      Optional<folly::SocketAddress>& peerAddress,
       size_t& totalData) override;
 
  private:

@@ -107,6 +107,7 @@ mvfst_add_library(mvfst_common_network_data
     mvfst_common_optional
     mvfst_common_time_points
     mvfst_constants
+    Folly::folly_network_address
 )
 
 mvfst_add_library(mvfst_common_time_points

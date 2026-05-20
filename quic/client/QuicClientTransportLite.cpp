@@ -401,7 +401,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
     if (conn_->scone && sp->rate != kSconeNoAdvice) {
       pendingSconeRateSignal_ = QuicConnectionStateBase::SconeRateSignal{
-          sp->rate, static_cast<QuicVersion>(sp->version)};
+          .rate = sp->rate, .version = static_cast<QuicVersion>(sp->version)};
     }
     return {};
   }
@@ -1461,22 +1461,18 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
     uint64_t readBufferSize,
     int numPackets,
     NetworkData& networkData,
-    Optional<folly::SocketAddress>& server,
     size_t& totalData) {
   for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place.
     BufPtr readBuffer = BufHelpers::createCombined(readBufferSize);
-    struct iovec vec;
+    struct iovec vec{};
     vec.iov_base = readBuffer->writableData();
     vec.iov_len = readBufferSize;
 
-    sockaddr* rawAddr{nullptr};
-
     struct sockaddr_storage addrStorage{};
-
-    if (!server) {
-      rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
+    auto* rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
+    {
       auto familyResult = sock.getLocalAddressFamily();
       if (!familyResult.has_value()) {
         return quic::make_unexpected(QuicError(
@@ -1494,7 +1490,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
     struct msghdr msg{};
 
     msg.msg_name = rawAddr;
-    msg.msg_namelen = rawAddr ? kAddrLen : 0;
+    msg.msg_namelen = kAddrLen;
     msg.msg_iov = &vec;
     msg.msg_iovlen = 1;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
@@ -1586,11 +1582,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
     auto bytesRead = size_t(ret);
     totalData += bytesRead;
-    if (!server) {
-      server = folly::SocketAddress();
-      server->setFromSockaddr(rawAddr, kAddrLen);
-    }
-    MVVLOG(10) << "Got data from socket peer=" << *server
+    folly::SocketAddress packetPeerAddress;
+    packetPeerAddress.setFromSockaddr(MVCHECK_NOTNULL(rawAddr), kAddrLen);
+    MVVLOG(10) << "Got data from socket peer=" << packetPeerAddress
                << " len=" << bytesRead;
     readBuffer->append(bytesRead);
     if (params.gro > 0) {
@@ -1612,24 +1606,27 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(
-              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
+          ReceivedUdpPacket pkt(std::move(tmp), timings, params.tos);
+          pkt.peerAddress = packetPeerAddress;
+          networkData.addPacket(std::move(pkt));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           MVDCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(
-              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+          ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
+          pkt.peerAddress = packetPeerAddress;
+          networkData.addPacket(std::move(pkt));
           // This is the last packet. Break here to silence the linter's warning
           // about a use-after-move in the next iteration of the loop
           break;
         }
       }
     } else {
-      networkData.addPacket(
-          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+      ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
+      pkt.peerAddress = std::move(packetPeerAddress);
+      networkData.addPacket(std::move(pkt));
     }
     maybeQlogDatagram(bytesRead);
   }
@@ -1641,8 +1638,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
     const Optional<folly::SocketAddress>& localAddress,
-    NetworkData&& networkData,
-    const Optional<folly::SocketAddress>& peerAddress) {
+    NetworkData&& networkData) {
   if (networkData.getPackets().empty()) {
     // recvMmsg and recvMsg might have already set the reason and counter
     if (conn_->loopDetectorCallback) {
@@ -1658,6 +1654,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
     return {};
   }
   MVDCHECK(localAddress.has_value());
+  const auto& peerAddress = networkData.getPackets().front().peerAddress;
   MVDCHECK(peerAddress.has_value());
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
@@ -1673,7 +1670,6 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize) {
   size_t totalData = 0;
-  Optional<folly::SocketAddress> server;
   for (size_t i = 0; i < conn_->transportSettings.maxRecvBatchSize; i++) {
     auto networkDataSinglePacket = NetworkData();
     networkDataSinglePacket.reserve(1);
@@ -1683,7 +1679,6 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
         readBufferSize,
         1 /* numPackets */,
         networkDataSinglePacket,
-        server,
         totalData);
 
     if (!recvResult.has_value()) {
@@ -1705,7 +1700,7 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
     }
 
     auto processResult = processPackets(
-        localAddressRes.value(), std::move(networkDataSinglePacket), server);
+        localAddressRes.value(), std::move(networkDataSinglePacket));
     if (!processResult.has_value()) {
       return processResult;
     }

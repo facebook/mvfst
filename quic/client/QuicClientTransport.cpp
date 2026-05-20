@@ -68,10 +68,9 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsgWrapper(
   NetworkData networkData;
   networkData.reserve(numPackets);
   size_t totalData = 0;
-  Optional<folly::SocketAddress> server;
 
   const auto result = sock.recvmmsgNetworkData(
-      readBufferSize, numPackets, networkData, server, totalData);
+      readBufferSize, numPackets, networkData, totalData);
 
   if (!result.has_value()) {
     return quic::make_unexpected(result.error());
@@ -124,8 +123,7 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsgWrapper(
     return quic::make_unexpected(localAddressRes.error());
   }
 
-  return processPackets(
-      localAddressRes.value(), std::move(networkData), server);
+  return processPackets(localAddressRes.value(), std::move(networkData));
 }
 
 quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsg(
@@ -135,12 +133,11 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsg(
   NetworkData networkData;
   networkData.reserve(numPackets);
   size_t totalData = 0;
-  Optional<folly::SocketAddress> server;
 
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   recvmmsgStorage_.resize(numPackets);
-  auto recvResult = recvMmsg(
-      sock, readBufferSize, numPackets, networkData, server, totalData);
+  auto recvResult =
+      recvMmsg(sock, readBufferSize, numPackets, networkData, totalData);
   if (!recvResult.has_value()) {
     return recvResult;
   }
@@ -150,8 +147,7 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsg(
     return quic::make_unexpected(localAddressRes.error());
   }
 
-  return processPackets(
-      localAddressRes.value(), std::move(networkData), server);
+  return processPackets(localAddressRes.value(), std::move(networkData));
 }
 
 quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
@@ -161,11 +157,10 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
   NetworkData networkData;
   networkData.reserve(numPackets);
   size_t totalData = 0;
-  Optional<folly::SocketAddress> server;
 
   // TODO(bschlinker): Deprecate in favor of Wrapper::recvmmsg
   auto recvResult =
-      recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+      recvMsg(sock, readBufferSize, numPackets, networkData, totalData);
   if (!recvResult.has_value()) {
     return recvResult;
   }
@@ -175,8 +170,7 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmsg(
     return quic::make_unexpected(localAddressRes.error());
   }
 
-  return processPackets(
-      localAddressRes.value(), std::move(networkData), server);
+  return processPackets(localAddressRes.value(), std::move(networkData));
 }
 
 quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
@@ -184,7 +178,6 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
     uint64_t readBufferSize,
     uint16_t numPackets,
     NetworkData& networkData,
-    Optional<folly::SocketAddress>& server,
     size_t& totalData) {
   auto& msgs = recvmmsgStorage_.msgs;
   int flags = 0;
@@ -312,10 +305,10 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
 #endif
     totalData += bytesRead;
 
-    if (!server) {
-      server.emplace(folly::SocketAddress());
+    folly::SocketAddress packetPeerAddress;
+    {
       auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
-      server->setFromSockaddr(rawAddr, kAddrLen);
+      packetPeerAddress.setFromSockaddr(rawAddr, kAddrLen);
     }
 
     ReceivedUdpPacket::Timings timings;
@@ -324,7 +317,7 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
           QuicAsyncUDPSocket::convertToSocketTimestampExt(*params.ts);
     }
 
-    MVVLOG(10) << "Got data from socket peer=" << *server
+    MVVLOG(10) << "Got data from socket peer=" << packetPeerAddress
                << " len=" << bytesRead;
     readBuffer->append(bytesRead);
     if (params.gro > 0) {
@@ -346,24 +339,27 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(
-              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
+          ReceivedUdpPacket pkt(std::move(tmp), timings, params.tos);
+          pkt.peerAddress = packetPeerAddress;
+          networkData.addPacket(std::move(pkt));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(
-              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+          ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
+          pkt.peerAddress = packetPeerAddress;
+          networkData.addPacket(std::move(pkt));
           // This is the last packet. Break here to silence the linter's warning
           // about a use-after-move in the next iteration of the loop
           break;
         }
       }
     } else {
-      networkData.addPacket(
-          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+      ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
+      pkt.peerAddress = std::move(packetPeerAddress);
+      networkData.addPacket(std::move(pkt));
     }
 
     maybeQlogDatagram(bytesRead);

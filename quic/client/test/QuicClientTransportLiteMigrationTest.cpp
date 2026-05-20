@@ -518,8 +518,7 @@ class QuicClientTransportLiteMockWithClose
 
   quic::Expected<void, QuicError> processPackets(
       const Optional<folly::SocketAddress>&,
-      NetworkData&&,
-      const Optional<folly::SocketAddress>&) override {
+      NetworkData&&) override {
     ++processPacketsCount;
     if (processPacketsCount == 1) {
       conn_->transportSettings.shouldDrain = true;

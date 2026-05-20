@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/SocketAddress.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/Optional.h>
@@ -84,6 +85,10 @@ struct ReceivedUdpPacket {
 
   // ToS / TClass value
   uint8_t tosValue{0};
+
+  // Source address of the datagram. Populated by socket readers
+  // (recvmmsgNetworkData, recvMsg, recvMmsg).
+  Optional<folly::SocketAddress> peerAddress;
 };
 
 struct NetworkData {

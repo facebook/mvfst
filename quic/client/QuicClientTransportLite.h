@@ -278,7 +278,6 @@ class QuicClientTransportLite
       uint64_t readBufferSize,
       int numPackets,
       NetworkData& networkData,
-      Optional<folly::SocketAddress>& server,
       size_t& totalData);
 
   /**
@@ -342,8 +341,7 @@ class QuicClientTransportLite
 
   [[nodiscard]] virtual quic::Expected<void, QuicError> processPackets(
       const Optional<folly::SocketAddress>& localAddress,
-      NetworkData&& networkData,
-      const Optional<folly::SocketAddress>& peerAddress);
+      NetworkData&& networkData);
 
   [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmsgSinglePacketLoop(
       QuicAsyncUDPSocket& sock,

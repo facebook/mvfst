@@ -22,7 +22,6 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     uint64_t readBufferSize,
     uint16_t numPackets,
     NetworkData& networkData,
-    Optional<folly::SocketAddress>& peerAddress,
     size_t& totalData) {
   /**
    * This is largely a copy / paste of QuicClientTransport::recvmmsg.
@@ -142,10 +141,10 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
 #endif
     totalData += bytesRead;
 
-    if (!peerAddress) {
-      peerAddress.emplace(folly::SocketAddress());
+    folly::SocketAddress packetPeerAddress;
+    {
       auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
-      peerAddress->setFromSockaddr(rawAddr, kAddrLen);
+      packetPeerAddress.setFromSockaddr(rawAddr, kAddrLen);
     }
 
     // timings
@@ -160,7 +159,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
       timings.maybeSoftwareTs = convertToSocketTimestampExt(*params.ts);
     }
 
-    MVVLOG(10) << "Got data from socket peer=" << *peerAddress
+    MVVLOG(10) << "Got data from socket peer=" << packetPeerAddress
                << " len=" << bytesRead;
     readBuffer->append(bytesRead);
     if (params.gro > 0) {
@@ -182,21 +181,24 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
 
           offset += params.gro;
           remaining -= params.gro;
-          networkData.addPacket(
-              ReceivedUdpPacket(std::move(tmp), timings, params.tos));
+          ReceivedUdpPacket pkt(std::move(tmp), timings, params.tos);
+          pkt.peerAddress = packetPeerAddress;
+          networkData.addPacket(std::move(pkt));
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           DCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          networkData.addPacket(
-              ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+          ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
+          pkt.peerAddress = packetPeerAddress;
+          networkData.addPacket(std::move(pkt));
         }
       }
     } else {
-      networkData.addPacket(
-          ReceivedUdpPacket(std::move(readBuffer), timings, params.tos));
+      ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
+      pkt.peerAddress = std::move(packetPeerAddress);
+      networkData.addPacket(std::move(pkt));
     }
   }
 

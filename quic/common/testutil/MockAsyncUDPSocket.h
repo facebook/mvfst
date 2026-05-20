@@ -75,7 +75,6 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
       (uint64_t readBufferSize,
        uint16_t numPackets,
        NetworkData& networkData,
-       Optional<folly::SocketAddress>& peerAddress,
        size_t& totalData));
   MOCK_METHOD((quic::Expected<int, QuicError>), getGRO, ());
   MOCK_METHOD((quic::Expected<void, QuicError>), setGRO, (bool));

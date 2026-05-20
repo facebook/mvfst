@@ -64,11 +64,7 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD(
       (quic::Expected<RecvResult, QuicError>),
       recvmmsgNetworkData,
-      (uint64_t,
-       uint16_t,
-       NetworkData&,
-       Optional<folly::SocketAddress>&,
-       size_t&));
+      (uint64_t, uint16_t, NetworkData&, size_t&));
   MOCK_METHOD((quic::Expected<int, QuicError>), getGSO, ());
   MOCK_METHOD((quic::Expected<int, QuicError>), getGRO, ());
   MOCK_METHOD((quic::Expected<void, QuicError>), setGRO, (bool));

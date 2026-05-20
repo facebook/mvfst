@@ -155,7 +155,6 @@ class QuicClientTransport : public QuicTransportBase,
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,
-      Optional<folly::SocketAddress>& server,
       size_t& totalData);
 
   // Happy Eyeballs virtual method overrides

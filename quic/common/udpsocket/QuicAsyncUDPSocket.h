@@ -280,7 +280,6 @@ class QuicAsyncUDPSocket {
       uint64_t readBufferSize,
       uint16_t numPackets,
       NetworkData& networkData,
-      Optional<folly::SocketAddress>& peerAddress,
       size_t& totalData) = 0;
 
   // generic segmentation offload get/set
