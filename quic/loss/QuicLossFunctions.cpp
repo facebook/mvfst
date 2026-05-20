@@ -7,8 +7,10 @@
 
 #include <quic/common/MvfstLogging.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -226,6 +228,14 @@ quic::Expected<void, QuicError> markPacketLoss(
         if (bufferItr == cryptoStream->retransmissionBuffer.end()) {
           break;
         }
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server &&
+                bufferItr->second->offset != frame.offset,
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_loss_functions",
+            "invariant_violation: crypto retransmission buffer offset "
+            "mismatch while marking packet lost");
         MVDCHECK_EQ(bufferItr->second->offset, frame.offset);
         cryptoStream->insertIntoLossBuffer(std::move(bufferItr->second));
         cryptoStream->retransmissionBuffer.erase(bufferItr);
@@ -345,6 +355,14 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
     }
 
     if (pkt.maybeClonedPacketIdentifier) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server &&
+              !conn.outstandings.clonedPacketCount[pnSpace],
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+          "quic_loss_functions",
+          "invariant_violation: cloned packet count underflow while "
+          "processing outstandings for loss");
       MVCHECK(conn.outstandings.clonedPacketCount[pnSpace]);
       --conn.outstandings.clonedPacketCount[pnSpace];
     }
@@ -367,6 +385,14 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
           *pkt.maybeClonedPacketIdentifier);
     }
     if (!processed) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server &&
+              !conn.outstandings.packetCount[currentPacketNumberSpace],
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+          "quic_loss_functions",
+          "invariant_violation: packet count underflow while processing "
+          "outstandings for loss");
       MVCHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
       --conn.outstandings.packetCount[currentPacketNumberSpace];
     }
@@ -489,6 +515,13 @@ detectLossPackets(
   }
 
   if (lossEvent.largestLostPacketNum.has_value()) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server &&
+            (!lossEvent.largestLostSentTime || !lossEvent.smallestLostSentTime),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_loss_functions",
+        "invariant_violation: loss event missing sent time metadata");
     MVDCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
     QLOG(
         conn,

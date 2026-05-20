@@ -100,6 +100,8 @@ mvfst_add_library(mvfst_codec_pktrebuilder
     mvfst_codec
     mvfst_common_mvfst_logging
     mvfst_flowcontrol_flow_control
+    mvfst_logging_oops_logger
+    mvfst_state_connection_oops_fields
     mvfst_state_simple_frame_functions
     mvfst_state_state_functions
     mvfst_state_stream_functions

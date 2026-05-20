@@ -165,6 +165,8 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
     ],
     exported_deps = [
         ":congestion_controller",
@@ -188,6 +190,8 @@ mvfst_cpp_library(
         "//quic/common:time_util",
         "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
     ],
     exported_deps = [
         ":congestion_controller",
@@ -215,7 +219,9 @@ mvfst_cpp_library(
         "//quic/common:time_util",
         "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",
+        "//quic/logging/oops_logger:oops_logger",
         "//quic/state:ack_frequency_functions",
+        "//quic/state:connection_oops_fields",
     ],
     exported_deps = [
         ":bandwidth",
@@ -273,6 +279,8 @@ mvfst_cpp_library(
     ],
     deps = [
         "//quic/logging:qlogger_macros",
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
     ],
     exported_deps = [
         ":bbr",

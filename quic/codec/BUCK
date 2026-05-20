@@ -146,6 +146,8 @@ mvfst_cpp_library(
         "//quic/api:ack_scheduler",
         "//quic/common:mvfst_logging",
         "//quic/flowcontrol:flow_control",
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
         "//quic/state:simple_frame_functions",
         "//quic/state:state_functions",
         "//quic/state:stream_functions",

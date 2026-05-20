@@ -102,8 +102,10 @@ mvfst_add_library(mvfst_congestion_control_newreno
   DEPS
     mvfst_common_mvfst_logging
     mvfst_congestion_control_congestion_control_functions
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
+    mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_congestion_control_congestion_controller
     mvfst_exception
@@ -118,8 +120,10 @@ mvfst_add_library(mvfst_congestion_control_copa
     mvfst_common_mvfst_logging
     mvfst_common_time_util
     mvfst_congestion_control_congestion_control_functions
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
+    mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_common_optional
     mvfst_congestion_control_congestion_controller
@@ -137,9 +141,11 @@ mvfst_add_library(mvfst_congestion_control_bbr
     mvfst_common_time_util
     mvfst_congestion_control_congestion_control_functions
     mvfst_constants
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
     mvfst_state_ack_frequency_functions
+    mvfst_state_connection_oops_fields
     Folly::folly_random
   EXPORTED_DEPS
     mvfst_congestion_control_bandwidth
@@ -177,7 +183,9 @@ mvfst_add_library(mvfst_congestion_control_bbr_bandwidth_sampler
   SRCS
     BbrBandwidthSampler.cpp
   DEPS
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_macros
+    mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_congestion_control_bbr
     mvfst_congestion_control_third_party_chromium_windowed_filter

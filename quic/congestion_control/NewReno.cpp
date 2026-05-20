@@ -11,6 +11,8 @@
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 
 namespace quic {
 
@@ -86,6 +88,15 @@ void NewReno::onPacketSent(const OutstandingPacketWrapper& packet) {
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          (!ack.largestNewlyAckedPacket.has_value() ||
+           ack.ackedPackets.empty()),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: NewReno ACK event missing acked packet "
+      "metadata");
   MVDCHECK(
       ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
   MVVLOG(10) << __func__ << " writable=" << getWritableBytes()
@@ -163,6 +174,15 @@ void NewReno::onPacketAckOrLoss(
 }
 
 void NewReno::onPacketLoss(const LossEvent& loss) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          (!loss.largestLostPacketNum.has_value() ||
+           !loss.largestLostSentTime.has_value()),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: NewReno loss event missing largest lost packet "
+      "metadata");
   MVDCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());

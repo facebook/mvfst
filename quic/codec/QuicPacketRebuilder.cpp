@@ -10,6 +10,8 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
@@ -30,6 +32,16 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
   // Either the packet has never been cloned before, or it's
   // maybeClonedPacketIdentifier is still in the
   // outstandings.clonedPacketIdentifiers set.
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          packet.maybeClonedPacketIdentifier &&
+          !conn_.outstandings.clonedPacketIdentifiers.count(
+              *packet.maybeClonedPacketIdentifier),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_rebuilder",
+      "invariant_violation: cloned packet identifier missing from "
+      "outstandings set before clone");
   MVDCHECK(
       !packet.maybeClonedPacketIdentifier ||
       conn_.outstandings.clonedPacketIdentifiers.count(
@@ -38,6 +50,14 @@ ClonedPacketIdentifier PacketRebuilder::cloneOutstandingPacket(
     auto packetNum = packet.packet.header.getPacketSequenceNum();
     auto packetNumberSpace = packet.packet.header.getPacketNumberSpace();
     ClonedPacketIdentifier event(packetNumberSpace, packetNum);
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server &&
+            conn_.outstandings.clonedPacketIdentifiers.contains(event),
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+        "quic_packet_rebuilder",
+        "invariant_violation: cloned packet identifier already present "
+        "while cloning packet");
     MVDCHECK(!conn_.outstandings.clonedPacketIdentifiers.contains(event));
     packet.maybeClonedPacketIdentifier = event;
     conn_.outstandings.clonedPacketIdentifiers.insert(event);
@@ -123,6 +143,14 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
           if (ret) {
             // Writing 0 byte for stream data is legit if the stream frame has
             // FIN. That's checked in writeStreamFrameHeader.
+            PROTO_OOPS_LOG_BUILDER_IF(
+                conn_.nodeType == QuicNodeType::Server && !streamData &&
+                    !streamFrame.fin,
+                conn_.oopsLogger,
+                proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+                "quic_packet_rebuilder",
+                "invariant_violation: stream clone wrote no data without "
+                "FIN");
             MVCHECK(streamData || streamFrame.fin);
             if (streamData) {
               writeStreamFrameData(builder_, *streamData, *dataLen);
@@ -308,6 +336,12 @@ const ChainedByteRangeHead* PacketRebuilder::cloneCryptoRetransmissionBuffer(
    * They have to be covered by making sure we do not clone an already acked or
    * lost packet.
    */
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && !frame.len,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_rebuilder",
+      "invariant_violation: empty crypto frame while cloning packet");
   MVDCHECK(frame.len, "WriteCryptoFrame cloning: frame is empty. " << conn_);
   auto iter = stream.retransmissionBuffer.find(frame.offset);
 
@@ -315,9 +349,23 @@ const ChainedByteRangeHead* PacketRebuilder::cloneCryptoRetransmissionBuffer(
   if (iter == stream.retransmissionBuffer.end()) {
     return nullptr;
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          iter->second->offset != frame.offset,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_rebuilder",
+      "invariant_violation: crypto clone retransmission offset mismatch");
   MVDCHECK(
       iter->second->offset == frame.offset,
       "WriteCryptoFrame cloning: offset mismatch. " << conn_);
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          iter->second->data.chainLength() != frame.len,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_rebuilder",
+      "invariant_violation: crypto clone retransmission length mismatch");
   MVDCHECK(
       iter->second->data.chainLength() == frame.len,
       "WriteCryptoFrame cloning: Len mismatch. " << conn_);
@@ -337,10 +385,32 @@ const ChainedByteRangeHead* PacketRebuilder::cloneRetransmissionBuffer(
    * have to be covered by making sure we do not clone an already acked, lost or
    * skipped packet.
    */
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && !stream,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_rebuilder",
+      "invariant_violation: missing stream while cloning stream frame");
   MVDCHECK(stream);
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && stream &&
+          !retransmittable(*stream),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_packet_rebuilder",
+      "invariant_violation: non-retransmittable stream while cloning stream "
+      "frame");
   MVDCHECK(retransmittable(*stream));
   auto iter = stream->retransmissionBuffer.find(frame.offset);
   if (iter != stream->retransmissionBuffer.end()) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && frame.len &&
+            iter->second->data.empty(),
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+        "quic_packet_rebuilder",
+        "invariant_violation: non-empty stream frame has empty "
+        "retransmission data while cloning");
     MVDCHECK(
         !frame.len || !iter->second->data.empty(),
         "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"

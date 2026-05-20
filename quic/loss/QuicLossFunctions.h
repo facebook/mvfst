@@ -18,7 +18,9 @@
 #include <quic/congestion_control/CongestionController.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/observer/SocketObserverTypes.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
@@ -227,6 +229,12 @@ template <class ClockType = Clock>
   if (conn.lossState.currentAlarmMethod ==
       LossState::AlarmMethod::EarlyRetransmitOrReordering) {
     auto lossTimeAndSpace = earliestLossTimer(conn);
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server && !lossTimeAndSpace.first,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_loss_functions",
+        "invariant_violation: early retransmit alarm missing loss timer");
     MVCHECK(lossTimeAndSpace.first);
     auto lossEventResult = detectLossPackets(
         conn,
@@ -239,6 +247,14 @@ template <class ClockType = Clock>
     }
     auto& lossEvent = lossEventResult.value();
     if (conn.congestionController && lossEvent) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn.nodeType == QuicNodeType::Server &&
+              (!lossEvent->largestLostSentTime ||
+               !lossEvent->smallestLostSentTime),
+          conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+          "quic_loss_functions",
+          "invariant_violation: loss alarm event missing sent time metadata");
       MVDCHECK(
           lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       subtractAndCheckUnderflow(
@@ -301,6 +317,15 @@ template <class ClockType = Clock>
 
   auto iter = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   while (iter != conn.outstandings.packets.end()) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server &&
+            iter->packet.header.getPacketNumberSpace() !=
+                PacketNumberSpace::AppData,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_loss_functions",
+        "invariant_violation: zero RTT loss walk encountered non-AppData "
+        "packet");
     MVDCHECK_EQ(
         iter->packet.header.getPacketNumberSpace(), PacketNumberSpace::AppData);
     auto isZeroRttPacket =
@@ -320,12 +345,29 @@ template <class ClockType = Clock>
       if (pkt.maybeClonedPacketIdentifier) {
         conn.outstandings.clonedPacketIdentifiers.erase(
             *pkt.maybeClonedPacketIdentifier);
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server &&
+                !conn.outstandings
+                     .clonedPacketCount[PacketNumberSpace::AppData],
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_loss_functions",
+            "invariant_violation: cloned packet count underflow while "
+            "marking zero RTT packets lost");
         MVCHECK(
             conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
         --conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData];
       }
       lossEvent.addLostPacket(pkt);
       if (!processed) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn.nodeType == QuicNodeType::Server &&
+                !conn.outstandings.packetCount[PacketNumberSpace::AppData],
+            conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+            "quic_loss_functions",
+            "invariant_violation: packet count underflow while marking "
+            "zero RTT packets lost");
         MVCHECK(conn.outstandings.packetCount[PacketNumberSpace::AppData]);
         --conn.outstandings.packetCount[PacketNumberSpace::AppData];
       }

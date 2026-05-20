@@ -8,6 +8,8 @@
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 
 namespace quic {
 
@@ -82,9 +84,27 @@ void BbrBandwidthSampler::onPacketAcked(
     }
     Bandwidth sendRate, ackRate;
     if (ackedPacket.lastAckedPacketInfo) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server &&
+              ackedPacket.outstandingPacketMetadata.time <=
+                  ackedPacket.lastAckedPacketInfo->sentTime,
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+          "quic_congestion_control",
+          "invariant_violation: BBR bandwidth sample has non-increasing "
+          "send timestamp");
       MVDCHECK(
           ackedPacket.outstandingPacketMetadata.time >
           ackedPacket.lastAckedPacketInfo->sentTime);
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server &&
+              ackedPacket.outstandingPacketMetadata.totalBytesSent <
+                  ackedPacket.lastAckedPacketInfo->totalBytesSent,
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+          "quic_congestion_control",
+          "invariant_violation: BBR bandwidth sample total bytes sent "
+          "regressed");
       MVDCHECK_GE(
           ackedPacket.outstandingPacketMetadata.totalBytesSent,
           ackedPacket.lastAckedPacketInfo->totalBytesSent);
@@ -95,7 +115,24 @@ void BbrBandwidthSampler::onPacketAcked(
               ackedPacket.outstandingPacketMetadata.time -
               ackedPacket.lastAckedPacketInfo->sentTime));
 
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server &&
+              ackEvent.ackTime <= ackedPacket.lastAckedPacketInfo->ackTime,
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+          "quic_congestion_control",
+          "invariant_violation: BBR bandwidth sample has non-increasing "
+          "ACK timestamp");
       MVDCHECK(ackEvent.ackTime > ackedPacket.lastAckedPacketInfo->ackTime);
+      PROTO_OOPS_LOG_BUILDER_IF(
+          conn_.nodeType == QuicNodeType::Server &&
+              conn_.lossState.totalBytesAcked <
+                  ackedPacket.lastAckedPacketInfo->totalBytesAcked,
+          conn_.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+          "quic_congestion_control",
+          "invariant_violation: BBR bandwidth sample total bytes acked "
+          "regressed");
       MVDCHECK_GE(
           conn_.lossState.totalBytesAcked,
           ackedPacket.lastAckedPacketInfo->totalBytesAcked);

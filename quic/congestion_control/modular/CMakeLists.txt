@@ -25,6 +25,8 @@ mvfst_add_library(mvfst_congestion_control_modular_bbr2_probe_rtt
     Bbr2ProbeRtt.cpp
   DEPS
     mvfst_congestion_control_congestion_control_functions
+    mvfst_logging_oops_logger
+    mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_congestion_control_congestion_controller
     mvfst_congestion_control_modular_bbr2_shared

@@ -22,8 +22,10 @@ mvfst_add_library(mvfst_loss
     mvfst_congestion_control_congestion_controller
     mvfst_constants
     mvfst_flowcontrol_flow_control
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_constants
     mvfst_observer_socket_observer_types
+    mvfst_state_connection_oops_fields
     mvfst_state_quic_state_machine
     mvfst_state_simple_frame_functions
     mvfst_state_state_functions

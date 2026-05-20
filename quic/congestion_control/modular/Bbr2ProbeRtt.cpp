@@ -8,6 +8,8 @@
 #include <quic/congestion_control/modular/Bbr2ProbeRtt.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <chrono>
 #include <cstdint>
 
@@ -45,6 +47,14 @@ void Bbr2ProbeRtt::finishAckProcessing(const AckEvent& ackEvent) {
 void Bbr2ProbeRtt::onPacketSent(const OutstandingPacketWrapper& packet) {
   shared_->onPacketSent(packet);
 
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          shared_->state_ != Bbr2State::ProbeRtt,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: modular BBR2 ProbeRtt packet sent outside "
+      "ProbeRtt state");
   CHECK(shared_->state_ == Bbr2State::ProbeRtt);
   if (shared_->idleRestart_) {
     checkProbeRttDone();
@@ -84,6 +94,14 @@ void Bbr2ProbeRtt::onPacketAckOrLoss(
     shared_->finalizeMinRttAndDeliverySignals();
 
     // Module-specific: ProbeRtt state management
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server &&
+            shared_->state_ != Bbr2State::ProbeRtt,
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+        "quic_congestion_control",
+        "invariant_violation: modular BBR2 ProbeRtt ACK handling outside "
+        "ProbeRtt state");
     CHECK(shared_->state_ == Bbr2State::ProbeRtt);
     handleProbeRtt();
 

@@ -14,6 +14,8 @@
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicAckFrequencyFunctions.h>
 #include <chrono>
 
@@ -195,6 +197,13 @@ void BbrCongestionController::onPacketAckOrLoss(
     }
   }
   if (ackEvent && ackEvent->largestNewlyAckedPacket.has_value()) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server &&
+            ackEvent->ackedPackets.empty(),
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+        "quic_congestion_control",
+        "invariant_violation: BBR ACK event missing acked packet metadata");
     MVCHECK(!ackEvent->ackedPackets.empty());
     onPacketAcked(*ackEvent, prevInflightBytes, lossEvent != nullptr);
   }
@@ -248,6 +257,12 @@ void BbrCongestionController::onPacketAcked(
     bandwidthSampler_->onPacketAcked(ack, roundTripCounter_);
   }
   if (inRecovery()) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && !endOfRecovery_.has_value(),
+        conn_.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+        "quic_congestion_control",
+        "invariant_violation: BBR recovery missing end time metadata");
     MVCHECK(endOfRecovery_.has_value());
     if (newRoundTrip &&
         recoveryState_ != BbrCongestionController::RecoveryState::GROWTH) {
@@ -436,7 +451,21 @@ bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
 void BbrCongestionController::handleAckInProbeRtt(
     bool newRoundTrip,
     TimePoint ackTime) noexcept {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && state_ != BbrState::ProbeRtt,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: BBR ProbeRtt ACK handler invoked outside "
+      "ProbeRtt state");
   MVDCHECK(state_ == BbrState::ProbeRtt);
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && !minRttSampler_,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: BBR ProbeRtt ACK handler missing min RTT "
+      "sampler");
   MVCHECK(minRttSampler_);
 
   if (bandwidthSampler_) {
@@ -501,12 +530,24 @@ void BbrCongestionController::transitToProbeBw(TimePoint congestionEventTime) {
 size_t BbrCongestionController::pickRandomCycle() {
   pacingCycleIndex_ =
       (folly::Random::rand32(numOfCycles_ - 1) + 2) % numOfCycles_;
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && pacingCycleIndex_ == 1,
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: BBR picked invalid pacing cycle index");
   MVDCHECK_NE(pacingCycleIndex_, 1);
   return pacingCycleIndex_;
 }
 
 void BbrCongestionController::updateRecoveryWindowWithAck(
     uint64_t bytesAcked) noexcept {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && !inRecovery(),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: BBR recovery window updated outside recovery");
   MVDCHECK(inRecovery());
   if (recoveryState_ == BbrCongestionController::RecoveryState::GROWTH) {
     recoveryWindow_ += bytesAcked;

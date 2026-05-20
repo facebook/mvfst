@@ -12,6 +12,8 @@
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 
 namespace quic {
 
@@ -174,6 +176,14 @@ void Copa::onPacketAckOrLoss(
 }
 
 void Copa::onPacketAcked(const AckEvent& ack) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          !ack.largestNewlyAckedPacket.has_value(),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: Copa ACK event missing largest newly acked "
+      "packet");
   MVDCHECK(ack.largestNewlyAckedPacket.has_value());
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
@@ -359,6 +369,13 @@ void Copa::onPacketLoss(const LossEvent& loss) {
       std::nullopt,
       isSlowStart_ ? "SlowStart" : "SteadyState",
       kCongestionPacketLoss);
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          !loss.largestLostPacketNum.has_value(),
+      conn_.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn_),
+      "quic_congestion_control",
+      "invariant_violation: Copa loss event missing largest lost packet");
   MVDCHECK(loss.largestLostPacketNum.has_value());
   if (loss.persistentCongestion) {
     // TODO See if we should go to slowStart here
