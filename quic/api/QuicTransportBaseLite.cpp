@@ -14,6 +14,7 @@
 #include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/observer/SocketObserverMacros.h>
 #include <quic/state/ConnectionOopsFields.h>

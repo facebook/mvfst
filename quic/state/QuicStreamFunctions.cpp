@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 #include <quic/QuicConstants.h>
@@ -22,6 +23,7 @@ void prependToBuf(quic::BufPtr& buf, quic::BufPtr toAppend) {
     buf = std::move(toAppend);
   }
 }
+
 } // namespace
 
 namespace quic {
@@ -230,6 +232,11 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
       }
       current = &(*it);
       currentAlreadyInserted = true;
+      PROTO_OOPS_LOG_IF(
+          startOverlap,
+          proto_oops::getThreadLocalOopsLogger(),
+          "quic_stream_functions",
+          "read buffer overlap state already set");
       MVDCHECK(!startOverlap);
       startOverlap = it + 1;
       endOverlap = it + 1;
@@ -238,15 +245,42 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
 
   // Could have also been completely to the right of the last element.
   if (startOverlap && !currentAlreadyInserted) {
+    PROTO_OOPS_LOG_IF(
+        !endOverlap,
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_stream_functions",
+        "missing read buffer overlap end");
     MVDCHECK(endOverlap);
+    PROTO_OOPS_LOG_IF(
+        endOverlap && *startOverlap == readBuffer.end() &&
+            *endOverlap != readBuffer.end(),
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_stream_functions",
+        "invalid read buffer overlap range");
     MVDCHECK(
         *startOverlap != readBuffer.end() || *endOverlap == readBuffer.end());
     auto insertIt = readBuffer.erase(*startOverlap, *endOverlap);
     readBuffer.emplace(insertIt, std::move(*current));
     return {};
   } else if (currentAlreadyInserted) {
+    PROTO_OOPS_LOG_IF(
+        !startOverlap,
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_stream_functions",
+        "missing read buffer overlap start");
     MVDCHECK(startOverlap);
+    PROTO_OOPS_LOG_IF(
+        !endOverlap,
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_stream_functions",
+        "missing read buffer overlap end");
     MVDCHECK(endOverlap);
+    PROTO_OOPS_LOG_IF(
+        startOverlap && endOverlap && *startOverlap == readBuffer.end() &&
+            *endOverlap != readBuffer.end(),
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_stream_functions",
+        "invalid read buffer overlap range");
     MVDCHECK(
         *startOverlap != readBuffer.end() || *endOverlap == readBuffer.end());
     readBuffer.erase(*startOverlap, *endOverlap);
@@ -308,6 +342,11 @@ std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
     // In the algorithm for the append function, we maintain the invariant that
     // the individual ranges are non-overlapping, thus if we get to this point,
     // we must have an offset which matches the read offset.
+    PROTO_OOPS_LOG_IF(
+        curr->offset != stream.currentReadOffset,
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_stream_functions",
+        "read buffer offset mismatch");
     MVCHECK_EQ(curr->offset, stream.currentReadOffset);
 
     uint64_t toRead =
@@ -317,6 +356,11 @@ std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(
       curr->data.trimStart(toRead);
     } else {
       splice = curr->data.splitAtMost(toRead);
+      PROTO_OOPS_LOG_IF(
+          splice->computeChainDataLength() != toRead,
+          proto_oops::getThreadLocalOopsLogger(),
+          "quic_stream_functions",
+          "read buffer split length mismatch");
       MVDCHECK_EQ(splice->computeChainDataLength(), toRead);
     }
     curr->offset += toRead;

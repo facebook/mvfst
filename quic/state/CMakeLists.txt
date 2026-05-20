@@ -144,6 +144,7 @@ mvfst_add_library(mvfst_state_stream_functions
     mvfst_constants
     mvfst_exception
     mvfst_flowcontrol_flow_control
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_common_expected
     mvfst_common_function_ref

@@ -12,6 +12,8 @@ mvfst_cpp_library(
         "//quic:constants",
         "//quic:exception",
         "//quic/common:mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
     ],
     exported_deps = [
         "//quic/codec:types",

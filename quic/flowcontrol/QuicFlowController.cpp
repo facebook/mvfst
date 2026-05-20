@@ -11,6 +11,8 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/StreamData.h>
 #include <algorithm>
 #include <limits>
@@ -87,6 +89,7 @@ inline uint64_t calculateMaximumData(const QuicStreamState& stream) {
       stream.currentReadOffset + stream.flowControlState.windowSize,
       stream.flowControlState.advertisedMaxOffset);
 }
+
 } // namespace
 
 void maybeIncreaseFlowControlWindow(
@@ -218,10 +221,29 @@ quic::Expected<void, QuicError> updateFlowControlOnRead(
     QuicStreamState& stream,
     uint64_t lastReadOffset,
     TimePoint readTime) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      stream.conn.nodeType == QuicNodeType::Server &&
+          stream.currentReadOffset < lastReadOffset,
+      stream.conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+          .setStreamId(stream.id)
+          .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "flow control read offset regression");
   DCHECK_GE(stream.currentReadOffset, lastReadOffset);
   uint64_t diff = 0;
   if (stream.reliableSizeFromPeer &&
       stream.currentReadOffset >= *stream.reliableSizeFromPeer) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        stream.conn.nodeType == QuicNodeType::Server &&
+            !stream.finalReadOffset.has_value(),
+        stream.conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+            .setStreamId(stream.id)
+            .setErrorCode(
+                static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+        "quic_flow_controller",
+        "missing final read offset on flow control read");
     MVCHECK(
         stream.finalReadOffset.has_value(),
         "We got a reset from the peer, but the finalReadOffset is not set.");
@@ -256,10 +278,28 @@ quic::Expected<void, QuicError> updateFlowControlOnRead(
 quic::Expected<void, QuicError> updateFlowControlOnReceiveReset(
     QuicStreamState& stream,
     TimePoint resetTime) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      stream.conn.nodeType == QuicNodeType::Server &&
+          !stream.reliableSizeFromPeer.has_value(),
+      stream.conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+          .setStreamId(stream.id)
+          .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "missing reliable size on flow control reset");
   MVCHECK(
       stream.reliableSizeFromPeer.has_value(),
       "updateFlowControlOnReceiveReset has been called, "
           << "but reliableSizeFromPeer has not been set");
+  PROTO_OOPS_LOG_BUILDER_IF(
+      stream.conn.nodeType == QuicNodeType::Server &&
+          !stream.finalReadOffset.has_value(),
+      stream.conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+          .setStreamId(stream.id)
+          .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "missing final read offset on flow control reset");
   MVCHECK(
       stream.finalReadOffset.has_value(),
       "updateFlowControlOnReceiveReset has been called, "
@@ -295,6 +335,15 @@ quic::Expected<void, QuicError> updateFlowControlOnWriteToSocket(
   if (!incrementResult.has_value()) {
     return incrementResult;
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      stream.conn.nodeType == QuicNodeType::Server &&
+          stream.conn.flowControlState.sumCurStreamBufferLen < length,
+      stream.conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+          .setStreamId(stream.id)
+          .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "stream buffer underflow after socket write");
   DCHECK_GE(stream.conn.flowControlState.sumCurStreamBufferLen, length);
   stream.conn.flowControlState.sumCurStreamBufferLen -= length;
   if (stream.conn.flowControlState.sumCurWriteOffset ==
@@ -439,6 +488,16 @@ void handleStreamBlocked(QuicStreamState& stream) {
 }
 
 uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      stream.conn.nodeType == QuicNodeType::Server &&
+          stream.flowControlState.peerAdvertisedMaxOffset <
+              stream.nextOffsetToWrite(),
+      stream.conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+          .setStreamId(stream.id)
+          .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "send stream flow control budget underflow");
   DCHECK_GE(
       stream.flowControlState.peerAdvertisedMaxOffset,
       stream.nextOffsetToWrite());
@@ -457,6 +516,15 @@ uint64_t getSendStreamFlowControlBytesAPI(const QuicStreamState& stream) {
 }
 
 uint64_t getSendConnFlowControlBytesWire(const QuicConnectionStateBase& conn) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          conn.flowControlState.peerAdvertisedMaxOffset <
+              conn.flowControlState.sumCurWriteOffset,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
+          static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "send conn flow control budget underflow");
   DCHECK_GE(
       conn.flowControlState.peerAdvertisedMaxOffset,
       conn.flowControlState.sumCurWriteOffset);
@@ -479,6 +547,17 @@ uint64_t getRecvStreamFlowControlBytes(const QuicStreamState& stream) {
     // because of the way we handle eofs with current read offset. We increment
     // read offset to be 1 over the FIN offset to indicate that we have read the
     // FIN.
+    PROTO_OOPS_LOG_BUILDER_IF(
+        stream.conn.nodeType == QuicNodeType::Server &&
+            stream.currentReadOffset !=
+                stream.flowControlState.advertisedMaxOffset + 1,
+        stream.conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+            .setStreamId(stream.id)
+            .setErrorCode(
+                static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+        "quic_flow_controller",
+        "recv stream flow control budget underflow");
     DCHECK_EQ(
         stream.currentReadOffset,
         stream.flowControlState.advertisedMaxOffset + 1);
@@ -488,6 +567,15 @@ uint64_t getRecvStreamFlowControlBytes(const QuicStreamState& stream) {
 }
 
 uint64_t getRecvConnFlowControlBytes(const QuicConnectionStateBase& conn) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          conn.flowControlState.advertisedMaxOffset <
+              conn.flowControlState.sumCurReadOffset,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
+          static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "recv conn flow control budget underflow");
   DCHECK_GE(
       conn.flowControlState.advertisedMaxOffset,
       conn.flowControlState.sumCurReadOffset);
@@ -499,6 +587,14 @@ void onConnWindowUpdateSent(
     QuicConnectionStateBase& conn,
     uint64_t maximumDataSent,
     TimePoint sentTime) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server &&
+          maximumDataSent < conn.flowControlState.advertisedMaxOffset,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
+          static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
+      "quic_flow_controller",
+      "conn window update moved backward");
   DCHECK_GE(maximumDataSent, conn.flowControlState.advertisedMaxOffset);
   conn.flowControlState.advertisedMaxOffset = maximumDataSent;
   conn.flowControlState.timeOfLastFlowControlUpdate = sentTime;

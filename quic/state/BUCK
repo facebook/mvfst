@@ -208,6 +208,7 @@ mvfst_cpp_library(
         "//quic:exception",
         "//quic/common:mvfst_logging",
         "//quic/flowcontrol:flow_control",
+        "//quic/logging/oops_logger:oops_logger",
     ],
     exported_deps = [
         ":quic_state_machine",

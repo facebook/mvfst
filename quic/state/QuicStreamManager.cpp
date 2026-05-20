@@ -8,6 +8,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/logging/QLogger.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicStreamUtilities.h>
@@ -498,6 +499,12 @@ QuicStreamState* QuicStreamManager::getStreamIfExists(StreamId streamId) {
   // - We verified streamExists() is true (stream is in open set)
   // - getStream() only returns nullptr for closed streams
   // - Closed streams are removed from open sets
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && result.value() == nullptr,
+      conn_.oopsLogger,
+      proto_oops::OopsFieldsBuilder().setStreamId(streamId),
+      "quic_stream_manager",
+      "known stream materialized as null");
   MVDCHECK(result.value() != nullptr);
   return result.value();
 }
@@ -868,6 +875,13 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
   }
 
   // If we reached here, openedResult must be NO_ERROR.
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          openedResult != LocalErrorCode::NO_ERROR,
+      conn_.oopsLogger,
+      proto_oops::OopsFieldsBuilder().setStreamId(streamId),
+      "quic_stream_manager",
+      "unexpected peer stream open result");
   MVDCHECK(openedResult == LocalErrorCode::NO_ERROR);
 
   // Check if peer saturated the limit *after* opening this stream
@@ -941,6 +955,13 @@ quic::Expected<QuicStreamState*, QuicError> QuicStreamManager::createStream(
         TransportErrorCode::STREAM_STATE_ERROR,
         "Cannot create stream: already exists or closed"));
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server &&
+          openedResultCode != LocalErrorCode::NO_ERROR,
+      conn_.oopsLogger,
+      proto_oops::OopsFieldsBuilder().setStreamId(streamId),
+      "quic_stream_manager",
+      "unexpected local stream open result");
   MVDCHECK(openedResultCode == LocalErrorCode::NO_ERROR);
 
   // Stream is now officially open, instantiate its state in the map.
@@ -968,6 +989,12 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
     return {};
   }
   MVVLOG(10) << "Removing closed stream=" << streamId;
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn_.nodeType == QuicNodeType::Server && !it->second.inTerminalStates(),
+      conn_.oopsLogger,
+      proto_oops::OopsFieldsBuilder().setStreamId(streamId),
+      "quic_stream_manager",
+      "removing non-terminal stream");
   MVDCHECK(it->second.inTerminalStates());
 
   // Clear from various tracking sets
@@ -980,6 +1007,12 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
   // Handle loss counter - we have mutable access to the stream here
   if (it->second.inLossSet_) {
     it->second.inLossSet_ = false;
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && numStreamsWithLoss_ == 0,
+        conn_.oopsLogger,
+        proto_oops::OopsFieldsBuilder().setStreamId(streamId),
+        "quic_stream_manager",
+        "loss stream count underflow");
     MVCHECK_GT(numStreamsWithLoss_, 0);
     numStreamsWithLoss_--;
   }
@@ -992,6 +1025,12 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
   connFlowControlBlocked_.erase(streamId);
   // Adjust control stream count if needed
   if (it->second.isControl) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && numControlStreams_ == 0,
+        conn_.oopsLogger,
+        proto_oops::OopsFieldsBuilder().setStreamId(streamId),
+        "quic_stream_manager",
+        "control stream count underflow");
     MVDCHECK_GT(numControlStreams_, 0);
     numControlStreams_--;
   }

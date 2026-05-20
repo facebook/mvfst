@@ -6,6 +6,8 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
 #include <quic/flowcontrol/QuicFlowController.h>
@@ -47,6 +49,18 @@ quic::Expected<void, QuicError> sendStopSendingSMHandler(
     const StopSendingFrame& frame) {
   switch (stream.sendState) {
     case StreamSendState::Open: {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          stream.conn.nodeType == QuicNodeType::Server &&
+              !isBidirectionalStream(stream.id) &&
+              !isSendingStream(stream.conn.nodeType, stream.id),
+          stream.conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+              .setStreamId(stream.id)
+              .setErrorCode(
+                  static_cast<uint64_t>(
+                      TransportErrorCode::STREAM_STATE_ERROR)),
+          "quic_stream_send_handlers",
+          "invalid send stream direction");
       MVCHECK(
           isBidirectionalStream(stream.id) ||
           isSendingStream(stream.conn.nodeType, stream.id));
@@ -88,12 +102,34 @@ quic::Expected<void, QuicError> sendRstSMHandler(
       // error checks before calling this function, which is why we're doing
       // CHECKs here.
       if (reliableSize && stream.reliableSizeToPeer) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            stream.conn.nodeType == QuicNodeType::Server &&
+                *reliableSize > *stream.reliableSizeToPeer,
+            stream.conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+                .setStreamId(stream.id)
+                .setErrorCode(
+                    static_cast<uint64_t>(
+                        TransportErrorCode::STREAM_STATE_ERROR)),
+            "quic_stream_send_handlers",
+            "reliable reset size increased");
         MVCHECK_LE(
             *reliableSize,
             *stream.reliableSizeToPeer,
             "It is illegal to increase the reliable size");
       }
       if (stream.appErrorCodeToPeer) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            stream.conn.nodeType == QuicNodeType::Server &&
+                *stream.appErrorCodeToPeer != errorCode,
+            stream.conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+                .setStreamId(stream.id)
+                .setErrorCode(
+                    static_cast<uint64_t>(
+                        TransportErrorCode::STREAM_STATE_ERROR)),
+            "quic_stream_send_handlers",
+            "reset application error code changed");
         MVCHECK_EQ(
             *stream.appErrorCodeToPeer,
             errorCode,
@@ -101,6 +137,17 @@ quic::Expected<void, QuicError> sendRstSMHandler(
       }
       if (!stream.reliableSizeToPeer &&
           stream.sendState == StreamSendState::ResetSent) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            stream.conn.nodeType == QuicNodeType::Server && reliableSize &&
+                *reliableSize != 0,
+            stream.conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+                .setStreamId(stream.id)
+                .setErrorCode(
+                    static_cast<uint64_t>(
+                        TransportErrorCode::STREAM_STATE_ERROR)),
+            "quic_stream_send_handlers",
+            "reliable reset size increased");
         MVCHECK(
             !reliableSize || *reliableSize == 0,
             "RESET_STREAM frame was previously sent, and we "
@@ -143,8 +190,41 @@ quic::Expected<void, QuicError> sendAckSMHandler(
       // Clean up the acked buffers from the retransmissionBuffer.
       auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
+        PROTO_OOPS_LOG_BUILDER_IF(
+            stream.conn.nodeType == QuicNodeType::Server &&
+                ackedFrame.offset != ackedBuffer->second->offset,
+            stream.conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+                .setStreamId(stream.id)
+                .setErrorCode(
+                    static_cast<uint64_t>(
+                        TransportErrorCode::STREAM_STATE_ERROR)),
+            "quic_stream_send_handlers",
+            "acked stream offset mismatch");
         MVCHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
+        PROTO_OOPS_LOG_BUILDER_IF(
+            stream.conn.nodeType == QuicNodeType::Server &&
+                ackedFrame.len != ackedBuffer->second->data.chainLength(),
+            stream.conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+                .setStreamId(stream.id)
+                .setErrorCode(
+                    static_cast<uint64_t>(
+                        TransportErrorCode::STREAM_STATE_ERROR)),
+            "quic_stream_send_handlers",
+            "acked stream length mismatch");
         MVCHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
+        PROTO_OOPS_LOG_BUILDER_IF(
+            stream.conn.nodeType == QuicNodeType::Server &&
+                ackedFrame.fin != ackedBuffer->second->eof,
+            stream.conn.oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+                .setStreamId(stream.id)
+                .setErrorCode(
+                    static_cast<uint64_t>(
+                        TransportErrorCode::STREAM_STATE_ERROR)),
+            "quic_stream_send_handlers",
+            "acked stream fin mismatch");
         MVCHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
         MVVLOG(10) << "Open: acked stream data stream=" << stream.id
                    << " offset=" << ackedBuffer->second->offset
@@ -181,7 +261,29 @@ quic::Expected<void, QuicError> sendAckSMHandler(
       break;
     }
     case StreamSendState::Closed: {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          stream.conn.nodeType == QuicNodeType::Server &&
+              !stream.retransmissionBuffer.empty(),
+          stream.conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+              .setStreamId(stream.id)
+              .setErrorCode(
+                  static_cast<uint64_t>(
+                      TransportErrorCode::STREAM_STATE_ERROR)),
+          "quic_stream_send_handlers",
+          "closed send stream has retransmission data");
       MVDCHECK(stream.retransmissionBuffer.empty());
+      PROTO_OOPS_LOG_BUILDER_IF(
+          stream.conn.nodeType == QuicNodeType::Server &&
+              !stream.pendingWrites.empty(),
+          stream.conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+              .setStreamId(stream.id)
+              .setErrorCode(
+                  static_cast<uint64_t>(
+                      TransportErrorCode::STREAM_STATE_ERROR)),
+          "quic_stream_send_handlers",
+          "closed send stream has pending writes");
       MVDCHECK(stream.pendingWrites.empty());
       break;
     }
