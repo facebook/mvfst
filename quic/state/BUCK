@@ -303,9 +303,11 @@ mvfst_cpp_library(
         "SimpleFrameFunctions.h",
     ],
     deps = [
+        ":connection_oops_fields",
         ":state_functions",
         "//quic:constants",
         "//quic/common:mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
         "//quic/state/stream:stream",
     ],
     exported_deps = [
@@ -317,8 +319,7 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "quic_connection_stats",
-    srcs = [
-    ],
+    srcs = [],
     headers = [
         "QuicConnectionStats.h",
     ],

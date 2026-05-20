@@ -366,11 +366,30 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceivedStaleResponse) {
   EXPECT_EQ(validatedPath, nullptr);
 }
 
-TEST_F(QuicPathManagerTest, OnPathResponseReceivedAfterRetransmitNoRttSample) {
-  // After a retransmit there are 2+ entries in outstandingChallenges.
-  // The RTT-bias guard from D102894190 still skips emitting a sample in that
-  // case; a follow-up change drops this guard once unique payloads make the
-  // matching unambiguous.
+TEST_F(QuicPathManagerTest, OnPathResponseReceivedAfterRetransmit) {
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType id = result.value();
+
+  // Mint twice (original + retransmit), each with a unique payload.
+  auto firstRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(firstRes.has_value());
+  auto secondRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(secondRes.has_value());
+
+  // Response carries the second (retransmitted) payload.
+  PathResponseFrame response(secondRes.value().pathData);
+  auto validatedPath = manager_->onPathResponseReceived(response, id);
+  ASSERT_NE(validatedPath, nullptr);
+  EXPECT_EQ(validatedPath->status, PathStatus::Validated);
+  // The big difference vs. the old behavior: we still get an RTT sample even
+  // after a retransmit, because each transmission is uniquely identifiable.
+  EXPECT_TRUE(validatedPath->rttSample.has_value());
+}
+
+TEST_F(
+    QuicPathManagerTest,
+    OnPathResponseReceivedMatchesOriginalAfterRetransmit) {
   auto result = manager_->addPath(localAddr1_, peerAddr1_);
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
@@ -380,11 +399,14 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceivedAfterRetransmitNoRttSample) {
   auto secondRes = manager_->prepareChallengeForSending(id);
   ASSERT_TRUE(secondRes.has_value());
 
-  PathResponseFrame response(secondRes.value().pathData);
+  // Response carries the *original* payload — i.e. the response was for the
+  // first send even though we already retransmitted. The match still works,
+  // and RTT is computed against the first send's timestamp.
+  PathResponseFrame response(firstRes.value().pathData);
   auto validatedPath = manager_->onPathResponseReceived(response, id);
   ASSERT_NE(validatedPath, nullptr);
   EXPECT_EQ(validatedPath->status, PathStatus::Validated);
-  EXPECT_FALSE(validatedPath->rttSample.has_value());
+  EXPECT_TRUE(validatedPath->rttSample.has_value());
 }
 
 TEST_F(QuicPathManagerTest, GetEarliestChallengeTimeout) {

@@ -276,13 +276,15 @@ const PathInfo* QuicPathManager::onPathResponseReceived(
   MVVLOG(6) << "Path response received for path=" << path.id << " at "
             << path.pathValidationTime->time_since_epoch().count();
 
-  // Only generate an RTT sample if the challenge was sent exactly once.
-  // On retransmission we cannot tell which transmission the response is
-  // for, so the measurement would be biased low.
-  if (path.outstandingChallenges.size() == 1) {
-    path.rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
-        *path.pathValidationTime -
-        path.outstandingChallenges.front().sentTimestamp);
+  // Each in-flight challenge has a unique payload, so the response
+  // unambiguously identifies which transmission it's for. Compute RTT
+  // against that exact send.
+  for (const auto& inFlight : path.outstandingChallenges) {
+    if (inFlight.pathData == pathResponse.pathData) {
+      path.rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
+          *path.pathValidationTime - inFlight.sentTimestamp);
+      break;
+    }
   }
 
   path.outstandingChallenges.clear();

@@ -189,6 +189,8 @@ mvfst_add_library(mvfst_state_simple_frame_functions
   DEPS
     mvfst_common_mvfst_logging
     mvfst_constants
+    mvfst_logging_oops_logger
+    mvfst_state_connection_oops_fields
     mvfst_state_state_functions
     mvfst_state_stream
   EXPORTED_DEPS

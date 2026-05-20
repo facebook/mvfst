@@ -7,6 +7,8 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
@@ -181,11 +183,20 @@ quic::Expected<bool, QuicError> updateSimpleFrameOnPacketReceived(
       auto validatedPath =
           conn.pathManager->onPathResponseReceived(pathResponse, pathId);
 
-      // If this is the current path that just got validated, we should update
-      // the RTT. The sample is absent if the challenge was retransmitted, in
-      // which case skip updating RTT.
-      if (validatedPath && validatedPath->id == conn.currentPathId &&
-          validatedPath->rttSample.has_value()) {
+      // If this is the current path that just got validated, update the RTT.
+      // Each in-flight challenge has a unique payload, so the response always
+      // matches an exact send and produces a valid RTT sample.
+      if (validatedPath && validatedPath->id == conn.currentPathId) {
+        MVDCHECK(validatedPath->rttSample.has_value());
+        if (!validatedPath->rttSample.has_value()) {
+          PROTO_OOPS_LOG_BUILDER_IF(
+              conn.nodeType == QuicNodeType::Server,
+              conn.oopsLogger,
+              proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+              "quic_simple_frame_functions",
+              "invariant_violation: validated path missing RTT sample");
+          return false;
+        }
         updateRtt(conn, validatedPath->rttSample.value(), 0us);
       }
 
