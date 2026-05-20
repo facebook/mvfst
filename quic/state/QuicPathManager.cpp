@@ -596,10 +596,10 @@ void QuicPathManager::maybeReapUnusedPaths(bool force) {
     }
     if (!force &&
         (it.second.status == PathStatus::Validating ||
-         it.second.challengePayloadToSend)) {
+         conn_.pendingEvents.pathChallenges.contains(it.first))) {
       // Besides force, the first condition covers the path after the path
-      // challenge as been written. The second condition covers the path before
-      // the path challenge has been written.
+      // challenge has been written. The second condition covers the path
+      // that's been flagged for a challenge but hasn't been written yet.
       continue;
     }
     if (!force && it.second.pathValidationTime &&

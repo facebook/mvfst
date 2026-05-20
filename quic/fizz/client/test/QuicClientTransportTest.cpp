@@ -1447,14 +1447,12 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
       newSocketPtr->address().value(), conn.peerAddress);
   ASSERT_TRUE(newPathRes);
   EXPECT_EQ(newPathRes->status, PathStatus::NotValid);
-  ASSERT_NO_THROW(conn.pendingEvents.pathChallenges.at(conn.currentPathId));
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(conn.currentPathId));
 
   loopForWrites();
 
   // The path challenge was written and the path is now validating
-  EXPECT_THROW(
-      conn.pendingEvents.pathChallenges.at(conn.currentPathId),
-      std::out_of_range);
+  EXPECT_FALSE(conn.pendingEvents.pathChallenges.contains(conn.currentPathId));
   EXPECT_EQ(newPathRes->status, PathStatus::Validating);
 
   client->closeNow(std::nullopt);
@@ -3297,12 +3295,9 @@ TEST_F(
   auto probePathId = probeRes.value();
 
   // Validate the probed path.
-  auto challengeDataRes =
-      conn.pathManager->getNewPathChallengeData(probePathId);
-  ASSERT_FALSE(challengeDataRes.hasError());
-  PathChallengeFrame chall{challengeDataRes.value()};
-  conn.pathManager->onPathChallengeSent(chall);
-  PathResponseFrame resp{challengeDataRes.value()};
+  auto challengeRes = conn.pathManager->prepareChallengeForSending(probePathId);
+  ASSERT_FALSE(challengeRes.hasError());
+  PathResponseFrame resp{challengeRes.value().pathData};
   auto* validated = conn.pathManager->onPathResponseReceived(resp, probePathId);
   ASSERT_NE(validated, nullptr);
 

@@ -146,19 +146,15 @@ class QuicClientTransportLiteMigrationTest : public Test {
     return probeSock;
   }
 
-  // Helper function to validate a path by simulating challenge/response
+  // Helper function to validate a path by simulating challenge/response.
+  // The mint records the challenge as in-flight with a current timestamp,
+  // exactly as the scheduler would at write time.
   void validatePath(PathIdType pathId) {
-    // Get challenge data
-    auto challengeDataRes =
-        quicClient_->getConn()->pathManager->getNewPathChallengeData(pathId);
-    ASSERT_FALSE(challengeDataRes.hasError());
+    auto challengeRes =
+        quicClient_->getConn()->pathManager->prepareChallengeForSending(pathId);
+    ASSERT_FALSE(challengeRes.hasError());
 
-    // Simulate sending the path challenge so timestamps are populated
-    PathChallengeFrame chall{challengeDataRes.value()};
-    quicClient_->getConn()->pathManager->onPathChallengeSent(chall);
-
-    // Simulate receiving the response
-    PathResponseFrame resp{challengeDataRes.value()};
+    PathResponseFrame resp{challengeRes.value().pathData};
     const auto* validated =
         quicClient_->getConn()->pathManager->onPathResponseReceived(
             resp, pathId);
@@ -287,14 +283,10 @@ TEST_F(QuicClientTransportLiteMigrationTest, PathProbeTimeout) {
   ASSERT_TRUE(res.has_value()) << "startPathProbe failed: " << res.error();
   auto pathId = res.value();
 
-  // Get challenge data and send it to set up the deadline
-  auto challengeDataRes =
-      quicClient_->getConn()->pathManager->getNewPathChallengeData(pathId);
-  ASSERT_FALSE(challengeDataRes.hasError());
-
-  // Simulate sending the path challenge to set timestamps and deadline
-  PathChallengeFrame chall{challengeDataRes.value()};
-  quicClient_->getConn()->pathManager->onPathChallengeSent(chall);
+  // Mint a challenge, which records it as in-flight and sets the deadline.
+  auto challengeRes =
+      quicClient_->getConn()->pathManager->prepareChallengeForSending(pathId);
+  ASSERT_FALSE(challengeRes.hasError());
 
   // Get the path to check its deadline
   const auto* pathInfo = quicClient_->getConn()->pathManager->getPath(pathId);
@@ -336,14 +328,10 @@ TEST_F(
   ASSERT_TRUE(startRes.has_value());
   auto pathId = startRes.value();
 
-  // Get challenge data and send it to set up the deadline
-  auto challengeDataRes =
-      quicClient_->getConn()->pathManager->getNewPathChallengeData(pathId);
-  ASSERT_FALSE(challengeDataRes.hasError());
-
-  // Simulate sending the path challenge to set timestamps and deadline
-  PathChallengeFrame chall{challengeDataRes.value()};
-  quicClient_->getConn()->pathManager->onPathChallengeSent(chall);
+  // Mint a challenge, which records it as in-flight and sets the deadline.
+  auto challengeRes =
+      quicClient_->getConn()->pathManager->prepareChallengeForSending(pathId);
+  ASSERT_FALSE(challengeRes.hasError());
 
   // Verify path is in Validating state
   const auto* pathInfo = quicClient_->getConn()->pathManager->getPath(pathId);

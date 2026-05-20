@@ -2212,7 +2212,7 @@ WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
 bool hasAlternatePathValidationDataToWrite(
     const QuicConnectionStateBase& conn) {
   // Check path challenges
-  for (const auto& [pathId, _] : conn.pendingEvents.pathChallenges) {
+  for (const auto& pathId : conn.pendingEvents.pathChallenges) {
     if (pathId != conn.currentPathId &&
         pathValidationWritableBytes(conn, pathId) > 0) {
       // This path has writable bytes, we can write path validation data
@@ -2291,8 +2291,7 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (!conn.pendingEvents.frames.empty()) {
     return WriteDataReason::SIMPLE;
   }
-  if ((conn.pendingEvents.pathChallenges.find(conn.currentPathId) !=
-       conn.pendingEvents.pathChallenges.end())) {
+  if (conn.pendingEvents.pathChallenges.contains(conn.currentPathId)) {
     return WriteDataReason::PATH_VALIDATION;
   }
   if ((conn.pendingEvents.pathResponses.find(conn.currentPathId) !=
@@ -2671,7 +2670,7 @@ writePathValidationDataForAlternatePaths(
   auto& bytesWritten = result.bytesWritten;
 
   UnorderedSet<PathIdType> pathIdUnion;
-  for (const auto& [pathId, _] : connection.pendingEvents.pathChallenges) {
+  for (const auto& pathId : connection.pendingEvents.pathChallenges) {
     if (pathId != connection.currentPathId) {
       pathIdUnion.insert(pathId);
     }

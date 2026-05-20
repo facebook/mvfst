@@ -469,8 +469,6 @@ TEST_P(
   EXPECT_EQ(conn.fallbackPathId.value(), firstPathId);
 
   ASSERT_TRUE(conn.pendingEvents.pathChallenges.contains(newPathId));
-  auto pathChallengeData =
-      conn.pendingEvents.pathChallenges.at(newPathId).pathData;
   EXPECT_EQ(conn.peerAddress, newPeer);
   EXPECT_EQ(conn.lossState.srtt, 0us);
   EXPECT_EQ(conn.lossState.lrtt, 0us);
@@ -498,6 +496,12 @@ TEST_P(
   EXPECT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
 
   EXPECT_NE(newPath->writableBytes, 0);
+
+  // The challenge payload is minted at write time; pull it from the actual
+  // outstanding PATH_CHALLENGE.
+  auto outstandingChallenge = getFirstOutstandingPathChallenge();
+  ASSERT_TRUE(outstandingChallenge);
+  auto pathChallengeData = outstandingChallenge->pathData;
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -586,8 +590,6 @@ TEST_P(
   EXPECT_EQ(conn.fallbackPathId.value(), firstPathId);
 
   ASSERT_TRUE(conn.pendingEvents.pathChallenges.contains(newPathId));
-  auto pathChallengeData =
-      conn.pendingEvents.pathChallenges.at(newPathId).pathData;
   EXPECT_EQ(conn.peerAddress, newPeer);
   EXPECT_EQ(conn.lossState.srtt, 0us);
   EXPECT_EQ(conn.lossState.lrtt, 0us);
@@ -616,6 +618,12 @@ TEST_P(
   EXPECT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
 
   EXPECT_NE(newPath->writableBytes, 0);
+
+  // The challenge payload is minted at write time; pull it from the actual
+  // outstanding PATH_CHALLENGE.
+  auto outstandingChallenge = getFirstOutstandingPathChallenge();
+  ASSERT_TRUE(outstandingChallenge);
+  auto pathChallengeData = outstandingChallenge->pathData;
 
   // Step 3: Client responds with path response on the fallback (initial) path
   packetData = packetToBuf(makePacketWithPathResponseFrame(pathChallengeData));
@@ -676,9 +684,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   // yet
   EXPECT_EQ(newPath->status, PathStatus::NotValid);
 
-  ASSERT_NO_THROW(conn.pendingEvents.pathChallenges.at(newPath->id));
-  auto pathChallengeData =
-      conn.pendingEvents.pathChallenges.at(newPath->id).pathData;
+  ASSERT_TRUE(conn.pendingEvents.pathChallenges.contains(newPath->id));
   EXPECT_EQ(conn.peerAddress, newPeer);
   EXPECT_EQ(conn.lossState.srtt, 0us);
   EXPECT_EQ(conn.lossState.lrtt, 0us);
@@ -690,11 +696,15 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   EXPECT_EQ(firstPath->cachedCCAndRttState->rttvar, rttvar);
 
   loopForWrites();
-  EXPECT_THROW(
-      conn.pendingEvents.pathChallenges.at(newPath->id), std::out_of_range);
+  EXPECT_FALSE(conn.pendingEvents.pathChallenges.contains(newPath->id));
   EXPECT_EQ(newPath->status, PathStatus::Validating);
   EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(server->pathValidationTimeout().isTimerCallbackScheduled());
+
+  // Read the actual sent challenge payload from the outstanding packet.
+  auto outstandingChallenge = getFirstOutstandingPathChallenge();
+  ASSERT_TRUE(outstandingChallenge);
+  auto pathChallengeData = outstandingChallenge->pathData;
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -751,7 +761,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   ASSERT_TRUE(newPath);
   ASSERT_EQ(conn.currentPathId, newPath->id);
 
-  EXPECT_NO_THROW(conn.pendingEvents.pathChallenges.at(newPath->id));
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(newPath->id));
   EXPECT_GE(newPath->writableBytes, conn.udpSendPacketLen);
   EXPECT_EQ(conn.peerAddress, newPeer);
 
@@ -799,10 +809,9 @@ TEST_P(
   ASSERT_TRUE(newPath);
   ASSERT_EQ(conn.currentPathId, newPath->id);
 
-  EXPECT_NO_THROW(conn.pendingEvents.pathChallenges.at(newPath->id));
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(newPath->id));
   loopForWrites();
-  EXPECT_THROW(
-      conn.pendingEvents.pathChallenges.at(newPath->id), std::out_of_range);
+  EXPECT_FALSE(conn.pendingEvents.pathChallenges.contains(newPath->id));
   ASSERT_EQ(newPath->status, PathStatus::Validating);
 
   auto outstandingChallenge = getFirstOutstandingPathChallenge();
@@ -1393,7 +1402,6 @@ TEST_P(
   auto newPathId = newPath->id;
   EXPECT_NE(conn.currentPathId, newPath->id);
   EXPECT_EQ(newPath->status, PathStatus::Validating);
-  EXPECT_TRUE(newPath->challengePayloadToSend);
   EXPECT_FALSE(newPath->outstandingChallenges.empty());
 
   // A path challenge was sent out
@@ -1409,7 +1417,6 @@ TEST_P(
   server->pathValidationTimeout().timeoutExpired();
 
   EXPECT_EQ(newPath->status, PathStatus::NotValid);
-  EXPECT_FALSE(newPath->challengePayloadToSend);
   EXPECT_TRUE(newPath->outstandingChallenges.empty());
 
   // This is a probe path that failed validation. It will be removed at the end
@@ -1455,7 +1462,6 @@ TEST_P(
   ASSERT_TRUE(newPath);
   EXPECT_EQ(conn.currentPathId, newPath->id);
   EXPECT_EQ(newPath->status, PathStatus::Validating);
-  EXPECT_TRUE(newPath->challengePayloadToSend);
   EXPECT_FALSE(newPath->outstandingChallenges.empty());
 
   // First congestion controller is cached
@@ -1473,7 +1479,6 @@ TEST_P(
   server->pathValidationTimeout().timeoutExpired();
 
   EXPECT_EQ(newPath->status, PathStatus::NotValid);
-  EXPECT_FALSE(newPath->challengePayloadToSend);
   EXPECT_TRUE(newPath->outstandingChallenges.empty());
 
   // The connection falls back to the firstPath
@@ -1685,7 +1690,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedValidatingPath) {
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
   // Path is validating. A path challenge frame has been sent for it.
   path.status = PathStatus::Validating;
-  path.challengePayloadToSend = 123;
+  path.outstandingChallenges.push_back({123, Clock::now()});
 
   // Deliver any data to the socket. This should trigger the reaping logic.
   {
@@ -1717,10 +1722,10 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedNewPath) {
   ASSERT_FALSE(pathIdRes.hasError());
   auto& path =
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
-  // Path is new. It has an outstanding path challenge but it hasn't been sent
-  // out yet
+  // Path is new. It has been flagged for a challenge but the scheduler
+  // hasn't minted/sent it yet.
   path.status = PathStatus::NotValid;
-  path.challengePayloadToSend = 123;
+  conn.pendingEvents.pathChallenges.insert(pathIdRes.value());
 
   // Deliver any data to the socket. This should trigger the reaping logic.
   {

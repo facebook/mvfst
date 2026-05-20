@@ -458,7 +458,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   struct PendingEvents {
     Resets resets;
 
-    UnorderedMap<PathIdType, PathChallengeFrame> pathChallenges;
+    // Paths that need a PATH_CHALLENGE written.
+    UnorderedSet<PathIdType> pathChallenges;
     UnorderedMap<PathIdType, PathResponseFrame> pathResponses;
 
     FrameList frames;

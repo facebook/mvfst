@@ -4095,9 +4095,8 @@ TEST_F(
   // There are writable bytes but no challenges/responses.
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
-  // There are writable bytes and a challenge.
-  conn->pendingEvents.pathChallenges.emplace(
-      pathInfo.id, PathChallengeFrame(12345));
+  // There are writable bytes and a challenge flagged.
+  conn->pendingEvents.pathChallenges.insert(pathInfo.id);
   EXPECT_EQ(WriteDataReason::PATH_VALIDATION, shouldWriteData(*conn));
 
   // There are writable bytes and a response.
@@ -4113,8 +4112,7 @@ TEST_F(
 
   // There is a challenge but no writable bytes
   conn->pendingEvents.pathResponses.clear();
-  conn->pendingEvents.pathChallenges.emplace(
-      pathInfo.id, PathChallengeFrame(12345));
+  conn->pendingEvents.pathChallenges.insert(pathInfo.id);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 

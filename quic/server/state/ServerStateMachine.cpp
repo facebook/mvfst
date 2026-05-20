@@ -777,18 +777,14 @@ quic::Expected<void, QuicError> onConnectionMigration(
     conn.fallbackPathId = connPath->id;
   }
 
-  if (readPath->status != PathStatus::Validated &&
-      readPath->challengePayloadToSend.has_value() &&
+  if (readPath->status == PathStatus::Validating &&
       !conn.pendingEvents.pathChallenges.contains(readPathId)) {
-    // We're migrating to a path with an outstanding path challenge that we
-    // haven't received a response for yet. We resend it here to give the path
-    // validation a better chance at succeeding.
-    // This helps work around a bug in some QUIC implementations that do
-    // not properly handle a path challenge when it's sent in the same packet as
-    // a path response responding to a path probe.
-    conn.pendingEvents.pathChallenges.emplace(
-        readPath->id,
-        PathChallengeFrame(readPath->challengePayloadToSend.value()));
+    // We're migrating to a path that has an outstanding challenge but no
+    // pending write. Re-flag it so the next write loop mints and sends a
+    // fresh challenge — this gives the path validation a better chance at
+    // succeeding and works around peer bugs where a challenge sent in the
+    // same packet as a response to a probe isn't handled correctly.
+    conn.pendingEvents.pathChallenges.insert(readPath->id);
   }
 
   // If this is NAT rebinding, keep congestion state unchanged
@@ -1399,15 +1395,10 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     }
     auto& readPath = readPathRes.value().get();
     if (readPath.status == PathStatus::NotValid &&
-        !conn.pendingEvents.pathChallenges.count(readPath.id)) {
-      // Send a path challenge for this path if it doesn't have one pending
-      auto pathChallengeDataResult =
-          conn.pathManager->getNewPathChallengeData(readPath.id);
-      if (pathChallengeDataResult.hasError()) {
-        return quic::make_unexpected(pathChallengeDataResult.error());
-      }
-      conn.pendingEvents.pathChallenges.emplace(
-          readPath.id, PathChallengeFrame(pathChallengeDataResult.value()));
+        !conn.pendingEvents.pathChallenges.contains(readPath.id)) {
+      // Flag this path for a challenge. The actual payload is minted at
+      // write time by the path manager.
+      conn.pendingEvents.pathChallenges.insert(readPath.id);
     }
     if (conn.currentPathId != readPath.id &&
         !readPath.destinationConnectionId) {

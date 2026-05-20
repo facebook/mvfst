@@ -247,38 +247,15 @@ TEST_F(QuicPathManagerTest, AddRemoveAndGetPathByAddress) {
 
 // Path Challenge/Response Tests
 
-TEST_F(QuicPathManagerTest, GetNewPathChallengeData) {
-  auto result = manager_->addPath(localAddr1_, peerAddr1_);
-  ASSERT_TRUE(result.has_value());
-  PathIdType id = result.value();
-
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
-
-  EXPECT_NE(challengeResult.value(), 0);
-
-  // Verify path has outstanding challenge data
-  auto path = manager_->getPath(id);
-  ASSERT_NE(path, nullptr);
-  ASSERT_TRUE(path->challengePayloadToSend.has_value());
-  EXPECT_EQ(path->challengePayloadToSend.value(), challengeResult.value());
-}
-
-TEST_F(QuicPathManagerTest, GetNewPathChallengeDataNonExistentPath) {
-  auto result = manager_->getNewPathChallengeData(999);
-  EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(result.error().code, LocalErrorCode::PATH_NOT_EXISTS);
-}
-
 TEST_F(QuicPathManagerTest, GetPathByChallengeData) {
   auto result = manager_->addPath(localAddr1_, peerAddr1_);
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
 
-  auto path = manager_->getPathByChallengeData(challengeResult.value());
+  auto path = manager_->getPathByChallengeData(challengeRes.value().pathData);
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->id, id);
 }
@@ -341,12 +318,13 @@ TEST_F(QuicPathManagerTest, RetransmitGeneratesFreshPayload) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
+  // First mint -> sets up validation.
   auto firstRes = manager_->prepareChallengeForSending(id);
   ASSERT_TRUE(firstRes.has_value());
-  auto firstDeadline = manager_->getPath(id)->pathResponseDeadline;
 
-  // A second call (e.g. on loss-triggered retransmit) mints a distinct
-  // payload but does NOT re-arm the validation timeout.
+  // Second mint (e.g. on loss) -> fresh payload, both still in-flight, the
+  // response deadline is preserved (validation has the same overall budget).
+  auto firstDeadline = manager_->getPath(id)->pathResponseDeadline;
   auto secondRes = manager_->prepareChallengeForSending(id);
   ASSERT_TRUE(secondRes.has_value());
   EXPECT_NE(firstRes.value().pathData, secondRes.value().pathData);
@@ -356,38 +334,11 @@ TEST_F(QuicPathManagerTest, RetransmitGeneratesFreshPayload) {
   EXPECT_EQ(path->outstandingChallenges.size(), 2u);
   EXPECT_EQ(path->pathResponseDeadline, firstDeadline);
 
-  // Both payloads remain routable so a delayed response to either send
-  // still produces a valid match.
+  // Both payloads should be routable back to this path.
   EXPECT_EQ(
       manager_->getPathByChallengeData(firstRes.value().pathData)->id, id);
   EXPECT_EQ(
       manager_->getPathByChallengeData(secondRes.value().pathData)->id, id);
-}
-
-TEST_F(QuicPathManagerTest, OnPathChallengeSent) {
-  auto result = manager_->addPath(localAddr1_, peerAddr1_);
-  ASSERT_TRUE(result.has_value());
-  PathIdType id = result.value();
-
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
-
-  // Add challenge to pending events
-  PathChallengeFrame challenge(challengeResult.value());
-
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-
-  manager_->onPathChallengeSent(challenge);
-
-  // Verify path status updated
-  auto path = manager_->getPath(id);
-  ASSERT_NE(path, nullptr);
-  EXPECT_EQ(path->status, PathStatus::Validating);
-  EXPECT_EQ(path->outstandingChallenges.size(), 1u);
-  EXPECT_TRUE(path->pathResponseDeadline.has_value());
-
-  // Verify pending events updated
-  EXPECT_TRUE(connState_->pendingEvents.schedulePathValidationTimeout);
 }
 
 TEST_F(QuicPathManagerTest, OnPathResponseReceived) {
@@ -395,25 +346,15 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceived) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  // Set up path challenge
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
 
-  PathChallengeFrame challenge(challengeResult.value());
-
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-  manager_->onPathChallengeSent(challenge);
-
-  // Send path response
-  PathResponseFrame response(challengeResult.value());
-  response.pathData = challengeResult.value();
-
+  PathResponseFrame response(challengeRes.value().pathData);
   auto validatedPath = manager_->onPathResponseReceived(response, id);
   ASSERT_NE(validatedPath, nullptr);
   EXPECT_EQ(validatedPath->id, id);
   EXPECT_EQ(validatedPath->status, PathStatus::Validated);
   EXPECT_TRUE(validatedPath->rttSample.has_value());
-  EXPECT_FALSE(validatedPath->challengePayloadToSend.has_value());
   EXPECT_TRUE(validatedPath->outstandingChallenges.empty());
   EXPECT_FALSE(validatedPath->pathResponseDeadline.has_value());
 }
@@ -425,26 +366,24 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceivedStaleResponse) {
   EXPECT_EQ(validatedPath, nullptr);
 }
 
-TEST_F(QuicPathManagerTest, OnPathResponseReceivedRetransmittedChallenge) {
+TEST_F(QuicPathManagerTest, OnPathResponseReceivedAfterRetransmitNoRttSample) {
+  // After a retransmit there are 2+ entries in outstandingChallenges.
+  // The RTT-bias guard from D102894190 still skips emitting a sample in that
+  // case; a follow-up change drops this guard once unique payloads make the
+  // matching unambiguous.
   auto result = manager_->addPath(localAddr1_, peerAddr1_);
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
+  auto firstRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(firstRes.has_value());
+  auto secondRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(secondRes.has_value());
 
-  PathChallengeFrame challenge(challengeResult.value());
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-
-  // Simulate sending the challenge twice (second send is a retransmission).
-  manager_->onPathChallengeSent(challenge);
-  manager_->onPathChallengeSent(challenge);
-
-  PathResponseFrame response(challengeResult.value());
+  PathResponseFrame response(secondRes.value().pathData);
   auto validatedPath = manager_->onPathResponseReceived(response, id);
   ASSERT_NE(validatedPath, nullptr);
   EXPECT_EQ(validatedPath->status, PathStatus::Validated);
-  // No RTT sample should be produced when the challenge was retransmitted.
   EXPECT_FALSE(validatedPath->rttSample.has_value());
 }
 
@@ -453,18 +392,13 @@ TEST_F(QuicPathManagerTest, GetEarliestChallengeTimeout) {
   auto timeout = manager_->getEarliestChallengeTimeout();
   EXPECT_FALSE(timeout.has_value());
 
-  // Add a path and send challenge
+  // Add a path and mint a challenge
   auto result = manager_->addPath(localAddr1_, peerAddr1_);
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
-
-  PathChallengeFrame challenge(challengeResult.value());
-
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-  manager_->onPathChallengeSent(challenge);
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
 
   // Should now have a timeout
   timeout = manager_->getEarliestChallengeTimeout();
@@ -476,14 +410,8 @@ TEST_F(QuicPathManagerTest, OnPathValidationTimeoutExpired) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  // Set up path challenge
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
-
-  PathChallengeFrame challenge(challengeResult.value());
-
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-  manager_->onPathChallengeSent(challenge);
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
 
   // Manually set deadline to past time to trigger timeout
   auto path = manager_->getPath(id);
@@ -498,7 +426,6 @@ TEST_F(QuicPathManagerTest, OnPathValidationTimeoutExpired) {
   path = manager_->getPath(id);
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->status, PathStatus::NotValid);
-  EXPECT_FALSE(path->challengePayloadToSend.has_value());
   EXPECT_TRUE(path->outstandingChallenges.empty());
   EXPECT_FALSE(path->pathResponseDeadline.has_value());
 }
@@ -531,16 +458,10 @@ TEST_F(QuicPathManagerTest, PathValidationCallbackOnValidation) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
 
-  PathChallengeFrame challenge(challengeResult.value());
-
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-  manager_->onPathChallengeSent(challenge);
-
-  PathResponseFrame response(challengeResult.value());
-
+  PathResponseFrame response(challengeRes.value().pathData);
   manager_->onPathResponseReceived(response, id);
 
   EXPECT_TRUE(callback.invoked);
@@ -557,13 +478,8 @@ TEST_F(QuicPathManagerTest, PathValidationCallbackOnTimeout) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  auto challengeResult = manager_->getNewPathChallengeData(id);
-  ASSERT_TRUE(challengeResult.has_value());
-
-  PathChallengeFrame challenge(challengeResult.value());
-
-  connState_->pendingEvents.pathChallenges.emplace(id, challenge);
-  manager_->onPathChallengeSent(challenge);
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
 
   // Simulate validation timeout expiration (failure)
   // Manually set deadline to past time to trigger timeout

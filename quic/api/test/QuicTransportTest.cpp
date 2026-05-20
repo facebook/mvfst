@@ -2473,11 +2473,9 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
   // Grant writable bytes for the path
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
 
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
+  // Flag the path as needing a challenge; the scheduler mints the payload at
+  // write time.
+  conn.pendingEvents.pathChallenges.insert(conn.currentPathId);
   transport_->updateWriteLooper(true);
 
   ASSERT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
@@ -2508,7 +2506,12 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
     if (!pathChallengeFrame) {
       continue;
     }
-    EXPECT_EQ(*pathChallengeFrame, pathChallenge);
+    // The challenge that landed in the packet should match the one in-flight
+    // on the path.
+    ASSERT_EQ(path->outstandingChallenges.size(), 1u);
+    EXPECT_EQ(
+        pathChallengeFrame->pathData,
+        path->outstandingChallenges.front().pathData);
     foundPathChallenge = true;
   }
   EXPECT_TRUE(foundPathChallenge);
@@ -2529,11 +2532,7 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   // Grant writable bytes for the path
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
 
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
+  conn.pendingEvents.pathChallenges.insert(conn.currentPathId);
   transport_->updateWriteLooper(true);
 
   ASSERT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
@@ -2559,7 +2558,7 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   // client/server transport. It's not covered here.
 }
 
-TEST_F(QuicTransportTest, SendPathChallengeWhileThereIsOutstandingOne) {
+TEST_F(QuicTransportTest, RetransmitPathChallengeKeepsBothInFlight) {
   auto& conn = transport_->getConnectionState();
   // Start with a new (Not Valid) path.
   auto pathIdRes = conn.pathManager->addPath(
@@ -2572,54 +2571,36 @@ TEST_F(QuicTransportTest, SendPathChallengeWhileThereIsOutstandingOne) {
   // Grant writable bytes for the path
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
 
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
+  conn.pendingEvents.pathChallenges.insert(conn.currentPathId);
   transport_->updateWriteLooper(true);
-
-  ASSERT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
-  ASSERT_EQ(path->status, PathStatus::NotValid);
-  ASSERT_FALSE(
-      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
-
   loopForWrites();
-  ASSERT_TRUE(conn.pendingEvents.pathChallenges.empty());
-  EXPECT_TRUE(conn.pendingEvents.schedulePathValidationTimeout);
   EXPECT_EQ(path->status, PathStatus::Validating);
-  EXPECT_TRUE(
-      transport_->getPathValidationTimeout().isTimerCallbackScheduled());
+  ASSERT_EQ(path->outstandingChallenges.size(), 1u);
+  auto firstPayload = path->outstandingChallenges.front().pathData;
   ASSERT_TRUE(conn.pathManager->getEarliestChallengeTimeout().has_value());
   auto timeout = conn.pathManager->getEarliestChallengeTimeout().value();
 
-  // Resending the same path challenge due to loss/clone should not reset the
-  // path validation timeout
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
+  // Re-flag the path (simulating a loss-driven retransmit). The next write
+  // mints a fresh payload, but the validation timeout is unchanged because
+  // it's anchored to the first in-flight challenge.
+  conn.pendingEvents.pathChallenges.insert(conn.currentPathId);
   transport_->updateWriteLooper(true);
   loopForWrites();
-  ASSERT_EQ(conn.pathManager->getEarliestChallengeTimeout().value(), timeout);
+  EXPECT_EQ(conn.pathManager->getEarliestChallengeTimeout().value(), timeout);
+  ASSERT_EQ(path->outstandingChallenges.size(), 2u);
+  auto secondPayload = path->outstandingChallenges.back().pathData;
+  EXPECT_NE(firstPayload, secondPayload);
 
-  // Sending a new path challenge should reset the path validation timeout.
-  auto pathChallengeData2 =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData2.hasError());
-  PathChallengeFrame pathChallenge2(pathChallengeData2.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge2);
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-  EXPECT_NE(conn.pathManager->getEarliestChallengeTimeout().value(), timeout);
-
-  // The path can now be found with the new challenge data and not the first
-  EXPECT_NE(
-      conn.pathManager->getPathByChallengeData(pathChallenge2.pathData),
-      nullptr);
-  EXPECT_EQ(
-      conn.pathManager->getPathByChallengeData(pathChallenge.pathData),
-      nullptr);
+  // Both payloads remain routable so a delayed response to either send still
+  // produces a valid match.
+  EXPECT_NE(conn.pathManager->getPathByChallengeData(firstPayload), nullptr);
+  EXPECT_NE(conn.pathManager->getPathByChallengeData(secondPayload), nullptr);
 }
 
 TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatingPath) {
+  // PATH_CHALLENGE is never cloned for any path state. Cloning would
+  // duplicate the in-flight payload and break the uniqueness guarantee that
+  // makes RTT computation unambiguous after retransmissions.
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandings.reset();
@@ -2627,7 +2608,6 @@ TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatingPath) {
     t.reset();
   }
 
-  // Start with a new (Not Valid) path.
   auto pathIdRes = conn.pathManager->addPath(
       folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
   ASSERT_FALSE(pathIdRes.hasError());
@@ -2638,11 +2618,7 @@ TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatingPath) {
   // Grant writable bytes for the path
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
 
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
+  conn.pendingEvents.pathChallenges.insert(conn.currentPathId);
   transport_->updateWriteLooper(true);
   loopForWrites();
   EXPECT_EQ(path->status, PathStatus::Validating);
@@ -2655,151 +2631,12 @@ TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatingPath) {
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Force a timeout to drive the cloning scheduler. The PATH_CHALLENGE must
-  // not be cloned.
+  // not be cloned even though it's still validating.
   transport_->lossTimeout().timeoutExpired();
   numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-  EXPECT_EQ(numPathChallengePackets, 1);
-}
-
-TEST_F(QuicTransportTest, DoNotCloneOldPathChallengeOnCurrentValidatingPath) {
-  auto& conn = transport_->getConnectionState();
-  // knock every handshake outstanding packets out
-  conn.outstandings.reset();
-  for (auto& t : conn.lossState.lossTimes) {
-    t.reset();
-  }
-
-  // Start with a new (Not Valid) path.
-  auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
-  ASSERT_FALSE(pathIdRes.hasError());
-  conn.currentPathId = pathIdRes.value();
-  auto path = conn.pathManager->getPath(conn.currentPathId);
-  ASSERT_TRUE(path);
-
-  // Grant writable bytes for the path
-  conn.pathManager->onPathPacketReceived(conn.currentPathId);
-
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-  EXPECT_EQ(path->status, PathStatus::Validating);
-
-  EXPECT_EQ(conn.outstandings.packets.size(), 1);
-  auto numPathChallengePackets = std::count_if(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-  EXPECT_EQ(numPathChallengePackets, 1);
-
-  // Replace the current challenge data
-  (void)conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-
-  // Force a timeout. The outstanding challenge with the stale data should not
-  // be cloned.
-  transport_->lossTimeout().timeoutExpired();
-  EXPECT_EQ(conn.outstandings.packets.size(), 2);
-  numPathChallengePackets = std::count_if(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-
-  EXPECT_EQ(numPathChallengePackets, 1);
-}
-
-TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatedPath) {
-  auto& conn = transport_->getConnectionState();
-  // knock every handshake outstanding packets out
-  conn.outstandings.reset();
-  for (auto& t : conn.lossState.lossTimes) {
-    t.reset();
-  }
-
-  auto path = conn.pathManager->getPath(conn.currentPathId);
-  ASSERT_TRUE(path);
-  ASSERT_EQ(path->status, PathStatus::Validated);
-
-  // Grant writable bytes for the path
-  conn.pathManager->onPathPacketReceived(conn.currentPathId);
-
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-
-  EXPECT_EQ(conn.outstandings.packets.size(), 1);
-  auto numPathChallengePackets = std::count_if(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-  EXPECT_EQ(numPathChallengePackets, 1);
-
-  // Force a timeout with no data so that it attempts to clone the packet.
-  // The path is already validated, so the challenge won't be cloned.
-  transport_->lossTimeout().timeoutExpired();
-  EXPECT_EQ(conn.outstandings.packets.size(), 2);
-  numPathChallengePackets = std::count_if(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-
-  EXPECT_EQ(numPathChallengePackets, 1);
-}
-
-TEST_F(QuicTransportTest, DoNotClonePathChallengeOnAlternatePath) {
-  auto& conn = transport_->getConnectionState();
-  // knock every handshake outstanding packets out
-  conn.outstandings.reset();
-  for (auto& t : conn.lossState.lossTimes) {
-    t.reset();
-  }
-
-  // Start with an alternate (Not Valid) path.
-  auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
-  ASSERT_FALSE(pathIdRes.hasError());
-  auto path = conn.pathManager->getPath(pathIdRes.value());
-  ASSERT_TRUE(path);
-  ASSERT_NE(path->id, conn.currentPathId);
-
-  // Grant writable bytes for the path
-  conn.pathManager->onPathPacketReceived(path->id);
-
-  auto pathChallengeData = conn.pathManager->getNewPathChallengeData(path->id);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(path->id, pathChallenge);
-
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-
-  EXPECT_EQ(path->status, PathStatus::Validating);
-  EXPECT_EQ(conn.outstandings.packets.size(), 1);
-  auto numPathChallengePackets = std::count_if(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-  EXPECT_EQ(numPathChallengePackets, 1);
-
-  // Force a timeout with no data so that it attempts to clone the packet.
-  // The path is already validated, so the challenge won't be cloned.
-  transport_->lossTimeout().timeoutExpired();
-  EXPECT_EQ(conn.outstandings.packets.size(), 2);
-  numPathChallengePackets = std::count_if(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-
   EXPECT_EQ(numPathChallengePackets, 1);
 }
 
@@ -2822,18 +2659,14 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLossForCurrentValidatingPath) {
   // Grant writable bytes for the path
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
 
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
+  conn.pendingEvents.pathChallenges.insert(conn.currentPathId);
   transport_->updateWriteLooper(true);
   loopForWrites();
   EXPECT_EQ(path->status, PathStatus::Validating);
+  ASSERT_FALSE(conn.pendingEvents.pathChallenges.contains(path->id));
+  ASSERT_EQ(path->outstandingChallenges.size(), 1u);
+  auto firstPayload = path->outstandingChallenges.front().pathData;
 
-  ASSERT_TRUE(
-      conn.pendingEvents.pathChallenges.find(path->id) ==
-      conn.pendingEvents.pathChallenges.end());
   EXPECT_EQ(conn.outstandings.packets.size(), 1);
   auto outstandingPacket = getLastOutstandingPacket(
       transport_->getConnectionState(), PacketNumberSpace::AppData);
@@ -2846,57 +2679,11 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLossForCurrentValidatingPath) {
       false);
   ASSERT_FALSE(result.hasError());
 
-  // The path challenge should have been re-added to the pending frames
-  ASSERT_FALSE(
-      conn.pendingEvents.pathChallenges.find(path->id) ==
-      conn.pendingEvents.pathChallenges.end());
-  EXPECT_EQ(
-      conn.pendingEvents.pathChallenges.at(path->id).pathData,
-      pathChallenge.pathData);
-}
-
-TEST_F(
-    QuicTransportTest,
-    DoNotResendPathChallengeOnLossForCurrentValidatedPath) {
-  auto& conn = transport_->getConnectionState();
-  // knock every handshake outstanding packets out
-  conn.outstandings.reset();
-  for (auto& t : conn.lossState.lossTimes) {
-    t.reset();
-  }
-
-  auto path = conn.pathManager->getPath(conn.currentPathId);
-  ASSERT_TRUE(path);
-  ASSERT_EQ(path->status, PathStatus::Validated);
-
-  auto pathChallengeData =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathChallengeData.hasError());
-  PathChallengeFrame pathChallenge(pathChallengeData.value());
-  conn.pendingEvents.pathChallenges.emplace(conn.currentPathId, pathChallenge);
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-
-  ASSERT_TRUE(
-      conn.pendingEvents.pathChallenges.find(path->id) ==
-      conn.pendingEvents.pathChallenges.end());
-  EXPECT_EQ(conn.outstandings.packets.size(), 1);
-  auto outstandingPacket = getLastOutstandingPacket(
-      transport_->getConnectionState(), PacketNumberSpace::AppData);
-
-  // Mark the packet as lost
-  auto result = markPacketLoss(
-      conn,
-      outstandingPacket->metadata.pathId,
-      outstandingPacket->packet,
-      false);
-  ASSERT_FALSE(result.hasError());
-
-  // The path challenge should not be re-added to the pending challenges since
-  // the path is validated
-  ASSERT_TRUE(
-      conn.pendingEvents.pathChallenges.find(path->id) ==
-      conn.pendingEvents.pathChallenges.end());
+  // The path should be re-flagged so the next write mints a fresh challenge.
+  // The lost payload remains in outstandingChallenges so a delayed response
+  // can still be matched.
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(path->id));
+  EXPECT_NE(conn.pathManager->getPathByChallengeData(firstPayload), nullptr);
 }
 
 TEST_F(QuicTransportTest, SendPathResponse) {
@@ -3071,12 +2858,10 @@ TEST_F(QuicTransportTest, ResendPathResponseOnLossValidatingPath) {
   // Give the path writable bytes
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
 
-  // Transition the path to validating state
-  auto challenDataRes =
-      conn.pathManager->getNewPathChallengeData(conn.currentPathId);
-  ASSERT_FALSE(pathRes.hasError());
-  conn.pathManager->onPathChallengeSent(
-      PathChallengeFrame(challenDataRes.value()));
+  // Transition the path to validating state by minting a challenge.
+  auto challengeRes =
+      conn.pathManager->prepareChallengeForSending(conn.currentPathId);
+  ASSERT_FALSE(challengeRes.hasError());
   auto path = conn.pathManager->getPath(conn.currentPathId);
   ASSERT_TRUE(path);
   ASSERT_EQ(path->status, PathStatus::Validating);

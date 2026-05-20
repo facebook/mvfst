@@ -823,8 +823,8 @@ PathValidationFrameScheduler::PathValidationFrameScheduler(
     : conn_(conn), pathId_(pathId) {}
 
 bool PathValidationFrameScheduler::hasPendingPathValidationFrames() const {
-  return conn_.pendingEvents.pathChallenges.find(pathId_) !=
-      conn_.pendingEvents.pathChallenges.end() ||
+  return (conn_.pendingEvents.pathChallenges.find(pathId_) !=
+          conn_.pendingEvents.pathChallenges.end()) ||
       conn_.pendingEvents.pathResponses.find(pathId_) !=
       conn_.pendingEvents.pathResponses.end();
 }
@@ -842,13 +842,14 @@ bool PathValidationFrameScheduler::writePathValidationFrames(
     framesWritten = true;
   }
 
-  // Write PathChallenge frames for the specified path
-  auto pathChallenge = conn_.pendingEvents.pathChallenges.find(pathId_);
-  if (pathChallenge != conn_.pendingEvents.pathChallenges.end()) {
-    if (!writeSimpleFrame(QuicSimpleFrame(pathChallenge->second), builder)) {
-      return false;
+  if (conn_.pendingEvents.pathChallenges.contains(pathId_)) {
+    auto challengeRes = conn_.pathManager->prepareChallengeForSending(pathId_);
+    if (challengeRes.has_value()) {
+      if (!writeSimpleFrame(QuicSimpleFrame(challengeRes.value()), builder)) {
+        return false;
+      }
+      framesWritten = true;
     }
-    framesWritten = true;
   }
 
   return framesWritten;

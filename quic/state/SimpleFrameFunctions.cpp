@@ -70,15 +70,7 @@ void updateSimpleFrameOnPacketSent(
     const QuicSimpleFrame& simpleFrame) {
   switch (simpleFrame.type()) {
     case QuicSimpleFrame::Type::PathChallengeFrame: {
-      const PathChallengeFrame& pathChallenge =
-          *simpleFrame.asPathChallengeFrame();
-      conn.pathManager->onPathChallengeSent(pathChallenge);
-
-      auto it = conn.pendingEvents.pathChallenges.find(pathId);
-      if (it != conn.pendingEvents.pathChallenges.end() &&
-          it->second.pathData == pathChallenge.pathData) {
-        conn.pendingEvents.pathChallenges.erase(it);
-      }
+      conn.pendingEvents.pathChallenges.erase(pathId);
       break;
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
@@ -116,16 +108,15 @@ void updateSimpleFrameOnPacketLoss(
     }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
-      // Find the path by the challenge data rather than the path id. This
-      // avoids having to do extra checks to confirm the challenge data in the
-      // frame is still current for the path.
+      // Find the path by the lost challenge data. If the path is still
+      // validating, just re-flag it so the scheduler mints a fresh challenge
+      // on the next write. The lost in-flight entry stays in the path's
+      // outstandingChallenges so a delayed response to it can still produce a
+      // valid RTT sample.
       auto maybePath =
           conn.pathManager->getPathByChallengeData(pathChallenge.pathData);
       if (maybePath && maybePath->status == PathStatus::Validating) {
-        // This path is still pending validation. We need to resend this path
-        // challenge frame
-        conn.pendingEvents.pathChallenges.insert_or_assign(
-            maybePath->id, pathChallenge);
+        conn.pendingEvents.pathChallenges.insert(maybePath->id);
       }
       break;
     }

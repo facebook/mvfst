@@ -2048,14 +2048,9 @@ quic::Expected<PathIdType, QuicError> QuicClientTransportLite::startPathProbe(
     pathValidationCallbacks_[pathId] = probeResultCallback;
   }
 
-  // Schedule a path challenge for the new path
-  auto pathChallengeDataResult =
-      conn_->pathManager->getNewPathChallengeData(pathId);
-  if (pathChallengeDataResult.hasError()) {
-    return quic::make_unexpected(pathChallengeDataResult.error());
-  }
-  conn_->pendingEvents.pathChallenges.emplace(
-      pathId, PathChallengeFrame(pathChallengeDataResult.value()));
+  // Schedule a path challenge for the new path. The actual payload is minted
+  // at write time by the path manager.
+  conn_->pendingEvents.pathChallenges.insert(pathId);
 
   // Assign it a new connection id to use. This is done as the last step to
   // avoid assigning a connection id then returning an error leaving a
