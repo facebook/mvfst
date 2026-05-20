@@ -30,18 +30,14 @@ Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       }
       return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathChallengeFrame: {
-      // Path challenges should only be cloned if we're on
-      // the same path and the path has not been validated yet.
-      // TODO: Should we disable probes completely if we only have packets for
-      // alternate paths?
-      const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
-      auto pathInfo =
-          conn.pathManager->getPathByChallengeData(pathChallenge.pathData);
-      if (!pathInfo || pathInfo->status != PathStatus::Validating ||
-          pathInfo->id != conn.currentPathId) {
-        return std::nullopt;
-      }
-      return QuicSimpleFrame(frame);
+      // PATH_CHALLENGE is never cloned. Cloning would re-emit the same
+      // challenge payload on a separate packet, which is undesirable: in a
+      // future change we'll rely on each transmission carrying a unique
+      // payload to compute path-validation RTT unambiguously after
+      // retransmissions, and a clone would silently break that invariant
+      // (clones bypass updateSimpleFrameOnPacketSent). Retransmission of a
+      // lost challenge is already handled by the loss path.
+      return std::nullopt;
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
       // Path responses should only be cloned if we're on

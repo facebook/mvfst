@@ -2619,7 +2619,7 @@ TEST_F(QuicTransportTest, SendPathChallengeWhileThereIsOutstandingOne) {
       nullptr);
 }
 
-TEST_F(QuicTransportTest, ClonePathChallengeOnCurrentValidatingPath) {
+TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatingPath) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandings.reset();
@@ -2654,15 +2654,14 @@ TEST_F(QuicTransportTest, ClonePathChallengeOnCurrentValidatingPath) {
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
-  // Force a timeout with no data so that it clones the packet
+  // Force a timeout to drive the cloning scheduler. The PATH_CHALLENGE must
+  // not be cloned.
   transport_->lossTimeout().timeoutExpired();
-  EXPECT_EQ(conn.outstandings.packets.size(), 2);
   numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
-
-  EXPECT_EQ(numPathChallengePackets, 2);
+  EXPECT_EQ(numPathChallengePackets, 1);
 }
 
 TEST_F(QuicTransportTest, DoNotCloneOldPathChallengeOnCurrentValidatingPath) {
