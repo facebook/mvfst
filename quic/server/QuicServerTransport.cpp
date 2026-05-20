@@ -10,10 +10,12 @@
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/TransportSettingsFunctions.h>
 
 #include <quic/common/Optional.h>
@@ -261,6 +263,12 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
     }
     updateLargestReceivedUdpPacketsAtLastCloseSent(*conn_);
     if (conn_->oneRttWriteCipher) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          !conn_->oneRttWriteHeaderCipher,
+          conn_->oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+          "quic_server_transport",
+          "invariant_violation: one-rtt write cipher missing header cipher");
       MVCHECK(conn_->oneRttWriteHeaderCipher);
       writeShortClose(
           *socket_,
@@ -271,6 +279,12 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
           *conn_->oneRttWriteHeaderCipher);
     }
     if (conn_->handshakeWriteCipher) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          !conn_->handshakeWriteHeaderCipher,
+          conn_->oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+          "quic_server_transport",
+          "invariant_violation: handshake write cipher missing header cipher");
       MVCHECK(conn_->handshakeWriteHeaderCipher);
       writeLongClose(
           *socket_,
@@ -284,6 +298,12 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
           version);
     }
     if (conn_->initialWriteCipher) {
+      PROTO_OOPS_LOG_BUILDER_IF(
+          !conn_->initialHeaderCipher,
+          conn_->oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+          "quic_server_transport",
+          "invariant_violation: initial write cipher missing header cipher");
       MVCHECK(conn_->initialHeaderCipher);
       writeLongClose(
           *socket_,
@@ -331,6 +351,12 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
     }
   }
   if (conn_->oneRttWriteCipher) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !conn_->oneRttWriteHeaderCipher,
+        conn_->oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+        "quic_server_transport",
+        "invariant_violation: one-rtt write cipher missing header cipher");
     MVCHECK(conn_->oneRttWriteHeaderCipher);
     auto writeLoopBeginTime = Clock::now();
     auto nonDsrPath =
@@ -408,6 +434,13 @@ void QuicServerTransport::unbindConnection() {
   if (routingCb_) {
     auto routingCb = routingCb_;
     routingCb_ = nullptr;
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !conn_->clientChosenDestConnectionId,
+        conn_->oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+        "quic_server_transport",
+        "invariant_violation: unbind missing client-chosen destination "
+        "connection id");
     MVCHECK(conn_->clientChosenDestConnectionId);
     if (conn_->serverConnectionId) {
       auto connectionIds =
@@ -725,6 +758,12 @@ void QuicServerTransport::maybeIssueConnectionIds() {
   if (!conn_->transportSettings.disableMigration &&
       (conn_->selfConnectionIds.size() < maximumIdsToIssue) &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !conn_->transportSettings.statelessResetTokenSecret.has_value(),
+        conn_->oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+        "quic_server_transport",
+        "invariant_violation: stateless reset token secret is not set");
     MVCHECK(conn_->transportSettings.statelessResetTokenSecret.has_value());
 
     // Make sure size of selfConnectionIds is not larger than maximumIdsToIssue
@@ -735,6 +774,13 @@ void QuicServerTransport::maybeIssueConnectionIds() {
         return;
       }
 
+      PROTO_OOPS_LOG_BUILDER_IF(
+          !routingCb_,
+          conn_->oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+          "quic_server_transport",
+          "invariant_violation: connection id available without routing "
+          "callback");
       MVCHECK(routingCb_);
       routingCb_->onConnectionIdAvailable(
           shared_from_this(), newConnIdData->connId);

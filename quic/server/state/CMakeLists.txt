@@ -20,9 +20,11 @@ mvfst_add_library(mvfst_server_state_server
     mvfst_fizz_handshake
     mvfst_fizz_server_handshake_handshake_app_token
     mvfst_handshake_transport_parameters
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_constants
     mvfst_logging_qlogger_macros
     mvfst_server_handshake_token_generator
+    mvfst_state_connection_oops_fields
     mvfst_state_datagram_handler
     mvfst_state_pacing_functions
     mvfst_state_stats_callback

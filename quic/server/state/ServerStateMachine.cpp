@@ -8,6 +8,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/state/ServerStateMachine.h>
 
@@ -18,6 +19,7 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/DatagramHandlers.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -758,6 +760,11 @@ quic::Expected<void, QuicError> onConnectionMigration(
   auto* readPath = conn.pathManager->getPath(readPathId);
   auto* connPath = conn.pathManager->getPath(conn.currentPathId);
   if (!readPath || !connPath) {
+    PROTO_OOPS_LOG_BUILDER(
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: migration missing path state");
     return quic::make_unexpected(QuicError(
         TransportErrorCode::INTERNAL_ERROR, "Inconsistent path state"));
   }
@@ -925,6 +932,12 @@ static void handleCipherUnavailable(
 quic::Expected<void, QuicError> onServerReadDataFromOpen(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.state != ServerState::Open,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_server_state_machine",
+      "invariant_violation: open read data processed outside open state");
   MVCHECK_EQ(conn.state, ServerState::Open);
 
   if (readData.udpPacket.buf.empty()) {
@@ -938,6 +951,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         readData.udpPacket.buf.front()->length());
     uint8_t initialByte = 0;
     // Non-empty => at least one byte
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !cursor.canAdvance(sizeof(initialByte)),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: initial packet missing first byte");
     MVCHECK(cursor.tryReadBE(initialByte));
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
@@ -990,11 +1009,35 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           "Initial destination connectionid too small"));
     }
 
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !conn.connIdAlgo,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: connection id algo is not set");
     MVCHECK(conn.connIdAlgo, "ConnectionIdAlgo is not set.");
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.serverConnectionId.has_value(),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: server connection id already initialized");
     MVCHECK(!conn.serverConnectionId.has_value());
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !conn.serverConnIdParams,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: server connection id params are not set");
     MVCHECK(conn.serverConnIdParams);
 
     auto newServerConnIdData = conn.createAndAddNewSelfConnId();
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !newServerConnIdData.has_value(),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: failed to create initial server connection id");
     MVCHECK(newServerConnIdData.has_value());
     conn.serverConnectionId = newServerConnIdData->connId;
 
@@ -1243,6 +1286,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
       }
     }
 
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !conn.clientConnectionId,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: packet missing client connection id");
     MVCHECK(conn.clientConnectionId);
     QLOG(conn, addPacket, regularPacket, packetSize);
 
@@ -1308,6 +1357,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     if (distanceFromExpectedPacketNum > 0) {
       QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
     }
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !hasReceivedUdpPackets(conn),
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+        "quic_server_state_machine",
+        "invariant_violation: ack state missing received UDP packet metadata");
     MVDCHECK(hasReceivedUdpPackets(conn));
 
     bool pktHasRetransmittableData = false;
@@ -1362,6 +1417,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
         case QuicWriteFrame::Type::WriteAckFrame: {
           const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+          PROTO_OOPS_LOG_BUILDER_IF(
+              frame.ackBlocks.empty(),
+              conn.oopsLogger,
+              proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+              "quic_server_state_machine",
+              "invariant_violation: received ack for empty ack block list");
           MVDCHECK(!frame.ackBlocks.empty());
           MVVLOG(4) << "Server received ack for largestAcked="
                     << frame.ackBlocks.front().end << " " << conn;
@@ -1808,6 +1869,12 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
 quic::Expected<void, QuicError> onServerReadDataFromClosed(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.state != ServerState::Closed,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_server_state_machine",
+      "invariant_violation: closed read data processed outside closed state");
   MVCHECK_EQ(conn.state, ServerState::Closed);
   BufQueue& udpData = readData.udpPacket.buf;
   auto packetSize = udpData.empty() ? 0 : udpData.chainLength();
@@ -1976,9 +2043,27 @@ void onServerCloseOpenState(QuicServerConnectionState& conn) {
 Optional<ConnectionIdData>
 QuicServerConnectionState::createAndAddNewSelfConnId() {
   // Should be set right after server transport construction.
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !connIdAlgo,
+      oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(*this),
+      "quic_server_state_machine",
+      "invariant_violation: connection id algo is not set");
   MVCHECK(connIdAlgo);
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !serverConnIdParams,
+      oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(*this),
+      "quic_server_state_machine",
+      "invariant_violation: server connection id params are not set");
   MVCHECK(serverConnIdParams);
 
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !transportSettings.statelessResetTokenSecret,
+      oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(*this),
+      "quic_server_state_machine",
+      "invariant_violation: stateless reset token secret is not set");
   MVCHECK(transportSettings.statelessResetTokenSecret);
 
   StatelessResetGenerator generator(

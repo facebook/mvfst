@@ -26,11 +26,13 @@
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/third-party/siphash.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicConnectionStats.h>
 
 // This hook is invoked by mvfst for every UDP socket it creates.
@@ -568,6 +570,11 @@ void QuicServerWorker::handleNetworkData(
 
     uint8_t initialByte = 0;
     // We already checked that we can advance sizeof(uint8_t) bytes
+    PROTO_OOPS_LOG_IF(
+        !cursor.canAdvance(sizeof(initialByte)),
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_server_worker",
+        "invariant_violation: packet cursor missing initial byte");
     MVCHECK(cursor.tryReadBE(initialByte));
     HeaderForm headerForm = getHeaderForm(initialByte);
 
@@ -784,6 +791,14 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     trans->accept(quicVersion);
     auto result = sourceAddressMap_.emplace(
         std::make_pair(std::make_pair(client, dstConnId), trans));
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !result.second && result.first->second->getState(),
+        result.first->second->getState()->oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(
+            *result.first->second->getState()),
+        "quic_server_worker",
+        "invariant_violation: source address map already contains new "
+        "connection");
     MVCHECK(result.second);
     for (const auto& observer : observerList_.getAll()) {
       observer->accept(trans.get());
@@ -862,6 +877,12 @@ void QuicServerWorker::dispatchPacketData(
       return;
     }
     // should either be marked as dropped or fwd-ed, can't be both
+    PROTO_OOPS_LOG_IF(
+        (packetDropReason != PacketDropReason::NONE) == shouldFwdPacket,
+        proto_oops::getThreadLocalOopsLogger(),
+        "quic_server_worker",
+        "invariant_violation: packet should be marked for exactly one of "
+        "drop or forward");
     MVCHECK((packetDropReason != PacketDropReason::NONE) ^ shouldFwdPacket);
 
     if (packetDropReason != PacketDropReason::NONE) {
@@ -907,6 +928,15 @@ void QuicServerWorker::dispatchPacketData(
 
   // helper fn to handle fwd-ing data to the transport
   auto fwdNetworkDataToTransport = [&](QuicServerTransport* transport) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        !transport->getEventBase()->isInEventBaseThread() &&
+            transport->getState(),
+        transport->getState()->oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(
+            *transport->getState()),
+        "quic_server_worker",
+        "invariant_violation: forwarding network data from wrong event base "
+        "thread");
     MVDCHECK(transport->getEventBase()->isInEventBaseThread());
     transport->onNetworkData(socket_->address(), std::move(networkData));
     // process pending 0rtt data for this DCID if present
@@ -1418,6 +1448,14 @@ void QuicServerWorker::onConnectionIdRetired(
 void QuicServerWorker::onConnectionIdBound(
     QuicServerTransport::Ptr transport) noexcept {
   auto clientInitialDestCid = transport->getClientChosenDestConnectionId();
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !clientInitialDestCid && transport->getState(),
+      transport->getState()->oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(
+          *transport->getState()),
+      "quic_server_worker",
+      "invariant_violation: bound connection missing client-chosen "
+      "destination connection id");
   MVCHECK(clientInitialDestCid);
   auto source = std::make_pair(
       transport->getOriginalPeerAddress(), *clientInitialDestCid);

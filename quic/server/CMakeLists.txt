@@ -37,6 +37,7 @@ mvfst_add_library(mvfst_server_server
     mvfst_congestion_control_copa
     mvfst_fizz_handshake
     mvfst_fizz_server_handshake
+    mvfst_logging_oops_logger
     mvfst_priority_http_priority_queue
     mvfst_server_accept_observer
     mvfst_server_handshake_app_token
@@ -44,6 +45,7 @@ mvfst_add_library(mvfst_server_server
     mvfst_server_handshake_stateless_reset_generator
     mvfst_server_handshake_token_generator
     mvfst_server_third_party_siphash
+    mvfst_state_connection_oops_fields
     mvfst_state_transport_settings_functions
     Folly::folly_chrono_conv
     Folly::folly_io_async_event_base_manager
