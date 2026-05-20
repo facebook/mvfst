@@ -183,6 +183,71 @@ Expected<uint64_t, QuicError> QuicPathManager::getNewPathChallengeData(
   return challengeData;
 }
 
+Expected<PathChallengeFrame, QuicError>
+QuicPathManager::prepareChallengeForSending(PathIdType pathId) {
+  auto it = pathIdToInfo_.find(pathId);
+  if (it == pathIdToInfo_.end()) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::PATH_NOT_EXISTS,
+        std::string(
+            "Could not generate path challenge data for non-existent path id")));
+  }
+  auto& path = it->second;
+
+  if (path.status == PathStatus::Validated) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::PATH_MANAGER_ERROR,
+        std::string(
+            "Sending path challenge on validated path is not supported")));
+  }
+
+  // Higher 32 bits are path id, lower 32 bits are random. The path id in the
+  // upper bits is what lets a returning PATH_RESPONSE be routed back to the
+  // right path before we even scan the in-flight list.
+  uint64_t challengeData =
+      (static_cast<uint64_t>(pathId) << 32) + folly::Random::rand32();
+
+  auto sentTimestamp = Clock::now();
+
+  // First in-flight challenge for this path -> set up the validation timeout
+  // and bookkeeping.
+  if (path.outstandingChallenges.empty() &&
+      path.status != PathStatus::Validated) {
+    auto pto = conn_.lossState.srtt +
+        std::max(4 * conn_.lossState.rttvar, kGranularity) +
+        conn_.lossState.maxAckDelay;
+    auto validationTimeout =
+        std::max(3 * pto, 6 * conn_.transportSettings.initialRtt);
+    auto timeoutMs =
+        std::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
+    path.pathResponseDeadline = sentTimestamp + timeoutMs;
+
+    // The path may already be in the pending response list (e.g. a previous
+    // attempt that was reset). Remove and re-add to keep the list ordered by
+    // earliest deadline.
+    pathsPendingResponse_.erase(
+        std::remove(
+            pathsPendingResponse_.begin(),
+            pathsPendingResponse_.end(),
+            path.id),
+        pathsPendingResponse_.end());
+    pathsPendingResponse_.emplace_back(path.id);
+    path.status = PathStatus::Validating;
+
+    conn_.pendingEvents.schedulePathValidationTimeout = true;
+  }
+
+  path.outstandingChallenges.push_back(
+      InFlightPathChallenge{
+          .pathData = challengeData, .sentTimestamp = sentTimestamp});
+
+  MVVLOG(6) << "Path challenge minted for path=" << path.id
+            << " data=" << challengeData << " at "
+            << sentTimestamp.time_since_epoch().count();
+
+  return PathChallengeFrame(challengeData);
+}
+
 const PathInfo* QuicPathManager::getPathByChallengeData(
     uint64_t challengeData) {
   return getPathByChallengeDataImpl(challengeData);
@@ -192,13 +257,24 @@ PathInfo* QuicPathManager::getPathByChallengeDataImpl(uint64_t challengeData) {
   // Higher 32 bits are path id, lower 32 bits are random
   auto pathId = static_cast<uint32_t>(challengeData >> 32);
   auto it = pathIdToInfo_.find(pathId);
-  if (it != pathIdToInfo_.end() &&
-      it->second.challengePayloadToSend.has_value() &&
-      it->second.challengePayloadToSend.value() == challengeData) {
-    return &it->second;
-  } else {
+  if (it == pathIdToInfo_.end()) {
     return nullptr;
   }
+  // Match either the legacy challengePayloadToSend sentinel (set by
+  // getNewPathChallengeData before the first send) or any entry already
+  // recorded in outstandingChallenges (populated by prepareChallengeForSending
+  // or onPathChallengeSent at write/post-write time). The two will be
+  // unified once getNewPathChallengeData is removed.
+  if (it->second.challengePayloadToSend.has_value() &&
+      it->second.challengePayloadToSend.value() == challengeData) {
+    return &it->second;
+  }
+  for (const auto& inFlight : it->second.outstandingChallenges) {
+    if (inFlight.pathData == challengeData) {
+      return &it->second;
+    }
+  }
+  return nullptr;
 }
 
 PathIdType QuicPathManager::generatePathId() {

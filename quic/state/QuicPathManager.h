@@ -196,6 +196,18 @@ class QuicPathManager {
    */
   Expected<uint64_t, QuicError> getNewPathChallengeData(PathIdType pathId);
 
+  /**
+   * Mint a fresh PATH_CHALLENGE for the given path, record it as in-flight
+   * with a Clock::now() timestamp, and return the frame to be sent. Intended
+   * to be called at write time by the scheduler so that every PATH_CHALLENGE
+   * on the wire carries a unique payload (including retransmissions). On the
+   * path's first in-flight challenge this also sets the path's response
+   * deadline and transitions it to Validating. Returns an error if the path
+   * doesn't exist.
+   */
+  Expected<PathChallengeFrame, QuicError> prepareChallengeForSending(
+      PathIdType pathId);
+
   const PathInfo* getPathByChallengeData(uint64_t challengeData);
 
   /**

@@ -288,6 +288,82 @@ TEST_F(QuicPathManagerTest, GetPathByChallengeDataNotFound) {
   EXPECT_EQ(path, nullptr);
 }
 
+TEST_F(QuicPathManagerTest, PrepareChallengeForSending) {
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType id = result.value();
+
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
+
+  // First mint records the path as in-flight, transitions to Validating, and
+  // sets the response deadline + timeout flag.
+  auto path = manager_->getPath(id);
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->status, PathStatus::Validating);
+  ASSERT_EQ(path->outstandingChallenges.size(), 1u);
+  EXPECT_EQ(
+      path->outstandingChallenges.front().pathData,
+      challengeRes.value().pathData);
+  EXPECT_TRUE(path->pathResponseDeadline.has_value());
+  EXPECT_TRUE(connState_->pendingEvents.schedulePathValidationTimeout);
+
+  // The minted payload is routable back to the path.
+  EXPECT_EQ(
+      manager_->getPathByChallengeData(challengeRes.value().pathData)->id, id);
+}
+
+TEST_F(QuicPathManagerTest, PrepareChallengeForSendingNonExistentPath) {
+  auto res = manager_->prepareChallengeForSending(999);
+  EXPECT_FALSE(res.has_value());
+  EXPECT_EQ(res.error().code, LocalErrorCode::PATH_NOT_EXISTS);
+}
+
+TEST_F(QuicPathManagerTest, PrepareChallengeForSendingValidatedPath) {
+  // Already-validated paths have no validation timeout, so an in-flight
+  // entry minted on them would never be cleaned up. The function should
+  // refuse the request rather than silently leak.
+  auto result = manager_->addValidatedPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType id = result.value();
+
+  auto res = manager_->prepareChallengeForSending(id);
+  EXPECT_FALSE(res.has_value());
+  EXPECT_EQ(res.error().code, LocalErrorCode::PATH_MANAGER_ERROR);
+
+  auto path = manager_->getPath(id);
+  ASSERT_NE(path, nullptr);
+  EXPECT_TRUE(path->outstandingChallenges.empty());
+}
+
+TEST_F(QuicPathManagerTest, RetransmitGeneratesFreshPayload) {
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType id = result.value();
+
+  auto firstRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(firstRes.has_value());
+  auto firstDeadline = manager_->getPath(id)->pathResponseDeadline;
+
+  // A second call (e.g. on loss-triggered retransmit) mints a distinct
+  // payload but does NOT re-arm the validation timeout.
+  auto secondRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(secondRes.has_value());
+  EXPECT_NE(firstRes.value().pathData, secondRes.value().pathData);
+
+  auto path = manager_->getPath(id);
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->outstandingChallenges.size(), 2u);
+  EXPECT_EQ(path->pathResponseDeadline, firstDeadline);
+
+  // Both payloads remain routable so a delayed response to either send
+  // still produces a valid match.
+  EXPECT_EQ(
+      manager_->getPathByChallengeData(firstRes.value().pathData)->id, id);
+  EXPECT_EQ(
+      manager_->getPathByChallengeData(secondRes.value().pathData)->id, id);
+}
+
 TEST_F(QuicPathManagerTest, OnPathChallengeSent) {
   auto result = manager_->addPath(localAddr1_, peerAddr1_);
   ASSERT_TRUE(result.has_value());
