@@ -283,8 +283,7 @@ std::chrono::microseconds QuicTransportBaseLite::getLooperPacingDelay() {
 
 void QuicTransportBaseLite::onNetworkData(
     const folly::SocketAddress& localAddress,
-    NetworkData&& networkData,
-    const folly::SocketAddress& peerAddress) noexcept {
+    NetworkData&& networkData) noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
     if (!conn_->transportSettings.networkDataPerSocketRead) {
@@ -344,7 +343,7 @@ void QuicTransportBaseLite::onNetworkData(
       for (const auto& pp : conn_->packetProcessors) {
         pp->onPacketRead(packet);
       }
-      auto res = onReadData(localAddress, std::move(packet), peerAddress);
+      auto res = onReadData(localAddress, std::move(packet));
       if (!res.has_value()) {
         MVVLOG(4) << __func__ << " " << res.error().message << " " << *this;
         exceptionCloseWhat_ = res.error().message;

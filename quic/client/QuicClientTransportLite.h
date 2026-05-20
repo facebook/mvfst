@@ -149,8 +149,7 @@ class QuicClientTransportLite
   // From QuicTransportBase
   quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& localAddress,
-      ReceivedUdpPacket&& udpPacket,
-      const folly::SocketAddress& peerAddress) override;
+      ReceivedUdpPacket&& udpPacket) override;
   quic::Expected<void, QuicError> writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
@@ -288,13 +287,11 @@ class QuicClientTransportLite
    * attempts to transform the UDP packet data into one or more QUIC packets
    *
    * @param localAddress      The local address the socket was bound to.
-   * @param networkData       UDP packet.
-   * @param peerAddress       The address of the remote peer.
+   * @param networkData       UDP packet (peer address is on udpPacket).
    */
   quic::Expected<void, QuicError> processUdpPacket(
       const folly::SocketAddress& localAddress,
-      ReceivedUdpPacket&& udpPacket,
-      const folly::SocketAddress& peerAddress);
+      ReceivedUdpPacket&& udpPacket);
 
   /**
    * Process data within a single UDP packet.
@@ -308,15 +305,13 @@ class QuicClientTransportLite
    * Since all QUIC packets are extracted from the same UDP packet, the packet
    * timings associated with that UDP packet are used for all QUIC packets.
    *
-   * @param localAddress  The address of the remote peer.
+   * @param localAddress  The address of the local socket.
    * @param udpPacket     The data received from the UDP socket along with
-   *                      timings
-   * @param peerAddress   The address of the remote peer.
+   *                      timings (peer address is on udpPacket).
    */
   quic::Expected<void, QuicError> processUdpPacketData(
       const folly::SocketAddress& localAddress,
-      ReceivedUdpPacket& udpPacket,
-      const folly::SocketAddress& peerAddress);
+      ReceivedUdpPacket& udpPacket);
 
   [[nodiscard]] quic::Expected<void, QuicError> startCryptoHandshake();
 

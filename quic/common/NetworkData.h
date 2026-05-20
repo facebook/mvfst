@@ -161,6 +161,12 @@ struct NetworkData {
     }
   }
 
+  void setPeerAddressForAllPackets(const folly::SocketAddress& peerAddress) {
+    for (auto& packet : packets_) {
+      packet.peerAddress = peerAddress;
+    }
+  }
+
   [[nodiscard]] TimePoint getReceiveTimePoint() const {
     return receiveTimePoint_;
   }

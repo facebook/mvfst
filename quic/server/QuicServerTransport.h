@@ -154,8 +154,7 @@ class QuicServerTransport
   // From QuicTransportBase
   quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& localAddress,
-      ReceivedUdpPacket&& udpPacket,
-      const folly::SocketAddress& peerAddress) override;
+      ReceivedUdpPacket&& udpPacket) override;
   quic::Expected<void, QuicError> writeData() override;
   void closeTransport() override;
   void unbindConnection() override;

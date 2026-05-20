@@ -222,9 +222,7 @@ class MockQuicTransport : public QuicServerTransport {
   MOCK_METHOD(
       (void),
       onNetworkData,
-      (const folly::SocketAddress&,
-       const NetworkData&,
-       const folly::SocketAddress&),
+      (const folly::SocketAddress&, const NetworkData&),
       (noexcept));
   MOCK_METHOD(
       (void),
@@ -264,9 +262,8 @@ class MockQuicTransport : public QuicServerTransport {
 
   void onNetworkData(
       const folly::SocketAddress& localAddress,
-      NetworkData&& networkData,
-      const folly::SocketAddress& peerAddress) noexcept override {
-    onNetworkData(localAddress, networkData, peerAddress);
+      NetworkData&& networkData) noexcept override {
+    onNetworkData(localAddress, networkData);
   }
 
   MOCK_METHOD(void, setBufAccessor, (BufAccessor*));

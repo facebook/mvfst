@@ -273,8 +273,7 @@ class TestQuicTransport
 
   quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress&,
-      ReceivedUdpPacket&& udpPacket,
-      const folly::SocketAddress&) override {
+      ReceivedUdpPacket&& udpPacket) override {
     if (udpPacket.buf.empty()) {
       return {};
     }
@@ -424,19 +423,25 @@ class TestQuicTransport
   void addDataToStream(StreamId id, StreamBuffer data) {
     auto buf = encodeStreamBuffer(id, std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
+    auto networkData = NetworkData(std::move(buf), Clock::now(), 0);
+    networkData.setPeerAddressForAllPackets(addr);
+    onNetworkData(addr, std::move(networkData));
   }
 
   void addCryptoData(StreamBuffer data) {
     auto buf = encodeCryptoBuffer(std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
+    auto networkData = NetworkData(std::move(buf), Clock::now(), 0);
+    networkData.setPeerAddressForAllPackets(addr);
+    onNetworkData(addr, std::move(networkData));
   }
 
   void addMaxStreamsFrame(MaxStreamsFrame frame) {
     auto buf = encodeMaxStreamsFrame(frame);
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now(), 0), addr);
+    auto networkData = NetworkData(std::move(buf), Clock::now(), 0);
+    networkData.setPeerAddressForAllPackets(addr);
+    onNetworkData(addr, std::move(networkData));
   }
 
   void addStreamReadError(StreamId id, QuicErrorCode ex) {
@@ -454,7 +459,9 @@ class TestQuicTransport
   void addDatagram(BufPtr data, TimePoint recvTime = Clock::now()) {
     auto buf = encodeDatagramFrame(std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), recvTime, 0), addr);
+    auto networkData = NetworkData(std::move(buf), recvTime, 0);
+    networkData.setPeerAddressForAllPackets(addr);
+    onNetworkData(addr, std::move(networkData));
   }
 
   void closeStream(StreamId id) {
@@ -502,7 +509,8 @@ class TestQuicTransport
         id,
         StreamBuffer(IOBuf::create(0), stream->maxOffsetObserved + 1, true));
     auto networkData = NetworkData(std::move(buf), Clock::now(), 0);
-    onNetworkData(addr, std::move(networkData), addr);
+    networkData.setPeerAddressForAllPackets(addr);
+    onNetworkData(addr, std::move(networkData));
   }
 
   QuicStreamState* getStream(StreamId id) {

@@ -845,6 +845,7 @@ void QuicServerWorker::dispatchPacketData(
     bool isForwardedData) noexcept {
   MVDCHECK(socket_);
   MVCHECK(transportFactory_);
+  networkData.setPeerAddressForAllPackets(client);
 
   // if set, log drop reason and do *not* attempt to forward packet
   auto packetDropReason = PacketDropReason::NONE;
@@ -907,14 +908,13 @@ void QuicServerWorker::dispatchPacketData(
   // helper fn to handle fwd-ing data to the transport
   auto fwdNetworkDataToTransport = [&](QuicServerTransport* transport) {
     MVDCHECK(transport->getEventBase()->isInEventBaseThread());
-    transport->onNetworkData(
-        socket_->address(), std::move(networkData), client);
+    transport->onNetworkData(socket_->address(), std::move(networkData));
     // process pending 0rtt data for this DCID if present
     if (routingData.isInitial && !pending0RttData_.empty()) {
       auto itr = pending0RttData_.find(dstConnId);
       if (itr != pending0RttData_.end()) {
         for (auto& data : itr->second) {
-          transport->onNetworkData(socket_->address(), std::move(data), client);
+          transport->onNetworkData(socket_->address(), std::move(data));
         }
         pending0RttData_.erase(itr);
       }

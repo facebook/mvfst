@@ -77,19 +77,16 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   // This is invoked when new data is received from the UDP socket.
   virtual void onNetworkData(
       const folly::SocketAddress& localAddress,
-      NetworkData&& data,
-      const folly::SocketAddress& peerAddress) noexcept;
+      NetworkData&& data) noexcept;
 
   /**
    * Invoked when a new packet is read from the network.
-   * peer is the address of the peer that was in the packet.
    * The sub-class may throw an exception if there was an error in processing
    * the packet in which case the connection will be closed.
    */
   virtual quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& localAddress,
-      ReceivedUdpPacket&& udpPacket,
-      const folly::SocketAddress& peerAddress) = 0;
+      ReceivedUdpPacket&& udpPacket) = 0;
 
   void close(Optional<QuicError> error) override;
 

@@ -73,8 +73,7 @@ class TestQuicTransport
 
   quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& /* localAddress */,
-      ReceivedUdpPacket&& /* udpPacket */,
-      const folly::SocketAddress& /* peerAddress */) noexcept override {
+      ReceivedUdpPacket&& /* udpPacket */) noexcept override {
     return {};
   }
 

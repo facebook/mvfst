@@ -37,6 +37,18 @@ using namespace testing;
 
 namespace quic::test {
 
+namespace {
+template <typename Transport>
+void dispatchNetworkData(
+    Transport& t,
+    const folly::SocketAddress& localAddr,
+    NetworkData networkData,
+    const folly::SocketAddress& peerAddr) {
+  networkData.setPeerAddressForAllPackets(peerAddr);
+  t.onNetworkData(localAddr, std::move(networkData));
+}
+} // namespace
+
 /**
  * A DeliveryCallback that closes your transport when it's canceled, or when
  * the targetOffset is delivered. Booyah!
@@ -1478,7 +1490,8 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   transport_->getConnectionState().streamManager->addClosed(id);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -1525,7 +1538,8 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   transport_->getConnectionState().streamManager->addClosed(id);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -1573,7 +1587,8 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   transport_->getConnectionState().streamManager->addClosed(id);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -1620,7 +1635,8 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   transport_->getConnectionState().streamManager->addClosed(id);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -3150,7 +3166,8 @@ TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   // called on the stream after this
   EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState->id)).Times(0);
   EXPECT_CALL(writeCallback_, onStreamWriteReady(streamState->id, _)).Times(0);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -3438,7 +3455,8 @@ TEST_F(QuicTransportTest, FlowControlCallbacks) {
       .WillOnce(Invoke([&](auto) {
         ASSERT_FALSE(transport_->createBidirectionalStream().hasError());
       }));
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -3477,7 +3495,7 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
   NetworkData emptyData;
   streamState->ackedIntervals.insert(0, 19);
   // This will invoke the DeliveryClalback::onDelivered
-  transport_->onNetworkData(lAddr, std::move(emptyData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
@@ -3498,7 +3516,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
 
   folly::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
-  transport_->onNetworkData(lAddr, std::move(emptyData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
   streamState->ackedIntervals.insert(0, 19);
 
   // Clear out the other delivery callbacks before tear down transport.
@@ -3515,7 +3533,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
   conn.lossState.srtt = 100us;
   NetworkData emptyData2;
   EXPECT_CALL(mockedDeliveryCallback, onDeliveryAck(stream, 1, 100us)).Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData2), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData2), rAddr);
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
@@ -3542,7 +3560,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
   folly::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   EXPECT_CALL(mockedDeliveryCallback, onDeliveryAck(stream, 1, 100us)).Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
@@ -3573,7 +3591,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   streamState->ackedIntervals.insert(0, 99);
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
       .Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
 
   // Clear out the other delivery callbacks before tear down transport.
   // Otherwise, transport will be holding on to delivery callback pointers
@@ -3588,7 +3606,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   streamState->ackedIntervals.insert(100, 199);
   EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 150, 100us))
       .Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData2), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData2), rAddr);
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
@@ -3626,7 +3644,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   streamState->ackedIntervals.insert(0, 49);
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
       .Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
 
   // Clear out the other delivery callbacks before tear down transport.
   // Otherwise, transport will be holding on to delivery callback pointers
@@ -3641,7 +3659,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   streamState->ackedIntervals.insert(50, 199);
   EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 150, 100us))
       .Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData2), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData2), rAddr);
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
@@ -3685,7 +3703,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   NetworkData emptyData;
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 30, 100us))
       .Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
 
   // Clear out the other delivery callbacks before tear down transport.
   // Otherwise, transport will be holding on to delivery callback pointers
@@ -3702,7 +3720,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
       .Times(1);
   EXPECT_CALL(mockedDeliveryCallback3, onDeliveryAck(stream, 150, 100us))
       .Times(1);
-  transport_->onNetworkData(lAddr, std::move(emptyData2), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(emptyData2), rAddr);
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByte) {
@@ -3739,7 +3757,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByte) {
   EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
-  transport_->onNetworkData(lAddr, std::move(networkData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(networkData), rAddr);
   Mock::VerifyAndClearExpectations(&writeChainDeliveryCb);
   Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
   Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
@@ -3801,7 +3819,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByteWithFin) {
   EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
   EXPECT_CALL(finDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
-  transport_->onNetworkData(lAddr, std::move(networkData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(networkData), rAddr);
   Mock::VerifyAndClearExpectations(&writeChainDeliveryCb);
   Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
   Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
@@ -4236,7 +4254,7 @@ TEST_F(
   EXPECT_CALL(deliveryCb1, onDeliveryAck(stream, 9, 100us)).Times(1);
   EXPECT_CALL(deliveryCb2, onDeliveryAck(stream, 19, 100us)).Times(1);
   EXPECT_CALL(deliveryCb3, onDeliveryAck(stream, 20, 100us)).Times(1);
-  transport_->onNetworkData(lAddr, std::move(networkData), rAddr);
+  dispatchNetworkData(*transport_, lAddr, std::move(networkData), rAddr);
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteConnImmediate) {
@@ -4307,7 +4325,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnAsync) {
       num);
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_));
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4337,7 +4356,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
   ASSERT_FALSE(updateFlowControlOnWriteToSocket(*stream, 10).hasError());
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_));
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4429,7 +4449,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferUseTotalSpace) {
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4457,7 +4478,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferOveruseSpace) {
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_)).Times(0);
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4497,7 +4519,8 @@ TEST_F(
 
   EXPECT_CALL(writeCallback_, onConnectionWriteReady(_));
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4520,7 +4543,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
       transport_->notifyPendingWriteOnStream(stream->id, &writeCallback_);
   evb_.loop();
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4533,7 +4557,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncConnBlocked) {
       conn,
       MaxDataFrame(conn.flowControlState.peerAdvertisedMaxOffset + 1000),
       num);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4561,7 +4586,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
   evb_.loop();
   Mock::VerifyAndClearExpectations(&writeCallback_);
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4585,7 +4611,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamWritableBytesBackpressure) {
           conn.flowControlState.peerAdvertisedMaxOffset +
           1000 * kDefaultUDPSendPacketLen),
       num);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4606,7 +4633,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncStreamBlocked) {
       transport_->notifyPendingWriteOnStream(stream->id, &writeCallback_);
   evb_.loop();
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4617,7 +4645,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamAsyncStreamBlocked) {
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _));
   EXPECT_CALL(connCallback_, onFlowControlUpdate(stream->id));
 
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4700,7 +4729,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnDuringClose) {
       conn,
       MaxDataFrame(conn.flowControlState.peerAdvertisedMaxOffset + 1000),
       num);
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4736,7 +4766,8 @@ TEST_F(QuicTransportTest, NotifyPendingWriteStreamDuringClose) {
   EXPECT_CALL(writeCallback_, onStreamWriteError(streamId2, _));
   EXPECT_CALL(writeCallback_, onStreamWriteReady(stream->id, _))
       .WillOnce(Invoke([&](auto, auto) { transport_->close(std::nullopt); }));
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::", 10001),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10000));
@@ -4874,7 +4905,8 @@ TEST_F(QuicTransportTest, CancelAckTimeout) {
   qEvb_->scheduleTimeout(transport_->getAckTimeout(), 1000000ms);
   EXPECT_TRUE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = false;
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::1", 10128),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10129));
@@ -4886,7 +4918,8 @@ TEST_F(QuicTransportTest, ScheduleAckTimeout) {
   transport_->getConnectionState().lossState.srtt = 25000000us;
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::1", 10003),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10004));
@@ -4901,7 +4934,8 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutSRTTFactor) {
   transport_->getConnectionState().lossState.srtt = 50ms;
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::1", 10003),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10004));
@@ -4920,7 +4954,8 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutAckFreq) {
   transport_->getConnectionState().ackStates.maxAckDelay = 50ms / 3;
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::1", 10003),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10004));
@@ -4937,7 +4972,8 @@ TEST_F(QuicTransportTest, ScheduleAckTimeoutFromMaxAckDelay) {
   transport_->getConnectionState().ackStates.maxAckDelay = 10ms;
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::1", 10003),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10004));
@@ -4952,7 +4988,8 @@ TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   transport_->getConnectionState().lossState.srtt = 25000000us;
   EXPECT_FALSE(transport_->getAckTimeout()->isTimerCallbackScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
-  transport_->onNetworkData(
+  dispatchNetworkData(
+      *transport_,
       SocketAddress("::1", 10003),
       NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
       SocketAddress("::1", 10004));

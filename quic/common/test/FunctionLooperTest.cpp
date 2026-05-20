@@ -67,8 +67,7 @@ class MockTransportForLooperTest : public QuicTransportBaseLite {
 
   quic::Expected<void, QuicError> onReadData(
       const folly::SocketAddress& /* localAddress */,
-      ReceivedUdpPacket&& /* udpPacket */,
-      const folly::SocketAddress& /* peerAddress */) override {
+      ReceivedUdpPacket&& /* udpPacket */) override {
     return {};
   }
 

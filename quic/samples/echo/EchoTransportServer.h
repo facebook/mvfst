@@ -90,10 +90,11 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
 
     ReceivedUdpPacket packet(std::move(readBuffer_));
     packet.timings.receiveTimePoint = packetReceiveTime;
+    packet.peerAddress = client;
     quic::NetworkData networkData(std::move(packet));
 
     transport_->onNetworkData(
-        transport_->getLocalAddress(), std::move(networkData), client);
+        transport_->getLocalAddress(), std::move(networkData));
   }
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override {
