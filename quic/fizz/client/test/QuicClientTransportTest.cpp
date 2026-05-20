@@ -4855,7 +4855,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
   auto packet = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
       *originalConnId /* dest */,
-      appDataPacketNum++,
+      ++appDataPacketNum,
       streamId,
       *data,
       0 /* cipherOverhead */,
