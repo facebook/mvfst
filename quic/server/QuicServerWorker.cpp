@@ -405,7 +405,8 @@ void QuicServerWorker::onDataAvailable(
     udpPacket.timings.receiveTimePoint = packetReceiveTime;
     udpPacket.timings.maybeSoftwareTs = maybeSockTsExt;
     udpPacket.tosValue = params.tos;
-    handleNetworkData(client, udpPacket);
+    udpPacket.peerAddress = client;
+    handleNetworkData(udpPacket);
   } else {
     // if we receive a truncated packet
     // we still need to consider the prev valid ones
@@ -430,7 +431,8 @@ void QuicServerWorker::onDataAvailable(
         udpPacket.timings.receiveTimePoint = packetReceiveTime;
         udpPacket.tosValue = params.tos;
         udpPacket.timings.maybeSoftwareTs = maybeSockTsExt;
-        handleNetworkData(client, udpPacket);
+        udpPacket.peerAddress = client;
+        handleNetworkData(udpPacket);
         break;
       }
       auto tmp = data->cloneOne();
@@ -446,7 +448,8 @@ void QuicServerWorker::onDataAvailable(
       udpPacket.timings.receiveTimePoint = packetReceiveTime;
       udpPacket.tosValue = params.tos;
       udpPacket.timings.maybeSoftwareTs = maybeSockTsExt;
-      handleNetworkData(client, udpPacket);
+      udpPacket.peerAddress = client;
+      handleNetworkData(udpPacket);
     }
   }
 }
@@ -522,15 +525,15 @@ void QuicServerWorker::onSocketReadable(QuicAsyncUDPSocket& sock) noexcept {
     QUIC_STATS(statsCallback_, onPacketReceived);
     QUIC_STATS(statsCallback_, onRead, udpPacket.buf.chainLength());
 
-    MVCHECK(udpPacket.peerAddress.has_value());
-    handleNetworkData(*udpPacket.peerAddress, udpPacket);
+    handleNetworkData(udpPacket);
   }
 }
 
 void QuicServerWorker::handleNetworkData(
-    const folly::SocketAddress& client,
     ReceivedUdpPacket& udpPacket,
     bool isForwardedData) noexcept {
+  MVCHECK(udpPacket.peerAddress.has_value());
+  const auto& client = *udpPacket.peerAddress;
   // if packet drop reason is set, invoke stats cb accordingly
   auto packetDropReason = PacketDropReason::NONE;
   auto maybeReportPacketDrop = folly::makeGuard([&]() {

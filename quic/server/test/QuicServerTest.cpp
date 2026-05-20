@@ -1006,7 +1006,8 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
     ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToReceivedUdpPacket(std::move(builder).buildPacket());
-  worker_->handleNetworkData(blockedSrcPort, packet);
+  packet.peerAddress = blockedSrcPort;
+  worker_->handleNetworkData(packet);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1025,7 +1026,8 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
     ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToReceivedUdpPacket(std::move(builder).buildPacket());
-  worker_->handleNetworkData(kClientAddr, packet);
+  packet.peerAddress = kClientAddr;
+  worker_->handleNetworkData(packet);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1043,7 +1045,8 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       packetToReceivedUdpPacket((std::move(initialBuilder).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
       .Times(1);
-  worker_->handleNetworkData(kClientAddr, initialPacket);
+  initialPacket.peerAddress = kClientAddr;
+  worker_->handleNetworkData(initialPacket);
   eventbase_.loopIgnoreKeepAlive();
 
   // Initial with any packet number should also increate the counting
@@ -1057,7 +1060,8 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       (std::move(initialBuilderBigNum).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
       .Times(1);
-  worker_->handleNetworkData(kClientAddr, initialPacketBigNum);
+  initialPacketBigNum.peerAddress = kClientAddr;
+  worker_->handleNetworkData(initialPacketBigNum);
   eventbase_.loopIgnoreKeepAlive();
 
   LongHeader handshakeHeader(
@@ -1068,7 +1072,8 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   auto handshakePacket =
       packetToReceivedUdpPacket((std::move(handshakeBuilder).buildPacket()));
   EXPECT_CALL(*quicStats_, onClientInitialReceived(_)).Times(0);
-  worker_->handleNetworkData(kClientAddr, handshakePacket);
+  handshakePacket.peerAddress = kClientAddr;
+  worker_->handleNetworkData(handshakePacket);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1090,7 +1095,8 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
     ASSERT_FALSE(writeFrame(PaddingFrame(), builder).hasError());
   }
   auto packet = packetToReceivedUdpPacket((std::move(builder).buildPacket()));
-  worker_->handleNetworkData(kClientAddr, packet);
+  packet.peerAddress = kClientAddr;
+  worker_->handleNetworkData(packet);
   eventbase_.loopIgnoreKeepAlive();
 }
 
@@ -1221,7 +1227,8 @@ TEST_F(QuicServerWorkerTest, PacketAfterShutdown) {
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   ASSERT_FALSE(builder.encodePacketHeader().hasError());
   auto packet = packetToReceivedUdpPacket((std::move(builder).buildPacket()));
-  worker_->handleNetworkData(kClientAddr, packet);
+  packet.peerAddress = kClientAddr;
+  worker_->handleNetworkData(packet);
   eventbase_.terminateLoopSoon();
   t.join();
 }

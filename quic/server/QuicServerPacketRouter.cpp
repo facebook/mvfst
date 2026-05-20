@@ -240,10 +240,8 @@ void TakeoverPacketHandler::processForwardedPacket(
   QUIC_STATS(worker_->getStatsCallback(), onForwardedPacketProcessed);
   ReceivedUdpPacket packet(std::move(data));
   packet.timings.receiveTimePoint = clientPacketReceiveTime;
-  worker_->handleNetworkData(
-      peerAddress,
-      packet,
-      /* isForwardedData */ true);
+  packet.peerAddress = peerAddress;
+  worker_->handleNetworkData(packet, /* isForwardedData */ true);
 }
 
 void TakeoverPacketHandler::stop() {

@@ -405,10 +405,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     return takeoverCB_.get();
   }
 
-  // Handle the network data for a udp packet
-  // public so that it can be called by tests as well.
+  // Handle the network data for a udp packet. Caller must populate
+  // packet.peerAddress with the datagram source. Public so tests can call it.
   void handleNetworkData(
-      const folly::SocketAddress& client,
       ReceivedUdpPacket& packet,
       bool isForwardedData = false) noexcept;
 
