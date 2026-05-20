@@ -551,6 +551,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   void onSocketReadable(QuicAsyncUDPSocket& sock) noexcept;
 
   std::unique_ptr<FollyAsyncUDPSocketAlias> socket_;
+  std::shared_ptr<FollyQuicAsyncUDPSocket> quicSocket_;
+  std::unique_ptr<QuicReadCallbackAdapter> quicReadCallbackAdapter_;
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
   folly::Executor::KeepAlive<folly::EventBase> evb_;

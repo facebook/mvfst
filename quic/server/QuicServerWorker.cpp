@@ -206,7 +206,14 @@ void QuicServerWorker::start() {
     pacingTimer_ = std::make_unique<HighResQuicTimer>(
         evb_.get(), transportSettings_.pacingTimerResolution);
   }
-  socket_->resumeRead(this);
+  if (transportSettings_.shouldUseWrapperRecvmmsgForBatchRecv) {
+    auto qEvb = std::make_shared<FollyQuicEventBase>(evb_.get());
+    quicSocket_ = std::make_shared<FollyQuicAsyncUDPSocket>(qEvb, *socket_);
+    quicReadCallbackAdapter_ = std::make_unique<QuicReadCallbackAdapter>(this);
+    quicSocket_->resumeRead(quicReadCallbackAdapter_.get());
+  } else {
+    socket_->resumeRead(this);
+  }
   MVVLOG(10) << fmt::format(
       "Registered read on worker={}, thread={}, processId={}",
       fmt::ptr(this),
@@ -229,7 +236,11 @@ void QuicServerWorker::logTimeBasedStats() {
 
 void QuicServerWorker::pauseRead() {
   MVCHECK(socket_);
-  socket_->pauseRead();
+  if (quicSocket_) {
+    quicSocket_->pauseRead();
+  } else {
+    socket_->pauseRead();
+  }
 }
 
 int QuicServerWorker::getFD() {
@@ -1491,7 +1502,9 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     return;
   }
   shutdown_ = true;
-  if (socket_) {
+  if (quicSocket_) {
+    quicSocket_->pauseRead();
+  } else if (socket_) {
     socket_->pauseRead();
   }
   if (takeoverCB_) {
@@ -1527,6 +1540,8 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   if (statsCallback_) {
     statsCallback_.reset();
   }
+  quicReadCallbackAdapter_.reset();
+  quicSocket_.reset();
   socket_.reset();
   takeoverCB_.reset();
   pacingTimer_.reset();

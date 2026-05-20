@@ -2179,9 +2179,6 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverCbReadError) {
 class QuicServerTest : public Test {
  public:
   void SetUp() override {
-    auto factory = std::make_unique<MockQuicServerTransportFactory>();
-    factory_ = factory.get();
-
     transportSettings_.advertisedInitialConnectionFlowControlWindow =
         kDefaultConnectionFlowControlWindow * 2;
     transportSettings_.advertisedInitialBidiLocalStreamFlowControlWindow =
@@ -2191,6 +2188,14 @@ class QuicServerTest : public Test {
     transportSettings_.advertisedInitialUniStreamFlowControlWindow =
         kDefaultStreamFlowControlWindow * 2;
     transportSettings_.statelessResetTokenSecret = getRandSecret();
+
+    createAndConfigureServer();
+  }
+
+  // Recreates server_ and factory_ from the current transportSettings_.
+  void createAndConfigureServer() {
+    auto factory = std::make_unique<MockQuicServerTransportFactory>();
+    factory_ = factory.get();
 
     server_ = QuicServer::createQuicServer(transportSettings_);
     server_->setQuicServerTransportFactory(std::move(factory));
@@ -2394,6 +2399,13 @@ class QuicServerTest : public Test {
 }; // namespace test
 
 TEST_F(QuicServerTest, NetworkTest) {
+  runTest(std::vector<folly::EventBase*>());
+}
+
+// runTest with shouldUseWrapperRecvmmsgForBatchRecv = true.
+TEST_F(QuicServerTest, NetworkTestWithWrapperRecvmmsg) {
+  transportSettings_.shouldUseWrapperRecvmmsgForBatchRecv = true;
+  createAndConfigureServer();
   runTest(std::vector<folly::EventBase*>());
 }
 
