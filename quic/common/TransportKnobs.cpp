@@ -97,7 +97,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
         case TransportKnobParamId::MAX_WRITE_CONN_DATA_PKT_LIM:
         case TransportKnobParamId::MIN_STREAM_BUF_THRESH:
         case TransportKnobParamId::EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS:
-        case TransportKnobParamId::ALLOW_DUPLICATE_PROBES:
         case TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT:
         case TransportKnobParamId::MAX_PTO:
         case TransportKnobParamId::SCONE_KNOB: {

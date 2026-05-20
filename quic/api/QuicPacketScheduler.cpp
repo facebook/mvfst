@@ -1113,23 +1113,6 @@ CloningScheduler::scheduleFramesForPacket(
     }
     // The packet is already a clone or has a clone outstanding
     if (outstandingPacket.maybeClonedPacketIdentifier) {
-      const auto& frames = outstandingPacket.packet.frames;
-      if (conn_.transportSettings.cloneAllPacketsWithCryptoFrame) {
-        // Has CRYPTO frame
-        if (std::find_if(frames.begin(), frames.end(), [](const auto& frame) {
-              return frame.type() == QuicWriteFrame::Type::WriteCryptoFrame;
-            }) != frames.end()) {
-          if (conn_.transportSettings.cloneCryptoPacketsAtMostOnce) {
-            continue;
-          }
-          auto mostRecentOutstandingPacketIdentifier =
-              conn_.outstandings.packets.back().maybeClonedPacketIdentifier;
-          if (mostRecentOutstandingPacketIdentifier ==
-              outstandingPacket.maybeClonedPacketIdentifier) {
-            continue;
-          }
-        }
-      }
       // This packet has already been processed (acked/lost), no need to
       // clone it.
       if (conn_.outstandings.clonedPacketIdentifiers.count(
@@ -1137,13 +1120,9 @@ CloningScheduler::scheduleFramesForPacket(
         continue;
       }
 
-      // Check if we've already cloned this packet in this write loop. We don't
-      // need to clone it again.
+      // Check if we've already cloned this packet in this write loop. We
+      // don't need to clone it again.
       bool alreadyClonedThisWrite = [&]() -> bool {
-        if (conn_.transportSettings.allowDuplicateProbesInSameWrite) {
-          // Allow the duplicate clone anyway if we explicitly want it.
-          return false;
-        }
         for (auto it = conn_.outstandings.packets.rbegin();
              it != conn_.outstandings.packets.rend();
              ++it) {

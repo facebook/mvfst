@@ -3050,7 +3050,6 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketNoDuplicateProbesTest) {
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
   conn->udpSendPacketLen = aead->getCipherOverhead() + 50;
-  conn->transportSettings.allowDuplicateProbesInSameWrite = false;
 
   EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb =

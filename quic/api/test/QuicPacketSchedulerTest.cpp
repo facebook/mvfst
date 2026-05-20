@@ -754,23 +754,24 @@ TEST_P(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   EXPECT_EQ(expected, result->clonedPacketIdentifier->packetNumber);
 }
 
-class CloneAllPacketsWithCryptoFrameTest
-    : public QuicPacketSchedulerTestBase,
-      public TestWithParam<std::tuple<bool, bool>> {};
-
+// Verifies the hardcoded "no duplicate clones in the same write loop"
+// behavior of the cloning scheduler. With multiple outstanding CRYPTO
+// packets, when the first packet has already been cloned in the current
+// write loop, scheduling another probe should pick the next un-cloned
+// packet rather than re-cloning the first one. This is the property that
+// the (now-removed) cloneAllPacketsWithCryptoFrame +
+// cloneCryptoPacketsAtMostOnce settings used to gate, and that we want to
+// preserve as the default behavior.
 TEST_P(
-    CloneAllPacketsWithCryptoFrameTest,
-    TestCloneAllPacketsWithCryptoFrameTrueFalse) {
+    QuicPacketSchedulerTest,
+    CloneSchedulerSkipsAlreadyClonedPacketInSameWriteLoop) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  auto testParams = GetParam();
-  conn.transportSettings.cloneAllPacketsWithCryptoFrame =
-      std::get<0>(testParams);
-  conn.transportSettings.cloneCryptoPacketsAtMostOnce = std::get<1>(testParams);
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
   conn.writeCount = 0;
 
+  // Add two original outstanding CRYPTO packets in writeCount==0.
   PacketNum firstPacketNum = addInitialOutstandingPacket(conn);
   {
     conn.outstandings.packets.back().packet.frames.push_back(
@@ -801,7 +802,10 @@ TEST_P(
         MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   }
 
-  // Add a third outstanding packet, which is a re-clone of the first packet
+  // Move into a new write loop and add a clone of the first packet in this
+  // new loop, simulating that we just cloned the first packet as part of
+  // the current PTO probing.
+  ++(conn.writeCount);
   {
     addInitialOutstandingPacket(conn);
     conn.outstandings.packets.back().packet.frames.push_back(
@@ -810,15 +814,15 @@ TEST_P(
         PacketNumberSpace::Initial, firstPacketNum);
     conn.outstandings.packets.back().maybeClonedPacketIdentifier =
         clonedPacketIdentifier;
-    // It is not processed yet
-    conn.outstandings.clonedPacketIdentifiers.insert(clonedPacketIdentifier);
     // There needs to have retransmittable frame for the rebuilder to work
     conn.outstandings.packets.back().packet.frames.push_back(
         MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   }
 
-  // Schedule a fourth packet
-  ++(conn.writeCount); // Next probe is in a new write.
+  // Schedule another probe in the same write loop. The scheduler should
+  // skip the first packet (already cloned in this write loop) and pick the
+  // second CRYPTO packet instead, ensuring distinct probe content for
+  // crypto handshakes.
   ConnectionId srcConnId = ConnectionId::createZeroLength();
   LongHeader header(
       LongHeader::Types::Initial,
@@ -833,31 +837,14 @@ TEST_P(
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   ASSERT_FALSE(result.hasError());
-  if (conn.transportSettings.cloneAllPacketsWithCryptoFrame &&
-      conn.transportSettings.cloneCryptoPacketsAtMostOnce) {
-    // First and second packets already cloned, skip all and schedule no packet
-    EXPECT_FALSE(result->clonedPacketIdentifier.has_value());
-    EXPECT_FALSE(result->packet.has_value());
-  } else {
-    ASSERT_TRUE(
-        result->clonedPacketIdentifier.has_value() &&
-        result->packet.has_value());
-    EXPECT_EQ(
-        conn.transportSettings.cloneAllPacketsWithCryptoFrame ? secondPacketNum
-                                                              : firstPacketNum,
-        result->clonedPacketIdentifier->packetNumber);
-  }
+  ASSERT_TRUE(
+      result->clonedPacketIdentifier.has_value() && result->packet.has_value());
+  EXPECT_EQ(secondPacketNum, result->clonedPacketIdentifier->packetNumber);
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    CloneAllPacketsWithCryptoFrameTest,
-    CloneAllPacketsWithCryptoFrameTest,
-    Combine(Bool(), Bool()));
 
 TEST_P(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn.transportSettings.cloneAllPacketsWithCryptoFrame = true;
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
 

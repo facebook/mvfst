@@ -229,9 +229,10 @@ QUIC_ENUM(
     // Controls how much excess CWND allowed on imminent stream
     // completion.
     EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS = 0x1000F,
-    // Controls whether the cloning scheduler should clone the same
-    // packet repeatedly in the same write loop.
-    ALLOW_DUPLICATE_PROBES = 0x10010,
+    // DEPRECATED: ALLOW_DUPLICATE_PROBES = 0x10010 (do not reuse value).
+    // Previously controlled whether the cloning scheduler could clone the
+    // same packet repeatedly in the same write loop. The no-duplicate
+    // behavior is now hardcoded.
     // Controls whether to send a ConnectionClose on idle timeout
     SEND_CLOSE_ON_IDLE_TIMEOUT = 0x10011,
     // Controls the max number of PTOs to send before closing the

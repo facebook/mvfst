@@ -446,8 +446,6 @@ struct TransportSettings {
   // Whether to trigger packet processing per socket read rather than batch
   // receiving and then processing.
   bool networkDataPerSocketRead{false};
-  bool cloneAllPacketsWithCryptoFrame{false};
-  bool cloneCryptoPacketsAtMostOnce{false};
   bool immediatelyRetransmitInitialPackets{false};
 
   // Ceiling of packets to receive from signaled socket per evb loop on the
@@ -480,11 +478,6 @@ struct TransportSettings {
 
   // Increase CCA CWND limit if imminent stream completion.
   uint16_t excessCwndPctForImminentStreams{0};
-
-  // Controls whether the cloning scheduler should clone the same
-  // packet repeatedly in the same write loop.
-  // TODO: Remove this after testing the underlying change.
-  bool allowDuplicateProbesInSameWrite{true};
 
   // Whether a ConnectionClose frame should be sent on IdleTimeout
   bool alwaysSendConnectionCloseOnIdleTimeout{false};
