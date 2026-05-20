@@ -260,8 +260,8 @@ TEST_F(QuicPathManagerTest, GetNewPathChallengeData) {
   // Verify path has outstanding challenge data
   auto path = manager_->getPath(id);
   ASSERT_NE(path, nullptr);
-  ASSERT_TRUE(path->outstandingChallengeData.has_value());
-  EXPECT_EQ(path->outstandingChallengeData.value(), challengeResult.value());
+  ASSERT_TRUE(path->challengePayloadToSend.has_value());
+  EXPECT_EQ(path->challengePayloadToSend.value(), challengeResult.value());
 }
 
 TEST_F(QuicPathManagerTest, GetNewPathChallengeDataNonExistentPath) {
@@ -307,7 +307,7 @@ TEST_F(QuicPathManagerTest, OnPathChallengeSent) {
   auto path = manager_->getPath(id);
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->status, PathStatus::Validating);
-  EXPECT_TRUE(path->lastChallengeSentTimestamp.has_value());
+  EXPECT_EQ(path->outstandingChallenges.size(), 1u);
   EXPECT_TRUE(path->pathResponseDeadline.has_value());
 
   // Verify pending events updated
@@ -337,8 +337,8 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceived) {
   EXPECT_EQ(validatedPath->id, id);
   EXPECT_EQ(validatedPath->status, PathStatus::Validated);
   EXPECT_TRUE(validatedPath->rttSample.has_value());
-  EXPECT_FALSE(validatedPath->outstandingChallengeData.has_value());
-  EXPECT_FALSE(validatedPath->lastChallengeSentTimestamp.has_value());
+  EXPECT_FALSE(validatedPath->challengePayloadToSend.has_value());
+  EXPECT_TRUE(validatedPath->outstandingChallenges.empty());
   EXPECT_FALSE(validatedPath->pathResponseDeadline.has_value());
 }
 
@@ -422,8 +422,8 @@ TEST_F(QuicPathManagerTest, OnPathValidationTimeoutExpired) {
   path = manager_->getPath(id);
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->status, PathStatus::NotValid);
-  EXPECT_FALSE(path->outstandingChallengeData.has_value());
-  EXPECT_FALSE(path->lastChallengeSentTimestamp.has_value());
+  EXPECT_FALSE(path->challengePayloadToSend.has_value());
+  EXPECT_TRUE(path->outstandingChallenges.empty());
   EXPECT_FALSE(path->pathResponseDeadline.has_value());
 }
 

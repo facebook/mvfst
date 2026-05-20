@@ -44,6 +44,15 @@ struct CachedCongestionControlAndRtt {
   std::chrono::microseconds mrtt{};
 };
 
+// One in-flight transmission of a PATH_CHALLENGE frame: the payload that
+// went on the wire and the time it was written.
+struct InFlightPathChallenge {
+  uint64_t pathData;
+  TimePoint sentTimestamp;
+};
+
+constexpr size_t kDefaultInFlightChallengesPerPath = 8;
+
 struct PathInfo {
   PathIdType id;
   // Local address
@@ -66,13 +75,11 @@ struct PathInfo {
   Optional<std::chrono::microseconds> rttSample;
 
   // If populated, this is the challenge we are scheduled to send to the peer
-  Optional<uint64_t> outstandingChallengeData;
-  // If validating, this is the timestamp the current challenge was first sent.
-  // It is not updated on retransmissions.
-  Optional<TimePoint> firstChallengeSentTimestamp;
-  // If validating, this is the timestamp of the last time we sent the
-  // outstanding challenge data. It is updated on retransmissions.
-  Optional<TimePoint> lastChallengeSentTimestamp;
+  Optional<uint64_t> challengePayloadToSend;
+  // PATH_CHALLENGE transmissions awaiting a response. One entry per
+  // `onPathChallengeSent` call.
+  SmallVec<InFlightPathChallenge, kDefaultInFlightChallengesPerPath>
+      outstandingChallenges;
   // If validating, this is when we'd timeout and mark the path as not valid
   // if we haven't received a response
   Optional<TimePoint> pathResponseDeadline;

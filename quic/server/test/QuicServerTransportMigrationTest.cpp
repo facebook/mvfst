@@ -1393,9 +1393,8 @@ TEST_P(
   auto newPathId = newPath->id;
   EXPECT_NE(conn.currentPathId, newPath->id);
   EXPECT_EQ(newPath->status, PathStatus::Validating);
-  EXPECT_TRUE(newPath->outstandingChallengeData);
-  EXPECT_TRUE(newPath->firstChallengeSentTimestamp);
-  EXPECT_TRUE(newPath->lastChallengeSentTimestamp);
+  EXPECT_TRUE(newPath->challengePayloadToSend);
+  EXPECT_FALSE(newPath->outstandingChallenges.empty());
 
   // A path challenge was sent out
   auto outstandingChallenge = getFirstOutstandingPathChallenge();
@@ -1410,9 +1409,8 @@ TEST_P(
   server->pathValidationTimeout().timeoutExpired();
 
   EXPECT_EQ(newPath->status, PathStatus::NotValid);
-  EXPECT_FALSE(newPath->outstandingChallengeData);
-  EXPECT_FALSE(newPath->firstChallengeSentTimestamp);
-  EXPECT_FALSE(newPath->lastChallengeSentTimestamp);
+  EXPECT_FALSE(newPath->challengePayloadToSend);
+  EXPECT_TRUE(newPath->outstandingChallenges.empty());
 
   // This is a probe path that failed validation. It will be removed at the end
   // of the event loop.
@@ -1457,9 +1455,8 @@ TEST_P(
   ASSERT_TRUE(newPath);
   EXPECT_EQ(conn.currentPathId, newPath->id);
   EXPECT_EQ(newPath->status, PathStatus::Validating);
-  EXPECT_TRUE(newPath->outstandingChallengeData);
-  EXPECT_TRUE(newPath->firstChallengeSentTimestamp);
-  EXPECT_TRUE(newPath->lastChallengeSentTimestamp);
+  EXPECT_TRUE(newPath->challengePayloadToSend);
+  EXPECT_FALSE(newPath->outstandingChallenges.empty());
 
   // First congestion controller is cached
   EXPECT_EQ(
@@ -1476,9 +1473,8 @@ TEST_P(
   server->pathValidationTimeout().timeoutExpired();
 
   EXPECT_EQ(newPath->status, PathStatus::NotValid);
-  EXPECT_FALSE(newPath->outstandingChallengeData);
-  EXPECT_FALSE(newPath->firstChallengeSentTimestamp);
-  EXPECT_FALSE(newPath->lastChallengeSentTimestamp);
+  EXPECT_FALSE(newPath->challengePayloadToSend);
+  EXPECT_TRUE(newPath->outstandingChallenges.empty());
 
   // The connection falls back to the firstPath
   EXPECT_EQ(conn.currentPathId, firstPath->id);
@@ -1689,7 +1685,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedValidatingPath) {
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
   // Path is validating. A path challenge frame has been sent for it.
   path.status = PathStatus::Validating;
-  path.outstandingChallengeData = 123;
+  path.challengePayloadToSend = 123;
 
   // Deliver any data to the socket. This should trigger the reaping logic.
   {
@@ -1724,7 +1720,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedNewPath) {
   // Path is new. It has an outstanding path challenge but it hasn't been sent
   // out yet
   path.status = PathStatus::NotValid;
-  path.outstandingChallengeData = 123;
+  path.challengePayloadToSend = 123;
 
   // Deliver any data to the socket. This should trigger the reaping logic.
   {

@@ -176,9 +176,10 @@ Expected<uint64_t, QuicError> QuicPathManager::getNewPathChallengeData(
   uint64_t challengeData =
       (static_cast<uint64_t>(pathId) << 32) + folly::Random::rand32();
 
-  it->second.outstandingChallengeData = challengeData;
-  it->second.firstChallengeSentTimestamp.reset();
-  it->second.lastChallengeSentTimestamp.reset();
+  it->second.challengePayloadToSend = challengeData;
+  // No transmissions yet -- the in-flight list will be populated when the
+  // scheduler calls onPathChallengeSent.
+  it->second.outstandingChallenges.clear();
   return challengeData;
 }
 
@@ -192,8 +193,8 @@ PathInfo* QuicPathManager::getPathByChallengeDataImpl(uint64_t challengeData) {
   auto pathId = static_cast<uint32_t>(challengeData >> 32);
   auto it = pathIdToInfo_.find(pathId);
   if (it != pathIdToInfo_.end() &&
-      it->second.outstandingChallengeData.has_value() &&
-      it->second.outstandingChallengeData.value() == challengeData) {
+      it->second.challengePayloadToSend.has_value() &&
+      it->second.challengePayloadToSend.value() == challengeData) {
     return &it->second;
   } else {
     return nullptr;
@@ -209,17 +210,18 @@ void QuicPathManager::onPathChallengeSent(
   auto maybePath = getPathByChallengeDataImpl(pathChallenge.pathData);
   if (maybePath) {
     auto& path = *maybePath;
+    auto sentTimestamp = Clock::now();
     MVVLOG(6) << "Path challenge sent for path=" << path.id << " at "
-              << Clock::now().time_since_epoch().count();
+              << sentTimestamp.time_since_epoch().count();
 
     if (path.status != PathStatus::Validated) {
-      path.lastChallengeSentTimestamp = Clock::now();
+      bool firstSend = path.outstandingChallenges.empty();
 
-      if (!path.firstChallengeSentTimestamp.has_value()) {
-        // This path challenge data has not been sent before. Update the
-        // timeout.
-        path.firstChallengeSentTimestamp = path.lastChallengeSentTimestamp;
+      path.outstandingChallenges.push_back(
+          InFlightPathChallenge{pathChallenge.pathData, sentTimestamp});
 
+      if (firstSend) {
+        // First transmission of this challenge: arm the validation timeout.
         auto pto = conn_.lossState.srtt +
             std::max(4 * conn_.lossState.rttvar, kGranularity) +
             conn_.lossState.maxAckDelay;
@@ -227,8 +229,7 @@ void QuicPathManager::onPathChallengeSent(
             std::max(3 * pto, 6 * conn_.transportSettings.initialRtt);
         auto timeoutMs =
             std::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
-        path.pathResponseDeadline =
-            *path.firstChallengeSentTimestamp + timeoutMs;
+        path.pathResponseDeadline = sentTimestamp + timeoutMs;
 
         // The path may already be in the pending response list. Remove it and
         // add it again at the back to maintain the order of the list.
@@ -277,15 +278,14 @@ const PathInfo* QuicPathManager::onPathResponseReceived(
   // Only generate an RTT sample if the challenge was sent exactly once.
   // On retransmission we cannot tell which transmission the response is
   // for, so the measurement would be biased low.
-  if (path.firstChallengeSentTimestamp.has_value() &&
-      path.firstChallengeSentTimestamp == path.lastChallengeSentTimestamp) {
+  if (path.outstandingChallenges.size() == 1) {
     path.rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
-        Clock::now() - *path.firstChallengeSentTimestamp);
+        *path.pathValidationTime -
+        path.outstandingChallenges.front().sentTimestamp);
   }
 
-  path.outstandingChallengeData.reset();
-  path.firstChallengeSentTimestamp.reset();
-  path.lastChallengeSentTimestamp.reset();
+  path.challengePayloadToSend.reset();
+  path.outstandingChallenges.clear();
   path.pathResponseDeadline.reset();
 
   // Remove the path from the pending response list
@@ -339,9 +339,8 @@ void QuicPathManager::onPathValidationTimeoutExpired(TimePoint timeNow) {
       if (timeNow > *pathInfo.pathResponseDeadline) {
         // The path has timed out and failed validation
         pathInfo.status = PathStatus::NotValid;
-        pathInfo.outstandingChallengeData.reset();
-        pathInfo.firstChallengeSentTimestamp.reset();
-        pathInfo.lastChallengeSentTimestamp.reset();
+        pathInfo.challengePayloadToSend.reset();
+        pathInfo.outstandingChallenges.clear();
         pathInfo.pathResponseDeadline.reset();
 
         // Remove the path from the pending
@@ -521,7 +520,7 @@ void QuicPathManager::maybeReapUnusedPaths(bool force) {
     }
     if (!force &&
         (it.second.status == PathStatus::Validating ||
-         it.second.outstandingChallengeData)) {
+         it.second.challengePayloadToSend)) {
       // Besides force, the first condition covers the path after the path
       // challenge as been written. The second condition covers the path before
       // the path challenge has been written.

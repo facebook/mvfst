@@ -778,7 +778,7 @@ quic::Expected<void, QuicError> onConnectionMigration(
   }
 
   if (readPath->status != PathStatus::Validated &&
-      readPath->outstandingChallengeData.has_value() &&
+      readPath->challengePayloadToSend.has_value() &&
       !conn.pendingEvents.pathChallenges.contains(readPathId)) {
     // We're migrating to a path with an outstanding path challenge that we
     // haven't received a response for yet. We resend it here to give the path
@@ -788,7 +788,7 @@ quic::Expected<void, QuicError> onConnectionMigration(
     // a path response responding to a path probe.
     conn.pendingEvents.pathChallenges.emplace(
         readPath->id,
-        PathChallengeFrame(readPath->outstandingChallengeData.value()));
+        PathChallengeFrame(readPath->challengePayloadToSend.value()));
   }
 
   // If this is NAT rebinding, keep congestion state unchanged
