@@ -366,6 +366,23 @@ TEST_F(QuicPathManagerTest, OnPathResponseReceivedStaleResponse) {
   EXPECT_EQ(validatedPath, nullptr);
 }
 
+TEST_F(QuicPathManagerTest, OnPathResponseClearsPendingFlag) {
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType id = result.value();
+
+  connState_->pendingEvents.pathChallenges.insert(id);
+
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
+
+  PathResponseFrame response(challengeRes.value().pathData);
+  auto validatedPath = manager_->onPathResponseReceived(response, id);
+  ASSERT_NE(validatedPath, nullptr);
+  EXPECT_EQ(validatedPath->status, PathStatus::Validated);
+  EXPECT_FALSE(connState_->pendingEvents.pathChallenges.contains(id));
+}
+
 TEST_F(QuicPathManagerTest, OnPathResponseReceivedAfterRetransmit) {
   auto result = manager_->addPath(localAddr1_, peerAddr1_);
   ASSERT_TRUE(result.has_value());
@@ -450,6 +467,30 @@ TEST_F(QuicPathManagerTest, OnPathValidationTimeoutExpired) {
   EXPECT_EQ(path->status, PathStatus::NotValid);
   EXPECT_TRUE(path->outstandingChallenges.empty());
   EXPECT_FALSE(path->pathResponseDeadline.has_value());
+}
+
+TEST_F(QuicPathManagerTest, OnPathValidationTimeoutClearsPendingFlag) {
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  PathIdType id = result.value();
+
+  connState_->pendingEvents.pathChallenges.insert(id);
+
+  auto challengeRes = manager_->prepareChallengeForSending(id);
+  ASSERT_TRUE(challengeRes.has_value());
+
+  auto path = manager_->getPath(id);
+  ASSERT_NE(path, nullptr);
+  auto pathInfo = const_cast<PathInfo*>(path);
+  pathInfo->pathResponseDeadline =
+      std::chrono::steady_clock::now() - std::chrono::seconds(1);
+
+  manager_->onPathValidationTimeoutExpired();
+
+  path = manager_->getPath(id);
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->status, PathStatus::NotValid);
+  EXPECT_FALSE(connState_->pendingEvents.pathChallenges.contains(id));
 }
 
 // Callback Tests

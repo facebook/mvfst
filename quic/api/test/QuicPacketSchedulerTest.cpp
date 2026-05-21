@@ -3342,6 +3342,32 @@ TEST_P(QuicPacketSchedulerTest, WritePathValidationFramesSpecificPathAndOrder) {
       path->outstandingChallenges.front().pathData);
 }
 
+TEST_P(
+    QuicPacketSchedulerTest,
+    PathValidationSchedulerDoesNotSpinAfterValidation) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  auto pathIdRes = conn.pathManager->addPath(
+      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+  ASSERT_TRUE(pathIdRes.has_value());
+  auto pathId = pathIdRes.value();
+
+  conn.pendingEvents.pathChallenges.insert(pathId);
+
+  auto challengeRes = conn.pathManager->prepareChallengeForSending(pathId);
+  ASSERT_TRUE(challengeRes.has_value());
+  PathResponseFrame response(challengeRes.value().pathData);
+  ASSERT_NE(
+      conn.pathManager->onPathResponseReceived(response, pathId), nullptr);
+
+  PathValidationFrameScheduler scheduler(conn, pathId);
+  EXPECT_FALSE(scheduler.hasPendingPathValidationFrames());
+  auto builder = setupMockPacketBuilder();
+  EXPECT_FALSE(scheduler.writePathValidationFrames(*builder));
+  EXPECT_TRUE(builder->frames_.empty());
+}
+
 TEST_P(QuicPacketSchedulerTest, PathValidationSchedulerRespectsPathId) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());

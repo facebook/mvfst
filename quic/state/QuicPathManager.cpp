@@ -296,6 +296,8 @@ const PathInfo* QuicPathManager::onPathResponseReceived(
           pathsPendingResponse_.begin(), pathsPendingResponse_.end(), path.id),
       pathsPendingResponse_.end());
 
+  conn_.pendingEvents.pathChallenges.erase(path.id);
+
   // TODO: JBESHAY MIGRATION - Update qlog events to be path
   // specific
 
@@ -346,6 +348,8 @@ void QuicPathManager::onPathValidationTimeoutExpired(TimePoint timeNow) {
 
         // Remove the path from the pending
         it = pathsPendingResponse_.erase(it);
+
+        conn_.pendingEvents.pathChallenges.erase(pathId);
 
         QLOG(conn_, addPathValidationEvent, false);
 
