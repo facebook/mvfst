@@ -23,8 +23,14 @@ StatelessResetGenerator::StatelessResetGenerator(
     const std::string& addressStr)
     : addressStr_(std::move(addressStr)),
       hkdf_(fizz::openssl::createHkdf<fizz::Sha256>()) {
-  extractedSecret_ =
-      hkdf_.extract(kSalt, ByteRange(secret.data(), secret.size()));
+  fizz::Error err;
+  FIZZ_THROW_ON_ERROR(
+      hkdf_.extract(
+          extractedSecret_,
+          err,
+          kSalt,
+          ByteRange(secret.data(), secret.size())),
+      err);
 }
 
 StatelessResetToken StatelessResetGenerator::generateToken(

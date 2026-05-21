@@ -28,7 +28,9 @@ quic::Expected<BufPtr, QuicError> FizzCryptoFactory::makeInitialTrafficSecret(
   auto connIdRange = quic::ByteRange(
       clientDestinationConnId.data(), clientDestinationConnId.size());
   folly::StringPiece salt = getQuicVersionSalt(version);
-  auto initialSecret = deriver->hkdfExtract(salt, connIdRange);
+  std::vector<uint8_t> initialSecret;
+  FIZZ_THROW_ON_ERROR(
+      deriver->hkdfExtract(initialSecret, err, salt, connIdRange), err);
   fizz::Buf trafficSecret;
   FIZZ_THROW_ON_ERROR(
       deriver->expandLabel(
