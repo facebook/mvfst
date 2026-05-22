@@ -926,8 +926,9 @@ void QuicServerWorker::dispatchPacketData(
     QUIC_STATS(statsCallback_, onPacketForwarded);
   });
 
-  // helper fn to handle fwd-ing data to the transport
-  auto fwdNetworkDataToTransport = [&](QuicServerTransport* transport) {
+  // helper fn to handle fwd-ing data to the transport.
+  auto fwdNetworkDataToTransport = [&](std::shared_ptr<QuicServerTransport>
+                                           transport) {
     PROTO_OOPS_LOG_BUILDER_IF(
         !transport->getEventBase()->isInEventBaseThread() &&
             transport->getState(),
@@ -954,7 +955,7 @@ void QuicServerWorker::dispatchPacketData(
   if (cit != connectionIdMap_.end()) {
     MVVLOG(10) << "Found existing connection for CID=" << dstConnId.hex() << " "
                << *cit->second.get();
-    fwdNetworkDataToTransport(cit->second.get());
+    fwdNetworkDataToTransport(cit->second);
     return;
   }
 
@@ -976,7 +977,7 @@ void QuicServerWorker::dispatchPacketData(
   if (sit != sourceAddressMap_.end()) {
     MVVLOG(4) << "Found existing connection for client=" << client << " "
               << sit->second.get();
-    fwdNetworkDataToTransport(sit->second.get());
+    fwdNetworkDataToTransport(sit->second);
     return;
   }
 
@@ -1071,7 +1072,7 @@ void QuicServerWorker::dispatchPacketData(
     sendVersionNegotiationPacket(client, inv);
     return;
   }
-  fwdNetworkDataToTransport(transport.get());
+  fwdNetworkDataToTransport(transport);
 }
 
 void QuicServerWorker::sendResetPacket(
