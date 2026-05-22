@@ -945,6 +945,24 @@ void QuicServerWorker::dispatchPacketData(
       auto itr = pending0RttData_.find(dstConnId);
       if (itr != pending0RttData_.end()) {
         for (auto& data : itr->second) {
+          // Drop 0-RTT replays whose source peer differs from the
+          // current Initial: address change during handshake is not
+          // allowed
+          bool peerMismatch = false;
+          for (const auto& packet : data.getPackets()) {
+            if (!packet.peerAddress.has_value() ||
+                *packet.peerAddress != client) {
+              peerMismatch = true;
+              break;
+            }
+          }
+          if (peerMismatch) {
+            QUIC_STATS(
+                statsCallback_,
+                onPacketDropped,
+                PacketDropReason::PEER_ADDRESS_CHANGE);
+            continue;
+          }
           transport->onNetworkData(socket_->address(), std::move(data));
         }
         pending0RttData_.erase(itr);

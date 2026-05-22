@@ -711,6 +711,70 @@ TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {
   EXPECT_EQ(0, srcAddrMap.size());
 }
 
+TEST_F(QuicServerWorkerTest, Drop0RttReplayWithPeerMismatch) {
+  // Buffer 0-RTT from clientA for a CID before any Initial arrives, then
+  // send an Initial with the same CID from a different clientB (NAT
+  // rebind, network switch, etc.). The lambda's 0-RTT replay loop must
+  // drop the buffered 0-RTT instead of forwarding it to the transport,
+  // where it would trip the ServerStateMachine migration check and
+  // synchronously close the connection.
+  folly::SocketAddress clientA("1.2.3.4", 11111);
+  folly::SocketAddress clientB("5.6.7.8", 22222);
+  auto connId = getTestConnectionId(hostId_);
+  QuicVersion version = QuicVersion::MVFST;
+
+  // Step 1: 0-RTT from clientA. No transport for connId, so the worker
+  // buffers it in pending0RttData_[connId].
+  {
+    RoutingData routingData0Rtt(
+        HeaderForm::Long, false /*isInitial*/, true /*is0Rtt*/, connId, connId);
+    auto data0Rtt = createData(kMinInitialPacketSize);
+    EXPECT_CALL(*quicStats_, onZeroRttBuffered()).Times(1);
+    worker_->dispatchPacketData(
+        clientA,
+        std::move(routingData0Rtt),
+        NetworkData(data0Rtt->clone(), Clock::now(), 0),
+        version);
+  }
+
+  // Step 2: Initial from clientB for the same connId. Worker creates a
+  // new transport for clientB and runs the 0-RTT replay loop. The
+  // buffered 0-RTT (peer=clientA) must be dropped, not replayed.
+  {
+    RoutingData routingDataInit(
+        HeaderForm::Long, true /*isInitial*/, false /*is0Rtt*/, connId, connId);
+    auto dataInit = createData(kMinInitialPacketSize + 10);
+    expectConnectionCreation(clientB);
+    // The transport sees onNetworkData exactly once -- for the current
+    // Initial. The buffered 0-RTT (peer=clientA) must NOT reach it.
+    EXPECT_CALL(
+        *transport_,
+        onNetworkData(_, NetworkDataMatchesWithPeer(*dataInit, clientB)))
+        .Times(1);
+    // The mismatched buffered 0-RTT is dropped, recorded as
+    // PEER_ADDRESS_CHANGE in the worker's packet-drop stats.
+    PacketDropReason dropReason = PacketDropReason::PEER_ADDRESS_CHANGE;
+    EXPECT_CALL(*quicStats_, onPacketDropped(dropReason)).Times(1);
+
+    worker_->dispatchPacketData(
+        clientB,
+        std::move(routingDataInit),
+        NetworkData(dataInit->clone(), Clock::now(), 0),
+        version);
+    eventbase_.loopIgnoreKeepAlive();
+
+    const auto& addrMap = worker_->getSrcToTransportMap();
+    EXPECT_TRUE(addrMap.contains(std::make_pair(clientB, connId)));
+  }
+
+  // Cleanup at test teardown: worker destruction iterates remaining
+  // transports and unwinds their callbacks.
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr))
+      .Times(testing::AnyNumber());
+}
+
 TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto connId = getTestConnectionId(hostId_);
