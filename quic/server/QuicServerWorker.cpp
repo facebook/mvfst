@@ -461,73 +461,88 @@ void QuicServerWorker::onSocketReadable(QuicAsyncUDPSocket& sock) noexcept {
                                       transportSettings_.maxRecvPacketSize,
                                       uint64_t(kDefaultUDPReadBufferSize)) *
       numGROBuffers_;
-  const uint16_t numPackets = transportSettings_.maxRecvBatchSize;
+  const uint16_t batchSize = transportSettings_.maxRecvBatchSize;
+  const uint32_t maxPkts = transportSettings_.maxServerRecvPacketsPerLoop;
+  uint32_t totalRecvd = 0;
 
-  NetworkData networkData;
-  networkData.reserve(numPackets);
-  size_t totalData = 0;
+  // Drain up to maxPkts per EVB iteration. Each iteration issues one
+  // recvmmsg(2). We rely on level-triggered EV_READ to re-fire on the next
+  // EVB iteration if the socket still has data when we bail.
+  while (totalRecvd < maxPkts) {
+    const uint16_t numPackets = static_cast<uint16_t>(
+        std::min<uint32_t>(batchSize, maxPkts - totalRecvd));
+    NetworkData networkData;
+    networkData.reserve(numPackets);
+    size_t totalData = 0;
 
-  auto recvResult = sock.recvmmsgNetworkData(
-      readBufferSize, numPackets, networkData, totalData);
-  if (!recvResult.has_value()) {
-    onReadError(
-        folly::AsyncSocketException(
-            folly::AsyncSocketException::INTERNAL_ERROR,
-            recvResult.error().message));
-    return;
-  }
-  if (recvResult->maybeNoReadReason) {
-    switch (recvResult->maybeNoReadReason.value()) {
-      case NoReadReason::NONRETRIABLE_ERROR:
-        // pauseRead has already been called inside the wrapper.
-        onReadError(
-            folly::AsyncSocketException(
-                folly::AsyncSocketException::INTERNAL_ERROR,
-                "::recvmmsg() failed"));
-        return;
-      case NoReadReason::RETRIABLE_ERROR:
-      case NoReadReason::READ_OK:
-      case NoReadReason::EMPTY_DATA:
-      case NoReadReason::TRUNCATED:
-      case NoReadReason::STALE_DATA:
-        return;
+    auto recvResult = sock.recvmmsgNetworkData(
+        readBufferSize, numPackets, networkData, totalData);
+    if (!recvResult.has_value()) {
+      onReadError(
+          folly::AsyncSocketException(
+              folly::AsyncSocketException::INTERNAL_ERROR,
+              recvResult.error().message));
+      return;
     }
-  }
-
-  const auto batchReceiveTime = Clock::now();
-  for (auto& udpPacket : std::move(networkData).movePackets()) {
-    if (udpPacket.buf.empty()) {
-      continue;
-    }
-    auto packetReceiveTime = batchReceiveTime;
-    if (udpPacket.timings.maybeSoftwareTs) {
-      auto packetRxEpochUs =
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              udpPacket.timings.maybeSoftwareTs->rawDuration);
-      if (packetRxEpochUs != 0us) {
-        auto now = std::chrono::system_clock::now();
-        auto nowEpochUs = std::chrono::duration_cast<std::chrono::microseconds>(
-            now.time_since_epoch());
-        auto rxDelayUs = nowEpochUs - packetRxEpochUs;
-        if (rxDelayUs >= 0us) {
-          packetReceiveTime -= rxDelayUs;
-          QUIC_STATS(statsCallback_, onRxDelaySample, rxDelayUs.count());
-        } else {
-          MVVLOG(10) << "Negative rx delay: " << rxDelayUs.count() << "us";
-        }
+    if (recvResult->maybeNoReadReason) {
+      switch (recvResult->maybeNoReadReason.value()) {
+        case NoReadReason::NONRETRIABLE_ERROR:
+          // pauseRead has already been called inside the wrapper.
+          onReadError(
+              folly::AsyncSocketException(
+                  folly::AsyncSocketException::INTERNAL_ERROR,
+                  "::recvmmsg() failed"));
+          return;
+        case NoReadReason::RETRIABLE_ERROR:
+        case NoReadReason::READ_OK:
+        case NoReadReason::EMPTY_DATA:
+        case NoReadReason::TRUNCATED:
+        case NoReadReason::STALE_DATA:
+          return;
       }
     }
-    if (packetReceiveTime < largestPacketReceiveTime_) {
-      packetReceiveTime = batchReceiveTime;
+
+    const auto batchReceiveTime = Clock::now();
+    auto packets = std::move(networkData).movePackets();
+    if (packets.empty()) {
+      return;
     }
-    largestPacketReceiveTime_ =
-        std::max(largestPacketReceiveTime_, packetReceiveTime);
-    udpPacket.timings.receiveTimePoint = packetReceiveTime;
+    for (auto& udpPacket : packets) {
+      if (udpPacket.buf.empty()) {
+        continue;
+      }
+      auto packetReceiveTime = batchReceiveTime;
+      if (udpPacket.timings.maybeSoftwareTs) {
+        auto packetRxEpochUs =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                udpPacket.timings.maybeSoftwareTs->rawDuration);
+        if (packetRxEpochUs != 0us) {
+          auto now = std::chrono::system_clock::now();
+          auto nowEpochUs =
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  now.time_since_epoch());
+          auto rxDelayUs = nowEpochUs - packetRxEpochUs;
+          if (rxDelayUs >= 0us) {
+            packetReceiveTime -= rxDelayUs;
+            QUIC_STATS(statsCallback_, onRxDelaySample, rxDelayUs.count());
+          } else {
+            MVVLOG(10) << "Negative rx delay: " << rxDelayUs.count() << "us";
+          }
+        }
+      }
+      if (packetReceiveTime < largestPacketReceiveTime_) {
+        packetReceiveTime = batchReceiveTime;
+      }
+      largestPacketReceiveTime_ =
+          std::max(largestPacketReceiveTime_, packetReceiveTime);
+      udpPacket.timings.receiveTimePoint = packetReceiveTime;
 
-    QUIC_STATS(statsCallback_, onPacketReceived);
-    QUIC_STATS(statsCallback_, onRead, udpPacket.buf.chainLength());
+      QUIC_STATS(statsCallback_, onPacketReceived);
+      QUIC_STATS(statsCallback_, onRead, udpPacket.buf.chainLength());
 
-    handleNetworkData(udpPacket);
+      handleNetworkData(udpPacket);
+    }
+    totalRecvd += static_cast<uint32_t>(packets.size());
   }
 }
 
