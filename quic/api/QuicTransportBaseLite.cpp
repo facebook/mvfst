@@ -305,6 +305,8 @@ void QuicTransportBaseLite::onNetworkData(
 
     conn_->lossState.totalBytesRecvd += networkData.getTotalData();
     auto originalAckVersion = currentAckStateVersion(*conn_);
+    auto originalNoAckPacketCount =
+        conn_->readDebugState.processedNoAckPacketCount;
 
     // handle PacketsReceivedEvent if requested by observers
     SOCKET_OBSERVER_IF(
@@ -360,9 +362,14 @@ void QuicTransportBaseLite::onNetworkData(
       processCallbacksAfterNetworkData();
     }
     if (closeState_ != CloseState::CLOSED) {
-      if (currentAckStateVersion(*conn_) != originalAckVersion) {
+      bool ackProgress = currentAckStateVersion(*conn_) != originalAckVersion;
+      bool noAckProgress = conn_->readDebugState.processedNoAckPacketCount !=
+          originalNoAckPacketCount;
+      if (ackProgress) {
         setIdleTimer();
         conn_->receivedNewPacketBeforeWrite = true;
+      }
+      if (ackProgress || noAckProgress) {
         if (conn_->loopDetectorCallback) {
           conn_->readDebugState.noReadReason = NoReadReason::READ_OK;
           conn_->readDebugState.loopCount = 0;

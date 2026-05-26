@@ -868,6 +868,7 @@ static void handleCipherUnavailable(
     QuicServerConnectionState& conn,
     size_t packetSize,
     ServerEvents::ReadData& readData) {
+  ++conn.readDebugState.processedNoAckPacketCount;
   if (!originalData->packet || originalData->packet->empty()) {
     MVVLOG(10) << "drop because no data " << conn;
     QLOG(conn, addPacketDrop, packetSize, kNoData);
@@ -1876,6 +1877,7 @@ quic::Expected<void, QuicError> onServerReadDataFromClosed(
       "quic_server_state_machine",
       "invariant_violation: closed read data processed outside closed state");
   MVCHECK_EQ(conn.state, ServerState::Closed);
+  ++conn.readDebugState.processedNoAckPacketCount;
   BufQueue& udpData = readData.udpPacket.buf;
   auto packetSize = udpData.empty() ? 0 : udpData.chainLength();
   if (!conn.readCodec) {

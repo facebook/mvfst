@@ -614,6 +614,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   struct ReadDebugState {
     uint64_t loopCount{0};
     NoReadReason noReadReason{NoReadReason::READ_OK};
+    uint64_t processedNoAckPacketCount{0};
   };
 
   WriteDebugState writeDebugState;
