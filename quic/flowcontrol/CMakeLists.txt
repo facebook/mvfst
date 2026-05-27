@@ -14,6 +14,7 @@ mvfst_add_library(mvfst_flowcontrol_flow_control
     mvfst_exception
     mvfst_logging_oops_logger
     mvfst_state_connection_oops_fields
+    fmt::fmt
   EXPORTED_DEPS
     mvfst_codec_types
     mvfst_common_expected

@@ -65,8 +65,8 @@ quic::Expected<void, QuicError> sendStopSendingSMHandler(
           isBidirectionalStream(stream.id) ||
           isSendingStream(stream.conn.nodeType, stream.id));
       if (stream.conn.nodeType == QuicNodeType::Server &&
-          getSendStreamFlowControlBytesWire(stream) == 0 &&
-          !stream.finalWriteOffset) {
+          !stream.finalWriteOffset &&
+          getSendStreamFlowControlBytesWire(stream) == 0) {
         MVVLOG(3) << "Client gives up a flow control blocked stream";
       }
       stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);

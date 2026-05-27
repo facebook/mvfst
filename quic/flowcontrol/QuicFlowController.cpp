@@ -8,6 +8,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 
+#include <fmt/format.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 
@@ -343,7 +344,11 @@ quic::Expected<void, QuicError> updateFlowControlOnWriteToSocket(
           .setStreamId(stream.id)
           .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
       "quic_flow_controller",
-      "stream buffer underflow after socket write");
+      fmt::format(
+          "stream buffer underflow after socket write: "
+          "sumCurStreamBufferLen={} length={}",
+          stream.conn.flowControlState.sumCurStreamBufferLen,
+          length));
   DCHECK_GE(stream.conn.flowControlState.sumCurStreamBufferLen, length);
   stream.conn.flowControlState.sumCurStreamBufferLen -= length;
   if (stream.conn.flowControlState.sumCurWriteOffset ==
@@ -488,21 +493,27 @@ void handleStreamBlocked(QuicStreamState& stream) {
 }
 
 uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
+  const auto peerAdvertisedMaxOffset =
+      stream.flowControlState.peerAdvertisedMaxOffset;
+  const auto nextOffsetToWrite = stream.nextOffsetToWrite();
   PROTO_OOPS_LOG_BUILDER_IF(
       stream.conn.nodeType == QuicNodeType::Server &&
-          stream.flowControlState.peerAdvertisedMaxOffset <
-              stream.nextOffsetToWrite(),
+          peerAdvertisedMaxOffset < nextOffsetToWrite,
       stream.conn.oopsLogger,
       proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
           .setStreamId(stream.id)
           .setErrorCode(static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
       "quic_flow_controller",
-      "send stream flow control budget underflow");
-  DCHECK_GE(
-      stream.flowControlState.peerAdvertisedMaxOffset,
-      stream.nextOffsetToWrite());
-  return stream.flowControlState.peerAdvertisedMaxOffset -
-      stream.nextOffsetToWrite();
+      fmt::format(
+          "send stream flow control budget underflow: "
+          "peerAdvertisedMaxOffset={} nextOffsetToWrite={} "
+          "finalWriteOffset={}",
+          peerAdvertisedMaxOffset,
+          nextOffsetToWrite,
+          stream.finalWriteOffset ? fmt::format("{}", *stream.finalWriteOffset)
+                                  : std::string("none")));
+  DCHECK_GE(peerAdvertisedMaxOffset, nextOffsetToWrite);
+  return peerAdvertisedMaxOffset - nextOffsetToWrite;
 }
 
 uint64_t getSendStreamFlowControlBytesAPI(const QuicStreamState& stream) {
@@ -516,20 +527,23 @@ uint64_t getSendStreamFlowControlBytesAPI(const QuicStreamState& stream) {
 }
 
 uint64_t getSendConnFlowControlBytesWire(const QuicConnectionStateBase& conn) {
+  const auto peerAdvertisedMaxOffset =
+      conn.flowControlState.peerAdvertisedMaxOffset;
+  const auto sumCurWriteOffset = conn.flowControlState.sumCurWriteOffset;
   PROTO_OOPS_LOG_BUILDER_IF(
       conn.nodeType == QuicNodeType::Server &&
-          conn.flowControlState.peerAdvertisedMaxOffset <
-              conn.flowControlState.sumCurWriteOffset,
+          peerAdvertisedMaxOffset < sumCurWriteOffset,
       conn.oopsLogger,
       proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
           static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
       "quic_flow_controller",
-      "send conn flow control budget underflow");
-  DCHECK_GE(
-      conn.flowControlState.peerAdvertisedMaxOffset,
-      conn.flowControlState.sumCurWriteOffset);
-  return conn.flowControlState.peerAdvertisedMaxOffset -
-      conn.flowControlState.sumCurWriteOffset;
+      fmt::format(
+          "send conn flow control budget underflow: "
+          "peerAdvertisedMaxOffset={} sumCurWriteOffset={}",
+          peerAdvertisedMaxOffset,
+          sumCurWriteOffset));
+  DCHECK_GE(peerAdvertisedMaxOffset, sumCurWriteOffset);
+  return peerAdvertisedMaxOffset - sumCurWriteOffset;
 }
 
 uint64_t getSendConnFlowControlBytesAPI(const QuicConnectionStateBase& conn) {
@@ -542,45 +556,50 @@ uint64_t getSendConnFlowControlBytesAPI(const QuicConnectionStateBase& conn) {
 }
 
 uint64_t getRecvStreamFlowControlBytes(const QuicStreamState& stream) {
-  if (stream.flowControlState.advertisedMaxOffset < stream.currentReadOffset) {
+  const auto advertisedMaxOffset = stream.flowControlState.advertisedMaxOffset;
+  const auto currentReadOffset = stream.currentReadOffset;
+  if (advertisedMaxOffset < currentReadOffset) {
     // It's possible for current read offset to exceed advertised offset,
     // because of the way we handle eofs with current read offset. We increment
     // read offset to be 1 over the FIN offset to indicate that we have read the
     // FIN.
     PROTO_OOPS_LOG_BUILDER_IF(
         stream.conn.nodeType == QuicNodeType::Server &&
-            stream.currentReadOffset !=
-                stream.flowControlState.advertisedMaxOffset + 1,
+            currentReadOffset != advertisedMaxOffset + 1,
         stream.conn.oopsLogger,
         proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
             .setStreamId(stream.id)
             .setErrorCode(
                 static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
         "quic_flow_controller",
-        "recv stream flow control budget underflow");
-    DCHECK_EQ(
-        stream.currentReadOffset,
-        stream.flowControlState.advertisedMaxOffset + 1);
+        fmt::format(
+            "recv stream flow control budget underflow: "
+            "advertisedMaxOffset={} currentReadOffset={}",
+            advertisedMaxOffset,
+            currentReadOffset));
+    DCHECK_EQ(currentReadOffset, advertisedMaxOffset + 1);
     return 0;
   }
-  return stream.flowControlState.advertisedMaxOffset - stream.currentReadOffset;
+  return advertisedMaxOffset - currentReadOffset;
 }
 
 uint64_t getRecvConnFlowControlBytes(const QuicConnectionStateBase& conn) {
+  const auto advertisedMaxOffset = conn.flowControlState.advertisedMaxOffset;
+  const auto sumCurReadOffset = conn.flowControlState.sumCurReadOffset;
   PROTO_OOPS_LOG_BUILDER_IF(
       conn.nodeType == QuicNodeType::Server &&
-          conn.flowControlState.advertisedMaxOffset <
-              conn.flowControlState.sumCurReadOffset,
+          advertisedMaxOffset < sumCurReadOffset,
       conn.oopsLogger,
       proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
           static_cast<uint64_t>(LocalErrorCode::INTERNAL_ERROR)),
       "quic_flow_controller",
-      "recv conn flow control budget underflow");
-  DCHECK_GE(
-      conn.flowControlState.advertisedMaxOffset,
-      conn.flowControlState.sumCurReadOffset);
-  return conn.flowControlState.advertisedMaxOffset -
-      conn.flowControlState.sumCurReadOffset;
+      fmt::format(
+          "recv conn flow control budget underflow: "
+          "advertisedMaxOffset={} sumCurReadOffset={}",
+          advertisedMaxOffset,
+          sumCurReadOffset));
+  DCHECK_GE(advertisedMaxOffset, sumCurReadOffset);
+  return advertisedMaxOffset - sumCurReadOffset;
 }
 
 void onConnWindowUpdateSent(
