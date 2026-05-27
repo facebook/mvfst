@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
+load("@fbsource//tools/build_defs/testinfra:network_access_utils.bzl", "network_access_utils")
 
 oncall("traffic_protocols")
 
@@ -18,6 +19,7 @@ mvfst_cpp_test(
     srcs = [
         "QLoggerTest.cpp",
     ],
+    network_access = network_access_utils.none(),
     deps = [
         "//folly:dynamic",
         "//folly:file_util",

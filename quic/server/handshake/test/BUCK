@@ -1,4 +1,5 @@
 load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("@fbsource//tools/build_defs/testinfra:network_access_utils.bzl", "network_access_utils")
 
 oncall("traffic_protocols")
 
@@ -7,6 +8,7 @@ fb_dirsync_cpp_unittest(
     srcs = [
         "ServerHandshakeTest.cpp",
     ],
+    network_access = network_access_utils.none(),
     deps = [
         "fbsource//third-party/googletest:gmock",
         "fbsource//third-party/googletest:gtest",
@@ -52,6 +54,7 @@ fb_dirsync_cpp_unittest(
     srcs = [
         "AppTokenTest.cpp",
     ],
+    network_access = network_access_utils.none(),
     deps = [
         "fbsource//third-party/googletest:gtest",
         "//quic:constants",
@@ -65,6 +68,7 @@ fb_dirsync_cpp_unittest(
     srcs = [
         "DefaultAppTokenValidatorTest.cpp",
     ],
+    network_access = network_access_utils.none(),
     deps = [
         "fbsource//third-party/googletest:gmock",
         "fbsource//third-party/googletest:gtest",
@@ -97,6 +101,7 @@ fb_dirsync_cpp_unittest(
     srcs = [
         "RetryTokenGeneratorTest.cpp",
     ],
+    network_access = network_access_utils.none(),
     deps = [
         "//folly:random",
         "//folly/portability:gtest",

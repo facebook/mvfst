@@ -1,4 +1,5 @@
 load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_unittest.bzl", "fb_dirsync_cpp_unittest")
+load("@fbsource//tools/build_defs/testinfra:network_access_utils.bzl", "network_access_utils")
 
 oncall("traffic_protocols")
 
@@ -7,6 +8,7 @@ fb_dirsync_cpp_unittest(
     srcs = [
         "QuicAsyncTransportServerTest.cpp",
     ],
+    network_access = network_access_utils.all(),
     deps = [
         "//folly/futures:core",
         "//folly/io/async:async_transport",

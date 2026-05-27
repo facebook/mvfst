@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_benchmark", "mvfst_cpp_test")
+load("@fbsource//tools/build_defs/testinfra:network_access_utils.bzl", "network_access_utils")
 
 # Common library
 
@@ -8,6 +9,7 @@ mvfst_cpp_test(
     name = "priority_queue_test",
     srcs = ["PriorityQueueTest.cpp"],
     headers = [],
+    network_access = network_access_utils.none(),
     deps = [
         "//folly/portability:gmock",
         "//folly/portability:gtest",
@@ -19,6 +21,7 @@ mvfst_cpp_test(
     name = "round_robin_test",
     srcs = ["RoundRobinTests.cpp"],
     headers = [],
+    network_access = network_access_utils.none(),
     deps = [
         "//folly/portability:gmock",
         "//folly/portability:gtest",
@@ -30,6 +33,7 @@ mvfst_cpp_test(
     name = "http_priority_queue_test",
     srcs = ["HTTPPriorityQueueTest.cpp"],
     headers = [],
+    network_access = network_access_utils.none(),
     deps = [
         "//folly/portability:gmock",
         "//folly/portability:gtest",
