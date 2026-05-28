@@ -33,7 +33,7 @@ class StreamReadCallback {
 };
 
 /**
- * Callback to be invoked when the quic transport recieves a stop_sending frame
+ * Callback to be invoked when the quic transport receives a stop_sending frame
  * for a given stream id. Note that this may never be invoked if a stream is
  * considered bidirectionally closed w/o having received a stop_sending frame
  * from the peer.
