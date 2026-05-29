@@ -1325,8 +1325,8 @@ TEST_F(QuicStreamFunctionsTestBase, IsSendingStream) {
       FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState(
       FizzServerQuicHandshakeContext::Builder().build());
-  QuicNodeType nodeType;
-  StreamId id;
+  QuicNodeType nodeType{};
+  StreamId id{};
 
   QuicStreamState biClientStream(0, clientState);
   nodeType = biClientStream.conn.nodeType;
@@ -1354,8 +1354,8 @@ TEST_F(QuicStreamFunctionsTestBase, IsReceivingStream) {
       FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState(
       FizzServerQuicHandshakeContext::Builder().build());
-  QuicNodeType nodeType;
-  StreamId id;
+  QuicNodeType nodeType{};
+  StreamId id{};
 
   QuicStreamState biClientStream(0, clientState);
   nodeType = biClientStream.conn.nodeType;
