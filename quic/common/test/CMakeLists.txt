@@ -85,3 +85,11 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   mvfst_test_utils
   ${BOOST_LIBRARIES}
 )
+
+quic_add_test(TARGET EventFdQueueTest SOURCES
+  EventFdQueueTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_common_event_fd_queue
+  mvfst_common_events_folly_eventbase
+)
