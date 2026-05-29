@@ -9,8 +9,7 @@
 
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/common/test/TestUtils.h>
-#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/common/test/TestTransportUtils.h>
 
 namespace quic {
 
@@ -24,8 +23,7 @@ class TestQuicTransport
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
       : QuicTransportBaseLite(evb, std::move(socket)), QuicTransportBase(evb, nullptr /* Initialized through the QuicTransportBaseLite constructor */), observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
-    conn_.reset(new QuicServerConnectionState(
-        FizzServerQuicHandshakeContext::Builder().build()));
+    conn_.reset(test::createTestQuicConnectionState().release());
     conn_->clientConnectionId = ConnectionId::createAndMaybeCrash({9, 8, 7, 6});
     conn_->serverConnectionId = ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
     conn_->version = QuicVersion::MVFST;
@@ -125,8 +123,8 @@ class TestQuicTransport
 
   void unbindConnection() override {}
 
-  QuicServerConnectionState& getConnectionState() {
-    return *dynamic_cast<QuicServerConnectionState*>(conn_.get());
+  QuicConnectionStateBase& getConnectionState() {
+    return *conn_;
   }
 
   auto getAckTimeout() {

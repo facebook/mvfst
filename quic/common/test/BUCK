@@ -99,6 +99,29 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "test_transport_utils",
+    srcs = [
+        "TestTransportUtils.cpp",
+    ],
+    headers = [
+        "TestTransportUtils.h",
+    ],
+    deps = [
+        "//quic/common:string_utils",
+        "//quic/congestion_control:cubic",
+        "//quic/flowcontrol:flow_control",
+    ],
+    exported_deps = [
+        "//folly/portability:gmock",
+        "//quic/common:buf_util",
+        "//quic/common:expected",
+        "//quic/common:mvfst_logging",
+        "//quic/handshake/test:mocks",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
     name = "test_utils",
     srcs = [
         "TestUtils.cpp",
@@ -125,6 +148,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         ":test_packet_builders",
+        ":test_transport_utils",
         "//fizz/client:fizz_client_context",
         "//fizz/server:fizz_server_context",
         "//quic/api:quic_batch_writer",

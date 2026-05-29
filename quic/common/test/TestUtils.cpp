@@ -283,18 +283,6 @@ void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx) {
   ctx.setCertManager(std::move(certManager));
 }
 
-std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead) {
-  return createNoOpAeadImpl<MockAead>(cipherOverhead);
-}
-
-quic::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
-createNoOpHeaderCipher() {
-  auto headerCipher = std::make_unique<NiceMock<MockPacketNumberCipher>>();
-  ON_CALL(*headerCipher, mask(_)).WillByDefault(Return(HeaderProtectionMask{}));
-  ON_CALL(*headerCipher, keyLength()).WillByDefault(Return(16));
-  return headerCipher;
-}
-
 RegularQuicPacketBuilder::Packet createStreamPacket(
     ConnectionId srcConnId,
     ConnectionId dstConnId,
@@ -752,17 +740,6 @@ RegularQuicWritePacket createPacketWithPaddingFrames() {
   return packet;
 }
 
-void initializePathManagerState(QuicConnectionStateBase& conn) {
-  if (!conn.pathManager) {
-    conn.pathManager = std::make_unique<QuicPathManager>(conn);
-  }
-  auto addPathRes = conn.pathManager->addValidatedPath(
-      folly::SocketAddress("::1", 12345), conn.peerAddress);
-  CHECK(!addPathRes.hasError())
-      << "Failed to add validated path: " << addPathRes.error();
-  conn.currentPathId = addPathRes.value();
-}
-
 std::vector<int> getQLogEventIndices(
     QLogEventType type,
     const std::shared_ptr<FileQLogger>& q) {
@@ -872,18 +849,6 @@ ssize_t TestPacketBatchWriter::write(
     QuicAsyncUDPSocket& /*unused*/,
     const folly::SocketAddress& /*unused*/) {
   return bufSize_;
-}
-
-TrafficKey getQuicTestKey() {
-  TrafficKey testKey;
-  auto keyOpt = quic::unhexlify("000102030405060708090A0B0C0D0E0F");
-  CHECK(keyOpt.has_value()) << "Failed to unhexlify test key";
-  testKey.key = folly::IOBuf::copyBuffer(keyOpt.value());
-
-  auto ivOpt = quic::unhexlify("000102030405060708090A0B");
-  CHECK(ivOpt.has_value()) << "Failed to unhexlify test IV";
-  testKey.iv = folly::IOBuf::copyBuffer(ivOpt.value());
-  return testKey;
 }
 
 std::unique_ptr<folly::IOBuf> getProtectionKey() {

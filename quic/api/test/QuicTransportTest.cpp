@@ -23,7 +23,6 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/priority/HTTPPriorityQueue.h>
-#include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
@@ -190,7 +189,7 @@ RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
   return packet;
 }
 
-void dropPackets(QuicServerConnectionState& conn) {
+void dropPackets(QuicConnectionStateBase& conn) {
   for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {
       const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
@@ -220,7 +219,7 @@ void dropPackets(QuicServerConnectionState& conn) {
 // Helper function to verify the data of buffer is written to outstanding
 // packets
 void verifyCorrectness(
-    const QuicServerConnectionState& conn,
+    const QuicConnectionStateBase& conn,
     size_t originalWriteOffset,
     StreamId id,
     const folly::IOBuf& expected,

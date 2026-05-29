@@ -70,7 +70,6 @@ mvfst_cpp_test(
         "//quic/handshake/test:mocks",
         "//quic/logging/test:mocks",
         "//quic/priority:http_priority_queue",
-        "//quic/server/state:server",
         "//quic/state:stream_functions",
         "//quic/state/stream:stream",
         "//quic/state/test:mocks",
@@ -253,7 +252,6 @@ mvfst_cpp_library(
     exported_deps = [
         "//quic/api:transport",
         "//quic/api:transport_helpers",
-        "//quic/common/test:test_utils",
-        "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/common/test:test_transport_utils",
     ],
 )

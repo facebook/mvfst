@@ -12,6 +12,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/test/TestPacketBuilders.h>
+#include <quic/common/test/TestTransportUtils.h>
 #include <quic/fizz/client/handshake/QuicPskCache.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
@@ -150,8 +151,6 @@ std::shared_ptr<fizz::server::FizzServerContext> createServerCtx();
 
 void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx);
 
-TrafficKey getQuicTestKey();
-
 void setupZeroRttOnServerCtx(
     fizz::server::FizzServerContext& serverCtx,
     const QuicCachedPsk& cachedPsk);
@@ -159,45 +158,6 @@ void setupZeroRttOnServerCtx(
 QuicCachedPsk setupZeroRttOnClientCtx(
     fizz::client::FizzClientContext& clientCtx,
     std::string hostname);
-
-template <class T>
-std::unique_ptr<T> createNoOpAeadImpl(uint64_t cipherOverhead = 0) {
-  // Fake that the handshake has already occurred
-  auto aead = std::make_unique<testing::NiceMock<T>>();
-  ON_CALL(*aead, _inplaceEncrypt(testing::_, testing::_, testing::_))
-      .WillByDefault(testing::Invoke([&](auto& buf, auto, auto) {
-        if (buf) {
-          return std::move(buf);
-        } else {
-          return BufHelpers::create(0);
-        }
-      }));
-  // Fake that the handshake has already occurred and fix the keys.
-  ON_CALL(*aead, _decrypt(testing::_, testing::_, testing::_))
-      .WillByDefault(
-          testing::Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
-  ON_CALL(*aead, _tryDecrypt(testing::_, testing::_, testing::_))
-      .WillByDefault(
-          testing::Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
-  ON_CALL(*aead, getCipherOverhead())
-      .WillByDefault(testing::Return(cipherOverhead));
-  ON_CALL(*aead, getKey()).WillByDefault(testing::Invoke([]() {
-    return getQuicTestKey();
-  }));
-  return aead;
-}
-
-std::unique_ptr<MockAead> createNoOpAead(uint64_t cipherOverhead = 0);
-
-quic::Expected<std::unique_ptr<MockPacketNumberCipher>, QuicError>
-createNoOpHeaderCipher();
-
-// For backward compatibility with existing code
-inline std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipherNoThrow() {
-  auto result = createNoOpHeaderCipher();
-  CHECK(!result.hasError()) << "Failed to create header cipher";
-  return std::move(result.value());
-}
 
 uint64_t computeExpectedDelay(
     std::chrono::microseconds ackDelay,
@@ -297,8 +257,6 @@ VersionNegotiationPacket createVersionNegotiationPacket();
 RegularQuicWritePacket createPacketWithAckFrames();
 
 RegularQuicWritePacket createPacketWithPaddingFrames();
-
-void initializePathManagerState(QuicConnectionStateBase& conn);
 
 // Helper function which takes in a specific event type and fetches all the
 // instances of that type in QLogger
