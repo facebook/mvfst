@@ -3,10 +3,10 @@ load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
 oncall("traffic_protocols")
 
 mvfst_cpp_library(
-    name = "mocks",
+    name = "api_mocks",
     headers = [
+        "ApiMocks.h",
         "MockQuicSocket.h",
-        "Mocks.h",
     ],
     exported_deps = [
         "//folly/io/async:async_base",
@@ -15,12 +15,24 @@ mvfst_cpp_library(
         "//quic/api:loop_detector_callback",
         "//quic/api:quic_callbacks",
         "//quic/api:transport",
+        "//quic/api:transport_helpers",
         "//quic/codec:types",
+        "//quic/state:quic_state_machine",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    exported_deps = [
+        ":api_mocks",
+        "//folly/portability:gmock",
         "//quic/common:network_data",
         "//quic/common/events:folly_eventbase",
         "//quic/common/events:quic_timer",
         "//quic/server:server",
-        "//quic/state:quic_state_machine",
     ],
 )
 
@@ -30,6 +42,7 @@ mvfst_cpp_test(
         "QuicSocketTest.cpp",
     ],
     deps = [
+        ":api_mocks",
         ":mocks",
         "//quic/api:transport",
     ],

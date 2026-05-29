@@ -5,7 +5,9 @@
 
 # Always install this header, even when not building tests.
 # It can be used by dependent projects to build their own tests
-install(FILES MockQuicSocket.h Mocks.h DESTINATION include/quic/api/test)
+install(
+  FILES ApiMocks.h MockQuicSocket.h Mocks.h
+  DESTINATION include/quic/api/test)
 
 # Header-only mocks library for downstream test projects
 mvfst_add_library(mvfst_api_test_mocks
