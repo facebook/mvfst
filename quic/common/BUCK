@@ -12,7 +12,9 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:macos": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
         "ovr_config//os/constraints:windows": {"MvfstCheck.h": "facebook/MvfstCheck-mobile.h"},  # @fb-only
     }),
-    exported_deps = select({
+    exported_deps = [
+        "//quic:logging_config",
+    ] + select({
         "DEFAULT": ["fbsource//third-party/glog:glog"],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
@@ -44,6 +46,8 @@ mvfst_cpp_library(
     exported_deps = [
         "fbsource//third-party/glog:glog",
         ":mvfst_check",
+        "//folly/logging:logging",
+        "//quic:logging_config",
     ],
 )
 
