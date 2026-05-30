@@ -206,7 +206,11 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
 }
 
 void QuicAsyncUDPSocketImpl::RecvmmsgStorage::resize(size_t numPackets) {
-  if (msgs.size() != numPackets) {
+  // Grow-only: shrinking would destroy persistent readBuffer/iovec/msg_hdr
+  // setup in the tail, which the next larger call would have to re-allocate
+  // and re-init. Callers only ever use the first numPackets entries, so an
+  // oversized vector is harmless.
+  if (msgs.size() < numPackets) {
     msgs.resize(numPackets);
     impl_.resize(numPackets);
   }
