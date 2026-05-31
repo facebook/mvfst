@@ -291,7 +291,8 @@ class InstallSysDepsCmd(ProjectCmdBase):
                     ]
                     + packages
                 )
-                cmd_argss.append(["pip", "install", "pex"])
+                cmd_argss.append(["pipx", "ensurepath"])
+                cmd_argss.append(["pipx", "install", "pex"])
         elif manager == "homebrew":
             packages = sorted(set(all_packages["homebrew"]))
             if packages:

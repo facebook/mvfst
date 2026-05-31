@@ -27,6 +27,9 @@ fizz
 [dependencies.all(test=on, not(os=windows))]
 googletest
 
+[debs]
+pipx
+
 [shipit.pathmap]
 fbcode/quic/public_root = .
 fbcode/quic = quic

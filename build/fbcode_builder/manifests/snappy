@@ -20,6 +20,7 @@ sha256 = d0ce758440920c0e636579da02092296a64aed5a8296e1175fdf1783a8440082
 [build]
 builder = cmake
 subdir = snappy-27ab5f7f518430a021239bc26a5b2fd64affbc7b
+patchfile = snappy_keep_rtti.patch
 
 [cmake.defines]
 SNAPPY_BUILD_TESTS = OFF
