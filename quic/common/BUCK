@@ -221,7 +221,6 @@ mvfst_cpp_library(
         "TimeUtil.h",
     ],
     exported_deps = [
-        "//folly:traits",
         "//quic:constants",
     ],
 )

@@ -119,7 +119,6 @@ mvfst_add_library(mvfst_common_time_points
 mvfst_add_library(mvfst_common_time_util
   EXPORTED_DEPS
     mvfst_constants
-    Folly::folly_traits
 )
 
 mvfst_add_library(mvfst_common_transport_knobs

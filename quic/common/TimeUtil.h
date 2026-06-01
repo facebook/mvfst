@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <folly/Traits.h>
 #include <quic/QuicConstants.h>
 #include <chrono>
+#include <type_traits>
 #include <utility>
 
 namespace quic {
@@ -29,7 +29,7 @@ T timeMax(T&& arg) {
  * Returns the min of all the types that are passed in
  */
 template <class T1, class... Args>
-folly::remove_cvref_t<T1> timeMin(T1&& arg1, Args&&... args) {
+std::remove_cvref_t<T1> timeMin(T1&& arg1, Args&&... args) {
   auto min = timeMin(std::forward<Args>(args)...);
   if (arg1 < min) {
     return arg1;
@@ -41,7 +41,7 @@ folly::remove_cvref_t<T1> timeMin(T1&& arg1, Args&&... args) {
  * Returns the max of all the types that are passed in
  */
 template <class T1, class... Args>
-folly::remove_cvref_t<T1> timeMax(T1&& arg1, Args&&... args) {
+std::remove_cvref_t<T1> timeMax(T1&& arg1, Args&&... args) {
   auto max = timeMax(std::forward<Args>(args)...);
   if (arg1 > max) {
     return arg1;
