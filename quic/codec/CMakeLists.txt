@@ -29,7 +29,6 @@ mvfst_add_library(mvfst_codec_types
     mvfst_constants
     mvfst_exception
     mvfst_folly_utils
-    Folly::folly_hash_hash
     Folly::folly_io_iobuf
     Folly::folly_lang_bits
     Folly::folly_network_address

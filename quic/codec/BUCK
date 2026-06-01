@@ -24,7 +24,6 @@ mvfst_cpp_library(
     exported_deps = [
         ":packet_number",
         "//folly:network_address",
-        "//folly/hash:hash",
         "//folly/io:iobuf",
         "//folly/lang:bits",
         "//quic:config",

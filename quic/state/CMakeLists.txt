@@ -44,8 +44,6 @@ mvfst_add_library(mvfst_state_ack_states
 mvfst_add_library(mvfst_state_cloned_packet_identifier
   SRCS
     ClonedPacketIdentifier.cpp
-  DEPS
-    Folly::folly_hash_hash
   EXPORTED_DEPS
     mvfst_codec_types
 )

@@ -134,6 +134,7 @@ mvfst_cpp_test(
         "QuicConnectionIdTest.cpp",
     ],
     deps = [
+        "//folly/hash:fnv_hash",
         "//folly/portability:gtest",
         "//quic/codec:types",
         "//quic/common:contiguous_cursor",

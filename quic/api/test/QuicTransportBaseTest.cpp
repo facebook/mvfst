@@ -186,7 +186,12 @@ class TestByteEventCallback : public ByteEventCallback {
   // Custom hash and comparator functions that use only id, offset and types
   // (not the srtt)
   HashFn hash = [](const ByteEvent& e) {
-    return folly::hash::hash_combine(e.id, e.offset, e.type);
+    size_t seed = std::hash<decltype(e.id)>{}(e.id);
+    seed ^= std::hash<decltype(e.offset)>{}(e.offset) + 0x9e3779b97f4a7c15ULL +
+        (seed << 6) + (seed >> 2);
+    seed ^= std::hash<decltype(e.type)>{}(e.type) + 0x9e3779b97f4a7c15ULL +
+        (seed << 6) + (seed >> 2);
+    return seed;
   };
   ComparatorFn comparator = [](const ByteEvent& lhs, const ByteEvent& rhs) {
     return (

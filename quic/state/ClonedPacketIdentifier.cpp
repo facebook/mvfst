@@ -7,8 +7,8 @@
 
 #include <quic/state/ClonedPacketIdentifier.h>
 
-#include <folly/hash/Hash.h>
 #include <functional>
+#include <type_traits>
 
 namespace quic {
 
@@ -29,9 +29,12 @@ bool operator==(
 
 size_t ClonedPacketIdentifierHash::operator()(
     const ClonedPacketIdentifier& clonedPacketIdentifier) const noexcept {
-  return folly::hash::hash_combine(
+  // Order-dependent hash combine (golden-ratio mix)
+  size_t seed = std::hash<std::underlying_type_t<PacketNumberSpace>>{}(
       static_cast<std::underlying_type_t<PacketNumberSpace>>(
-          clonedPacketIdentifier.packetNumberSpace),
-      clonedPacketIdentifier.packetNumber);
+          clonedPacketIdentifier.packetNumberSpace));
+  seed ^= std::hash<PacketNum>{}(clonedPacketIdentifier.packetNumber) +
+      0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+  return seed;
 }
 } // namespace quic

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <folly/hash/FnvHash.h>
 #include <folly/portability/GTest.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/ContiguousCursor.h>
@@ -68,6 +69,26 @@ TEST(ConnectionIdTest, ConnIdSize) {
     testconnid.push_back(0);
   }
   EXPECT_TRUE(ConnectionId::create(testconnid).has_value());
+}
+
+TEST(ConnectionIdTest, HashMatchesFollyBroken) {
+  ConnectionIdHash hasher;
+  auto check = [&](const ConnectionId& connid) {
+    EXPECT_EQ(
+        hasher(connid),
+        folly::hash::fnv32_buf_BROKEN(connid.data(), connid.size()));
+  };
+  check(ConnectionId::createZeroLength());
+  const std::vector<std::vector<uint8_t>> samples = {
+      {0x00},
+      {0x00, 0x01, 0x02, 0x03},
+      {0xff, 0xff, 0xff, 0x00}, // exercises the signed-char sign extension
+      {0x80, 0x7f, 0x81, 0xfe, 0x01},
+      {0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe},
+  };
+  for (const auto& bytes : samples) {
+    check(ConnectionId::createAndMaybeCrash(bytes));
+  }
 }
 
 } // namespace quic::test

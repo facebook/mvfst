@@ -71,9 +71,7 @@ mvfst_cpp_library(
     headers = [
         "ClonedPacketIdentifier.h",
     ],
-    deps = [
-        "//folly/hash:hash",
-    ],
+    deps = [],
     exported_deps = [
         "//quic/codec:types",
     ],

@@ -10,10 +10,10 @@
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 
-#include <folly/hash/Hash.h>
 #include <folly/io/IOBuf.h>
 
 #include <array>
+#include <cstdint>
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
@@ -90,7 +90,17 @@ struct ConnectionId {
 
 struct ConnectionIdHash {
   size_t operator()(const ConnectionId& connId) const {
-    return folly::hash::fnv32_buf_BROKEN(connId.data(), connId.size());
+    // FNV-1 hash, byte-for-byte compatible with the historical
+    // folly::hash::fnv32_buf_BROKEN (including its signed-char XOR)
+    uint32_t hash = 2166136261UL;
+    const uint8_t* buf = connId.data();
+    const size_t n = connId.size();
+    for (size_t i = 0; i < n; ++i) {
+      hash = hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) +
+          (hash << 24);
+      hash ^= static_cast<int8_t>(buf[i]);
+    }
+    return hash;
   }
 };
 
