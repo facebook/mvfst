@@ -5,11 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/lang/Bits.h>
 #include <glog/logging.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/common/MvfstLogging.h>
+#include <bit>
 
 namespace quic {
 
@@ -24,7 +24,7 @@ PacketNumEncodingResult encodePacketNumber(
   PacketNum twiceDistance = (packetNum - largestAckedPacketNum) * 2;
   // The number of bits we need to mask all set bits in twiceDistance.
   // This is 1 + floor(log2(x)).
-  size_t lengthInBits = folly::findLastSet(twiceDistance);
+  size_t lengthInBits = std::bit_width(twiceDistance);
   // Round up to bytes
   size_t lengthInBytes = lengthInBits == 0 ? 1 : (lengthInBits + 7) >> 3;
   MVCHECK(
