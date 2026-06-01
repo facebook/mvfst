@@ -140,7 +140,7 @@ void TakeoverPacketHandler::forwardPacketToAnotherServer(
       peerAddress.getActualSize() + sizeof(uint64_t);
   BufPtr writeBuffer = BufHelpers::create(bufSize);
   BufWriter bufWriter(writeBuffer->writableData(), bufSize);
-  bufWriter.writeBE<uint32_t>(folly::to_underlying(takeoverProtocol_));
+  bufWriter.writeBE<uint32_t>(static_cast<uint32_t>(takeoverProtocol_));
   sockaddr_storage addrStorage{};
   uint16_t socklen = peerAddress.getAddress(&addrStorage);
   bufWriter.writeBE<uint16_t>(socklen);

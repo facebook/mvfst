@@ -13,6 +13,8 @@
 #include <quic/folly_utils/Utils.h>
 #include <quic/handshake/TransportParameters.h>
 
+#include <type_traits>
+
 namespace {
 
 inline quic::BufPtr encodeVarintParams(
@@ -205,7 +207,8 @@ inline void validateTransportExtensions(
         throw fizz::FizzException(
             fmt::format(
                 "unexpected extension type ({:#x}) for quic v1",
-                folly::to_underlying(extension.extension_type)),
+                static_cast<std::underlying_type_t<fizz::ExtensionType>>(
+                    extension.extension_type)),
             fizz::AlertDescription::illegal_parameter);
       }
       found = true;
