@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <folly/functional/Invoke.h>
 #include <quic/common/Optional.h>
+#include <functional> // IWYU pragma: keep (std::invoke used in QUIC_STATS macros)
 #include <string>
 
 #include <quic/QuicConstants.h>
@@ -265,7 +265,7 @@ class QuicTransportStatsCallbackFactory {
 
 #define QUIC_STATS(statsCallback, method, ...)                              \
   if (statsCallback) {                                                      \
-    folly::invoke(                                                          \
+    std::invoke(                                                            \
         &QuicTransportStatsCallback::method, statsCallback, ##__VA_ARGS__); \
   }                                                                         \
   static_assert(true, "semicolon required")
@@ -273,7 +273,7 @@ class QuicTransportStatsCallbackFactory {
 #define QUIC_STATS_FOR_EACH(iterBegin, iterEnd, statsCallback, method, ...)   \
   if (statsCallback) {                                                        \
     std::for_each(iterBegin, iterEnd, [&](const auto&) {                      \
-      folly::invoke(                                                          \
+      std::invoke(                                                            \
           &QuicTransportStatsCallback::method, statsCallback, ##__VA_ARGS__); \
     });                                                                       \
   }                                                                           \

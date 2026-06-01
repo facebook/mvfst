@@ -173,7 +173,6 @@ mvfst_add_library(mvfst_state_stats_callback
     mvfst_common_optional
     mvfst_constants
     mvfst_exception
-    Folly::folly_functional_invoke
 )
 
 mvfst_add_library(mvfst_state_pacing_functions

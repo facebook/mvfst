@@ -255,7 +255,6 @@ mvfst_cpp_library(
     }),
     exported_deps = select({
         "DEFAULT": [
-            "//folly/functional:invoke",
             "//quic:constants",
             "//quic:exception",
             "//quic/common:optional",
@@ -267,7 +266,6 @@ mvfst_cpp_library(
                 "//quic/common:optional",
             ],
             "ovr_config//build_mode:arvr_mode[enabled]": [
-                "//folly/functional:invoke",
                 "//quic:constants",
                 "//quic:exception",
                 "//quic/common:optional",

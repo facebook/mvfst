@@ -14,6 +14,7 @@
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StateData.h>
+#include <functional>
 
 namespace quic {
 
@@ -889,7 +890,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
     auto limitSaturatedFn = isBidirectionalStream(streamId)
         ? &QuicTransportStatsCallback::onPeerMaxBidiStreamsLimitSaturated
         : &QuicTransportStatsCallback::onPeerMaxUniStreamsLimitSaturated;
-    folly::invoke(limitSaturatedFn, conn_.statsCallback);
+    std::invoke(limitSaturatedFn, conn_.statsCallback);
   }
 
   // Stream(s) successfully marked as open, now instantiate the specific one
