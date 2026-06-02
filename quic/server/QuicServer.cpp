@@ -344,6 +344,29 @@ void QuicServer::start() {
   }
 }
 
+quic::Expected<void, QuicError> QuicServer::enableZeroCopy() {
+  checkRunningInThread(mainThreadId_);
+  if (workers_.empty()) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "QuicServer::enableZeroCopy called before workers initialized"));
+  }
+  Optional<QuicError> firstError;
+  for (auto& worker : workers_) {
+    worker->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait(
+        [&worker, &firstError]() mutable {
+          auto result = worker->enableZeroCopy();
+          if (result.hasError() && !firstError.has_value()) {
+            firstError = result.error();
+          }
+        });
+  }
+  if (firstError.has_value()) {
+    return quic::make_unexpected(*firstError);
+  }
+  return {};
+}
+
 void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker

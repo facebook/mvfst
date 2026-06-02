@@ -137,6 +137,39 @@ TEST_F(SimpleQuicServerWorkerTest, TurnOffPMTU) {
   worker_->bind(addr);
 }
 
+TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopy) {
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
+  rawSocket_ = sock.get();
+  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  worker_->setSocket(std::move(sock));
+
+  EXPECT_CALL(*rawSocket_, setZeroCopy(true)).WillOnce(Return(true));
+
+  auto result = worker_->enableZeroCopy();
+  ASSERT_FALSE(result.hasError());
+}
+
+TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWhenSetZeroCopyFails) {
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
+  rawSocket_ = sock.get();
+  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  worker_->setSocket(std::move(sock));
+
+  EXPECT_CALL(*rawSocket_, setZeroCopy(true)).WillOnce(Return(false));
+
+  auto result = worker_->enableZeroCopy();
+  ASSERT_TRUE(result.hasError());
+}
+
+TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWithoutSocket) {
+  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  auto result = worker_->enableZeroCopy();
+  ASSERT_TRUE(result.hasError());
+}
+
 std::unique_ptr<folly::IOBuf> createData(size_t size) {
   std::string data;
   data.resize(size);

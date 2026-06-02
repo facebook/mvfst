@@ -98,6 +98,23 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   void setSocket(std::unique_ptr<FollyAsyncUDPSocketAlias> socket);
 
   /**
+   * Enable SO_ZEROCOPY on the worker's listener socket so the listener
+   * and all per-connection writers that share its fd can issue
+   * MSG_ZEROCOPY sends. Must be called from the worker's eventbase
+   * thread after setSocket().
+   *
+   * After this returns, makeTransport() routes per-connection writer
+   * creation through `QuicUDPSocketFactory::makeAlias`, whose default
+   * implementation calls `folly::AsyncUDPSocket::createPeerOnSameFd`
+   * to wire up FDOwnership::SHARED, share the listener's per-fd
+   * ZeroCopyFdBookkeeping, and call setZeroCopy(true). The listener
+   * remains the sole socket draining POLLERR for the shared fd, and
+   * its onCompletion routes IOBuf release callbacks back to whichever
+   * per-conn writer originally registered the buf.
+   */
+  quic::Expected<void, QuicError> enableZeroCopy();
+
+  /**
    * Sets the socket options
    */
   void setSocketOptions(folly::SocketOptionMap* options) {
@@ -474,6 +491,17 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       int fd) const;
 
   /**
+   * Creates a per-connection writer that shares the listener's kernel
+   * fd via `QuicUDPSocketFactory::makeAlias`. Used when
+   * `enableZeroCopy()` is set so all per-conn writers share the
+   * listener's per-fd `ZeroCopyFdBookkeeping`. Parallels `makeSocket`
+   * — invokes `mvfst_hook_on_socket_create` on the returned fd so
+   * integrators observing newly-created per-conn UDP fds see the alias
+   * path on equal footing with the non-zero-copy path.
+   */
+  std::unique_ptr<FollyAsyncUDPSocketAlias> makeAlias() const;
+
+  /**
    * Tries to get the encrypted retry token from a client initial packet
    */
   Optional<std::string> maybeGetEncryptedToken(ContiguousReadCursor& cursor);
@@ -555,6 +583,11 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
   folly::Executor::KeepAlive<folly::EventBase> evb_;
+
+  // Set by enableZeroCopy(); selects the makeAlias() factory path in
+  // makeTransport() so per-conn writers share the listener's fd and
+  // ZC bookkeeping.
+  bool zeroCopyEnabled_{false};
 
   // factories are owned by quic server
   QuicUDPSocketFactory* socketFactory_;

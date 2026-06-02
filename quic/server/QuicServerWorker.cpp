@@ -88,6 +88,24 @@ void QuicServerWorker::setSocket(
   evb_ = folly::ExecutorKeepAlive(socket_->getEventBase());
 }
 
+quic::Expected<void, QuicError> QuicServerWorker::enableZeroCopy() {
+  if (!socket_) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "QuicServerWorker::enableZeroCopy: listener socket not set"));
+  }
+  if (!socket_->setZeroCopy(true)) {
+    int errnoCopy = errno;
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "QuicServerWorker::enableZeroCopy: setZeroCopy(true) failed: errno={}",
+            errnoCopy)));
+  }
+  zeroCopyEnabled_ = true;
+  return {};
+}
+
 void QuicServerWorker::bind(
     const folly::SocketAddress& address,
     FollyAsyncUDPSocketAlias::BindOptions bindOptions) {
@@ -729,7 +747,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     bool validNewToken) {
   // create 'accepting' transport
   auto* evb = getEventBase();
-  auto sock = makeSocket(evb);
+  auto sock = zeroCopyEnabled_ ? makeAlias() : makeSocket(evb);
   auto trans =
       transportFactory_->make(evb, std::move(sock), client, quicVersion, ctx_);
   if (trans) {
@@ -1410,6 +1428,15 @@ std::unique_ptr<FollyAsyncUDPSocketAlias> QuicServerWorker::makeSocket(
     folly::EventBase* evb,
     int fd) const {
   auto sock = socketFactory_->make(evb, fd);
+  if (sock && mvfst_hook_on_socket_create) {
+    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
+  }
+  return sock;
+}
+
+std::unique_ptr<FollyAsyncUDPSocketAlias> QuicServerWorker::makeAlias() const {
+  MVCHECK(socket_);
+  auto sock = socketFactory_->makeAlias(socket_.get());
   if (sock && mvfst_hook_on_socket_create) {
     mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
   }

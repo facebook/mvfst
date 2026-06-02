@@ -246,6 +246,21 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       QuicServerTransportFactory* acceptor);
 
   /**
+   * Enable SO_ZEROCOPY on every worker's listener socket and create a
+   * per-worker shared MSG_ZEROCOPY bookkeeping object. After this returns,
+   * every per-connection write socket created by a worker (via
+   * QuicSharedUDPSocketFactory, which shares the listener fd) will be
+   * automatically wired to its worker's bookkeeping so MSG_ZEROCOPY sends
+   * and listener-side completion drains stay coherent.
+   *
+   * Must be called after start() so that worker listener sockets exist.
+   * Calls into each worker's eventbase synchronously; returns the first
+   * error encountered across workers, or success if all worker listeners
+   * enabled zerocopy.
+   */
+  quic::Expected<void, QuicError> enableZeroCopy();
+
+  /**
    * Initialize necessary steps to enable being taken over of this server by
    * another server, such as binding to a local port so that once another
    * process starts to takeover the port this server is listening to, the other
