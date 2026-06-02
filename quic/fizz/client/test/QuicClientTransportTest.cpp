@@ -2697,16 +2697,6 @@ TEST_F(QuicClientTransportAfterStartTest, CleanupReadLoopCounting) {
   EXPECT_EQ(0, conn.readDebugState.loopCount);
 }
 
-TEST_F(QuicClientTransportAfterStartTest, StaleReadLoopCounting) {
-  auto& conn = client->getNonConstConn();
-  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
-  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
-
-  auto data = IOBuf::copyBuffer("Short Trip Home");
-  deliverData(data->coalesce());
-  EXPECT_EQ(NoReadReason::STALE_DATA, conn.readDebugState.noReadReason);
-}
-
 TEST_F(QuicClientTransportAfterStartTest, RetriableErrorLoopCounting) {
   auto& conn = client->getNonConstConn();
   auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();

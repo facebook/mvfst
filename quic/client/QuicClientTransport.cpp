@@ -114,7 +114,6 @@ quic::Expected<void, QuicError> QuicClientTransport::readWithRecvmmsgWrapper(
       case NoReadReason::READ_OK:
       case NoReadReason::EMPTY_DATA:
       case NoReadReason::TRUNCATED:
-      case NoReadReason::STALE_DATA:
         break;
     }
   }

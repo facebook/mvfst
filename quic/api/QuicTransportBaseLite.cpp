@@ -305,8 +305,6 @@ void QuicTransportBaseLite::onNetworkData(
 
     conn_->lossState.totalBytesRecvd += networkData.getTotalData();
     auto originalAckVersion = currentAckStateVersion(*conn_);
-    auto originalNoAckPacketCount =
-        conn_->readDebugState.processedNoAckPacketCount;
 
     // handle PacketsReceivedEvent if requested by observers
     SOCKET_OBSERVER_IF(
@@ -362,23 +360,13 @@ void QuicTransportBaseLite::onNetworkData(
       processCallbacksAfterNetworkData();
     }
     if (closeState_ != CloseState::CLOSED) {
-      bool ackProgress = currentAckStateVersion(*conn_) != originalAckVersion;
-      bool noAckProgress = conn_->readDebugState.processedNoAckPacketCount !=
-          originalNoAckPacketCount;
-      if (ackProgress) {
+      if (currentAckStateVersion(*conn_) != originalAckVersion) {
         setIdleTimer();
         conn_->receivedNewPacketBeforeWrite = true;
-      }
-      if (ackProgress || noAckProgress) {
         if (conn_->loopDetectorCallback) {
           conn_->readDebugState.noReadReason = NoReadReason::READ_OK;
           conn_->readDebugState.loopCount = 0;
         }
-      } else if (conn_->loopDetectorCallback) {
-        conn_->readDebugState.noReadReason = NoReadReason::STALE_DATA;
-        conn_->loopDetectorCallback->onSuspiciousReadLoops(
-            ++conn_->readDebugState.loopCount,
-            conn_->readDebugState.noReadReason);
       }
       // Reading data could process an ack and change the loss timer.
       setLossDetectionAlarm(*conn_, *self);

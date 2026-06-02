@@ -161,8 +161,6 @@ std::string readNoReadReasonString(NoReadReason reason) {
       return "Retriable error";
     case NoReadReason::NONRETRIABLE_ERROR:
       return "Nonretriable error";
-    case NoReadReason::STALE_DATA:
-      return "Stale data";
   }
   folly::assume_unreachable();
 }

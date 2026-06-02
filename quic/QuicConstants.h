@@ -815,7 +815,6 @@ enum class NoReadReason {
   EMPTY_DATA,
   RETRIABLE_ERROR,
   NONRETRIABLE_ERROR,
-  STALE_DATA,
 };
 
 std::string writeDataReasonString(WriteDataReason reason);

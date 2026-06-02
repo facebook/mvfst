@@ -507,7 +507,6 @@ void QuicServerWorker::onSocketReadable(QuicAsyncUDPSocket& sock) noexcept {
       case NoReadReason::READ_OK:
       case NoReadReason::EMPTY_DATA:
       case NoReadReason::TRUNCATED:
-      case NoReadReason::STALE_DATA:
         return;
     }
   }
