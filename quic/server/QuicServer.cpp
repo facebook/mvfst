@@ -466,19 +466,31 @@ void QuicServer::routeDataToWorker(
     return;
   }
 
-  // For initial or zeroRtt packets, pick the worker that kernel / bpf routed to
-  // Without this, when (bpf / kernel) hash and userspace hash get out of sync
-  // (e.g. due to shuffling of sockets in the hash ring), it results in
-  // very high amount of 'misses'
+  // Initial/0-RTT default: kernel/bpf-routed worker. Keeps userspace and
+  // kernel hashing in sync.
+  //
+  // Exception: if the DCID parses as one of our server-issued CIDs (hostId
+  // matches ours), the client retransmitted an Initial after switching to
+  // the server-chosen DCID. RFC 9000 §7.2 still derives Initial keys from
+  // the original client-chosen DCID, so the packet must reach the worker
+  // that owns the conn — route via connIdAlgo to avoid spawning a new
+  // wrong-keyed transport on the kernel-routed worker.
   if (routingData.clientChosenDcid && workerPtr_) {
-    MVCHECK(workerPtr_->getEventBase()->isInEventBaseThread());
-    workerPtr_->dispatchPacketData(
-        client,
-        std::move(routingData),
-        std::move(networkData),
-        quicVersion,
-        isForwardedData);
-    return;
+    // parseConnectionId is self-guarding (returns an error for CIDs we can't
+    // parse), so rely on its result directly rather than a redundant canParse.
+    auto parsed = connIdAlgo_->parseConnectionId(routingData.destinationConnId);
+    bool dcidIsOurServerIssued =
+        parsed.has_value() && parsed.value().hostId == hostId_;
+    if (!dcidIsOurServerIssued) {
+      MVCHECK(workerPtr_->getEventBase()->isInEventBaseThread());
+      workerPtr_->dispatchPacketData(
+          client,
+          std::move(routingData),
+          std::move(networkData),
+          quicVersion,
+          isForwardedData);
+      return;
+    }
   }
 
   auto workerToRunOn =

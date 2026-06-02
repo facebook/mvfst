@@ -2663,6 +2663,97 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   t.join();
 }
 
+class QuicServerMultiWorkerRoutingTest : public QuicServerTest {
+ protected:
+  void runMultiWorkerRoutingTest(
+      uint32_t encodedHostId,
+      uint8_t encodedWorkerId,
+      folly::EventBase* injectFromEvb,
+      folly::EventBase* expectedFactoryEvb) {
+    DefaultConnectionIdAlgo algo;
+    auto dcid =
+        algo
+            .encodeConnectionId(ServerConnectionIdParams(
+                ConnectionIdVersion::V2, encodedHostId, 0, encodedWorkerId))
+            .value();
+    ASSERT_TRUE(algo.canParse(dcid));
+
+    auto srcConnId =
+        ConnectionId::createAndMaybeCrash({1, 2, 3, 4, 5, 6, 7, 8});
+    auto data = createData(kMinInitialPacketSize + 10);
+
+    folly::Baton<> baton;
+    folly::EventBase* factoryEvb = nullptr;
+    EXPECT_CALL(*factory_, _make(_, _, _, _))
+        .WillOnce(
+            Invoke([&](folly::EventBase* evb,
+                       std::unique_ptr<FollyAsyncUDPSocketAlias>& /*sock*/,
+                       const folly::SocketAddress& /*addr*/,
+                       std::shared_ptr<const fizz::server::FizzServerContext>) {
+              factoryEvb = evb;
+              baton.post();
+              return nullptr;
+            }));
+
+    injectFromEvb->runInEventBaseThreadAndWait([&] {
+      RoutingData routingData(HeaderForm::Long, true, false, dcid, srcConnId);
+      static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
+          ->routeDataToWorker(
+              kClientAddr,
+              std::move(routingData),
+              NetworkData(data->clone(), Clock::now(), 0),
+              QuicVersion::MVFST,
+              injectFromEvb,
+              /*isForwardedData=*/false);
+    });
+
+    ASSERT_TRUE(baton.try_wait_for(std::chrono::seconds(5)));
+    EXPECT_EQ(factoryEvb, expectedFactoryEvb);
+
+    std::thread t([&] { server_->shutdown(); });
+    t.join();
+  }
+};
+
+// Bug repro: server-issued DCID (matches our hostId) routed via
+// connIdAlgo to the owning worker, not the kernel-routed worker.
+// numWorkers=2 and encodedWorkerId=1: getWorkerToRouteTo gives 1 % 2 = 1
+// (worker B); injecting from worker A's thread means workerPtr_ would
+// have chosen A. The test fails iff routing collapses to workerPtr_.
+TEST_F(
+    QuicServerMultiWorkerRoutingTest,
+    ServerChosenInitialRoutedToOwningWorker) {
+  folly::ScopedEventBaseThread evbThreadA;
+  folly::ScopedEventBaseThread evbThreadB;
+  std::vector<folly::EventBase*> evbs{
+      evbThreadA.getEventBase(), evbThreadB.getEventBase()};
+  initializeServer(evbs);
+
+  runMultiWorkerRoutingTest(
+      /*encodedHostId=*/serverHostId_,
+      /*encodedWorkerId=*/1,
+      /*injectFromEvb=*/evbThreadA.getEventBase(),
+      /*expectedFactoryEvb=*/evbThreadB.getEventBase());
+}
+
+// DCID whose encoded hostId is not ours stays on the kernel-routed
+// worker, avoiding a cross-thread hop on every new connection.
+TEST_F(
+    QuicServerMultiWorkerRoutingTest,
+    RandomInitialStaysOnKernelRoutedWorker) {
+  folly::ScopedEventBaseThread evbThreadA;
+  folly::ScopedEventBaseThread evbThreadB;
+  std::vector<folly::EventBase*> evbs{
+      evbThreadA.getEventBase(), evbThreadB.getEventBase()};
+  initializeServer(evbs);
+
+  runMultiWorkerRoutingTest(
+      /*encodedHostId=*/serverHostId_ ^ 0xDEAD,
+      /*encodedWorkerId=*/1,
+      /*injectFromEvb=*/evbThreadA.getEventBase(),
+      /*expectedFactoryEvb=*/evbThreadA.getEventBase());
+}
+
 TEST_F(QuicServerTest, OverrideTakeoverAddressTest) {
   folly::ScopedEventBaseThread evbThread;
   std::vector<folly::EventBase*> evbs;
