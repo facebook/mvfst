@@ -2532,6 +2532,56 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
   EXPECT_TRUE(foundPathChallenge);
 }
 
+TEST_F(
+    QuicTransportTest,
+    AlternatePathValidationDoesNotSpinWithSubPacketBudget) {
+  // The path validation packet is written exactly once -- in the second loop,
+  // after a full packet of credit is available. The first loop (sub-packet
+  // budget) must write nothing.
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
+
+  auto& conn = transport_->getConnectionState();
+
+  // The fixture already has a validated current path. Add an alternate
+  // (probing) path that is not the current path.
+  auto altPathRes = conn.pathManager->addPath(
+      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+  ASSERT_FALSE(altPathRes.hasError());
+  auto altPathId = altPathRes.value();
+  ASSERT_NE(altPathId, conn.currentPathId);
+  auto* altPath = conn.pathManager->getPath(altPathId);
+  ASSERT_TRUE(altPath);
+
+  conn.udpSendPacketLen = 1200;
+  conn.transportSettings.limitedCwndInMss = 1;
+
+  // Leave the alternate path with a positive-but-sub-packet writable budget:
+  // credit one packet's worth, then account a slightly smaller sent packet.
+  conn.pathManager->onPathPacketReceived(altPathId);
+  conn.pathManager->onPathPacketSent(altPathId, 1150);
+  ASSERT_EQ(altPath->writableBytes, 50);
+
+  conn.pendingEvents.pathChallenges.insert(altPathId);
+
+  // First loop: with a sub-packet budget the dedicated path validation writer
+  // cannot emit a packet, so it must write nothing and leave the challenge
+  // pending rather than spinning the write loop.
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.contains(altPathId));
+  EXPECT_EQ(0, conn.outstandings.packets.size());
+
+  // Second loop: a full packet of credit makes the path writable and the
+  // challenge is sent.
+  conn.pathManager->onPathPacketReceived(altPathId);
+  ASSERT_GE(altPath->writableBytes, conn.udpSendPacketLen);
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+  EXPECT_TRUE(conn.pendingEvents.pathChallenges.empty());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
+}
+
 TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   EXPECT_CALL(*socket_, write(_, _, _))
       .WillOnce(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));

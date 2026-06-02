@@ -4115,6 +4115,45 @@ TEST_F(
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
+TEST_F(
+    QuicTransportFunctionsTest,
+    HasAlternatePathValidationDataToWriteRequiresFullPacketBudget) {
+  auto conn = createConn();
+
+  auto pathInfoRes = conn->pathManager->getOrAddPath(
+      folly::SocketAddress("::1", 12346), folly::SocketAddress("::1", 54321));
+  ASSERT_FALSE(pathInfoRes.hasError());
+  auto& pathInfo = pathInfoRes.value().get();
+
+  conn->transportSettings.limitedCwndInMss = 1;
+  conn->udpSendPacketLen = 1200;
+
+  // Leave the alternate path with a positive-but-sub-packet writable budget:
+  // credit one packet's worth, then account a slightly smaller sent packet so
+  // 50 bytes remain -- too small to emit a path validation packet.
+  conn->pathManager->onPathPacketReceived(pathInfo.id);
+  ASSERT_EQ(pathInfo.writableBytes, 1200);
+  conn->pathManager->onPathPacketSent(pathInfo.id, 1150);
+  ASSERT_EQ(pathInfo.writableBytes, 50);
+
+  // A challenge is pending but the path cannot fit a path validation packet.
+  // The loop trigger must be false; otherwise the write loop spins emitting
+  // empty PathValidationScheduler writes (no_write_reason=NoFrame).
+  conn->pendingEvents.pathChallenges.insert(pathInfo.id);
+  EXPECT_FALSE(hasAlternatePathValidationDataToWrite(*conn));
+
+  // Same for a pending response.
+  conn->pendingEvents.pathChallenges.clear();
+  conn->pendingEvents.pathResponses.emplace(
+      pathInfo.id, PathResponseFrame(12345));
+  EXPECT_FALSE(hasAlternatePathValidationDataToWrite(*conn));
+
+  // Once a full packet of credit is available, the path is writable again.
+  conn->pathManager->onPathPacketReceived(pathInfo.id);
+  ASSERT_GE(pathInfo.writableBytes, conn->udpSendPacketLen);
+  EXPECT_TRUE(hasAlternatePathValidationDataToWrite(*conn));
+}
+
 TEST_F(QuicTransportFunctionsTest, ShouldWriteStreamsNoCipher) {
   auto conn = createConn();
   auto mockCongestionController =

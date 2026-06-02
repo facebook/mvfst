@@ -2209,22 +2209,28 @@ WriteDataReason shouldWriteData(/*const*/ QuicConnectionStateBase& conn) {
   return hasNonAckDataToWrite(conn);
 }
 
+static bool canWriteAlternatePathValidation(
+    const QuicConnectionStateBase& conn,
+    PathIdType pathId) {
+  // A path validation packet is padded to a full UDP packet, and the path's
+  // anti-amplification budget is replenished in udpSendPacketLen units, so a
+  // sub-packet budget can never send one.
+  return pathId != conn.currentPathId &&
+      pathValidationWritableBytes(conn, pathId) >= conn.udpSendPacketLen;
+}
+
 bool hasAlternatePathValidationDataToWrite(
     const QuicConnectionStateBase& conn) {
   // Check path challenges
   for (const auto& pathId : conn.pendingEvents.pathChallenges) {
-    if (pathId != conn.currentPathId &&
-        pathValidationWritableBytes(conn, pathId) > 0) {
-      // This path has writable bytes, we can write path validation data
+    if (canWriteAlternatePathValidation(conn, pathId)) {
       return true;
     }
   }
 
   // Check path responses
   for (const auto& [pathId, _] : conn.pendingEvents.pathResponses) {
-    if (pathId != conn.currentPathId &&
-        pathValidationWritableBytes(conn, pathId) > 0) {
-      // This path has writable bytes, we can write path validation data
+    if (canWriteAlternatePathValidation(conn, pathId)) {
       return true;
     }
   }
@@ -2671,12 +2677,12 @@ writePathValidationDataForAlternatePaths(
 
   UnorderedSet<PathIdType> pathIdUnion;
   for (const auto& pathId : connection.pendingEvents.pathChallenges) {
-    if (pathId != connection.currentPathId) {
+    if (canWriteAlternatePathValidation(connection, pathId)) {
       pathIdUnion.insert(pathId);
     }
   }
   for (const auto& [pathId, _] : connection.pendingEvents.pathResponses) {
-    if (pathId != connection.currentPathId) {
+    if (canWriteAlternatePathValidation(connection, pathId)) {
       pathIdUnion.insert(pathId);
     }
   }
