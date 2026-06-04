@@ -1,0 +1,16 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_test(
+    name = "QuicSocketAddressTest",
+    srcs = [
+        "QuicSocketAddressTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//folly/portability:sockets",
+        "//quic/common/address:quic_address_util",
+        "//quic/common/address:quic_socket_address",
+    ],
+)

@@ -160,6 +160,7 @@ mvfst_add_library(mvfst_common_quic_iobuf_queue
     mvfst_common_quic_buffer
 )
 
+add_subdirectory(address)
 add_subdirectory(events)
 add_subdirectory(testutil)
 add_subdirectory(third-party)

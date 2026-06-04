@@ -1,0 +1,32 @@
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+
+oncall("traffic_protocols")
+
+mvfst_cpp_library(
+    name = "quic_socket_address",
+    srcs = [
+        "QuicSocketAddress.cpp",
+    ],
+    headers = [
+        "QuicSocketAddress.h",
+    ],
+    deps = ["fbsource//third-party/fmt:fmt"],
+    exported_deps = [
+        "//folly:network_address",
+        "//folly/portability:sockets",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_address_util",
+    srcs = [
+        "QuicAddressUtil.cpp",
+    ],
+    headers = [
+        "QuicAddressUtil.h",
+    ],
+    exported_deps = [
+        ":quic_socket_address",
+        "//folly/portability:sockets",
+    ],
+)
