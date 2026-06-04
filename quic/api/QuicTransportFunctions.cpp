@@ -21,6 +21,7 @@
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/QLoggerMacros.h>
 #include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/loss/QuicLossFunctions.h>
 
 #include <quic/state/AckHandlers.h>
 #include <quic/state/ConnectionOopsFields.h>
@@ -1327,8 +1328,11 @@ quic::Expected<WriteQuicDataResult, QuicError> writeCryptoAndAckDataToSocket(
   auto& numProbePackets =
       connection.pendingEvents
           .numProbePackets[LongHeader::typeToPacketNumberSpace(packetType)];
+  // During the handshake, probe with no data to retransmit so a PING is sent
+  // (RFC 9002 6.2.2.1).
   if (numProbePackets &&
-      (cryptoStream.retransmissionBuffer.size() || scheduler.hasData())) {
+      (cryptoStream.retransmissionBuffer.size() || scheduler.hasData() ||
+       needsAntiDeadlockPTO(connection))) {
     auto probeResult = writeProbingDataToSocket(
         sock,
         connection,

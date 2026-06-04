@@ -133,6 +133,22 @@ quic::Expected<void, QuicError> onPTOAlarm(QuicConnectionStateBase& conn) {
           packetCount[PacketNumberSpace::AppData];
     }
   }
+  // RFC 9002 6.2.2.1: during the handshake, send a probe (PING) when nothing is
+  // in flight and there is no crypto data to send. Probe the Handshake space if
+  // handshake keys exist, otherwise Initial.
+  if (needsAntiDeadlockPTO(conn)) {
+    auto antiDeadlockSpace = conn.handshakeWriteCipher
+        ? PacketNumberSpace::Handshake
+        : PacketNumberSpace::Initial;
+    const auto& antiDeadlockStream = conn.handshakeWriteCipher
+        ? conn.cryptoState->handshakeStream
+        : conn.cryptoState->initialStream;
+    if (conn.outstandings.numOutstanding() == 0 &&
+        antiDeadlockStream.pendingWrites.empty() &&
+        antiDeadlockStream.lossBuffer.empty()) {
+      numProbePackets[antiDeadlockSpace] = 1;
+    }
+  }
   return {};
 }
 
@@ -561,8 +577,10 @@ handleAckForLoss(
     return quic::make_unexpected(lossEventResult.error());
   }
 
+  // Keep the PTO armed during the handshake even with zero outstanding packets
+  // (RFC 9002 6.2.2.1).
   conn.pendingEvents.setLossDetectionAlarm =
-      conn.outstandings.numOutstanding() > 0;
+      conn.outstandings.numOutstanding() > 0 || needsAntiDeadlockPTO(conn);
   MVVLOG(10) << __func__ << " largestAckedInPacket="
              << ack.largestNewlyAckedPacket.value_or(0)
              << " setLossDetectionAlarm="

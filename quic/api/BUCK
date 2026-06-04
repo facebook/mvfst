@@ -217,6 +217,7 @@ mvfst_cpp_library(
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/logging:qlogger_macros",
         "//quic/logging/oops_logger:oops_logger",
+        "//quic/loss:loss",
         "//quic/state:ack_frequency_functions",
         "//quic/state:ack_handler",
         "//quic/state:connection_oops_fields",

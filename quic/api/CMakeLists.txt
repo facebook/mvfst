@@ -136,6 +136,7 @@ mvfst_add_library(mvfst_api_transport_helpers
     mvfst_happyeyeballs
     mvfst_logging_oops_logger
     mvfst_logging_qlogger_macros
+    mvfst_loss
     mvfst_state_ack_frequency_functions
     mvfst_state_ack_handler
     mvfst_state_connection_oops_fields

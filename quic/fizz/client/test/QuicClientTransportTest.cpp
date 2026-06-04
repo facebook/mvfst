@@ -1364,6 +1364,70 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   client->closeNow(std::nullopt);
 }
 
+// After a bare ACK of the ClientHello during the handshake, the client has
+// nothing in flight but must still write an ack-eliciting Initial probe when
+// its PTO fires.
+TEST_F(
+    QuicClientTransportTest,
+    AntiDeadlockPTOProbesAfterBareAckDuringHandshake) {
+  client->addNewPeerAddress(serverAddr);
+  // Capture packets the client puts on the wire.
+  ON_CALL(*sock, write(testing::_, testing::_, testing::_))
+      .WillByDefault([&](const folly::SocketAddress&,
+                         const struct iovec* vec,
+                         size_t iovec_len) {
+        socketWrites.push_back(
+            copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+        return getTotalIovecLen(vec, iovec_len);
+      });
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+
+  originalConnId = client->getConn().clientConnectionId;
+  ServerConnectionIdParams params(0, 0, 0);
+  client->getNonConstConn().serverConnectionId =
+      *connIdAlgo_->encodeConnectionId(params);
+
+  // Server bare-ACKs every outstanding Initial packet (the ClientHello).
+  AckBlocks acks;
+  auto firstInitial = getFirstOutstandingPacket(
+                          client->getNonConstConn(), PacketNumberSpace::Initial)
+                          ->packet.header.getPacketSequenceNum();
+  auto lastInitial = getLastOutstandingPacket(
+                         client->getNonConstConn(), PacketNumberSpace::Initial)
+                         ->packet.header.getPacketSequenceNum();
+  acks.insert(firstInitial, lastInitial);
+  auto& aead = getInitialCipher();
+  auto& headerCipher = getInitialHeaderCipher();
+  auto ackPacket = packetToBufCleartext(
+      createAckPacket(
+          client->getNonConstConn(),
+          initialPacketNum,
+          acks,
+          PacketNumberSpace::Initial,
+          &aead),
+      aead,
+      headerCipher,
+      initialPacketNum);
+  initialPacketNum++;
+  deliverData(serverAddr, ackPacket->coalesce());
+
+  // Nothing in flight, handshake not complete.
+  ASSERT_EQ(0, client->getNonConstConn().outstandings.numOutstanding());
+  ASSERT_FALSE(client->hasWriteCipher());
+
+  // Firing the PTO must write an Initial probe, tracked as outstanding.
+  socketWrites.clear();
+  client->lossTimeout().cancelTimerCallback();
+  client->lossTimeout().timeoutExpired();
+  ASSERT_FALSE(socketWrites.empty());
+  EXPECT_EQ(
+      1,
+      client->getNonConstConn()
+          .outstandings.packetCount[PacketNumberSpace::Initial]);
+
+  client->closeNow(std::nullopt);
+}
+
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
   client->addNewPeerAddress(serverAddr);
   EXPECT_CALL(*sock, write(_, _, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));

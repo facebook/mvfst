@@ -31,6 +31,12 @@ namespace quic {
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
 
+// Whether the client must keep a PTO armed during the handshake even with no
+// outstanding packets (RFC 9002 6.2.2.1).
+inline bool needsAntiDeadlockPTO(const QuicConnectionStateBase& conn) {
+  return conn.nodeType == QuicNodeType::Client && !conn.oneRttWriteCipher;
+}
+
 std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn);
 
 /**
@@ -123,7 +129,8 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    * cwnd. So we must set the loss timer so that we can write this data with the
    * slack packet space for the clones.
    */
-  if (!hasDataToWrite && conn.outstandings.clonedPacketIdentifiers.empty() &&
+  if (!hasDataToWrite && !needsAntiDeadlockPTO(conn) &&
+      conn.outstandings.clonedPacketIdentifiers.empty() &&
       totalPacketsOutstanding == conn.outstandings.numClonedPackets()) {
     MVVLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
                << " outstanding=" << totalPacketsOutstanding
@@ -221,9 +228,10 @@ template <class ClockType = Clock>
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor) {
   auto now = ClockType::now();
-  if (conn.outstandings.packets.empty()) {
-    MVVLOG(10) << "Transmission alarm fired with no outstanding packets "
-               << conn;
+  if (conn.outstandings.packets.empty() && !needsAntiDeadlockPTO(conn)) {
+    MVVLOG(10)
+        << "Transmission alarm fired with no outstanding packets and no anti-deadlock PTO"
+        << conn;
     return {};
   }
   if (conn.lossState.currentAlarmMethod ==
@@ -269,7 +277,7 @@ template <class ClockType = Clock>
     }
   }
   conn.pendingEvents.setLossDetectionAlarm =
-      conn.outstandings.numOutstanding() > 0;
+      conn.outstandings.numOutstanding() > 0 || needsAntiDeadlockPTO(conn);
   MVVLOG(10) << __func__ << " setLossDetectionAlarm="
              << conn.pendingEvents.setLossDetectionAlarm
              << " outstanding=" << conn.outstandings.numOutstanding()

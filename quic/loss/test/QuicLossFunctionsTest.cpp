@@ -2997,4 +2997,60 @@ TEST_F(QuicLossFunctionsTest, NoDegradationWithoutOneRttCipher) {
   EXPECT_FALSE(conn->lossState.blackholeFired);
 }
 
+// During the handshake, a bare ACK of the ClientHello leaves the client with
+// zero outstanding packets; it must still arm a PTO and produce a probe.
+TEST_F(QuicLossFunctionsTest, AntiDeadlockPTOAfterBareAckDuringHandshake) {
+  auto conn = createClientConn();
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher().value();
+  // Handshake not complete: no handshake/1-RTT ciphers.
+  conn->handshakeWriteCipher = nullptr;
+  conn->oneRttWriteCipher = nullptr;
+
+  auto currentTime = Clock::now();
+
+  // Client sends its Initial (ClientHello).
+  auto initialPacketNum =
+      sendPacket(*conn, currentTime, std::nullopt, PacketType::Initial);
+
+  ASSERT_EQ(1, conn->outstandings.numOutstanding());
+  ASSERT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+
+  // Server bare-ACKs the ClientHello.
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = initialPacketNum;
+  ackFrame.ackBlocks.emplace_back(initialPacketNum, initialPacketNum);
+
+  auto lossVisitor = [](auto&,
+                        auto /* pathId */,
+                        auto&,
+                        bool) -> quic::Expected<void, QuicError> { return {}; };
+
+  ASSERT_FALSE(
+      processAckFrame(
+          *conn,
+          PacketNumberSpace::Initial,
+          ackFrame,
+          [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+          [&](auto&, auto&) -> quic::Expected<void, quic::QuicError> {
+            return {};
+          },
+          lossVisitor,
+          Clock::now())
+          .hasError());
+
+  ASSERT_EQ(0, conn->outstandings.numOutstanding());
+
+  // PTO stays armed despite zero outstanding packets.
+  EXPECT_CALL(timeout, cancelLossTimeout()).Times(AtLeast(1));
+  EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(1);
+  setLossDetectionAlarm(*conn, timeout);
+  EXPECT_EQ(LossState::AlarmMethod::PTO, conn->lossState.currentAlarmMethod);
+
+  // The fired PTO must request a probe to send.
+  EXPECT_CALL(*quicStats_, onPTO());
+  ASSERT_FALSE(onLossDetectionAlarm<Clock>(*conn, lossVisitor).hasError());
+  EXPECT_GT(conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial], 0);
+}
+
 } // namespace quic::test

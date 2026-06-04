@@ -11,10 +11,12 @@
 #include <quic/common/MvfstLogging.h>
 
 #include <quic/api/test/Mocks.h>
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -222,7 +224,22 @@ class QuicTransportFunctionsTest : public Test {
     return conn;
   }
 
-  QuicVersion getVersion(QuicServerConnectionState& conn) {
+  std::unique_ptr<QuicClientConnectionState> createClientConn() {
+    auto conn = std::make_unique<QuicClientConnectionState>(
+        FizzClientQuicHandshakeContext::Builder().build());
+    conn->serverConnectionId = getTestConnectionId();
+    conn->clientConnectionId = getTestConnectionId();
+    conn->version = QuicVersion::MVFST;
+    conn->originalVersion = QuicVersion::MVFST;
+    conn->statsCallback = quicStats_.get();
+    conn->initialWriteCipher = createNoOpAead();
+    conn->initialHeaderCipher = createNoOpHeaderCipher().value();
+    initializePathManagerState(*conn);
+    conn->transportSettings.skipOneInNPacketSequenceNumber = 0;
+    return conn;
+  }
+
+  QuicVersion getVersion(QuicConnectionStateBase& conn) {
     return conn.version.value_or(*conn.originalVersion);
   }
 
@@ -3877,6 +3894,24 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
       conn->transportSettings.writeConnectionDataPacketsLimit);
   ASSERT_FALSE(writeRes3.hasError());
   EXPECT_FALSE(conn->pendingEvents.anyProbePackets());
+
+  // A handshaking client with a queued probe but nothing to retransmit still
+  // writes an ack-eliciting Initial packet (PING).
+  auto clientConn = createClientConn();
+  clientConn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 2;
+  auto antiDeadlockRes = writeCryptoAndAckDataToSocket(
+      *rawSocket,
+      *clientConn,
+      *clientConn->clientConnectionId,
+      *clientConn->serverConnectionId,
+      LongHeader::Types::Initial,
+      *clientConn->initialWriteCipher,
+      *clientConn->initialHeaderCipher,
+      getVersion(*clientConn),
+      clientConn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_FALSE(antiDeadlockRes.hasError());
+  EXPECT_GT(antiDeadlockRes->bytesWritten, 0);
+  EXPECT_FALSE(clientConn->pendingEvents.anyProbePackets());
 }
 
 TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {

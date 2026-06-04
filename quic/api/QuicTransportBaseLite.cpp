@@ -2294,6 +2294,7 @@ QuicTransportBaseLite::handleInitialWriteDataCommon(
   if ((initialCryptoStream.retransmissionBuffer.size() &&
        conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
        numProbePackets) ||
+      (numProbePackets && needsAntiDeadlockPTO(*conn_)) ||
       initialScheduler.hasData() || toWriteInitialAcks(*conn_)) {
     MVCHECK(conn_->initialHeaderCipher);
     return writeCryptoAndAckDataToSocket(
@@ -2325,6 +2326,7 @@ QuicTransportBaseLite::handleHandshakeWriteDataCommon(
       conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
   if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
        handshakeCryptoStream.retransmissionBuffer.size() && numProbePackets) ||
+      (numProbePackets && needsAntiDeadlockPTO(*conn_)) ||
       handshakeScheduler.hasData() || toWriteHandshakeAcks(*conn_)) {
     MVCHECK(conn_->handshakeWriteHeaderCipher);
     return writeCryptoAndAckDataToSocket(
