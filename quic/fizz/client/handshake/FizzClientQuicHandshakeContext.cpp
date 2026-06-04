@@ -106,8 +106,13 @@ FizzClientQuicHandshakeContext::Builder::build() && {
     context_ = std::make_shared<const fizz::client::FizzClientContext>();
   }
   if (!verifier_) {
-    verifier_ = fizz::DefaultCertificateVerifier::create(
-        fizz::VerificationContext::Client);
+    std::unique_ptr<fizz::DefaultCertificateVerifier> defaultVerifier;
+    fizz::Error err;
+    FIZZ_THROW_ON_ERROR(
+        fizz::DefaultCertificateVerifier::create(
+            defaultVerifier, err, fizz::VerificationContext::Client),
+        err);
+    verifier_ = std::move(defaultVerifier);
   }
 
   return std::shared_ptr<FizzClientQuicHandshakeContext>(
