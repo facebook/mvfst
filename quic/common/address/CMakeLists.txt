@@ -15,6 +15,12 @@ mvfst_add_library(mvfst_common_address_quic_socket_address
     Folly::folly_portability_sockets
 )
 
+mvfst_add_library(mvfst_common_address_quic_socket_address_bridge
+  EXPORTED_DEPS
+    mvfst_common_address_quic_socket_address
+    Folly::folly_network_address
+)
+
 mvfst_add_library(mvfst_common_address_quic_address_util
   SRCS
     QuicAddressUtil.cpp

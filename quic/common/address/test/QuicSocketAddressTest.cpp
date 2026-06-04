@@ -8,7 +8,9 @@
 #include <quic/common/address/QuicSocketAddress.h>
 
 #include <quic/common/address/QuicAddressUtil.h>
+#include <quic/common/address/QuicSocketAddressBridge.h>
 
+#include <folly/SocketAddress.h>
 #include <folly/portability/GTest.h>
 #include <folly/portability/Sockets.h>
 
@@ -735,4 +737,162 @@ TEST(QuicSocketAddressTest, OstreamOperator) {
   std::ostringstream os;
   os << addr;
   EXPECT_EQ(os.str(), addr.describe());
+}
+
+// =============================================================================
+// Bridge: toFollySocketAddress / fromFollySocketAddress round-trip
+// =============================================================================
+
+TEST(QuicSocketAddressBridgeTest, ToFollyRoundTripIPv4) {
+  QuicSocketAddress quicAddr(folly::IPAddress("192.168.1.100"), 443);
+  auto follyAddr = quic::toFollySocketAddress(quicAddr);
+
+  EXPECT_EQ(follyAddr.getIPAddress(), folly::IPAddress("192.168.1.100"));
+  EXPECT_EQ(follyAddr.getPort(), 443);
+  EXPECT_EQ(follyAddr.getFamily(), AF_INET);
+}
+
+TEST(QuicSocketAddressBridgeTest, ToFollyRoundTripIPv6) {
+  QuicSocketAddress quicAddr(folly::IPAddress("2001:db8::1"), 8080);
+  auto follyAddr = quic::toFollySocketAddress(quicAddr);
+
+  EXPECT_EQ(follyAddr.getIPAddress(), folly::IPAddress("2001:db8::1"));
+  EXPECT_EQ(follyAddr.getPort(), 8080);
+  EXPECT_EQ(follyAddr.getFamily(), AF_INET6);
+}
+
+TEST(QuicSocketAddressBridgeTest, ToFollyUninitialized) {
+  QuicSocketAddress quicAddr;
+  auto follyAddr = quic::toFollySocketAddress(quicAddr);
+
+  EXPECT_FALSE(follyAddr.isInitialized());
+}
+
+TEST(QuicSocketAddressBridgeTest, FromFollyRoundTripIPv4) {
+  folly::SocketAddress follyAddr("10.0.0.1", 9000);
+  auto quicAddr = quic::fromFollySocketAddress<QuicSocketAddress>(follyAddr);
+
+  EXPECT_TRUE(quicAddr.isInitialized());
+  EXPECT_EQ(quicAddr.getFamily(), AF_INET);
+  EXPECT_EQ(quicAddr.getPort(), 9000);
+  EXPECT_EQ(quicAddr.getIPAddress(), folly::IPAddress("10.0.0.1"));
+}
+
+TEST(QuicSocketAddressBridgeTest, FromFollyRoundTripIPv6) {
+  folly::SocketAddress follyAddr("::1", 4433);
+  auto quicAddr = quic::fromFollySocketAddress<QuicSocketAddress>(follyAddr);
+
+  EXPECT_TRUE(quicAddr.isInitialized());
+  EXPECT_EQ(quicAddr.getFamily(), AF_INET6);
+  EXPECT_EQ(quicAddr.getPort(), 4433);
+  EXPECT_EQ(quicAddr.getIPAddress(), folly::IPAddress("::1"));
+}
+
+TEST(QuicSocketAddressBridgeTest, FromFollyUninitialized) {
+  folly::SocketAddress follyAddr;
+  auto quicAddr = quic::fromFollySocketAddress<QuicSocketAddress>(follyAddr);
+
+  EXPECT_FALSE(quicAddr.isInitialized());
+}
+
+TEST(QuicSocketAddressBridgeTest, FromFollyNonInetReturnsEmpty) {
+  // A non-inet folly address (AF_UNIX) has no QuicSocketAddress representation
+  // — mvfst is inet-only. It must convert to an empty (uninitialized) result
+  // rather than a live object carrying a meaningless family.
+  folly::SocketAddress follyAddr;
+  follyAddr.setFromPath("/tmp/quic_bridge_test.sock");
+  ASSERT_TRUE(follyAddr.isInitialized());
+  ASSERT_FALSE(follyAddr.isFamilyInet());
+
+  auto quicAddr = quic::fromFollySocketAddress<QuicSocketAddress>(follyAddr);
+  EXPECT_FALSE(quicAddr.isInitialized());
+}
+
+TEST(QuicSocketAddressBridgeTest, FullRoundTripFollyToQuicToFolly) {
+  folly::SocketAddress original("172.16.254.1", 5000);
+  auto quicAddr = quic::fromFollySocketAddress<QuicSocketAddress>(original);
+  auto roundTripped = quic::toFollySocketAddress(quicAddr);
+
+  EXPECT_EQ(roundTripped, original);
+}
+
+TEST(QuicSocketAddressBridgeTest, FullRoundTripQuicToFollyToQuic) {
+  QuicSocketAddress original(folly::IPAddress("10.20.30.40"), 6000);
+  auto follyAddr = quic::toFollySocketAddress(original);
+  auto roundTripped =
+      quic::fromFollySocketAddress<QuicSocketAddress>(follyAddr);
+
+  EXPECT_EQ(roundTripped, original);
+}
+
+TEST(QuicSocketAddressBridgeTest, IdentityPassthroughForFollySocketAddress) {
+  // When T is folly::SocketAddress, toFollySocketAddress should be identity
+  folly::SocketAddress original("1.2.3.4", 80);
+  auto result = quic::toFollySocketAddress(original);
+  EXPECT_EQ(result, original);
+}
+
+TEST(QuicSocketAddressBridgeTest, IdentityPassthroughFromFollySocketAddress) {
+  // When DestT is folly::SocketAddress, fromFollySocketAddress should be
+  // identity
+  folly::SocketAddress original("1.2.3.4", 80);
+  auto result = quic::fromFollySocketAddress<folly::SocketAddress>(original);
+  EXPECT_EQ(result, original);
+}
+
+TEST(QuicSocketAddressBridgeTest, ToFollySocketAddressRefWithQuicAddr) {
+  QuicSocketAddress quicAddr(folly::IPAddress("10.0.0.1"), 80);
+  folly::SocketAddress cache;
+  const auto& ref = quic::toFollySocketAddressRef(quicAddr, cache);
+
+  // ref should point to cache
+  EXPECT_EQ(&ref, &cache);
+  EXPECT_EQ(ref.getIPAddress(), folly::IPAddress("10.0.0.1"));
+  EXPECT_EQ(ref.getPort(), 80);
+}
+
+TEST(QuicSocketAddressBridgeTest, ToFollySocketAddressRefWithFollyAddr) {
+  folly::SocketAddress follyAddr("10.0.0.1", 80);
+  folly::SocketAddress cache;
+  const auto& ref = quic::toFollySocketAddressRef(follyAddr, cache);
+
+  // ref should point to the original follyAddr (identity, zero overhead)
+  EXPECT_EQ(&ref, &follyAddr);
+}
+
+TEST(QuicSocketAddressBridgeTest, ToFollySocketAddressRefCachesCorrectly) {
+  QuicSocketAddress quicAddr(folly::IPAddress("192.168.0.1"), 443);
+  folly::SocketAddress cache;
+
+  // First call populates cache
+  const auto& ref1 = quic::toFollySocketAddressRef(quicAddr, cache);
+  EXPECT_EQ(ref1.getPort(), 443);
+
+  // Change the quic address and call again — cache should be updated
+  QuicSocketAddress quicAddr2(folly::IPAddress("192.168.0.2"), 8443);
+  const auto& ref2 = quic::toFollySocketAddressRef(quicAddr2, cache);
+  EXPECT_EQ(ref2.getPort(), 8443);
+  EXPECT_EQ(ref2.getIPAddress(), folly::IPAddress("192.168.0.2"));
+}
+
+TEST(QuicSocketAddressBridgeTest, FromFollySocketAddressRefIdentityForFolly) {
+  // DestT == folly::SocketAddress: identity branch returns the input reference
+  // directly (zero copy), the cache is untouched.
+  folly::SocketAddress follyAddr("10.0.0.1", 80);
+  folly::SocketAddress cache;
+  const auto& ref =
+      quic::fromFollySocketAddressRef<folly::SocketAddress>(follyAddr, cache);
+  EXPECT_EQ(&ref, &follyAddr);
+}
+
+TEST(QuicSocketAddressBridgeTest, FromFollySocketAddressRefConvertsIntoCache) {
+  // DestT == QuicSocketAddress (distinct type): converts into the caller cache
+  // and returns a reference to it.
+  folly::SocketAddress follyAddr("10.0.0.1", 80);
+  QuicSocketAddress cache;
+  const auto& ref =
+      quic::fromFollySocketAddressRef<QuicSocketAddress>(follyAddr, cache);
+  EXPECT_EQ(&ref, &cache);
+  EXPECT_EQ(ref.getPort(), 80);
+  EXPECT_EQ(ref.getIPAddress(), folly::IPAddress("10.0.0.1"));
 }

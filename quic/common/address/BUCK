@@ -18,6 +18,17 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "quic_socket_address_bridge",
+    headers = [
+        "QuicSocketAddressBridge.h",
+    ],
+    exported_deps = [
+        ":quic_socket_address",
+        "//folly:network_address",
+    ],
+)
+
+mvfst_cpp_library(
     name = "quic_address_util",
     srcs = [
         "QuicAddressUtil.cpp",

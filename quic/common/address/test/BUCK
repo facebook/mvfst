@@ -8,9 +8,11 @@ mvfst_cpp_test(
         "QuicSocketAddressTest.cpp",
     ],
     deps = [
+        "//folly:network_address",
         "//folly/portability:gtest",
         "//folly/portability:sockets",
         "//quic/common/address:quic_address_util",
         "//quic/common/address:quic_socket_address",
+        "//quic/common/address:quic_socket_address_bridge",
     ],
 )
