@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <folly/SocketAddress.h>
 #include <folly/container/F14Map.h>
 #include <folly/container/F14Set.h>
 #include <folly/container/heap_vector_types.h>
@@ -75,5 +76,7 @@ template <class T>
 using OptionalIntegral = detail::tiny::optional<T>;
 
 using OptionalMicros = detail::tiny::optional<std::chrono::microseconds>;
+
+using SocketAddress = folly::SocketAddress;
 
 } // namespace quic

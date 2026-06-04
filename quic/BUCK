@@ -72,13 +72,18 @@ mvfst_cpp_library(
     }),
     exported_deps = select({
         "DEFAULT": [
+            "//folly:network_address",  # @manual
             "//folly:small_vector",  # @manual
             "//folly/container:f14_hash",  # @manual
             "//folly/container:heap_vector_types",  # @manual
             "//quic/common/third-party:tiny_optional",  # @manual
         ],
-        "ovr_config//os/constraints:android": [],  # @manual
-        "ovr_config//os/constraints:iphoneos": [],  # @manual
+        "ovr_config//os/constraints:android": [
+            "//folly:network_address",  # @manual
+        ],
+        "ovr_config//os/constraints:iphoneos": [
+            "//folly:network_address",  # @manual
+        ],
     }),
 )
 
@@ -131,7 +136,8 @@ mvfst_cpp_library(
         "DEFAULT": ["//quic/common:mvfst_logging"],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
-    }) + [],
+    }) + [
+    ],
     exported_deps = [
         ":constants",
         ":tls_exception",
