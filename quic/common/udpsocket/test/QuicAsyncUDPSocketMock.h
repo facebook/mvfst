@@ -17,45 +17,38 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD(
       (quic::Expected<void, QuicError>),
       bind,
-      (const folly::SocketAddress&));
+      (const quic::SocketAddress&));
   MOCK_METHOD((bool), isBound, (), (const));
   MOCK_METHOD(
       (quic::Expected<void, QuicError>),
       connect,
-      (const folly::SocketAddress&));
+      (const quic::SocketAddress&));
   MOCK_METHOD((quic::Expected<void, QuicError>), close, ());
   MOCK_METHOD((void), resumeRead, (ReadCallback*));
   MOCK_METHOD((void), pauseRead, ());
   MOCK_METHOD(
       (ssize_t),
       write,
-      (const folly::SocketAddress&, const struct iovec* vec, size_t iovec_len));
-  MOCK_METHOD(
-      (int),
-      writem,
-      (folly::Range<folly::SocketAddress const*>, iovec*, size_t*, size_t));
+      (const quic::SocketAddress&, const struct iovec* vec, size_t iovec_len));
+  MOCK_METHOD((int), writem, (AddressRange, iovec*, size_t*, size_t));
   MOCK_METHOD(
       ssize_t,
       writeGSO,
-      (const folly::SocketAddress&,
+      (const quic::SocketAddress&,
        const struct iovec* vec,
        size_t iovec_len,
        WriteOptions));
   MOCK_METHOD(
       (int),
       writemGSO,
-      (folly::Range<folly::SocketAddress const*>,
+      (AddressRange,
        const std::unique_ptr<folly::IOBuf>*,
        size_t,
        const WriteOptions*));
   MOCK_METHOD(
       (int),
       writemGSO,
-      (folly::Range<folly::SocketAddress const*>,
-       iovec*,
-       size_t*,
-       size_t,
-       const WriteOptions*));
+      (AddressRange, iovec*, size_t*, size_t, const WriteOptions*));
   MOCK_METHOD((ssize_t), recvmsg, (struct msghdr*, int));
   MOCK_METHOD(
       (int),
@@ -69,11 +62,11 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD((quic::Expected<int, QuicError>), getGRO, ());
   MOCK_METHOD((quic::Expected<void, QuicError>), setGRO, (bool));
   MOCK_METHOD(
-      (quic::Expected<folly::SocketAddress, QuicError>),
+      (quic::Expected<quic::SocketAddress, QuicError>),
       address,
       (),
       (const));
-  MOCK_METHOD((const folly::SocketAddress&), addressRef, (), (const));
+  MOCK_METHOD((const quic::SocketAddress&), addressRef, (), (const));
   MOCK_METHOD((void), attachEventBase, (std::shared_ptr<QuicEventBase>));
   MOCK_METHOD((void), detachEventBase, ());
   MOCK_METHOD((std::shared_ptr<QuicEventBase>), getEventBase, (), (const));
@@ -173,10 +166,10 @@ class MockUDPReadCallback : public quic::QuicAsyncUDPSocket::ReadCallback {
   MOCK_METHOD(
       void,
       onDataAvailable_,
-      (const folly::SocketAddress&, size_t, bool, OnDataAvailableParams));
+      (const quic::SocketAddress&, size_t, bool, OnDataAvailableParams));
 
   void onDataAvailable(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       size_t len,
       bool truncated,
       OnDataAvailableParams params) noexcept override {

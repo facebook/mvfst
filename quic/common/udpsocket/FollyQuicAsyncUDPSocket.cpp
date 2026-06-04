@@ -10,11 +10,44 @@
 #include <quic/common/Expected.h>
 #include <quic/common/MvfstLogging.h> // For QuicError, QuicErrorCode, TransportErrorCode
 #include <quic/common/StringUtils.h>
+#include <quic/common/address/QuicSocketAddressBridge.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <cerrno> // For errno
 #include <memory>
+#include <vector>
 
 namespace quic {
+
+// Verify that quic::SocketAddress is currently an alias for
+// folly::SocketAddress on server builds. On mobile (Android/Apple),
+// quic::SocketAddress is a distinct type, so skip this check.
+#if !defined(__ANDROID__) && !defined(__APPLE__)
+static_assert(
+    std::is_same_v<quic::SocketAddress, folly::SocketAddress>,
+    "quic::SocketAddress must be folly::SocketAddress on server builds");
+#endif
+
+namespace {
+
+template <typename AddrRange>
+auto toFollyAddrRange(
+    const AddrRange& addrs,
+    std::vector<folly::SocketAddress>& buf) {
+  if constexpr (std::is_same_v<
+                    std::decay_t<decltype(*addrs.data())>,
+                    folly::SocketAddress>) {
+    return addrs;
+  } else {
+    buf.reserve(addrs.size());
+    for (const auto& addr : addrs) {
+      buf.push_back(quic::toFollySocketAddress(addr));
+    }
+    return folly::Range<const folly::SocketAddress*>(buf.data(), buf.size());
+  }
+}
+
+} // namespace
+
 quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::init(
     sa_family_t family) {
   try {
@@ -32,9 +65,10 @@ quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::init(
 }
 
 quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::bind(
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   try {
-    follySocket_.bind(address);
+    folly::SocketAddress addrCache;
+    follySocket_.bind(quic::toFollySocketAddressRef(address, addrCache));
     return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly bind failed: " + std::string(ex.what());
@@ -52,9 +86,10 @@ quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::bind(
 }
 
 quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::connect(
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   try {
-    follySocket_.connect(address);
+    folly::SocketAddress addrCache;
+    follySocket_.connect(quic::toFollySocketAddressRef(address, addrCache));
     return {};
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly connect failed: " + std::string(ex.what());
@@ -130,13 +165,18 @@ quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setErrMessageCallback(
 }
 
 ssize_t FollyQuicAsyncUDPSocket::write(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     const struct iovec* vec,
     size_t iovec_len) {
   try {
     folly::AsyncUDPSocket::WriteOptions writeOptions(
         0 /*gsoVal*/, false /* zerocopyVal*/);
-    return follySocket_.writev(address, vec, iovec_len, writeOptions);
+    folly::SocketAddress addrCache;
+    return follySocket_.writev(
+        quic::toFollySocketAddressRef(address, addrCache),
+        vec,
+        iovec_len,
+        writeOptions);
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
@@ -146,14 +186,15 @@ ssize_t FollyQuicAsyncUDPSocket::write(
 }
 
 int FollyQuicAsyncUDPSocket::writem(
-    folly::Range<folly::SocketAddress const*> addrs,
+    AddressRange addrs,
     iovec* iov,
     size_t* numIovecsInBuffer,
     size_t count) {
   try {
-    return follySocket_.writemv(addrs, iov, numIovecsInBuffer, count);
+    std::vector<folly::SocketAddress> buf;
+    auto range = toFollyAddrRange(addrs, buf);
+    return follySocket_.writemv(range, iov, numIovecsInBuffer, count);
   } catch (const folly::AsyncSocketException& ex) {
-    // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
     MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writem failed: " << ex.what();
     return -1;
@@ -161,7 +202,7 @@ int FollyQuicAsyncUDPSocket::writem(
 }
 
 ssize_t FollyQuicAsyncUDPSocket::writeGSO(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     const struct iovec* vec,
     size_t iovec_len,
     WriteOptions options) {
@@ -169,7 +210,12 @@ ssize_t FollyQuicAsyncUDPSocket::writeGSO(
     folly::AsyncUDPSocket::WriteOptions follyOptions(
         options.gso, options.zerocopy);
     follyOptions.txTime = options.txTime;
-    return follySocket_.writev(address, vec, iovec_len, follyOptions);
+    folly::SocketAddress addrCache;
+    return follySocket_.writev(
+        quic::toFollySocketAddressRef(address, addrCache),
+        vec,
+        iovec_len,
+        follyOptions);
   } catch (const folly::AsyncSocketException& ex) {
     // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
@@ -179,20 +225,21 @@ ssize_t FollyQuicAsyncUDPSocket::writeGSO(
 }
 
 int FollyQuicAsyncUDPSocket::writemGSO(
-    folly::Range<folly::SocketAddress const*> addrs,
+    AddressRange addrs,
     const BufPtr* bufs,
     size_t count,
     const WriteOptions* options) {
   try {
+    std::vector<folly::SocketAddress> buf;
+    auto range = toFollyAddrRange(addrs, buf);
     std::vector<folly::AsyncUDPSocket::WriteOptions> follyOptions(count);
     for (size_t i = 0; i < count; ++i) {
       follyOptions[i].gso = options[i].gso;
       follyOptions[i].zerocopy = options[i].zerocopy;
       follyOptions[i].txTime = options[i].txTime;
     }
-    return follySocket_.writemGSO(addrs, bufs, count, follyOptions.data());
+    return follySocket_.writemGSO(range, bufs, count, follyOptions.data());
   } catch (const folly::AsyncSocketException& ex) {
-    // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
     MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writemGSO(IOBuf) failed: "
                 << ex.what();
@@ -201,12 +248,14 @@ int FollyQuicAsyncUDPSocket::writemGSO(
 }
 
 int FollyQuicAsyncUDPSocket::writemGSO(
-    folly::Range<folly::SocketAddress const*> addrs,
+    AddressRange addrs,
     iovec* iov,
     size_t* numIovecsInBuffer,
     size_t count,
     const WriteOptions* options) {
   try {
+    std::vector<folly::SocketAddress> buf;
+    auto range = toFollyAddrRange(addrs, buf);
     std::vector<folly::AsyncUDPSocket::WriteOptions> follyOptions(count);
     for (size_t i = 0; i < count; ++i) {
       follyOptions[i].gso = options[i].gso;
@@ -214,9 +263,8 @@ int FollyQuicAsyncUDPSocket::writemGSO(
       follyOptions[i].txTime = options[i].txTime;
     }
     return follySocket_.writemGSOv(
-        addrs, iov, numIovecsInBuffer, count, follyOptions.data());
+        range, iov, numIovecsInBuffer, count, follyOptions.data());
   } catch (const folly::AsyncSocketException& ex) {
-    // Log the error, set errno, return -1 for syscall-like behavior
     errno = ex.getErrno();
     MVLOG_ERROR << "FollyQuicAsyncUDPSocket::writemGSO(iovec) failed: "
                 << ex.what();
@@ -353,10 +401,11 @@ quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setTosOrTrafficClass(
   }
 }
 
-[[nodiscard]] quic::Expected<folly::SocketAddress, QuicError>
+[[nodiscard]] quic::Expected<quic::SocketAddress, QuicError>
 FollyQuicAsyncUDPSocket::address() const {
   try {
-    return follySocket_.address();
+    return quic::fromFollySocketAddress<quic::SocketAddress>(
+        follySocket_.address());
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly address() failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
@@ -368,10 +417,11 @@ FollyQuicAsyncUDPSocket::address() const {
   }
 }
 
-[[nodiscard]] const folly::SocketAddress& FollyQuicAsyncUDPSocket::addressRef()
+[[nodiscard]] const quic::SocketAddress& FollyQuicAsyncUDPSocket::addressRef()
     const {
   try {
-    return follySocket_.address();
+    return quic::fromFollySocketAddressRef(
+        follySocket_.address(), cachedAddress_);
   } catch (const folly::AsyncSocketException& ex) {
     std::string errorMsg = "Folly address() failed: " + std::string(ex.what());
     if (ex.getErrno() != 0) {
@@ -643,8 +693,14 @@ void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onDataAvailable(
     localParams.ts.emplace(*params.ts);
   }
 
+  // Forward by reference: on server (identity) this aliases `client` with no
+  // copy; on mobile it converts once into the local cache. Avoids the per-
+  // packet copy that fromFollySocketAddress() (returns by value) would incur.
+  quic::SocketAddress quicClientCache;
+  const quic::SocketAddress& quicClient =
+      quic::fromFollySocketAddressRef(client, quicClientCache);
   return wrappedReadCallback_->onDataAvailable(
-      client, len, truncated, localParams);
+      quicClient, len, truncated, localParams);
 }
 
 void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onNotifyDataAvailable(

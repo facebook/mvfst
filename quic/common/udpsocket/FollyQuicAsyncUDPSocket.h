@@ -61,13 +61,13 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       sa_family_t family) override;
 
   [[nodiscard]] quic::Expected<void, QuicError> bind(
-      const folly::SocketAddress& address) override;
+      const quic::SocketAddress& address) override;
   // TODO: bind should return Expected
 
   [[nodiscard]] bool isBound() const override;
 
   quic::Expected<void, QuicError> connect(
-      const folly::SocketAddress& address) override;
+      const quic::SocketAddress& address) override;
 
   quic::Expected<void, QuicError> close() override;
 
@@ -77,18 +77,18 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   void pauseRead() override;
 
   ssize_t write(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       const struct iovec* vec,
       size_t iovec_len) override;
 
   int writem(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       iovec* iov,
       size_t* numIovecsInBuffer,
       size_t count) override;
 
   ssize_t writeGSO(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       const struct iovec* vec,
       size_t iovec_len,
       WriteOptions options) override;
@@ -103,13 +103,13 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    *  verify GSO is supported on this platform by calling getGSO
    */
   int writemGSO(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       const BufPtr* bufs,
       size_t count,
       const WriteOptions* options) override;
 
   int writemGSO(
-      folly::Range<folly::SocketAddress const*> addrs,
+      AddressRange addrs,
       iovec* iov,
       size_t* numIovecsInBuffer,
       size_t count,
@@ -143,13 +143,13 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   /**
    * Returns the socket address this socket is bound to and error otherwise.
    */
-  [[nodiscard]] quic::Expected<folly::SocketAddress, QuicError> address()
+  [[nodiscard]] quic::Expected<quic::SocketAddress, QuicError> address()
       const override;
 
   /**
    * Returns the socket address this socket is bound to and crashes otherwise.
    */
-  [[nodiscard]] const folly::SocketAddress& addressRef() const override;
+  [[nodiscard]] const quic::SocketAddress& addressRef() const override;
 
   /**
    * Manage the eventbase driving this socket
@@ -283,5 +283,6 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   std::unique_ptr<FollyErrCallbackWrapper> errCallbackWrapper_{nullptr};
   std::unique_ptr<folly::AsyncUDPSocket> follySocketPtr;
   folly::AsyncUDPSocket& follySocket_;
+  mutable quic::SocketAddress cachedAddress_;
 };
 } // namespace quic

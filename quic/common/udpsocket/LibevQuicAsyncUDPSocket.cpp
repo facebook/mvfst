@@ -92,7 +92,7 @@ void LibevQuicAsyncUDPSocket::pauseWrite() {
 }
 
 ssize_t LibevQuicAsyncUDPSocket::write(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     const struct iovec* vec,
     size_t iovec_len) {
   if (fd_ == -1) {
@@ -160,7 +160,7 @@ quic::Expected<int, QuicError> LibevQuicAsyncUDPSocket::getGSO() {
 }
 
 ssize_t LibevQuicAsyncUDPSocket::writeGSO(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     const struct iovec* vec,
     size_t iovec_len,
     WriteOptions options) {
@@ -294,7 +294,7 @@ bool LibevQuicAsyncUDPSocket::isBound() const {
   return bound_;
 }
 
-quic::Expected<folly::SocketAddress, QuicError>
+quic::Expected<quic::SocketAddress, QuicError>
 LibevQuicAsyncUDPSocket::address() const {
   if (!bound_) {
     // Return error if not bound
@@ -305,7 +305,7 @@ LibevQuicAsyncUDPSocket::address() const {
   return localAddress_;
 }
 
-const folly::SocketAddress& LibevQuicAsyncUDPSocket::addressRef() const {
+const quic::SocketAddress& LibevQuicAsyncUDPSocket::addressRef() const {
   LOG_IF(FATAL, !bound_) << "socket is not bound";
   return localAddress_;
 }
@@ -473,7 +473,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::init(
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::bind(
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   // TODO: remove dependency on folly::SocketAdress since this pulls in
   // folly::portability and other headers which should be avoidable.
   if (fd_ == -1) {
@@ -518,7 +518,7 @@ quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::bind(
 }
 
 quic::Expected<void, QuicError> LibevQuicAsyncUDPSocket::connect(
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   if (fd_ == -1) {
     auto initResult = init(address.getFamily());
     if (initResult.hasError()) {

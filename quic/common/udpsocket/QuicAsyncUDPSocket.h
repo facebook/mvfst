@@ -10,7 +10,6 @@
 #include <type_traits>
 
 #include <folly/Range.h>
-#include <folly/SocketAddress.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncSocketException.h>
@@ -22,6 +21,7 @@
 #include <quic/common/NetworkData.h>
 #include <quic/common/Optional.h>
 #include <quic/common/events/QuicEventBase.h>
+#include <quic/mvfst-config.h>
 
 namespace quic {
 // Forward declarations are likely in QuicException.h now
@@ -71,7 +71,7 @@ class QuicAsyncUDPSocket {
     virtual void onReadError(const folly::AsyncSocketException&) noexcept = 0;
     virtual void getReadBuffer(void**, size_t*) noexcept = 0;
     virtual void onDataAvailable(
-        const folly::SocketAddress&,
+        const quic::SocketAddress&,
         size_t,
         bool,
         OnDataAvailableParams) noexcept = 0;
@@ -112,7 +112,7 @@ class QuicAsyncUDPSocket {
    * returns.
    */
   [[nodiscard]] virtual quic::Expected<void, QuicError> bind(
-      const folly::SocketAddress& address) = 0;
+      const quic::SocketAddress& address) = 0;
 
   [[nodiscard]] virtual bool isBound() const = 0;
 
@@ -136,7 +136,7 @@ class QuicAsyncUDPSocket {
    * Returns the result of calling the connect syscall.
    */
   [[nodiscard]] virtual quic::Expected<void, QuicError> connect(
-      const folly::SocketAddress& /* address */) = 0;
+      const quic::SocketAddress& /* address */) = 0;
 
   /**
    * Stop listening on the socket.
@@ -180,7 +180,7 @@ class QuicAsyncUDPSocket {
    * ::sendmsg.
    */
   virtual ssize_t write(
-      const folly::SocketAddress& /* address */,
+      const quic::SocketAddress& /* address */,
       const struct iovec* vec,
       size_t iovec_len) = 0;
 
@@ -218,7 +218,7 @@ class QuicAsyncUDPSocket {
    *  verify GSO is supported on this platform by calling getGSO
    */
   virtual ssize_t writeGSO(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       const struct iovec* vec,
       size_t iovec_len,
       WriteOptions options) = 0;
@@ -305,13 +305,13 @@ class QuicAsyncUDPSocket {
   /**
    * Returns the socket address this socket is bound to and error otherwise.
    */
-  [[nodiscard]] virtual quic::Expected<folly::SocketAddress, QuicError>
-  address() const = 0;
+  [[nodiscard]] virtual quic::Expected<quic::SocketAddress, QuicError> address()
+      const = 0;
 
   /**
    * Returns the socket address this socket is bound to and crashes otherwise.
    */
-  [[nodiscard]] virtual const folly::SocketAddress& addressRef() const = 0;
+  [[nodiscard]] virtual const quic::SocketAddress& addressRef() const = 0;
 
   /**
    * Manage the eventbase driving this socket

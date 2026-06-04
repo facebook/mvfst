@@ -13,12 +13,12 @@ mvfst_cpp_library(
     ],
     deps = ["//quic/common:mvfst_logging"],
     exported_deps = [
-        "//folly:network_address",
         "//folly:range",
         "//folly/io:iobuf",
         "//folly/io:socket_option_map",
         "//folly/io/async:async_socket_exception",
         "//folly/portability:sockets",
+        "//quic:config",
         "//quic:constants",
         "//quic:exception",
         "//quic/common:expected",
@@ -59,6 +59,7 @@ mvfst_cpp_library(
         "//folly/io/async:async_socket_exception",
         "//quic:exception",
         "//quic/common:string_utils",
+        "//quic/common/address:quic_socket_address_bridge",
     ],
     exported_deps = [
         ":quic_async_udp_socket_impl",

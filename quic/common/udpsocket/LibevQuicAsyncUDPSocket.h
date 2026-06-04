@@ -27,12 +27,12 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       sa_family_t family) override;
 
   [[nodiscard]] quic::Expected<void, QuicError> bind(
-      const folly::SocketAddress& address) override;
+      const quic::SocketAddress& address) override;
 
   [[nodiscard]] bool isBound() const override;
 
   quic::Expected<void, QuicError> connect(
-      const folly::SocketAddress& address) override;
+      const quic::SocketAddress& address) override;
 
   quic::Expected<void, QuicError> close() override;
 
@@ -44,7 +44,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   [[nodiscard]] bool isReadPaused() const override;
 
   ssize_t write(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       const struct iovec* vec,
       size_t iovec_len) override;
 
@@ -55,7 +55,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
       size_t count) override;
 
   ssize_t writeGSO(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       const struct iovec* vec,
       size_t iovec_len,
       WriteOptions options) override;
@@ -115,13 +115,13 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   /**
    * Returns the socket address this socket is bound to and error otherwise.
    */
-  [[nodiscard]] quic::Expected<folly::SocketAddress, QuicError> address()
+  [[nodiscard]] quic::Expected<quic::SocketAddress, QuicError> address()
       const override;
 
   /**
    * Returns the socket address this socket is bound to and crashes otherwise.
    */
-  [[nodiscard]] const folly::SocketAddress& addressRef() const override;
+  [[nodiscard]] const quic::SocketAddress& addressRef() const override;
 
   /**
    * Manage the eventbase driving this socket
@@ -225,8 +225,8 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   size_t handleSocketErrors();
 
   int fd_{-1};
-  folly::SocketAddress localAddress_;
-  folly::SocketAddress connectedAddress_;
+  quic::SocketAddress localAddress_;
+  quic::SocketAddress connectedAddress_;
   FDOwnership ownership_;
 
   std::shared_ptr<LibevQuicEventBase> evb_{nullptr};

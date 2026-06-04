@@ -15,12 +15,12 @@ mvfst_add_library(mvfst_common_udpsocket_quic_async_udp_socket
     mvfst_common_expected
     mvfst_common_network_data
     mvfst_common_optional
+    mvfst_config
     mvfst_constants
     mvfst_exception
     Folly::folly_io_async_async_socket_exception
     Folly::folly_io_iobuf
     Folly::folly_io_socket_option_map
-    Folly::folly_network_address
     Folly::folly_portability_sockets
     Folly::folly_range
 )
@@ -41,6 +41,7 @@ mvfst_add_library(mvfst_common_udpsocket_folly_async_udp_socket
   SRCS
     FollyQuicAsyncUDPSocket.cpp
   DEPS
+    mvfst_common_address_quic_socket_address_bridge
     mvfst_common_string_utils
     mvfst_exception
     Folly::folly_io_async_async_socket_exception

@@ -141,7 +141,7 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
 #endif
     totalData += bytesRead;
 
-    folly::SocketAddress packetPeerAddress;
+    quic::SocketAddress packetPeerAddress;
     {
       auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
       packetPeerAddress.setFromSockaddr(rawAddr, kAddrLen);
