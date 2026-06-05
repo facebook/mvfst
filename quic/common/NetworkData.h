@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <folly/SocketAddress.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/Optional.h>
 #include <quic/common/TimePoints.h>
+#include <quic/mvfst-config.h>
 
 #include <memory>
 #include <vector>
@@ -88,7 +88,7 @@ struct ReceivedUdpPacket {
 
   // Source address of the datagram. Populated by socket readers
   // (recvmmsgNetworkData, recvMsg, recvMmsg).
-  Optional<folly::SocketAddress> peerAddress;
+  Optional<quic::SocketAddress> peerAddress;
 };
 
 struct NetworkData {
@@ -161,7 +161,7 @@ struct NetworkData {
     }
   }
 
-  void setPeerAddressForAllPackets(const folly::SocketAddress& peerAddress) {
+  void setPeerAddressForAllPackets(const quic::SocketAddress& peerAddress) {
     for (auto& packet : packets_) {
       packet.peerAddress = peerAddress;
     }

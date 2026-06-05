@@ -10,17 +10,17 @@
 #include <chrono>
 #include <string>
 
-#include <folly/SocketAddress.h>
 #include <quic/QuicConstants.h>
 #include <quic/congestion_control/CongestionController.h>
+#include <quic/mvfst-config.h>
 
 namespace quic {
 
 struct QuicConnectionStats {
   uint8_t workerID{0};
   uint32_t numConnIDs{0};
-  folly::SocketAddress localAddress;
-  folly::SocketAddress peerAddress;
+  quic::SocketAddress localAddress;
+  quic::SocketAddress peerAddress;
   std::chrono::duration<float> duration{0};
   uint64_t cwnd_bytes{0};
   CongestionControlType congestionController;

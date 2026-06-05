@@ -419,11 +419,11 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   Optional<QuicVersion> originalVersion;
 
   // Original address used by the peer when first establishing the connection.
-  folly::SocketAddress originalPeerAddress;
+  quic::SocketAddress originalPeerAddress;
 
   // Current peer address.
   // TODO: JBESHAY MIGRATION - Read this from the current path state instead.
-  folly::SocketAddress peerAddress;
+  quic::SocketAddress peerAddress;
 
   // Current path id as tracked by the path manager.
   PathIdType currentPathId;
@@ -434,7 +434,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Local address. INADDR_ANY if not set.
   // TODO: JBESHAY MIGRATION - Read this from the current path state instead.
-  Optional<folly::SocketAddress> localAddress;
+  Optional<quic::SocketAddress> localAddress;
 
   // Local error on the connection.
   Optional<QuicError> localConnectionError;

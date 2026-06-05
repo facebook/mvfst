@@ -24,8 +24,8 @@ QuicPathManager::QuicPathManager(
 }
 
 quic::Expected<PathIdType, QuicError> QuicPathManager::addPath(
-    const folly::SocketAddress& localAddress,
-    const folly::SocketAddress& peerAddress,
+    const quic::SocketAddress& localAddress,
+    const quic::SocketAddress& peerAddress,
     std::unique_ptr<QuicAsyncUDPSocket> socket) {
   auto it = pathTupleToId_.find({localAddress, peerAddress});
   if (it != pathTupleToId_.end()) {
@@ -61,8 +61,8 @@ quic::Expected<PathIdType, QuicError> QuicPathManager::addPath(
 
 quic::Expected<std::reference_wrapper<const PathInfo>, QuicError>
 QuicPathManager::getOrAddPath(
-    const folly::SocketAddress& localAddress,
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& localAddress,
+    const quic::SocketAddress& peerAddress) {
   if (cachedPath_ && cachedPath_->localAddress == localAddress &&
       cachedPath_->peerAddress == peerAddress) {
     return std::cref(*cachedPath_);
@@ -81,8 +81,8 @@ QuicPathManager::getOrAddPath(
 }
 
 quic::Expected<PathIdType, QuicError> QuicPathManager::addValidatedPath(
-    const folly::SocketAddress& localAddress,
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& localAddress,
+    const quic::SocketAddress& peerAddress) {
   auto idRes = addPath(localAddress, peerAddress, nullptr);
   if (idRes.hasError()) {
     return quic::make_unexpected(idRes.error());
@@ -149,8 +149,8 @@ const PathInfo* QuicPathManager::getPath(PathIdType pathId) const {
 }
 
 const PathInfo* QuicPathManager::getPath(
-    const folly::SocketAddress& localAddress,
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& localAddress,
+    const quic::SocketAddress& peerAddress) {
   if (cachedPath_ && cachedPath_->localAddress == localAddress &&
       cachedPath_->peerAddress == peerAddress) {
     return cachedPath_;

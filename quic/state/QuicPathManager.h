@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include <folly/SocketAddress.h>
-
 #include <quic/common/Expected.h>
 #include <quic/common/Optional.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
@@ -56,9 +54,9 @@ constexpr size_t kDefaultInFlightChallengesPerPath = 8;
 struct PathInfo {
   PathIdType id;
   // Local address
-  folly::SocketAddress localAddress;
+  quic::SocketAddress localAddress;
   // Peer address
-  folly::SocketAddress peerAddress;
+  quic::SocketAddress peerAddress;
 
   // If set, use this when writing packets on this path.
   // Otherwise, use the one used by the primary path.
@@ -103,8 +101,8 @@ struct PathInfo {
 
   PathInfo(
       PathIdType idIn,
-      folly::SocketAddress localAddressIn,
-      folly::SocketAddress peerAddressIn,
+      quic::SocketAddress localAddressIn,
+      quic::SocketAddress peerAddressIn,
       std::unique_ptr<QuicAsyncUDPSocket> socketIn,
       PathStatus statusIn)
       : id(idIn),
@@ -144,8 +142,8 @@ class QuicPathManager {
    * Returns the PathId of the newly added path.
    */
   [[nodiscard]] quic::Expected<PathIdType, QuicError> addPath(
-      const folly::SocketAddress& localAddress,
-      const folly::SocketAddress& peerAddress,
+      const quic::SocketAddress& localAddress,
+      const quic::SocketAddress& peerAddress,
       std::unique_ptr<QuicAsyncUDPSocket> socket = nullptr);
 
   /**
@@ -154,8 +152,8 @@ class QuicPathManager {
    */
   quic::Expected<std::reference_wrapper<const PathInfo>, QuicError>
   getOrAddPath(
-      const folly::SocketAddress& localAddress,
-      const folly::SocketAddress& peerAddress);
+      const quic::SocketAddress& localAddress,
+      const quic::SocketAddress& peerAddress);
 
   /**
    * Add a new path that is already validated. This is used for the path used by
@@ -163,8 +161,8 @@ class QuicPathManager {
    * added path.
    */
   [[nodiscard]] quic::Expected<PathIdType, QuicError> addValidatedPath(
-      const folly::SocketAddress& localAddress,
-      const folly::SocketAddress& peerAddress);
+      const quic::SocketAddress& localAddress,
+      const quic::SocketAddress& peerAddress);
 
   /**
    * Remove a path by PathId.
@@ -184,8 +182,8 @@ class QuicPathManager {
    * Returns PathInfo* or nullptr if not found.
    */
   const PathInfo* getPath(
-      const folly::SocketAddress& localAddress,
-      const folly::SocketAddress& peerAddress);
+      const quic::SocketAddress& localAddress,
+      const quic::SocketAddress& peerAddress);
 
   /**
    * Mint a fresh PATH_CHALLENGE for the given path, record it as in-flight
@@ -303,8 +301,7 @@ class QuicPathManager {
   UnorderedNodeMap<PathIdType, PathInfo> pathIdToInfo_;
 
   // localAddress, peerAddress
-  using PathAddressTuple =
-      std::pair<folly::SocketAddress, folly::SocketAddress>;
+  using PathAddressTuple = std::pair<quic::SocketAddress, quic::SocketAddress>;
 
   // Map from PathAddressTuple to PathId
   UnorderedMap<PathAddressTuple, PathIdType> pathTupleToId_;

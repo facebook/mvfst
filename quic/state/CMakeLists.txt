@@ -97,7 +97,6 @@ mvfst_add_library(mvfst_state_quic_state_machine
     mvfst_state_transport_settings
     Folly::folly_container_f14_hash
     Folly::folly_io_async_delayed_destruction
-    Folly::folly_network_address
     Folly::folly_token_bucket
 )
 
@@ -198,9 +197,9 @@ mvfst_add_library(mvfst_state_simple_frame_functions
 
 mvfst_add_library(mvfst_state_quic_connection_stats
   EXPORTED_DEPS
+    mvfst_config
     mvfst_congestion_control_congestion_controller
     mvfst_constants
-    Folly::folly_network_address
 )
 
 mvfst_add_library(mvfst_state_datagram_handler
