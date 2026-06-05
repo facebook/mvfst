@@ -65,18 +65,18 @@ class MockQuicTransport : public QuicServerTransport {
   }
 
   MOCK_METHOD(void, customDestructor, ());
-  MOCK_METHOD(const folly::SocketAddress&, getPeerAddress, (), (const));
-  MOCK_METHOD(const folly::SocketAddress&, getOriginalPeerAddress, (), (const));
+  MOCK_METHOD(const quic::SocketAddress&, getPeerAddress, (), (const));
+  MOCK_METHOD(const quic::SocketAddress&, getOriginalPeerAddress, (), (const));
 
   MOCK_METHOD((std::shared_ptr<QuicEventBase>), getEventBase, (), (const));
   MOCK_METHOD((void), accept, (folly::Optional<QuicVersion>), ());
   MOCK_METHOD((void), setTransportSettings, (TransportSettings), ());
-  MOCK_METHOD((void), setOriginalPeerAddress, (const folly::SocketAddress&));
+  MOCK_METHOD((void), setOriginalPeerAddress, (const quic::SocketAddress&));
   MOCK_METHOD((void), setPacingTimer, (QuicTimer::SharedPtr), (noexcept));
   MOCK_METHOD(
       (void),
       onNetworkData,
-      (const folly::SocketAddress&, const NetworkData&),
+      (const quic::SocketAddress&, const NetworkData&),
       (noexcept));
   MOCK_METHOD(
       (void),
@@ -115,7 +115,7 @@ class MockQuicTransport : public QuicServerTransport {
   MOCK_METHOD((void), setConnectionIdAlgo, (ConnectionIdAlgo*), (noexcept));
 
   void onNetworkData(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       NetworkData&& networkData) noexcept override {
     onNetworkData(localAddress, networkData);
   }

@@ -37,12 +37,12 @@ TYPED_TEST_SUITE_P(QuicAsyncUDPSocketTest);
 TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   ASSERT_FALSE(
-      this->udpSocket_->bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+      this->udpSocket_->bind(quic::SocketAddress("127.0.0.1", 0)).hasError());
   this->udpSocket_->resumeRead(&this->readCb_);
   ASSERT_FALSE(
       this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
 
-  folly::SocketAddress addr("127.0.0.1", 10000);
+  quic::SocketAddress addr("127.0.0.1", 10000);
   bool errRecvd = false;
 
   // Expect an ICMP error
@@ -76,12 +76,12 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ErrToNonExistentServer) {
 TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   ASSERT_FALSE(
-      this->udpSocket_->bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+      this->udpSocket_->bind(quic::SocketAddress("127.0.0.1", 0)).hasError());
   this->udpSocket_->resumeRead(&this->readCb_);
   ASSERT_FALSE(
       this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
   ASSERT_FALSE(this->udpSocket_->setErrMessageCallback(nullptr).hasError());
-  folly::SocketAddress addr("127.0.0.1", 10000);
+  quic::SocketAddress addr("127.0.0.1", 10000);
   EXPECT_CALL(this->errCb_, errMessage_(testing::_)).Times(0);
   EXPECT_CALL(this->readCb_, onNotifyDataAvailable_(testing::_)).Times(0);
 
@@ -116,12 +116,12 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, TestUnsetErrCallback) {
 TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   ASSERT_FALSE(
-      this->udpSocket_->bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+      this->udpSocket_->bind(quic::SocketAddress("127.0.0.1", 0)).hasError());
   this->udpSocket_->resumeRead(&this->readCb_);
   ASSERT_FALSE(
       this->udpSocket_->setErrMessageCallback(&this->errCb_).hasError());
 
-  folly::SocketAddress addr("127.0.0.1", 10000);
+  quic::SocketAddress addr("127.0.0.1", 10000);
   bool errRecvd = false;
   auto evb = this->udpSocket_->getEventBase();
 
@@ -149,7 +149,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, CloseInErrorCallback) {
 }
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, ConnectMarksSocketBoundIPv4) {
-  auto connectAddress = folly::SocketAddress("127.0.0.1", 10000);
+  auto connectAddress = quic::SocketAddress("127.0.0.1", 10000);
   ASSERT_FALSE(this->udpSocket_->connect(connectAddress).hasError());
 
   EXPECT_TRUE(this->udpSocket_->isBound());
@@ -163,7 +163,7 @@ TYPED_TEST_P(QuicAsyncUDPSocketTest, ConnectMarksSocketBoundIPv4) {
 }
 
 TYPED_TEST_P(QuicAsyncUDPSocketTest, ConnectMarksSocketBoundIPv6) {
-  auto connectAddress = folly::SocketAddress("::1", 10000);
+  auto connectAddress = quic::SocketAddress("::1", 10000);
   ASSERT_FALSE(this->udpSocket_->connect(connectAddress).hasError());
 
   EXPECT_TRUE(this->udpSocket_->isBound());

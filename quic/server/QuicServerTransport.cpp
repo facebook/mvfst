@@ -125,7 +125,7 @@ void QuicServerTransport::setHandshakeFinishedCallback(
 }
 
 void QuicServerTransport::setOriginalPeerAddress(
-    const folly::SocketAddress& addr) {
+    const quic::SocketAddress& addr) {
   conn_->originalPeerAddress = addr;
 }
 
@@ -161,7 +161,7 @@ void QuicServerTransport::setServerConnectionIdRejector(
 }
 
 quic::Expected<void, QuicError> QuicServerTransport::onReadData(
-    const folly::SocketAddress& localAddress,
+    const quic::SocketAddress& localAddress,
     ReceivedUdpPacket&& udpPacket) {
   ServerEvents::ReadData readData;
   MVCHECK(udpPacket.peerAddress.has_value());

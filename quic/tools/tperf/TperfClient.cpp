@@ -169,7 +169,7 @@ void TPerfClient::onStreamWriteError(
 }
 
 void TPerfClient::start() {
-  folly::SocketAddress addr(host_.c_str(), port_);
+  quic::SocketAddress addr(host_.c_str(), port_);
   auto sock = std::make_unique<folly::AsyncUDPSocket>(&fEvb_);
   auto sockWrapper =
       std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_, std::move(sock));

@@ -59,7 +59,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     virtual void handleWorkerError(LocalErrorCode error) = 0;
 
     virtual void routeDataToWorker(
-        const folly::SocketAddress& client,
+        const quic::SocketAddress& client,
         RoutingData&& routingData,
         NetworkData&& networkData,
         Optional<QuicVersion> quicVersion,
@@ -125,7 +125,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * Binds to the given address
    */
   void bind(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       FollyAsyncUDPSocketAlias::BindOptions bindOptions =
           FollyAsyncUDPSocketAlias::BindOptions());
 
@@ -142,7 +142,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * Returns listening address of this server
    */
-  [[nodiscard]] const folly::SocketAddress& getAddress() const;
+  [[nodiscard]] const quic::SocketAddress& getAddress() const;
 
   /*
    * Returns the File Descriptor of the listening socket
@@ -162,21 +162,21 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   void allowBeingTakenOver(
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-      const folly::SocketAddress& address);
+      const quic::SocketAddress& address);
 
   /**
    * Override listening address for takeover packets
    * Returns const ref to SocketAddress representing the address it is bound to.
    */
-  const folly::SocketAddress& overrideTakeoverHandlerAddress(
+  const quic::SocketAddress& overrideTakeoverHandlerAddress(
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-      const folly::SocketAddress& address);
+      const quic::SocketAddress& address);
 
   /**
    * Setup address that the taken over quic server is listening to forward
    * misrouted packets belonging to the old server.
    */
-  void startPacketForwarding(const folly::SocketAddress& destAddr);
+  void startPacketForwarding(const quic::SocketAddress& destAddr);
 
   /**
    * Stop forwarding of packets and clean up any allocated resources
@@ -298,7 +298,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   void getReadBuffer(void** buf, size_t* len) noexcept override;
 
   void onDataAvailable(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       size_t len,
       bool truncated,
       OnDataAvailableParams params) noexcept override;
@@ -367,7 +367,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
     }
 
     void onDataAvailable(
-        const folly::SocketAddress& /*client*/,
+        const quic::SocketAddress& /*client*/,
         size_t /*len*/,
         bool /*truncated*/,
         OnDataAvailableParams /*params*/) noexcept override {
@@ -393,7 +393,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   };
 
   void dispatchPacketData(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
       Optional<QuicVersion> quicVersion,
@@ -432,7 +432,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * Try handling the data as a health check.
    */
   bool tryHandlingAsHealthCheck(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       const Buf& data);
 
   /**
@@ -516,24 +516,24 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       const folly::IPAddress& clientIp);
 
   void sendRetryPacket(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       const ConnectionId& dstConnId,
       const ConnectionId& srcConnId);
 
   void sendResetPacket(
       const HeaderForm& headerForm,
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       const NetworkData& networkData,
       const ConnectionId& connId);
 
   bool maybeSendVersionNegotiationPacketOrDrop(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       bool isInitial,
       LongHeaderInvariant& invariant,
       size_t datagramLen);
 
   void sendVersionNegotiationPacket(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       LongHeaderInvariant& invariant);
 
   void recordRxDelay(
@@ -553,7 +553,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * Forward data to the right worker or to the takeover socket
    */
   void forwardNetworkData(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
       Optional<QuicVersion> quicVersion,
@@ -562,7 +562,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // Create transport and invoke appropriate setters
   QuicServerTransport::Ptr makeTransport(
       QuicVersion quicVersion,
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       const Optional<ConnectionId>& srcConnId,
       const ConnectionId& dstConnId,
       bool validNewToken);
@@ -571,7 +571,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // this host/process.
   PacketDropReason isDstConnIdMisrouted(
       const ConnectionId& dstConnId,
-      const folly::SocketAddress& client);
+      const quic::SocketAddress& client);
 
   // Read handler for the shouldOnlyNotify path. Calls recvmmsgNetworkData,
   // then dispatches each packet to handleNetworkData using its peerAddress.

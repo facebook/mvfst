@@ -56,10 +56,10 @@ class QuicPathManagerTest : public ::testing::Test {
   std::unique_ptr<QuicPathManager> manager_;
 
   // Helper addresses for testing
-  const folly::SocketAddress localAddr1_{"192.168.1.100", 8080};
-  const folly::SocketAddress peerAddr1_{"192.168.1.1", 443};
-  const folly::SocketAddress localAddr2_{"192.168.1.100", 8081};
-  const folly::SocketAddress peerAddr2_{"192.168.1.2", 443};
+  const quic::SocketAddress localAddr1_{"192.168.1.100", 8080};
+  const quic::SocketAddress peerAddr1_{"192.168.1.1", 443};
+  const quic::SocketAddress localAddr2_{"192.168.1.100", 8081};
+  const quic::SocketAddress peerAddr2_{"192.168.1.2", 443};
 };
 
 // Basic Path Management Tests
@@ -220,8 +220,8 @@ TEST_F(QuicPathManagerTest, GetPathByAddress) {
   ASSERT_TRUE(result.has_value());
   PathIdType id = result.value();
 
-  const folly::SocketAddress localAddr1Copy{"192.168.1.100", 8080};
-  const folly::SocketAddress peerAddr1Copy{"192.168.1.1", 443};
+  const quic::SocketAddress localAddr1Copy{"192.168.1.100", 8080};
+  const quic::SocketAddress peerAddr1Copy{"192.168.1.1", 443};
   auto path = manager_->getPath(localAddr1Copy, peerAddr1Copy);
   ASSERT_NE(path, nullptr);
   EXPECT_EQ(path->id, id);

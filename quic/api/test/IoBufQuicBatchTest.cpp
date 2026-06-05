@@ -25,7 +25,7 @@ void RunTest(int numBatch) {
   FollyQuicAsyncUDPSocket sock(qEvb);
 
   auto batchWriter = BatchWriterPtr(new test::TestPacketBatchWriter(numBatch));
-  folly::SocketAddress peerAddress{"127.0.0.1", 1234};
+  quic::SocketAddress peerAddress{"127.0.0.1", 1234};
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   QuicClientConnectionState::HappyEyeballsState happyEyeballsState;

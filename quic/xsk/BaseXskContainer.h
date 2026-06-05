@@ -35,8 +35,8 @@ class BaseXskContainer {
       const XskContainerConfig& xskContainerConfig) = 0;
 
   virtual XskSender* pickXsk(
-      const folly::SocketAddress& src,
-      const folly::SocketAddress& dst) = 0;
+      const quic::SocketAddress& src,
+      const quic::SocketAddress& dst) = 0;
 
  protected:
   quic::Expected<std::unique_ptr<XskSender>, std::runtime_error>

@@ -39,7 +39,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
   QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
@@ -51,7 +51,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       _make,
       (folly::EventBase*,
        std::unique_ptr<FollyAsyncUDPSocketAlias>&,
-       const folly::SocketAddress&,
+       const quic::SocketAddress&,
        std::shared_ptr<const fizz::server::FizzServerContext>),
       (noexcept));
 };
@@ -64,7 +64,7 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
   MOCK_METHOD(
       void,
       routeDataToWorkerLong,
-      (const folly::SocketAddress&,
+      (const quic::SocketAddress&,
        std::unique_ptr<RoutingData>&,
        std::unique_ptr<NetworkData>&,
        Optional<QuicVersion>,
@@ -73,14 +73,14 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
   MOCK_METHOD(
       void,
       routeDataToWorkerShort,
-      (const folly::SocketAddress&,
+      (const quic::SocketAddress&,
        std::unique_ptr<RoutingData>&,
        std::unique_ptr<NetworkData>&,
        Optional<QuicVersion>,
        bool isForwardedData));
 
   void routeDataToWorker(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       RoutingData&& routingDataIn,
       NetworkData&& networkDataIn,
       Optional<QuicVersion> quicVersion,
@@ -165,7 +165,7 @@ class MockQuicServerTransport : public QuicServerTransport {
   MOCK_CONST_METHOD0(getOneRttCipherInfo, CipherInfo());
   MOCK_CONST_METHOD0(getServerConnectionId, Optional<ConnectionId>());
   MOCK_CONST_METHOD0(getClientConnectionId, Optional<ConnectionId>());
-  MOCK_CONST_METHOD0(getPeerAddress, folly::SocketAddress&());
+  MOCK_CONST_METHOD0(getPeerAddress, quic::SocketAddress&());
 };
 
 } // namespace quic

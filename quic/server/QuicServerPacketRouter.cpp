@@ -36,7 +36,7 @@ TakeoverHandlerCallback::~TakeoverHandlerCallback() {
   }
 }
 
-void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
+void TakeoverHandlerCallback::bind(const quic::SocketAddress& addr) {
   MVCHECK(socket_);
   // first reset existing socket if any
   socket_->bind(addr);
@@ -45,7 +45,7 @@ void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
 
 void TakeoverHandlerCallback::rebind(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-    const folly::SocketAddress& addr) {
+    const quic::SocketAddress& addr) {
   if (socket_) {
     // first reset existing socket if any
     socket_->pauseRead();
@@ -62,7 +62,7 @@ void TakeoverHandlerCallback::pause() {
   }
 }
 
-const folly::SocketAddress& TakeoverHandlerCallback::getAddress() const {
+const quic::SocketAddress& TakeoverHandlerCallback::getAddress() const {
   MVCHECK(socket_);
   return socket_->address();
 }
@@ -82,7 +82,7 @@ void TakeoverHandlerCallback::getReadBuffer(void** buf, size_t* len) noexcept {
 }
 
 void TakeoverHandlerCallback::onDataAvailable(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     size_t len,
     bool truncated,
     OnDataAvailableParams /*params*/) noexcept {
@@ -123,13 +123,13 @@ void TakeoverHandlerCallback::onReadClosed() noexcept {
 }
 
 void TakeoverPacketHandler::setDestination(
-    const folly::SocketAddress& destAddr) {
-  pktForwardDestAddr_ = folly::SocketAddress(destAddr);
+    const quic::SocketAddress& destAddr) {
+  pktForwardDestAddr_ = quic::SocketAddress(destAddr);
   packetForwardingEnabled_ = true;
 }
 
 void TakeoverPacketHandler::forwardPacketToAnotherServer(
-    const folly::SocketAddress& peerAddress,
+    const quic::SocketAddress& peerAddress,
     NetworkData&& networkData) {
   const TimePoint receiveTimePoint = networkData.getReceiveTimePoint();
   BufPtr buf = std::move(networkData).moveAllData();
@@ -168,7 +168,7 @@ void TakeoverPacketHandler::forwardPacket(BufPtr writeBuffer) {
   if (!pktForwardingSocket_) {
     MVCHECK(socketFactory_);
     pktForwardingSocket_ = socketFactory_->make(worker_->getEventBase(), -1);
-    folly::SocketAddress localAddress;
+    quic::SocketAddress localAddress;
     localAddress.setFromHostPort("::1", 0);
     pktForwardingSocket_->bind(localAddress);
   }
@@ -181,7 +181,7 @@ std::unique_ptr<FollyAsyncUDPSocketAlias> TakeoverPacketHandler::makeSocket(
 }
 
 void TakeoverPacketHandler::processForwardedPacket(
-    const folly::SocketAddress& /*client*/,
+    const quic::SocketAddress& /*client*/,
     BufPtr data) {
   // The 'client' here is the local server that is taking over the port
   // First we decode the actual client and time from the packet
@@ -218,7 +218,7 @@ void TakeoverPacketHandler::processForwardedPacket(
               << " from the forwarded packet. Dropping the packet.";
     return;
   }
-  folly::SocketAddress peerAddress;
+  quic::SocketAddress peerAddress;
   try {
     MVCHECK_NOTNULL(sockaddr);
     peerAddress.setFromSockaddr(sockaddr, addrLen);

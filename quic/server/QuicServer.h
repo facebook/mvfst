@@ -50,11 +50,11 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   // Initialize and start the quic server where the quic server manages
   // the eventbases for workers
-  void start(const folly::SocketAddress& address, size_t maxWorkers);
+  void start(const quic::SocketAddress& address, size_t maxWorkers);
 
   // Initialize quic server worker per evb.
   void initialize(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       const std::vector<folly::EventBase*>& evbs,
       bool useDefaultTransport = false);
 
@@ -208,7 +208,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   /**
    * Returns listening address of this server
    */
-  const folly::SocketAddress& getAddress() const;
+  const quic::SocketAddress& getAddress() const;
 
   /**
    * Returns true iff the server is fully initialized
@@ -269,17 +269,17 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * Note that this should also be called after initialize(..),
    * calling this before initialize is undefined.
    */
-  void allowBeingTakenOver(const folly::SocketAddress& addr);
+  void allowBeingTakenOver(const quic::SocketAddress& addr);
 
-  folly::SocketAddress overrideTakeoverHandlerAddress(
-      const folly::SocketAddress& addr);
+  quic::SocketAddress overrideTakeoverHandlerAddress(
+      const quic::SocketAddress& addr);
 
   /*
    * Setup and initialize the listening socket of the old server from the given
    * address to forward misrouted packets belonging to that server during
    * the takeover process
    */
-  void startPacketForwarding(const folly::SocketAddress& destAddr);
+  void startPacketForwarding(const quic::SocketAddress& destAddr);
 
   /*
    * Disable packet forwarding, even if the packet has no connection id
@@ -390,7 +390,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * have the state for the connection associated with the given data and client
    */
   void routeDataToWorker(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
       Optional<QuicVersion> quicVersion,
@@ -404,7 +404,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   // initializes a QuicServerWorker per evb.
   void initializeImpl(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       std::vector<MaybeOwnedEvbPtr> evbs,
       bool useDefaultTransport = false);
 
@@ -426,7 +426,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // helper method to run the given function in all worker synchronously
   void runOnAllWorkersSync(const std::function<void(QuicServerWorker*)>& func);
 
-  void bindWorkersToSocket(const folly::SocketAddress& address);
+  void bindWorkersToSocket(const quic::SocketAddress& address);
 
   std::vector<QuicVersion> supportedVersions_{{
       QuicVersion::MVFST,
@@ -491,7 +491,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
   QuicExperimentHandlerFn quicExperimentHandlerFn_;
   // address that the server is bound to
-  folly::SocketAddress boundAddress_;
+  quic::SocketAddress boundAddress_;
   folly::SocketOptionMap socketOptions_;
 
   // Rate limits

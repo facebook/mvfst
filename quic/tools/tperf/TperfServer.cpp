@@ -412,7 +412,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
-      const folly::SocketAddress&,
+      const quic::SocketAddress&,
       QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
@@ -596,7 +596,7 @@ TPerfServer::TPerfServer(
 
 void TPerfServer::start() {
   // Create a SocketAddress and the default or passed in host.
-  folly::SocketAddress addr1(host_.c_str(), port_);
+  quic::SocketAddress addr1(host_.c_str(), port_);
   addr1.setFromHostPort(host_, port_);
   server_->start(addr1, numServerWorkers_);
   auto workerEvbs = server_->getWorkerEvbs();

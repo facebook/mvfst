@@ -30,7 +30,7 @@ class QuicTransportFactory : public quic::QuicServerTransportFactory {
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-      const folly::SocketAddress& /* peerAddr */,
+      const quic::SocketAddress& /* peerAddr */,
       quic::QuicVersion /*quicVersion*/,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
@@ -84,7 +84,7 @@ class ServerTransportParameters : public testing::Test {
     server_->setQuicServerTransportFactory(
         std::make_unique<QuicTransportFactory>());
     // start server
-    server_->start(folly::SocketAddress("::1", 0), 1);
+    server_->start(quic::SocketAddress("::1", 0), 1);
     server_->waitUntilInitialized();
   }
 

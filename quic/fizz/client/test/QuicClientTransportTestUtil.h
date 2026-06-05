@@ -434,16 +434,16 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   struct TestReadData {
     ReceivedUdpPacket udpPacket;
-    folly::SocketAddress addr;
+    quic::SocketAddress addr;
     Optional<int> err;
 
-    TestReadData(ByteRange dataIn, folly::SocketAddress addrIn)
+    TestReadData(ByteRange dataIn, quic::SocketAddress addrIn)
         : udpPacket(folly::IOBuf::copyBuffer(dataIn)),
           addr(std::move(addrIn)) {}
 
     TestReadData(
         const ReceivedUdpPacket&& udpPacketIn,
-        folly::SocketAddress addrIn)
+        quic::SocketAddress addrIn)
         : udpPacket(
               udpPacketIn.buf.clone(),
               udpPacketIn.timings,
@@ -582,7 +582,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     client->setHostname(hostname_);
     ON_CALL(*sock, write(testing::_, testing::_, testing::_))
         .WillByDefault(
-            testing::Invoke([&](const folly::SocketAddress&,
+            testing::Invoke([&](const quic::SocketAddress&,
                                 const struct iovec* vec,
                                 size_t iovec_len) {
               socketWrites.push_back(
@@ -704,7 +704,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     serverChosenConnId = *connIdAlgo_->encodeConnectionId(params);
   }
 
-  void recvServerHello(const folly::SocketAddress& addr) {
+  void recvServerHello(const quic::SocketAddress& addr) {
     auto serverHello = folly::IOBuf::copyBuffer("Fake SHLO");
     ChainedByteRangeHead serverHelloRch(serverHello);
     PacketNum nextPacketNum = initialPacketNum++;
@@ -725,7 +725,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     deliverData(addr, packet->coalesce());
   }
 
-  ConnectionId recvServerRetry(const folly::SocketAddress& addr) {
+  ConnectionId recvServerRetry(const quic::SocketAddress& addr) {
     // Make the server send a retry packet to the client. The server chooses a
     // connection id that the client must use in all future initial packets.
     std::vector<uint8_t> serverConnIdVec = {
@@ -772,7 +772,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     deliverData(packet->coalesce());
   }
 
-  void performFakeHandshake(const folly::SocketAddress& addr) {
+  void performFakeHandshake(const quic::SocketAddress& addr) {
     // Create a fake server response to trigger fetching keys.
     recvServerHello(addr);
     assertWritten(false, LongHeader::Types::Handshake);
@@ -835,7 +835,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   void deliverDataWithoutErrorCheck(
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       ByteRange data,
       bool writes = true) {
     ASSERT_TRUE(networkReadCallback);
@@ -849,7 +849,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   void deliverDataWithoutErrorCheck(
       ByteRange data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     deliverDataWithoutErrorCheck(
         peer == nullptr ? serverAddr : *peer, data, writes);
   }
@@ -857,7 +857,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   void deliverDataWithoutErrorCheck(
       NetworkData&& data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     for (const auto& packet : data.getPackets()) {
       deliverDataWithoutErrorCheck(
           peer == nullptr ? serverAddr : *peer,
@@ -867,7 +867,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   void deliverData(
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       ByteRange data,
       bool writes = true) {
     deliverDataWithoutErrorCheck(addr, data, writes);
@@ -888,12 +888,12 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   void deliverData(
       ByteRange data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     deliverData(peer == nullptr ? serverAddr : *peer, data, writes);
   }
 
   void deliverDataWithoutErrorCheck(
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       const ReceivedUdpPacket&& udpPacket,
       bool writes = true) {
     ASSERT_TRUE(networkReadCallback);
@@ -905,7 +905,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   void deliverData(
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       const ReceivedUdpPacket&& udpPacket,
       bool writes = true) {
     deliverDataWithoutErrorCheck(addr, std::move(udpPacket), writes);
@@ -926,7 +926,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   void deliverData(
       NetworkData&& data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     for (const auto& packet : data.getPackets()) {
       deliverData(
           peer == nullptr ? serverAddr : *peer, std::move(packet), writes);
@@ -1087,7 +1087,7 @@ class QuicClientTransportTestBase : public virtual testing::Test {
       destructionCallback;
   std::unique_ptr<folly::EventBase> eventbase_;
   std::shared_ptr<FollyQuicEventBase> qEvb_;
-  folly::SocketAddress serverAddr{"127.0.0.1", 443};
+  quic::SocketAddress serverAddr{"127.0.0.1", 443};
   QuicAsyncUDPSocket::ReadCallback* networkReadCallback{nullptr};
   FakeOneRttHandshakeLayer* mockClientHandshake;
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzClientContext;

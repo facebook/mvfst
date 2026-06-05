@@ -3265,11 +3265,11 @@ TEST_P(QuicPacketSchedulerTest, PathValidationHasPendingFrames) {
   // Register two real paths so prepareChallengeForSending has somewhere to
   // mint into; the scheduler routes by these path ids.
   auto pathId1Res = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_TRUE(pathId1Res.has_value());
   auto pathId1 = pathId1Res.value();
   auto pathId2Res = conn.pathManager->addPath(
-      folly::SocketAddress("::", 33333), folly::SocketAddress("::", 44444));
+      quic::SocketAddress("::", 33333), quic::SocketAddress("::", 44444));
   ASSERT_TRUE(pathId2Res.has_value());
   auto pathId2 = pathId2Res.value();
 
@@ -3298,11 +3298,11 @@ TEST_P(QuicPacketSchedulerTest, WritePathValidationFramesSpecificPathAndOrder) {
   // Register two real paths so the scheduler can mint a challenge for the
   // target path via the path manager.
   auto targetPathRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_TRUE(targetPathRes.has_value());
   auto targetPath = targetPathRes.value();
   auto otherPathRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 33333), folly::SocketAddress("::", 44444));
+      quic::SocketAddress("::", 33333), quic::SocketAddress("::", 44444));
   ASSERT_TRUE(otherPathRes.has_value());
   auto otherPath = otherPathRes.value();
 
@@ -3349,7 +3349,7 @@ TEST_P(
       FizzClientQuicHandshakeContext::Builder().build());
 
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_TRUE(pathIdRes.has_value());
   auto pathId = pathIdRes.value();
 
@@ -3373,7 +3373,7 @@ TEST_P(QuicPacketSchedulerTest, PathValidationSchedulerRespectsPathId) {
       FizzClientQuicHandshakeContext::Builder().build());
 
   auto pathWithDataRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_TRUE(pathWithDataRes.has_value());
   auto pathWithData = pathWithDataRes.value();
   PathIdType emptyPath = pathWithData + 1; // a path id never registered
@@ -3393,7 +3393,7 @@ TEST_P(QuicPacketSchedulerTest, PathValidationCausesPaddingToFullPacket) {
       FizzClientQuicHandshakeContext::Builder().build());
 
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_TRUE(pathIdRes.has_value());
   auto pathId = pathIdRes.value();
   conn.pendingEvents.pathChallenges.insert(pathId);

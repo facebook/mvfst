@@ -28,10 +28,10 @@ class QuicAsyncTransportServer {
   void setFizzContext(
       std::shared_ptr<const fizz::server::FizzServerContext> ctx);
 
-  void start(const folly::SocketAddress& address, size_t numThreads = 0);
+  void start(const quic::SocketAddress& address, size_t numThreads = 0);
 
   void start(
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       std::vector<folly::EventBase*> evbs);
 
   quic::QuicServer& quicServer() {

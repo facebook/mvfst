@@ -208,7 +208,7 @@ TEST_P(
 
   // Deliver a path challenge from a new peer address
   auto incomingPathChallengeData = 123;
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
     auto packetData = packetToBuf(packet);
@@ -270,7 +270,7 @@ TEST_P(
 
   // Deliver a path challenge from a new peer address
   auto incomingPathChallengeData = 123;
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
     auto packetData = packetToBuf(packet);
@@ -331,7 +331,7 @@ TEST_P(
 
   // Deliver a path challenge from a new peer address
   auto incomingPathChallengeData = 123;
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
     auto packetData = packetToBuf(packet);
@@ -419,7 +419,7 @@ TEST_P(
   auto peerAddress = server->getConn().peerAddress;
 
   // Receive first packet later from a different address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(firstPacket), true, &newPeer);
 
   // No migration for reordered packet
@@ -456,7 +456,7 @@ TEST_P(
   EXPECT_CALL(*quicStats_, onPathAdded).Times(2);
   EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
 
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPathId = conn.currentPathId;
@@ -577,7 +577,7 @@ TEST_P(
   auto firstMrtt = conn.lossState.mrtt;
 
   // Step 1: Client migrates to new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPathId = conn.currentPathId;
@@ -674,7 +674,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
   EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
   EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
 
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPath = conn.pathManager->getPath(conn.currentPathId);
@@ -747,7 +747,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
 
   auto peerAddress = server->getConn().peerAddress;
 
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   ASSERT_FALSE(conn.pathManager->getPath(server->getLocalAddress(), newPeer));
 
   EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
@@ -802,7 +802,7 @@ TEST_P(
   EXPECT_CALL(*quicStats_, onPathValidationSuccess).Times(1);
   EXPECT_CALL(*quicStats_, onPathValidationFailure).Times(0);
 
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
 
   auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
@@ -817,7 +817,7 @@ TEST_P(
   auto outstandingChallenge = getFirstOutstandingPathChallenge();
   ASSERT_TRUE(outstandingChallenge);
 
-  folly::SocketAddress newPeer2("200.101.102.103", 23456);
+  quic::SocketAddress newPeer2("200.101.102.103", 23456);
   auto pathResponsePkt =
       makePacketWithPathResponseFrame(outstandingChallenge->pathData);
   deliverData(packetToBuf(pathResponsePkt), false, &newPeer2);
@@ -1012,7 +1012,7 @@ TEST_P(
       0 /* largestAcked */));
 
   // Migrate to unvalidated peer
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), true, &newPeer);
 
   ASSERT_EQ(conn.peerAddress, newPeer);
@@ -1093,7 +1093,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
       0 /* largestAcked */));
 
   // Migrate to unvalidated peer
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), true, &newPeer);
 
   ASSERT_EQ(conn.peerAddress, newPeer);
@@ -1182,7 +1182,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientPortChangeNATRebinding) {
   conn.lossState.rttvar = 20ms;
   conn.lossState.mrtt = 80ms;
 
-  folly::SocketAddress newPeer(
+  quic::SocketAddress newPeer(
       clientAddr.getIPAddress(), clientAddr.getPort() + 1);
   deliverData(std::move(packetData), true, &newPeer);
 
@@ -1233,7 +1233,7 @@ TEST_P(
       0 /* cipherOverhead */,
       0 /* largestAcked */));
 
-  folly::SocketAddress newPeer(
+  quic::SocketAddress newPeer(
       clientAddr.getIPAddress(), clientAddr.getPort() + 1);
   deliverData(std::move(rebindPacket), /*writes=*/true, &newPeer);
 
@@ -1298,7 +1298,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientAddressChangeNATRebinding) {
   conn.lossState.mrtt = 80ms;
 
   // Current address is 127.0.0.1:1000
-  folly::SocketAddress newPeer("127.0.0.100", clientAddr.getPort());
+  quic::SocketAddress newPeer("127.0.0.100", clientAddr.getPort());
   deliverData(std::move(packetData), true, &newPeer);
 
   auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
@@ -1357,7 +1357,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ClientAddressChangeOutOfSubnet) {
 
   // Current address is 127.0.0.1:1000. New address is out of the /24 subnet.
   // This won't count as NAT rebinding.
-  folly::SocketAddress newPeer("127.0.1.1", clientAddr.getPort());
+  quic::SocketAddress newPeer("127.0.1.1", clientAddr.getPort());
   deliverData(std::move(packetData), true, &newPeer);
 
   auto newPath = conn.pathManager->getPath(server->getLocalAddress(), newPeer);
@@ -1389,7 +1389,7 @@ TEST_P(
 
   // Deliver a path challenge from a new peer address
   auto incomingPathChallengeData = 123;
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
     auto packetData = packetToBuf(packet);
@@ -1441,7 +1441,7 @@ TEST_P(
       ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
 
   // Deliver a stream packet from a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("bad data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -1502,7 +1502,7 @@ TEST_P(
       ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
 
   // Deliver a stream packet from a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("bad data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -1557,7 +1557,7 @@ TEST_P(
       ConnectionId::createAndMaybeCrash({1, 2, 3, 4}), 1);
 
   // Deliver a stream packet from a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("bad data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -1581,7 +1581,7 @@ TEST_P(
 
   // Deliver a path probe packet from a new peer address
   auto incomingPathChallengeData = 123;
-  folly::SocketAddress newPeer2("100.101.102.104", 23456);
+  quic::SocketAddress newPeer2("100.101.102.104", 23456);
   {
     auto packet = makePacketWithPathChallegeFrame(incomingPathChallengeData);
     auto packetData = packetToBuf(packet);
@@ -1617,7 +1617,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ReapOldValidatedPaths) {
   conn.qLogger = qLogger;
 
   auto pathIdRes = conn.pathManager->addPath(
-      server->getLocalAddress(), folly::SocketAddress("1.2.3.4", 23456));
+      server->getLocalAddress(), quic::SocketAddress("1.2.3.4", 23456));
   ASSERT_FALSE(pathIdRes.hasError());
   auto& path =
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
@@ -1651,7 +1651,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, ReapUnusedNotValidPaths) {
   conn.qLogger = qLogger;
 
   auto pathIdRes = conn.pathManager->addPath(
-      server->getLocalAddress(), folly::SocketAddress("1.2.3.4", 23456));
+      server->getLocalAddress(), quic::SocketAddress("1.2.3.4", 23456));
   ASSERT_FALSE(pathIdRes.hasError());
   auto& path =
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
@@ -1684,7 +1684,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedValidatingPath) {
   conn.qLogger = qLogger;
 
   auto pathIdRes = conn.pathManager->addPath(
-      server->getLocalAddress(), folly::SocketAddress("1.2.3.4", 23456));
+      server->getLocalAddress(), quic::SocketAddress("1.2.3.4", 23456));
   ASSERT_FALSE(pathIdRes.hasError());
   auto& path =
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
@@ -1718,7 +1718,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, DoNotReapUnusedNewPath) {
   conn.qLogger = qLogger;
 
   auto pathIdRes = conn.pathManager->addPath(
-      server->getLocalAddress(), folly::SocketAddress("1.2.3.4", 23456));
+      server->getLocalAddress(), quic::SocketAddress("1.2.3.4", 23456));
   ASSERT_FALSE(pathIdRes.hasError());
   auto& path =
       PathManagerTestAccessor::getNonConstPathInfo(conn, pathIdRes.value());
@@ -1759,7 +1759,7 @@ TEST_P(
   conn.peerConnectionIds.emplace_back(newCid2, 2);
 
   // Create a new path
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
 
   // Deliver a path challenge from the new peer address
   auto incomingPathChallengeData = 456;
@@ -1843,7 +1843,7 @@ TEST_P(
   EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
 
   // Migrate to a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("migration data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -1900,7 +1900,7 @@ TEST_P(
   // Perform 5 consecutive migration failures
   for (uint32_t i = 0; i < kMaxConsecutiveMigrationFailures; ++i) {
     // Create a new peer address for each migration attempt
-    folly::SocketAddress newPeer(
+    quic::SocketAddress newPeer(
         "100.101.102." + std::to_string(100 + i), 23456 + i);
 
     // Migrate to new peer
@@ -1973,7 +1973,7 @@ TEST_P(
   EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
 
   // Migrate to a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("migration data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -2039,7 +2039,7 @@ TEST_P(
   conn.pendingEvents.sendPing = false;
 
   // Migrate to a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("migration data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -2085,7 +2085,7 @@ TEST_P(
   EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
 
   // Migrate to a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("migration data");
     auto packetData = packetToBuf(createStreamPacket(
@@ -2140,7 +2140,7 @@ TEST_P(
   EXPECT_EQ(conn.consecutiveMigrationFailures, 0);
 
   // First migration that will fail
-  folly::SocketAddress newPeer1("100.101.102.103", 23456);
+  quic::SocketAddress newPeer1("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("migration data 1");
     auto packetData = packetToBuf(createStreamPacket(
@@ -2172,7 +2172,7 @@ TEST_P(
   EXPECT_EQ(conn.currentPathId, firstPath->id);
 
   // Second migration to a different peer
-  folly::SocketAddress newPeer2("100.101.102.104", 23457);
+  quic::SocketAddress newPeer2("100.101.102.104", 23457);
   {
     auto data = IOBuf::copyBuffer("migration data 2");
     auto packetData = packetToBuf(createStreamPacket(
@@ -2243,7 +2243,7 @@ TEST_P(
   EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
 
   // Trigger migration by sending data from a new peer address
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   {
     auto data = IOBuf::copyBuffer("migration data");
     auto packetData = packetToBuf(createStreamPacket(

@@ -434,7 +434,7 @@ TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   StreamId streamId = 4;
-  clientAddr = folly::SocketAddress("127.0.0.1", 2000);
+  clientAddr = quic::SocketAddress("127.0.0.1", 2000);
   auto data = IOBuf::copyBuffer("data");
   EXPECT_THROW(
       recvEncryptedStream(streamId, *data, 0, true), std::runtime_error);
@@ -1844,7 +1844,7 @@ TEST_F(
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   try {
     deliverData(std::move(packetData), true, &newPeer);
     FAIL();
@@ -2434,7 +2434,7 @@ TEST_F(
   server->getNonConstConn().qLogger = qLogger;
   recvClientHello();
 
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
 
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   try {
@@ -2470,7 +2470,7 @@ TEST_F(
       false;
   recvClientHello();
 
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
 
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   recvClientFinished(true, &newPeer);
@@ -2496,7 +2496,7 @@ TEST_F(
   recvClientHello();
 
   auto data = IOBuf::copyBuffer("bad data");
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
 
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   try {
@@ -2667,7 +2667,7 @@ TEST_F(
       std::make_pair(
           LongHeader::Types::ZeroRtt, server->getConn().supportedVersions[0]),
       false));
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   try {
     deliverData(std::move(packetData), true, &newPeer);
   } catch (const std::runtime_error& ex) {
@@ -2696,7 +2696,7 @@ TEST_F(
       *data,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), true, &newPeer);
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
   EXPECT_EQ(server->getConn().pendingOneRttData->size(), 1);
@@ -3480,7 +3480,7 @@ TEST_F(QuicUnencryptedServerTransportTest, CwndHintEncodeDecodeRoundTrip) {
   {
     QuicServerConnectionState nextConn(
         FizzServerQuicHandshakeContext::Builder().build());
-    nextConn.peerAddress = folly::SocketAddress("127.0.0.2", 4433);
+    nextConn.peerAddress = quic::SocketAddress("127.0.0.2", 4433);
     auto cc = std::make_unique<StubCC>();
     auto* rawCC = cc.get();
     nextConn.congestionController = std::move(cc);
@@ -3498,7 +3498,7 @@ TEST_F(QuicUnencryptedServerTransportTest, CwndHintEncodeDecodeRoundTrip) {
   {
     QuicServerConnectionState nextConn(
         FizzServerQuicHandshakeContext::Builder().build());
-    nextConn.peerAddress = folly::SocketAddress("10.0.0.6", 4433);
+    nextConn.peerAddress = quic::SocketAddress("10.0.0.6", 4433);
     auto cc = std::make_unique<StubCC>();
     auto* rawCC = cc.get();
     nextConn.congestionController = std::move(cc);

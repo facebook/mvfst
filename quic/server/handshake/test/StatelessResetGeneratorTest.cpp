@@ -20,7 +20,7 @@ class StatelessResetGeneratorTest : public Test {};
 TEST_F(StatelessResetGeneratorTest, SameSecretSameAddress) {
   StatelessResetSecret secret;
   folly::Random::secureRandom(secret.data(), secret.size());
-  folly::SocketAddress address("1.2.3.4", 8080);
+  quic::SocketAddress address("1.2.3.4", 8080);
   StatelessResetGenerator generator1(secret, address.getFullyQualified()),
       generator2(secret, address.getFullyQualified());
   EXPECT_EQ(
@@ -33,7 +33,7 @@ TEST_F(StatelessResetGeneratorTest, SameSecretSameAddress) {
 TEST_F(StatelessResetGeneratorTest, SameSecretDifferentAddress) {
   StatelessResetSecret secret;
   folly::Random::secureRandom(secret.data(), secret.size());
-  folly::SocketAddress address1("1.2.3.4", 8080), address2("2.3.4.5", 8888);
+  quic::SocketAddress address1("1.2.3.4", 8080), address2("2.3.4.5", 8888);
   StatelessResetGenerator generator1(secret, address1.getFullyQualified()),
       generator2(secret, address2.getFullyQualified());
   // I was told by security expert that by the time they collide, I'm already
@@ -50,7 +50,7 @@ TEST_F(StatelessResetGeneratorTest, DifferentSecretSameAddress) {
   StatelessResetSecret secret1, secret2;
   folly::Random::secureRandom(secret1.data(), secret1.size());
   folly::Random::secureRandom(secret2.data(), secret2.size());
-  folly::SocketAddress address("2.3.4.255", 8088);
+  quic::SocketAddress address("2.3.4.255", 8088);
   StatelessResetGenerator generator1(secret1, address.getFullyQualified()),
       generator2(secret2, address.getFullyQualified());
   EXPECT_NE(

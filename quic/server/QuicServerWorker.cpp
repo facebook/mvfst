@@ -107,7 +107,7 @@ quic::Expected<void, QuicError> QuicServerWorker::enableZeroCopy() {
 }
 
 void QuicServerWorker::bind(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     FollyAsyncUDPSocketAlias::BindOptions bindOptions) {
   // TODO get rid of the temporary wrapper
   FollyQuicAsyncUDPSocket tmpSock(
@@ -268,7 +268,7 @@ int QuicServerWorker::getFD() {
   return socket_->getNetworkSocket().toFd();
 }
 
-const folly::SocketAddress& QuicServerWorker::getAddress() const {
+const quic::SocketAddress& QuicServerWorker::getAddress() const {
   MVCHECK(socket_);
   return socket_->address();
 }
@@ -284,7 +284,7 @@ void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
 // negotiation packet to the client. Returns false if there's
 // no need for version negotiation.
 bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     bool isInitial,
     LongHeaderInvariant& invariant,
     size_t datagramLen) {
@@ -350,7 +350,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
 }
 
 void QuicServerWorker::sendVersionNegotiationPacket(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     LongHeaderInvariant& invariant) {
   VersionNegotiationPacketBuilder builder(
       invariant.dstConnId, invariant.srcConnId, supportedVersions_);
@@ -364,7 +364,7 @@ void QuicServerWorker::sendVersionNegotiationPacket(
 }
 
 void QuicServerWorker::onDataAvailable(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     size_t len,
     bool truncated,
     OnDataAvailableParams params) noexcept {
@@ -671,7 +671,7 @@ void QuicServerWorker::handleNetworkData(
 }
 
 bool QuicServerWorker::tryHandlingAsHealthCheck(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     const Buf& data) {
   // If we cannot parse the long header then it is not a QUIC invariant
   // packet, so just drop it after checking whether it could be a health
@@ -695,7 +695,7 @@ bool QuicServerWorker::tryHandlingAsHealthCheck(
 }
 
 void QuicServerWorker::forwardNetworkData(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
     Optional<QuicVersion> quicVersion,
@@ -740,7 +740,7 @@ void QuicServerWorker::setPacingTimer(
 
 QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     QuicVersion quicVersion,
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     const Optional<ConnectionId>& srcConnId,
     const ConnectionId& dstConnId,
     bool validNewToken) {
@@ -827,7 +827,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
 
 PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
     const ConnectionId& dstConnId,
-    const folly::SocketAddress& client) {
+    const quic::SocketAddress& client) {
   // parse dst conn-id to determine if packet was misrouted
   if (!connIdAlgo_->canParse(dstConnId)) {
     MVVLOG(3) << "Dropping packet with bad DCID, routingInfo="
@@ -870,7 +870,7 @@ PacketDropReason QuicServerWorker::isDstConnIdMisrouted(
 }
 
 void QuicServerWorker::dispatchPacketData(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
     Optional<QuicVersion> quicVersion,
@@ -1112,7 +1112,7 @@ void QuicServerWorker::dispatchPacketData(
 
 void QuicServerWorker::sendResetPacket(
     const HeaderForm& headerForm,
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     const NetworkData& networkData,
     const ConnectionId& connId) {
   if (headerForm != HeaderForm::Short) {
@@ -1223,7 +1223,7 @@ bool QuicServerWorker::validNewToken(
 }
 
 void QuicServerWorker::sendRetryPacket(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
   if (!transportSettings_.retryTokenSecret.has_value()) {
@@ -1290,7 +1290,7 @@ void QuicServerWorker::sendRetryPacket(
 
 void QuicServerWorker::allowBeingTakenOver(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   MVDCHECK(!takeoverCB_);
   // We instantiate and bind the TakeoverHandlerCallback to the given address.
   // It is reset at shutdownAllConnections (i.e. only when the process dies).
@@ -1299,16 +1299,16 @@ void QuicServerWorker::allowBeingTakenOver(
   takeoverCB_->bind(address);
 }
 
-const folly::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
+const quic::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   MVCHECK(takeoverCB_);
   takeoverCB_->rebind(std::move(socket), address);
   return takeoverCB_->getAddress();
 }
 
 void QuicServerWorker::startPacketForwarding(
-    const folly::SocketAddress& destAddr) {
+    const quic::SocketAddress& destAddr) {
   packetForwardingEnabled_ = true;
   takeoverPktHandler_.setDestination(destAddr);
 }

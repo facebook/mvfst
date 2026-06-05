@@ -22,7 +22,7 @@ void SinglePacketBatchWriter::reset() {
 bool SinglePacketBatchWriter::append(
     BufPtr&& buf,
     size_t /*unused*/,
-    const folly::SocketAddress& /*unused*/,
+    const quic::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
   buf_ = std::move(buf);
 
@@ -32,7 +32,7 @@ bool SinglePacketBatchWriter::append(
 
 ssize_t SinglePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   iovec vec[kNumIovecBufferChains];
   size_t iovec_len = fillIovec(buf_, vec);
   return sock.write(address, vec, iovec_len);
@@ -46,7 +46,7 @@ void SinglePacketInplaceBatchWriter::reset() {
 bool SinglePacketInplaceBatchWriter::append(
     BufPtr&& /* buf */,
     size_t /*unused*/,
-    const folly::SocketAddress& /*unused*/,
+    const quic::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
   // Always flush. This should trigger a write afterwards.
   return true;
@@ -54,7 +54,7 @@ bool SinglePacketInplaceBatchWriter::append(
 
 ssize_t SinglePacketInplaceBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   auto& buf = conn_.bufAccessor->buf();
   MVCHECK(!conn_.bufAccessor->isChained());
 
@@ -91,7 +91,7 @@ void SendmmsgPacketBatchWriter::reset() {
 bool SendmmsgPacketBatchWriter::append(
     BufPtr&& buf,
     size_t size,
-    const folly::SocketAddress& /*unused*/,
+    const quic::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
   MVCHECK_LT(bufs_.size(), maxBufs_);
   bufs_.emplace_back(std::move(buf));
@@ -108,7 +108,7 @@ bool SendmmsgPacketBatchWriter::append(
 
 ssize_t SendmmsgPacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   MVCHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
     iovec vec[kNumIovecBufferChains];
@@ -196,7 +196,7 @@ void SendmmsgInplacePacketBatchWriter::reset() {
 bool SendmmsgInplacePacketBatchWriter::append(
     BufPtr&& /* buf */,
     size_t size,
-    const folly::SocketAddress& /*unused*/,
+    const quic::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
   MVCHECK_LT(numPacketsBuffered_, maxBufs_);
 
@@ -219,7 +219,7 @@ bool SendmmsgInplacePacketBatchWriter::append(
 
 ssize_t SendmmsgInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   MVCHECK_GT(numPacketsBuffered_, 0);
 
   auto& buf = conn_.bufAccessor->buf();

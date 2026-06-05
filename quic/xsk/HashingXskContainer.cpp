@@ -41,8 +41,8 @@ quic::Expected<void, std::runtime_error> HashingXskContainer::init(
 }
 
 XskSender* HashingXskContainer::pickXsk(
-    const folly::SocketAddress& src,
-    const folly::SocketAddress& dst) {
+    const quic::SocketAddress& src,
+    const quic::SocketAddress& dst) {
   auto queueId = startQueue_ + (src.hash() + dst.hash()) % numQueues_;
   return queueIdToXsk_.at(queueId).get();
 }

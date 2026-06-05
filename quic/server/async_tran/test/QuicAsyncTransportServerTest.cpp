@@ -57,7 +57,7 @@ class QuicAsyncTransportServerTest : public Test {
       serverAsyncWrapper_ = std::move(sock);
     });
     server_->setFizzContext(test::createServerCtx());
-    folly::SocketAddress addr("::1", 0);
+    quic::SocketAddress addr("::1", 0);
     server_->start(addr, 1);
     serverAddr_ = server_->quicServer().getAddress();
   }
@@ -109,7 +109,7 @@ class QuicAsyncTransportServerTest : public Test {
 
  protected:
   std::shared_ptr<QuicAsyncTransportServer> server_;
-  folly::SocketAddress serverAddr_;
+  quic::SocketAddress serverAddr_;
   folly::AsyncTransport::UniquePtr serverAsyncWrapper_;
   folly::test::MockWriteCallback serverWriteCB_;
   folly::test::MockReadCallback serverReadCB_;

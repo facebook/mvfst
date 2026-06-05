@@ -126,22 +126,22 @@ class XskSender {
 
   void writeXskBuffer(
       const XskBuffer& xskBuffer,
-      const folly::SocketAddress& peer,
-      const folly::SocketAddress& src);
+      const quic::SocketAddress& peer,
+      const quic::SocketAddress& src);
 
   // Return a buffer to the free list without writing it out to
   // the network
   void returnBuffer(const XskBuffer& xskBuffer);
 
   SendResult writeUdpPacket(
-      const folly::SocketAddress& peer,
-      const folly::SocketAddress& src,
+      const quic::SocketAddress& peer,
+      const quic::SocketAddress& src,
       const void* data,
       uint16_t len);
 
   SendResult writeUdpPacket(
-      const folly::SocketAddress& peer,
-      const folly::SocketAddress& src,
+      const quic::SocketAddress& peer,
+      const quic::SocketAddress& src,
       std::unique_ptr<folly::IOBuf>& data,
       uint16_t len);
 
@@ -158,14 +158,14 @@ class XskSender {
 
   void writeUdpPacketScaffoldingToBuffer(
       char* buffer,
-      const folly::SocketAddress& peer,
-      const folly::SocketAddress& src,
+      const quic::SocketAddress& peer,
+      const quic::SocketAddress& src,
       uint16_t payloadLength);
 
   void writeUdpPacketToBuffer(
       char* buffer,
-      const folly::SocketAddress& peer,
-      const folly::SocketAddress& src,
+      const quic::SocketAddress& peer,
+      const quic::SocketAddress& src,
       const void* data,
       uint16_t len);
 
@@ -173,7 +173,7 @@ class XskSender {
   // only be called when checksumOffloadEnabled_ is true.
   void writeTxMetadata(
       char* frameStart,
-      const folly::SocketAddress& peer,
+      const quic::SocketAddress& peer,
       uint16_t udpPayloadLength);
 
   quic::Expected<void, std::runtime_error> initXdpSocket();

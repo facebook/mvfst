@@ -652,7 +652,7 @@ BufQueue bufToQueue(BufPtr buf) {
 StatelessResetToken generateStatelessResetToken() {
   StatelessResetSecret secret;
   folly::Random::secureRandom(secret.data(), secret.size());
-  folly::SocketAddress address("1.2.3.4", 8080);
+  quic::SocketAddress address("1.2.3.4", 8080);
   StatelessResetGenerator generator(secret, address.getFullyQualified());
 
   return generator.generateToken(
@@ -838,7 +838,7 @@ void TestPacketBatchWriter::reset() {
 bool TestPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& /*unused*/,
     size_t size,
-    const folly::SocketAddress& /*unused*/,
+    const quic::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
   bufNum_++;
   bufSize_ += size;
@@ -847,7 +847,7 @@ bool TestPacketBatchWriter::append(
 
 ssize_t TestPacketBatchWriter::write(
     QuicAsyncUDPSocket& /*unused*/,
-    const folly::SocketAddress& /*unused*/) {
+    const quic::SocketAddress& /*unused*/) {
   return bufSize_;
 }
 

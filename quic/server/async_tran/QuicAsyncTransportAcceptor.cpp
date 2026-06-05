@@ -91,7 +91,7 @@ QuicAsyncTransportAcceptor::QuicAsyncTransportAcceptor(
 quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
     folly::EventBase* evb,
     std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
-    const folly::SocketAddress&,
+    const quic::SocketAddress&,
     QuicVersion,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
   MVCHECK_EQ(evb, evb_);

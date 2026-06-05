@@ -76,8 +76,8 @@ quic::Optional<XskBuffer> XskSender::getXskBuffer(bool isIpV6) {
 
 void XskSender::writeXskBuffer(
     const XskBuffer& xskBuffer,
-    const folly::SocketAddress& peer,
-    const folly::SocketAddress& src) {
+    const quic::SocketAddress& peer,
+    const quic::SocketAddress& src) {
   bool isIpV6 = peer.getIPAddress().isV6();
 
   char* frameStart = (char*)umemArea_ +
@@ -114,8 +114,8 @@ void XskSender::returnBuffer(const XskBuffer& xskBuffer) {
 
 void XskSender::writeUdpPacketScaffoldingToBuffer(
     char* buffer,
-    const folly::SocketAddress& peer,
-    const folly::SocketAddress& src,
+    const quic::SocketAddress& peer,
+    const quic::SocketAddress& src,
     uint16_t payloadLength) {
   char* bufferCopy = buffer;
 
@@ -156,7 +156,7 @@ void XskSender::writeUdpPacketScaffoldingToBuffer(
 
 void XskSender::writeTxMetadata(
     char* frameStart,
-    const folly::SocketAddress& peer,
+    const quic::SocketAddress& peer,
     uint16_t /*udpPayloadLength*/) {
   auto* meta = reinterpret_cast<folly::netops::xsk_tx_metadata*>(frameStart);
   *meta = {};
@@ -167,8 +167,8 @@ void XskSender::writeTxMetadata(
 }
 
 SendResult XskSender::writeUdpPacket(
-    const folly::SocketAddress& peer,
-    const folly::SocketAddress& src,
+    const quic::SocketAddress& peer,
+    const quic::SocketAddress& src,
     const void* data,
     uint16_t len) {
   auto guard = xskSenderConfig_.xskPerThread ? std::unique_lock<std::mutex>()
@@ -222,8 +222,8 @@ SendResult XskSender::writeUdpPacket(
 }
 
 SendResult XskSender::writeUdpPacket(
-    const folly::SocketAddress& peer,
-    const folly::SocketAddress& src,
+    const quic::SocketAddress& peer,
+    const quic::SocketAddress& src,
     std::unique_ptr<folly::IOBuf>& data,
     uint16_t len) {
   return writeUdpPacket(peer, src, data->data(), len);
@@ -286,8 +286,8 @@ FlushResult XskSender::flush() {
 
 void XskSender::writeUdpPacketToBuffer(
     char* buffer,
-    const folly::SocketAddress& peer,
-    const folly::SocketAddress& src,
+    const quic::SocketAddress& peer,
+    const quic::SocketAddress& src,
     const void* data,
     uint16_t len) {
   char* bufferCopy = buffer;

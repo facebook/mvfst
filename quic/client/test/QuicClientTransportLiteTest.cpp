@@ -508,9 +508,9 @@ TEST_F(QuicClientTransportLiteTest, SetDestinationCidForPath_Success) {
   auto conn = quicClient_->getConn();
 
   // Create a new path
-  folly::SocketAddress newPeer("100.101.102.103", 23456);
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
   auto pathIdRes = conn->pathManager->addPath(
-      folly::SocketAddress("0.0.0.0", 0), newPeer, nullptr);
+      quic::SocketAddress("0.0.0.0", 0), newPeer, nullptr);
   ASSERT_FALSE(pathIdRes.hasError());
   auto newPathId = pathIdRes.value();
 

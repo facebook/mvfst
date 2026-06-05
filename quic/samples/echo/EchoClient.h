@@ -165,7 +165,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
     auto qEvb = std::make_shared<FollyQuicEventBase>(evb);
-    folly::SocketAddress addr(host_.c_str(), port_);
+    quic::SocketAddress addr(host_.c_str(), port_);
 
     evb->runInEventBaseThreadAndWait([&] {
       auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);

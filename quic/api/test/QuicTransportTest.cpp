@@ -40,9 +40,9 @@ namespace {
 template <typename Transport>
 void dispatchNetworkData(
     Transport& t,
-    const folly::SocketAddress& localAddr,
+    const quic::SocketAddress& localAddr,
     NetworkData networkData,
-    const folly::SocketAddress& peerAddr) {
+    const quic::SocketAddress& peerAddr) {
   networkData.setPeerAddressForAllPackets(peerAddr);
   t.onNetworkData(localAddr, std::move(networkData));
 }
@@ -2479,7 +2479,7 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
   auto& conn = transport_->getConnectionState();
   // Start with a new (Not Valid) path.
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_FALSE(pathIdRes.hasError());
   conn.currentPathId = pathIdRes.value();
   auto path = conn.pathManager->getPath(conn.currentPathId);
@@ -2588,7 +2588,7 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   auto& conn = transport_->getConnectionState();
   // Start with a new (Not Valid) path.
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_FALSE(pathIdRes.hasError());
   conn.currentPathId = pathIdRes.value();
   auto path = conn.pathManager->getPath(conn.currentPathId);
@@ -2627,7 +2627,7 @@ TEST_F(QuicTransportTest, RetransmitPathChallengeKeepsBothInFlight) {
   auto& conn = transport_->getConnectionState();
   // Start with a new (Not Valid) path.
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_FALSE(pathIdRes.hasError());
   conn.currentPathId = pathIdRes.value();
   auto path = conn.pathManager->getPath(conn.currentPathId);
@@ -2674,7 +2674,7 @@ TEST_F(QuicTransportTest, DoNotClonePathChallengeOnCurrentValidatingPath) {
   }
 
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_FALSE(pathIdRes.hasError());
   conn.currentPathId = pathIdRes.value();
   auto path = conn.pathManager->getPath(conn.currentPathId);
@@ -2715,7 +2715,7 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLossForCurrentValidatingPath) {
 
   // Start with a new (Not Valid) path.
   auto pathIdRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 11111), folly::SocketAddress("::", 22222));
+      quic::SocketAddress("::", 11111), quic::SocketAddress("::", 22222));
   ASSERT_FALSE(pathIdRes.hasError());
   conn.currentPathId = pathIdRes.value();
   auto path = conn.pathManager->getPath(conn.currentPathId);
@@ -2879,7 +2879,7 @@ TEST_F(QuicTransportTest, ResendPathResponseOnLossValidPath) {
 TEST_F(QuicTransportTest, ResendPathResponseOnLossNotValidPath) {
   auto& conn = transport_->getConnectionState();
   auto pathRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 12345), folly::SocketAddress("::", 54321));
+      quic::SocketAddress("::", 12345), quic::SocketAddress("::", 54321));
   ASSERT_FALSE(pathRes.hasError());
   conn.currentPathId = pathRes.value();
   conn.pathManager->onPathPacketReceived(conn.currentPathId);
@@ -2917,7 +2917,7 @@ TEST_F(QuicTransportTest, ResendPathResponseOnLossNotValidPath) {
 TEST_F(QuicTransportTest, ResendPathResponseOnLossValidatingPath) {
   auto& conn = transport_->getConnectionState();
   auto pathRes = conn.pathManager->addPath(
-      folly::SocketAddress("::", 12345), folly::SocketAddress("::", 54321));
+      quic::SocketAddress("::", 12345), quic::SocketAddress("::", 54321));
   ASSERT_FALSE(pathRes.hasError());
   conn.currentPathId = pathRes.value();
   // Give the path writable bytes
@@ -3540,7 +3540,7 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
   ASSERT_FALSE(streamResult.hasError());
   auto streamState = streamResult.value();
   conn.streamManager->addDeliverable(stream1);
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   streamState->ackedIntervals.insert(0, 19);
   // This will invoke the DeliveryClalback::onDelivered
@@ -3563,7 +3563,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
   ASSERT_FALSE(streamResult.hasError());
   auto streamState = streamResult.value();
 
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
   streamState->ackedIntervals.insert(0, 19);
@@ -3606,7 +3606,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
   streamState->retransmissionBuffer.clear();
   streamState->ackedIntervals.insert(0, 1);
 
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   EXPECT_CALL(mockedDeliveryCallback, onDeliveryAck(stream, 1, 100us)).Times(1);
   dispatchNetworkData(*transport_, lAddr, std::move(emptyData), rAddr);
@@ -3635,7 +3635,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   auto streamState = streamResult.value();
   streamState->retransmissionBuffer.clear();
 
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   streamState->ackedIntervals.insert(0, 99);
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
@@ -3688,7 +3688,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
           std::make_unique<WriteStreamBuffer>(
               ChainedByteRangeHead(retxBufferData), 51, false)));
 
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   streamState->ackedIntervals.insert(0, 49);
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
@@ -3748,7 +3748,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   streamState->lossBuffer.emplace_back(std::move(lossBufferRch), 31, false);
   streamState->ackedIntervals.insert(0, 30);
 
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   NetworkData emptyData;
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 30, 100us))
       .Times(1);
@@ -3795,7 +3795,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByte) {
 
   // writeChain, first, last byte callbacks triggered after delivery
   auto& conn = transport_->getConnectionState();
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;
@@ -3856,7 +3856,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByteWithFin) {
 
   // writeChain, first, last byte, fin callbacks triggered after delivery
   auto& conn = transport_->getConnectionState();
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;
@@ -4292,7 +4292,7 @@ TEST_F(
   EXPECT_CALL(txCb3, onByteEvent(getTxMatcher(stream, 20))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb3);
-  folly::SocketAddress lAddr, rAddr;
+  quic::SocketAddress lAddr, rAddr;
   conn.streamManager->addDeliverable(stream);
   conn.lossState.srtt = 100us;
   NetworkData networkData;

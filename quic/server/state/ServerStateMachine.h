@@ -42,9 +42,9 @@ enum ServerState {
 
 struct ServerEvents {
   struct ReadData {
-    folly::SocketAddress localAddress;
+    quic::SocketAddress localAddress;
     ReceivedUdpPacket udpPacket;
-    folly::SocketAddress peerAddress;
+    quic::SocketAddress peerAddress;
   };
 
   struct Close {};
@@ -52,7 +52,7 @@ struct ServerEvents {
 
 struct CongestionAndRttState {
   // The corresponding peer address
-  folly::SocketAddress peerAddress;
+  quic::SocketAddress peerAddress;
 
   // Time when this state is recorded, i.e. when migration happens
   TimePoint recordTime;
@@ -117,7 +117,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   Optional<bool> sourceTokenMatching;
 
   // Server address of VIP. Currently used as input for stateless reset token.
-  folly::SocketAddress serverAddr;
+  quic::SocketAddress serverAddr;
 
   // Whether we've sent the handshake done signal yet.
   bool sentHandshakeDone{false};

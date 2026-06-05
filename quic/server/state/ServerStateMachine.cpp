@@ -35,8 +35,8 @@ namespace {
 constexpr size_t kConnIdEncodingRetryLimit = 32;
 
 bool maybeNATRebinding(
-    const folly::SocketAddress& newPeerAddress,
-    const folly::SocketAddress& oldPeerAddress) {
+    const quic::SocketAddress& newPeerAddress,
+    const quic::SocketAddress& oldPeerAddress) {
   auto& newIPAddr = newPeerAddress.getIPAddress();
   auto& oldIPAddr = oldPeerAddress.getIPAddress();
 

@@ -277,7 +277,7 @@ class TestQuicTransport
   }
 
   quic::Expected<void, QuicError> onReadData(
-      const folly::SocketAddress&,
+      const quic::SocketAddress&,
       ReceivedUdpPacket&& udpPacket) override {
     if (udpPacket.buf.empty()) {
       return {};
@@ -1882,7 +1882,7 @@ TEST_F(QuicTransportImplTestBase, ReadErrorUnsanitizedErrorMsg) {
 
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillOnce(Invoke(
-          [](const folly::SocketAddress&, const struct iovec*, size_t) -> int {
+          [](const quic::SocketAddress&, const struct iovec*, size_t) -> int {
             throw std::runtime_error("You need to calm down.");
           }));
   auto writeChain_tmp = transport->writeChain(
@@ -1905,7 +1905,7 @@ TEST_F(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
           std::string("Well there's your problem"))));
   EXPECT_CALL(*socketPtr, write(_, _, _))
       .WillOnce(Invoke(
-          [](const folly::SocketAddress&, const struct iovec*, size_t) -> int {
+          [](const quic::SocketAddress&, const struct iovec*, size_t) -> int {
             throw std::runtime_error("Well there's your problem");
           }));
   ASSERT_FALSE(

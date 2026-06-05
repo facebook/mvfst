@@ -98,8 +98,8 @@ class QuicClientTransportLiteMigrationTest : public Test {
     ON_CALL(*socket, appendCmsgs(_))
         .WillByDefault(Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*socket, address())
-        .WillByDefault(Return(
-            quic::Expected<folly::SocketAddress, QuicError>{localAddr_}));
+        .WillByDefault(
+            Return(quic::Expected<quic::SocketAddress, QuicError>{localAddr_}));
     auto mockFactory = std::make_shared<MockClientHandshakeFactory>();
     EXPECT_CALL(*mockFactory, makeClientHandshakeImpl(_))
         .WillRepeatedly(Invoke(
@@ -122,7 +122,7 @@ class QuicClientTransportLiteMigrationTest : public Test {
 
   // Helper function to create and setup a probe socket mock
   std::unique_ptr<QuicAsyncUDPSocketMock> createProbeSocketMock(
-      const folly::SocketAddress& socketLocalAddr) {
+      const quic::SocketAddress& socketLocalAddr) {
     auto probeSock = std::make_unique<QuicAsyncUDPSocketMock>();
     auto* probeSockPtr = probeSock.get();
     ON_CALL(*probeSockPtr, setReuseAddr(_))
@@ -142,7 +142,7 @@ class QuicClientTransportLiteMigrationTest : public Test {
         .WillByDefault(Return(quic::Expected<void, QuicError>{}));
     ON_CALL(*probeSockPtr, address())
         .WillByDefault(Return(
-            quic::Expected<folly::SocketAddress, QuicError>{socketLocalAddr}));
+            quic::Expected<quic::SocketAddress, QuicError>{socketLocalAddr}));
     return probeSock;
   }
 
@@ -165,13 +165,13 @@ class QuicClientTransportLiteMigrationTest : public Test {
   std::shared_ptr<FollyQuicEventBase> qEvb_;
   std::shared_ptr<QuicClientTransportLiteMock> quicClient_;
   QuicAsyncUDPSocketMock* sockPtr_{nullptr};
-  folly::SocketAddress localAddr_{"::", 54321};
+  quic::SocketAddress localAddr_{"::", 54321};
 };
 
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     StartPathProbeSuccessWithoutMigrating) {
-  folly::SocketAddress localAddr("::", 12345);
+  quic::SocketAddress localAddr("::", 12345);
   auto probeSock = createProbeSocketMock(localAddr);
 
   auto probeSockPtr = probeSock.get();
@@ -207,7 +207,7 @@ TEST_F(
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     StartPathProbeSuccessWithMigrating) {
-  folly::SocketAddress localAddr("::", 12345);
+  quic::SocketAddress localAddr("::", 12345);
   auto initialPathId = quicClient_->getConn()->currentPathId;
   auto probeSock = createProbeSocketMock(localAddr);
 
@@ -252,7 +252,7 @@ TEST_F(
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     MigrateConnectionSwitchesCurrentPath) {
-  folly::SocketAddress localAddr("::", 22334);
+  quic::SocketAddress localAddr("::", 22334);
   auto probeSock = createProbeSocketMock(localAddr);
   auto probeSockPtr = probeSock.get();
 
@@ -275,7 +275,7 @@ TEST_F(
 }
 
 TEST_F(QuicClientTransportLiteMigrationTest, PathProbeTimeout) {
-  folly::SocketAddress localAddr("::", 33445);
+  quic::SocketAddress localAddr("::", 33445);
   auto probeSock = createProbeSocketMock(localAddr);
 
   TestPathValidationCallback callback;
@@ -320,7 +320,7 @@ TEST_F(QuicClientTransportLiteMigrationTest, PathProbeTimeout) {
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     MigrateToUnvalidatedPathThenTimeout) {
-  folly::SocketAddress localAddr("::", 44556);
+  quic::SocketAddress localAddr("::", 44556);
   auto probeSock = createProbeSocketMock(localAddr);
 
   TestPathValidationCallback callback;
@@ -365,7 +365,7 @@ TEST_F(
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     CannotStartProbeWithUnboundSocket) {
-  folly::SocketAddress localAddr("::", 55555);
+  quic::SocketAddress localAddr("::", 55555);
   auto probeSock = std::make_unique<QuicAsyncUDPSocketMock>();
   auto* probeSockPtr = probeSock.get();
 
@@ -382,7 +382,7 @@ TEST_F(
     QuicClientTransportLiteMigrationTest,
     CannotStartProbeWithSocketAddressFamilyMismatch) {
   // The main socket is IPv6 ("::"), so use IPv4 for mismatch
-  folly::SocketAddress localAddr("127.0.0.1", 55556);
+  quic::SocketAddress localAddr("127.0.0.1", 55556);
   auto probeSock = createProbeSocketMock(localAddr);
 
   // Simulate the probe socket is bound
@@ -398,7 +398,7 @@ TEST_F(
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     CannotStartProbeWhenPeerDisablesActiveMigration) {
-  folly::SocketAddress localAddr("::", 56565);
+  quic::SocketAddress localAddr("::", 56565);
   auto probeSock = createProbeSocketMock(localAddr);
 
   quicClient_->getConn()->peerSupportsActiveConnectionMigration = false;
@@ -415,7 +415,7 @@ TEST_F(
 TEST_F(
     QuicClientTransportLiteMigrationTest,
     CannotStartProbeWithoutOneRttCipher) {
-  folly::SocketAddress localAddr("::", 57575);
+  quic::SocketAddress localAddr("::", 57575);
   auto probeSock = createProbeSocketMock(localAddr);
 
   quicClient_->getConn()->oneRttWriteCipher = nullptr;
@@ -441,7 +441,7 @@ TEST_F(
   auto conn = quicClient_->getConn();
 
   // Create a probe socket
-  folly::SocketAddress localAddr("::", 12345);
+  quic::SocketAddress localAddr("::", 12345);
   auto probeSock = createProbeSocketMock(localAddr);
 
   // Start the path probe
@@ -486,7 +486,7 @@ TEST_F(
   }
 
   // Create a probe socket
-  folly::SocketAddress localAddr("::", 12345);
+  quic::SocketAddress localAddr("::", 12345);
   auto probeSock = createProbeSocketMock(localAddr);
 
   // Attempt to start the path probe - should fail due to no available CIDs
@@ -517,7 +517,7 @@ class QuicClientTransportLiteMockWithClose
         QuicClientTransportLiteMock(evb, nullptr, handshakeFactory) {}
 
   quic::Expected<void, QuicError> processPackets(
-      const Optional<folly::SocketAddress>&,
+      const Optional<quic::SocketAddress>&,
       NetworkData&&) override {
     ++processPacketsCount;
     if (processPacketsCount == 1) {
@@ -566,7 +566,7 @@ TEST_F(
       .WillByDefault(Return(quic::Expected<void, QuicError>{}));
   ON_CALL(*socket, address())
       .WillByDefault(
-          Return(quic::Expected<folly::SocketAddress, QuicError>{localAddr_}));
+          Return(quic::Expected<quic::SocketAddress, QuicError>{localAddr_}));
   auto mockFactory = std::make_shared<MockClientHandshakeFactory>();
   EXPECT_CALL(*mockFactory, makeClientHandshakeImpl(_))
       .WillRepeatedly(Invoke(
@@ -581,7 +581,7 @@ TEST_F(
       test::createNoOpHeaderCipher().value();
 
   // Create a probe socket in the path manager.
-  folly::SocketAddress probeAddr("::", 12345);
+  quic::SocketAddress probeAddr("::", 12345);
   auto probeSock = createProbeSocketMock(probeAddr);
   auto* probeSockPtr = probeSock.get();
   ON_CALL(*probeSockPtr, getGRO()).WillByDefault(Return(0));

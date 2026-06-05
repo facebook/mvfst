@@ -58,8 +58,8 @@ quic::Expected<void, std::runtime_error> ThreadLocalXskContainer::init(
 }
 
 XskSender* ThreadLocalXskContainer::pickXsk(
-    const folly::SocketAddress& /* src */,
-    const folly::SocketAddress& /* dst */) {
+    const quic::SocketAddress& /* src */,
+    const quic::SocketAddress& /* dst */) {
   return xskSender_.get();
 }
 

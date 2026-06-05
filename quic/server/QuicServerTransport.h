@@ -42,7 +42,7 @@ class QuicServerTransport
  public:
   using Ptr = std::shared_ptr<QuicServerTransport>;
   using Ref = const QuicServerTransport&;
-  using SourceIdentity = std::pair<folly::SocketAddress, ConnectionId>;
+  using SourceIdentity = std::pair<quic::SocketAddress, ConnectionId>;
 
   class RoutingCallback {
    public:
@@ -111,7 +111,7 @@ class QuicServerTransport
   virtual void setHandshakeFinishedCallback(
       HandshakeFinishedCallback* callback) noexcept;
 
-  virtual void setOriginalPeerAddress(const folly::SocketAddress& addr);
+  virtual void setOriginalPeerAddress(const quic::SocketAddress& addr);
 
   virtual void setServerConnectionIdParams(
       ServerConnectionIdParams params) noexcept;
@@ -153,7 +153,7 @@ class QuicServerTransport
 
   // From QuicTransportBase
   quic::Expected<void, QuicError> onReadData(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       ReceivedUdpPacket&& udpPacket) override;
   quic::Expected<void, QuicError> writeData() override;
   void closeTransport() override;

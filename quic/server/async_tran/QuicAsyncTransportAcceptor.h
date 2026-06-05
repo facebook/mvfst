@@ -28,7 +28,7 @@ class QuicAsyncTransportAcceptor : public quic::QuicServerTransportFactory {
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
-      const folly::SocketAddress&,
+      const quic::SocketAddress&,
       QuicVersion quickVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override;

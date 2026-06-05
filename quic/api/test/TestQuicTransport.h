@@ -70,7 +70,7 @@ class TestQuicTransport
   }
 
   quic::Expected<void, QuicError> onReadData(
-      const folly::SocketAddress& /* localAddress */,
+      const quic::SocketAddress& /* localAddress */,
       ReceivedUdpPacket&& /* udpPacket */) noexcept override {
     return {};
   }

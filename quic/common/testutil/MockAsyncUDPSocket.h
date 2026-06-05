@@ -22,15 +22,15 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
 
   MOCK_METHOD((quic::Expected<void, QuicError>), init, (sa_family_t));
   MOCK_METHOD(
-      (quic::Expected<folly::SocketAddress, QuicError>),
+      (quic::Expected<quic::SocketAddress, QuicError>),
       address,
       (),
       (const));
-  MOCK_METHOD((const folly::SocketAddress&), addressRef, (), (const));
+  MOCK_METHOD((const quic::SocketAddress&), addressRef, (), (const));
   MOCK_METHOD(
       (quic::Expected<void, QuicError>),
       bind,
-      (const folly::SocketAddress&));
+      (const quic::SocketAddress&));
   MOCK_METHOD(
       (quic::Expected<void, QuicError>),
       setFD,
@@ -38,33 +38,33 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
   MOCK_METHOD(
       ssize_t,
       write,
-      (const folly::SocketAddress&, const struct iovec*, size_t));
+      (const quic::SocketAddress&, const struct iovec*, size_t));
   MOCK_METHOD(
       int,
       writem,
-      (folly::Range<folly::SocketAddress const*>, iovec*, size_t*, size_t));
+      (folly::Range<quic::SocketAddress const*>, iovec*, size_t*, size_t));
   MOCK_METHOD(
       ssize_t,
       writeGSO,
-      (const folly::SocketAddress&,
+      (const quic::SocketAddress&,
        const struct iovec*,
        size_t,
        QuicAsyncUDPSocket::WriteOptions));
   MOCK_METHOD(
       ssize_t,
       writev,
-      (const folly::SocketAddress&, const struct iovec*, size_t));
+      (const quic::SocketAddress&, const struct iovec*, size_t));
   MOCK_METHOD(
       int,
       writemGSO,
-      (folly::Range<folly::SocketAddress const*> addrs,
+      (folly::Range<quic::SocketAddress const*> addrs,
        const std::unique_ptr<folly::IOBuf>* bufs,
        size_t count,
        const WriteOptions* options));
   MOCK_METHOD(
       int,
       writemGSO,
-      (folly::Range<folly::SocketAddress const*> addrs,
+      (folly::Range<quic::SocketAddress const*> addrs,
        iovec* iov,
        size_t* numIovecsInBuffer,
        size_t count,
@@ -100,7 +100,7 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
   MOCK_METHOD(
       (quic::Expected<void, QuicError>),
       connect,
-      (const folly::SocketAddress&));
+      (const quic::SocketAddress&));
   MOCK_METHOD(bool, isBound, (), (const));
   MOCK_METHOD((quic::Expected<int, QuicError>), getGSO, ());
   MOCK_METHOD((quic::Expected<void, QuicError>), setGSO, (int));

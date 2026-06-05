@@ -25,7 +25,7 @@ void QuicAsyncTransportServer::setFizzContext(
 }
 
 void QuicAsyncTransportServer::start(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     size_t numThreads) {
   if (numThreads == 0) {
     numThreads = folly::available_concurrency();
@@ -41,7 +41,7 @@ void QuicAsyncTransportServer::start(
 }
 
 void QuicAsyncTransportServer::start(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     std::vector<folly::EventBase*> evbs) {
   quicServer_->initialize(address, evbs, false /* useDefaultTransport */);
   quicServer_->waitUntilInitialized();

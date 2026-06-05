@@ -134,7 +134,7 @@ bool QuicServer::isInitialized() const noexcept {
   return initialized_;
 }
 
-void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
+void QuicServer::start(const quic::SocketAddress& address, size_t maxWorkers) {
   checkRunningInThread(mainThreadId_);
   MVCHECK(ctx_, "Must set a TLS context for the Quic server");
   MVCHECK_LE(
@@ -167,7 +167,7 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
 }
 
 void QuicServer::initialize(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     const std::vector<folly::EventBase*>& evbs,
     bool useDefaultTransport) {
   checkRunningInThread(mainThreadId_);
@@ -185,7 +185,7 @@ void QuicServer::initialize(
 }
 
 void QuicServer::initializeImpl(
-    const folly::SocketAddress& address,
+    const quic::SocketAddress& address,
     std::vector<MaybeOwnedEvbPtr> evbs,
     bool useDefaultTransport) {
   checkRunningInThread(mainThreadId_);
@@ -266,7 +266,7 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   return worker;
 }
 
-void QuicServer::bindWorkersToSocket(const folly::SocketAddress& address) {
+void QuicServer::bindWorkersToSocket(const quic::SocketAddress& address) {
   auto workerEvbs = workerEvbs_.rlock();
   auto numWorkers = workerEvbs->size();
   MVCHECK(!initialized_);
@@ -367,7 +367,7 @@ quic::Expected<void, QuicError> QuicServer::enableZeroCopy() {
   return {};
 }
 
-void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
+void QuicServer::allowBeingTakenOver(const quic::SocketAddress& addr) {
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker
   checkRunningInThread(mainThreadId_);
@@ -399,8 +399,8 @@ void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
   takeoverHandlerInitialized_ = true;
 }
 
-folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
-    const folly::SocketAddress& addr) {
+quic::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
+    const quic::SocketAddress& addr) {
   checkRunningInThread(mainThreadId_);
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker
@@ -415,7 +415,7 @@ folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
         !worker->getEventBase()->isRunning() ||
         !worker->getEventBase()->isInEventBaseThread());
   }
-  folly::SocketAddress boundAddress;
+  quic::SocketAddress boundAddress;
   for (auto& worker : workers_) {
     worker->getEventBase()->runInEventBaseThreadAndWait([&] {
       std::lock_guard<std::mutex> guard(startMutex_);
@@ -435,7 +435,7 @@ void QuicServer::pauseRead() {
 }
 
 void QuicServer::routeDataToWorker(
-    const folly::SocketAddress& client,
+    const quic::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
     Optional<QuicVersion> quicVersion,
@@ -713,7 +713,7 @@ void QuicServer::blockListedSrcPort(
   });
 }
 
-void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
+void QuicServer::startPacketForwarding(const quic::SocketAddress& destAddr) {
   checkRunningInThread(mainThreadId_);
   if (initialized_) {
     runOnAllWorkersSync([destAddr](auto worker) mutable {
@@ -779,7 +779,7 @@ void QuicServer::addTransportFactory(
   });
 }
 
-const folly::SocketAddress& QuicServer::getAddress() const {
+const quic::SocketAddress& QuicServer::getAddress() const {
   MVCHECK(initialized_, kQuicServerNotInitialized << __func__);
   return boundAddress_;
 }

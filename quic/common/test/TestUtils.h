@@ -350,12 +350,12 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
   bool append(
       BufPtr&& /*unused*/,
       size_t size,
-      const folly::SocketAddress& /*unused*/,
+      const quic::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
 
   ssize_t write(
       QuicAsyncUDPSocket& /*unused*/,
-      const folly::SocketAddress& /*unused*/) override;
+      const quic::SocketAddress& /*unused*/) override;
 
   [[nodiscard]] size_t getBufSize() const {
     return bufSize_;

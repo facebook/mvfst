@@ -22,7 +22,7 @@ class QuicServerTransportFactory {
   virtual QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       QuicVersion quicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept = 0;
 };

@@ -40,9 +40,9 @@ class MockQuicSocket : public QuicSocket {
       getClientChosenDestConnectionId,
       (),
       (const));
-  MOCK_METHOD(const folly::SocketAddress&, getPeerAddress, (), (const));
-  MOCK_METHOD(const folly::SocketAddress&, getOriginalPeerAddress, (), (const));
-  MOCK_METHOD(const folly::SocketAddress&, getLocalAddress, (), (const));
+  MOCK_METHOD(const quic::SocketAddress&, getPeerAddress, (), (const));
+  MOCK_METHOD(const quic::SocketAddress&, getOriginalPeerAddress, (), (const));
+  MOCK_METHOD(const quic::SocketAddress&, getLocalAddress, (), (const));
   MOCK_METHOD(
       Optional<std::vector<TransportParameter>>,
       getPeerTransportParams,

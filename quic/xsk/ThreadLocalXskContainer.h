@@ -27,8 +27,8 @@ class ThreadLocalXskContainer : public BaseXskContainer {
       const XskContainerConfig& xskContainerConfig) override;
 
   XskSender* pickXsk(
-      const folly::SocketAddress& src,
-      const folly::SocketAddress& dst) override;
+      const quic::SocketAddress& src,
+      const quic::SocketAddress& dst) override;
 
   // The user needs to call this function within each thread that
   // will use an AF_XDP socket, in order to set the thread local

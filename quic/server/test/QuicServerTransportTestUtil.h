@@ -154,8 +154,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   ~QuicServerTransportTestBase() override = default;
 
   void SetUp() override {
-    clientAddr = folly::SocketAddress("127.0.0.1", 1000);
-    serverAddr = folly::SocketAddress("1.2.3.4", 8080);
+    clientAddr = quic::SocketAddress("127.0.0.1", 1000);
+    serverAddr = quic::SocketAddress("1.2.3.4", 8080);
     clientConnectionId = getTestConnectionId();
     initialDestinationConnectionId = clientConnectionId;
     // change the initialDestinationConnectionId to be different
@@ -169,7 +169,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     socket = sock.get();
     EXPECT_CALL(*sock, write(testing::_, testing::_, testing::_))
         .WillRepeatedly(
-            testing::Invoke([&](const folly::SocketAddress&,
+            testing::Invoke([&](const quic::SocketAddress&,
                                 const struct iovec* vec,
                                 size_t iovec_len) {
               serverWrites.push_back(
@@ -391,7 +391,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
   void recvClientFinished(
       bool writes = true,
-      folly::SocketAddress* peerAddress = nullptr,
+      quic::SocketAddress* peerAddress = nullptr,
       QuicVersion version = QuicVersion::MVFST) {
     auto finished = folly::IOBuf::copyBuffer("FINISHED");
     auto nextPacketNum = clientNextHandshakePacketNum++;
@@ -564,7 +564,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   void deliverDataWithoutErrorCheck(
       NetworkData&& data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     data.setPeerAddressForAllPackets(peer == nullptr ? clientAddr : *peer);
     server->onNetworkData(server->getLocalAddress(), std::move(data));
     if (writes) {
@@ -575,7 +575,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   void deliverDataWithoutErrorCheck(
       BufPtr data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     data->coalesce();
     deliverDataWithoutErrorCheck(
         NetworkData(ReceivedUdpPacket(std::move(data))), writes, peer);
@@ -584,7 +584,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   void deliverData(
       NetworkData&& data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     deliverDataWithoutErrorCheck(std::move(data), writes, peer);
     if (server->getConn().localConnectionError) {
       bool idleTimeout = false;
@@ -603,7 +603,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   void deliverData(
       BufPtr data,
       bool writes = true,
-      folly::SocketAddress* peer = nullptr) {
+      quic::SocketAddress* peer = nullptr) {
     data->coalesce();
     deliverData(NetworkData(ReceivedUdpPacket(std::move(data))), writes, peer);
   }
@@ -675,8 +675,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
   folly::EventBase evb;
   std::shared_ptr<FollyQuicEventBase> qEvb_;
-  folly::SocketAddress serverAddr;
-  folly::SocketAddress clientAddr;
+  quic::SocketAddress serverAddr;
+  quic::SocketAddress clientAddr;
   testing::NiceMock<MockConnectionSetupCallback> connSetupCallback;
   testing::NiceMock<MockConnectionCallback> connCallback;
   testing::NiceMock<MockRoutingCallback> routingCallback;

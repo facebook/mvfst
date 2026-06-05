@@ -33,8 +33,8 @@ class HashingXskContainer : public BaseXskContainer {
       const XskContainerConfig& xskContainerConfig) override;
 
   XskSender* pickXsk(
-      const folly::SocketAddress& src,
-      const folly::SocketAddress& dst) override;
+      const quic::SocketAddress& src,
+      const quic::SocketAddress& dst) override;
 
  private:
   folly::F14FastMap<uint32_t, std::unique_ptr<XskSender>> queueIdToXsk_;

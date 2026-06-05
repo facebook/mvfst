@@ -37,7 +37,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   MOCK_METHOD(
       (void),
       onDataAvailable,
-      (const folly::SocketAddress&, size_t, bool, OnDataAvailableParams),
+      (const quic::SocketAddress&, size_t, bool, OnDataAvailableParams),
       (noexcept));
   MOCK_METHOD((bool), shouldOnlyNotify, ());
   MOCK_METHOD((void), onNotifyDataAvailable, (QuicAsyncUDPSocket&), (noexcept));

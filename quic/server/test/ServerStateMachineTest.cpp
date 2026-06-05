@@ -44,7 +44,7 @@ TEST(ServerStateMachineTest, TestAddConnId) {
 
   serverState.connIdAlgo = algo.get();
   serverState.serverConnIdParams = originalParams;
-  serverState.serverAddr = folly::SocketAddress("0.0.0.0", 42069);
+  serverState.serverAddr = quic::SocketAddress("0.0.0.0", 42069);
   quic::MockQuicStats mockQuicStats;
   serverState.statsCallback = &mockQuicStats;
 
@@ -99,7 +99,7 @@ TEST(ServerStateMachineTest, TestCidRejected) {
   serverConn.peerActiveConnectionIdLimit = 10;
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverConn.transportSettings.statelessResetTokenSecret = secret;
-  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 225);
+  serverConn.serverAddr = quic::SocketAddress("0.0.0.0", 225);
   quic::MockQuicStats mockQuicStats;
   serverConn.statsCallback = &mockQuicStats;
 
@@ -134,7 +134,7 @@ TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
   serverConn.peerActiveConnectionIdLimit = 10;
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverConn.transportSettings.statelessResetTokenSecret = secret;
-  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 770);
+  serverConn.serverAddr = quic::SocketAddress("0.0.0.0", 770);
   quic::MockQuicStats mockQuicStats;
   serverConn.statsCallback = &mockQuicStats;
 
@@ -166,7 +166,7 @@ TEST(ServerStateMachineTest, TestCidRejectedGiveUp) {
   serverConn.peerActiveConnectionIdLimit = 10;
   std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
   serverConn.transportSettings.statelessResetTokenSecret = secret;
-  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 770);
+  serverConn.serverAddr = quic::SocketAddress("0.0.0.0", 770);
   quic::MockQuicStats mockQuicStats;
   serverConn.statsCallback = &mockQuicStats;
 

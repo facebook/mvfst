@@ -176,7 +176,7 @@ uint64_t getEncodedBodySize(const RegularQuicPacketBuilder::Packet& packet) {
 
 void initializePathManagerState(QuicServerConnectionState& conn) {
   auto pathRes = conn.pathManager->addValidatedPath(
-      folly::SocketAddress("::1", 12345), folly::SocketAddress("::1", 54321));
+      quic::SocketAddress("::1", 12345), quic::SocketAddress("::1", 54321));
   MVCHECK(!pathRes.hasError());
   conn.currentPathId = pathRes.value();
 }
@@ -4037,7 +4037,7 @@ TEST_F(
 
   // Switch to an unvalidated path
   auto pathInfoRes = conn->pathManager->getOrAddPath(
-      folly::SocketAddress("::1", 12346), folly::SocketAddress("::1", 54321));
+      quic::SocketAddress("::1", 12346), quic::SocketAddress("::1", 54321));
   ASSERT_FALSE(pathInfoRes.hasError());
   auto& pathInfo = pathInfoRes.value().get();
   conn->currentPathId = pathInfo.id;
@@ -4099,7 +4099,7 @@ TEST_F(
   // Initiate a probe on an alternate path. This is not the current path.
 
   auto pathInfoRes = conn->pathManager->getOrAddPath(
-      folly::SocketAddress("::1", 12346), folly::SocketAddress("::1", 54321));
+      quic::SocketAddress("::1", 12346), quic::SocketAddress("::1", 54321));
   ASSERT_FALSE(pathInfoRes.hasError());
   auto& pathInfo = pathInfoRes.value().get();
 
@@ -5058,7 +5058,7 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
   ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const folly::SocketAddress&,
+      .WillOnce(Invoke([&](const quic::SocketAddress&,
                            const struct iovec* vec,
                            size_t iovec_len,
                            QuicAsyncUDPSocket::WriteOptions options) {
@@ -5109,7 +5109,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
       writeDataToQuicStream(*stream, inputBuf->clone(), true).hasError());
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const folly::SocketAddress&,
+      .WillOnce(Invoke([&](const quic::SocketAddress&,
                            const struct iovec* vec,
                            size_t iovec_len,
                            QuicAsyncUDPSocket::WriteOptions options) {
@@ -5148,7 +5148,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   ASSERT_EQ(firstPacketSize, conn->udpSendPacketLen);
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const folly::SocketAddress&,
+      .WillOnce(Invoke([&](const quic::SocketAddress&,
                            const struct iovec* vec,
                            size_t iovec_len,
                            auto) {
@@ -5170,7 +5170,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   // Clone again, this time 2 pacckets.
   EXPECT_CALL(mockSock, writeGSO(_, _, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](const folly::SocketAddress&,
+      .WillOnce(Invoke([&](const quic::SocketAddress&,
                            const struct iovec* vec,
                            size_t iovec_len,
                            QuicAsyncUDPSocket::WriteOptions options) {

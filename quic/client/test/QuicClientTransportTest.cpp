@@ -50,7 +50,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   }
 
   quic::Expected<void, QuicError> processPackets(
-      const Optional<folly::SocketAddress>& /*localAddress*/,
+      const Optional<quic::SocketAddress>& /*localAddress*/,
       NetworkData&& networkData) override {
     if (!networkData.getPackets().empty()) {
       server_ = networkData.getPackets().front().peerAddress;
@@ -64,7 +64,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   }
 
   std::vector<NetworkData> networkDataVec_;
-  Optional<folly::SocketAddress> server_;
+  Optional<quic::SocketAddress> server_;
 };
 
 class QuicClientTransportTest : public Test {

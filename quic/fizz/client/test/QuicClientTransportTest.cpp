@@ -128,10 +128,10 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     client->setHostname(hostname);
     switch (serverAddr.getFamily()) {
       case AF_INET6:
-        client->setLocalAddress(folly::SocketAddress("::1", 0));
+        client->setLocalAddress(quic::SocketAddress("::1", 0));
         break;
       case AF_INET:
-        client->setLocalAddress(folly::SocketAddress("127.0.0.1", 0));
+        client->setLocalAddress(quic::SocketAddress("127.0.0.1", 0));
         break;
     }
     client->addNewPeerAddress(serverAddr);
@@ -180,7 +180,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
         std::make_unique<QuicSharedUDPSocketFactory>());
     server->setFizzContext(serverCtx);
     server->setSupportedVersion({getVersion(), MVFST1});
-    folly::SocketAddress addr("::1", 0);
+    quic::SocketAddress addr("::1", 0);
     server->setProcessId(processId);
     server->start(addr, 1);
     server->waitUntilInitialized();
@@ -288,7 +288,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::string hostname;
   folly::EventBase eventbase_;
   std::shared_ptr<FollyQuicEventBase> qEvb_;
-  folly::SocketAddress serverAddr;
+  quic::SocketAddress serverAddr;
   NiceMock<MockConnectionSetupCallback> clientConnSetupCallback;
   NiceMock<MockConnectionCallback> clientConnCallback;
   NiceMock<MockReadCallback> readCb;
@@ -1440,12 +1440,12 @@ TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
 }
 
 TEST_F(QuicClientTransportTest, AddNewPeerAddressSetsPacketSize) {
-  folly::SocketAddress v4Address("0.0.0.0", 0);
+  quic::SocketAddress v4Address("0.0.0.0", 0);
   ASSERT_TRUE(v4Address.getFamily() == AF_INET);
   client->addNewPeerAddress(v4Address);
   EXPECT_EQ(kDefaultV4UDPSendPacketLen, client->getConn().udpSendPacketLen);
 
-  folly::SocketAddress v6Address("::", 0);
+  quic::SocketAddress v6Address("::", 0);
   ASSERT_TRUE(v6Address.getFamily() == AF_INET6);
   client->addNewPeerAddress(v6Address);
   EXPECT_EQ(kDefaultV6UDPSendPacketLen, client->getConn().udpSendPacketLen);
@@ -1480,7 +1480,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   conn.peerConnectionIds.push_back(originalCid);
   conn.peerConnectionIds.push_back(secondCid);
 
-  folly::SocketAddress v4Address("0.0.0.0", 0);
+  quic::SocketAddress v4Address("0.0.0.0", 0);
   client->addNewPeerAddress(v4Address);
   auto validatedPathId =
       conn.pathManager->addValidatedPath(client->getLocalAddress(), v4Address);
@@ -1493,7 +1493,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   EXPECT_CALL(*newSocketPtr, close());
   EXPECT_CALL(*newSocketPtr, isBound()).WillRepeatedly(Return(true));
   EXPECT_CALL(*newSocketPtr, address())
-      .WillRepeatedly(Return(folly::SocketAddress("1.2.3.4", 1234)));
+      .WillRepeatedly(Return(quic::SocketAddress("1.2.3.4", 1234)));
 
   client->setQLogger(mockQLogger);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true));
@@ -1991,7 +1991,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _, _));
     EXPECT_CALL(*secondSock, bind(_))
-        .WillOnce(Invoke([](const folly::SocketAddress&) {
+        .WillOnce(Invoke([](const quic::SocketAddress&) {
           return quic::make_unexpected(
               QuicError(TransportErrorCode::INTERNAL_ERROR, "oopsies"));
         }));
@@ -3336,13 +3336,13 @@ TEST_F(
       ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
 
   // Create a probe socket and start a path probe.
-  folly::SocketAddress probeLocalAddr("1.2.3.4", 1234);
+  quic::SocketAddress probeLocalAddr("1.2.3.4", 1234);
   auto probeSock = getMockSocketWithExpectations(qEvb_);
   auto* probeSockPtr = probeSock.get();
   ON_CALL(*probeSockPtr, isBound()).WillByDefault(Return(true));
   ON_CALL(*probeSockPtr, address())
       .WillByDefault(Return(
-          quic::Expected<folly::SocketAddress, QuicError>{probeLocalAddr}));
+          quic::Expected<quic::SocketAddress, QuicError>{probeLocalAddr}));
 
   auto probeRes = client->startPathProbe(std::move(probeSock));
   ASSERT_TRUE(probeRes.has_value()) << probeRes.error();
@@ -4003,7 +4003,7 @@ TEST_F(QuicClientTransportAfterStartTest, DropPacketFromUnknownPeerAddress) {
       0 /* largestAcked */));
 
   // Deliver the packet from an unknown peer address (different from serverAddr)
-  folly::SocketAddress unknownPeer("::1", 54321);
+  quic::SocketAddress unknownPeer("::1", 54321);
   deliverDataWithoutErrorCheck(unknownPeer, packet->coalesce(), false);
 
   // No data was delivered
@@ -6508,7 +6508,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
     void getReadBuffer(void**, size_t*) noexcept override {}
 
     void onDataAvailable(
-        const folly::SocketAddress&,
+        const quic::SocketAddress&,
         size_t,
         bool,
         OnDataAvailableParams) noexcept override {}
@@ -6541,7 +6541,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   ASSERT_FALSE(happyEyeballsSetUpSocket(
                    socket,
                    std::nullopt,
-                   folly::SocketAddress("127.0.0.1", 12345),
+                   quic::SocketAddress("127.0.0.1", 12345),
                    transportSettings,
                    0, // tosValue
                    &errMessageCallback,

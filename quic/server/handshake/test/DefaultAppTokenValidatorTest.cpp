@@ -44,7 +44,7 @@ class TestEarlyDataAppParamsHandler : public EarlyDataAppParamsHandler {
 TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
       ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
@@ -81,7 +81,7 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
 TEST(DefaultAppTokenValidatorTest, TestValidOptionalParameter) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
       ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
@@ -124,7 +124,7 @@ TEST(
     TestValidUnequalParamsUpdateTransportSettings) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
       ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
@@ -170,7 +170,7 @@ TEST(
 TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
   ResumptionState resState;
@@ -187,7 +187,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
 TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -211,7 +211,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
 TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -272,7 +272,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
 // TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
 //   QuicServerConnectionState conn(
 //       FizzServerQuicHandshakeContext::Builder().build());
-//   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+//   conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
 //   conn.version = QuicVersion::MVFST;
 //   auto quicStats = std::make_shared<MockQuicStats>();
 //   conn.statsCallback = quicStats.get();
@@ -308,7 +308,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
 TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -346,7 +346,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
 TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -383,7 +383,7 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
 TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -420,7 +420,7 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
 TEST(DefaultAppTokenValidatorTest, TestInvalidExtendedAckSupportChanged) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -455,7 +455,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidExtendedAckSupportChanged) {
 TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.peerAddress = quic::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
@@ -499,7 +499,7 @@ class SourceAddressTokenTest : public Test {
       : conn_(FizzServerQuicHandshakeContext::Builder().build()) {}
 
   void SetUp() override {
-    conn_.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+    conn_.peerAddress = quic::SocketAddress("1.2.3.4", 443);
     conn_.version = QuicVersion::MVFST;
 
     auto transportParamsResult = createTicketTransportParameters(

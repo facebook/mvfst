@@ -37,7 +37,7 @@ class UDPAcceptor : public folly::AsyncUDPSocket::ReadCallback {
   }
 
   void onDataAvailable(
-      const folly::SocketAddress& client,
+      const quic::SocketAddress& client,
       size_t len,
       bool /*truncated*/,
       OnDataAvailableParams) noexcept override {
@@ -122,7 +122,7 @@ class EchoTransportServer {
   void start() {
     auto socket = std::make_shared<folly::AsyncUDPSocket>(&eventbase_);
     UDPAcceptor udpAcceptor(&eventbase_, socket);
-    socket->bind(folly::SocketAddress(host_, port_));
+    socket->bind(quic::SocketAddress(host_, port_));
     socket->resumeRead(&udpAcceptor);
 
     MVLOG_INFO << "Echo transport server started at: " << socket->address();
