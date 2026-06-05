@@ -8,7 +8,6 @@
 #pragma once
 
 #include <folly/Random.h>
-#include <folly/SocketAddress.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/net/NetOps.h>
 #include <quic/api/QuicTransportBaseLite.h>
@@ -86,12 +85,12 @@ class QuicClientTransportLite
    * Supplies a new peer address to use for the connection. This must be called
    * at least once before start().
    */
-  void addNewPeerAddress(folly::SocketAddress peerAddress);
+  void addNewPeerAddress(quic::SocketAddress peerAddress);
   /**
    * Supplies the local address to use for the connection. Calling this is
    * optional. If not called, INADDR_ANY will be used.
    */
-  void setLocalAddress(folly::SocketAddress localAddress);
+  void setLocalAddress(quic::SocketAddress localAddress);
 
   /**
    * Starts the connection.
@@ -148,7 +147,7 @@ class QuicClientTransportLite
 
   // From QuicTransportBase
   quic::Expected<void, QuicError> onReadData(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       ReceivedUdpPacket&& udpPacket) override;
   quic::Expected<void, QuicError> writeData() override;
   void closeTransport() override;
@@ -265,7 +264,7 @@ class QuicClientTransportLite
   // From QuicAsyncUDPSocket::ReadCallback
   void getReadBuffer(void** buf, size_t* len) noexcept override;
   void onDataAvailable(
-      const folly::SocketAddress& server,
+      const quic::SocketAddress& server,
       size_t len,
       bool truncated,
       OnDataAvailableParams params) noexcept override;
@@ -290,7 +289,7 @@ class QuicClientTransportLite
    * @param networkData       UDP packet (peer address is on udpPacket).
    */
   quic::Expected<void, QuicError> processUdpPacket(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       ReceivedUdpPacket&& udpPacket);
 
   /**
@@ -310,7 +309,7 @@ class QuicClientTransportLite
    *                      timings (peer address is on udpPacket).
    */
   quic::Expected<void, QuicError> processUdpPacketData(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       ReceivedUdpPacket& udpPacket);
 
   [[nodiscard]] quic::Expected<void, QuicError> startCryptoHandshake();
@@ -322,12 +321,12 @@ class QuicClientTransportLite
   virtual void startHappyEyeballsIfEnabled();
 
   virtual void happyEyeballsOnDataReceivedIfEnabled(
-      const folly::SocketAddress& peerAddress);
+      const quic::SocketAddress& peerAddress);
 
   virtual void cancelHappyEyeballsConnAttemptDelayTimeout();
 
   [[nodiscard]] virtual bool happyEyeballsAddPeerAddressIfEnabled(
-      const folly::SocketAddress& peerAddress);
+      const quic::SocketAddress& peerAddress);
 
   void handleAckFrame(
       const OutstandingPacketWrapper& outstandingPacket,
@@ -335,7 +334,7 @@ class QuicClientTransportLite
       const ReadAckFrame&);
 
   [[nodiscard]] virtual quic::Expected<void, QuicError> processPackets(
-      const Optional<folly::SocketAddress>& localAddress,
+      const Optional<quic::SocketAddress>& localAddress,
       NetworkData&& networkData);
 
   [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmsgSinglePacketLoop(

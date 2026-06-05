@@ -12,7 +12,6 @@ mvfst_cpp_library(
     ],
     deps = [
         "//common/network:mvfst_hooks",  # @manual
-        "//folly:network_address",
         "//folly/portability:sockets",
         "//quic/common:mvfst_logging",
         "//quic/common:socket_util",

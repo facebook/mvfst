@@ -12,7 +12,6 @@
 
 #include <quic/state/StateData.h>
 
-#include <folly/SocketAddress.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/portability/Sockets.h>
 
@@ -32,7 +31,7 @@ namespace quic {
 
 void happyEyeballsAddPeerAddress(
     QuicClientConnectionState& connection,
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& peerAddress) {
   // TODO: Do not wait for both IPv4 and IPv6 addresses to return before
   // attempting connection establishment. -- RFC8305
   // RFC8305 HappyEyeballs version 2 implementation will be more complex:
@@ -121,8 +120,8 @@ void startHappyEyeballs(
 
 quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket& socket,
-    Optional<folly::SocketAddress> localAddress,
-    const folly::SocketAddress& peerAddress,
+    Optional<quic::SocketAddress> localAddress,
+    const quic::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
     const uint8_t socketTos,
     QuicAsyncUDPSocket::ErrMessageCallback* errMsgCallback,
@@ -177,7 +176,7 @@ quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
     }
   }
   if (!socket.isBound()) {
-    auto addr = folly::SocketAddress(
+    auto addr = quic::SocketAddress(
         peerAddress.getFamily() == AF_INET ? "0.0.0.0" : "::", 0);
     auto initResult = initSockAndApplyOpts();
     if (!initResult) {
@@ -246,7 +245,7 @@ void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     QuicTimerCallback& connAttemptDelayTimeout,
     std::unique_ptr<QuicAsyncUDPSocket>& socket,
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& peerAddress) {
   if (connection.happyEyeballsState.finished) {
     return;
   }

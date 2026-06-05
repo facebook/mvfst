@@ -23,13 +23,13 @@ struct CachedServerTransportParameters;
 
 struct PendingClientData {
   ReceivedUdpPacket udpPacket;
-  folly::SocketAddress peerAddress;
-  folly::SocketAddress localAddress;
+  quic::SocketAddress peerAddress;
+  quic::SocketAddress localAddress;
 
   PendingClientData(
-      folly::SocketAddress localAddressIn,
+      quic::SocketAddress localAddressIn,
       ReceivedUdpPacket udpPacketIn,
-      folly::SocketAddress peerAddressIn)
+      quic::SocketAddress peerAddressIn)
       : udpPacket(std::move(udpPacketIn)),
         peerAddress(std::move(peerAddressIn)),
         localAddress(std::move(localAddressIn)) {}
@@ -88,14 +88,14 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     QuicTimerCallback* connAttemptDelayTimeout{nullptr};
 
     // IPv6 peer address
-    folly::SocketAddress v6PeerAddress;
+    quic::SocketAddress v6PeerAddress;
 
     // IPv4 peer address
-    folly::SocketAddress v4PeerAddress;
+    quic::SocketAddress v4PeerAddress;
 
     // The address that this socket will try to connect to after connection
     // attempt delay timeout fires
-    folly::SocketAddress secondPeerAddress;
+    quic::SocketAddress secondPeerAddress;
 
     // The UDP socket that will be used for the second connection attempt
     std::unique_ptr<QuicAsyncUDPSocket> secondSocket;

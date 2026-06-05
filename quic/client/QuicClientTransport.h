@@ -165,12 +165,12 @@ class QuicClientTransport : public QuicTransportBase,
   void startHappyEyeballsIfEnabled() override;
 
   void happyEyeballsOnDataReceivedIfEnabled(
-      const folly::SocketAddress& peerAddress) override;
+      const quic::SocketAddress& peerAddress) override;
 
   void cancelHappyEyeballsConnAttemptDelayTimeout() override;
 
   [[nodiscard]] bool happyEyeballsAddPeerAddressIfEnabled(
-      const folly::SocketAddress& peerAddress) override;
+      const quic::SocketAddress& peerAddress) override;
 
  protected:
   // Happy Eyeballs state

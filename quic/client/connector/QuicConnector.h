@@ -46,8 +46,8 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
 
   void connect(
       folly::EventBase* eventBase,
-      Optional<folly::SocketAddress> localAddr,
-      const folly::SocketAddress& connectAddr,
+      Optional<quic::SocketAddress> localAddr,
+      const quic::SocketAddress& connectAddr,
       std::shared_ptr<const fizz::client::FizzClientContext> fizzContext,
       std::shared_ptr<const fizz::CertificateVerifier> verifier,
       std::shared_ptr<quic::QuicPskCache> quicPskCache,

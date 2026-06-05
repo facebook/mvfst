@@ -53,7 +53,6 @@ mvfst_add_library(mvfst_client_client_lite
     mvfst_state_quic_connection_stats
     Folly::folly_io_socket_option_map
     Folly::folly_net_net_ops
-    Folly::folly_network_address
     Folly::folly_random
 )
 

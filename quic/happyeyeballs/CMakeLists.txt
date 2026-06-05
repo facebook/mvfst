@@ -12,7 +12,6 @@ mvfst_add_library(mvfst_happyeyeballs
     mvfst_common_mvfst_logging
     mvfst_common_socket_util
     mvfst_state_quic_state_machine
-    Folly::folly_network_address
     Folly::folly_portability_sockets
   EXPORTED_DEPS
     mvfst_client_state_and_handshake

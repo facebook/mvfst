@@ -304,7 +304,7 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
 #endif
     totalData += bytesRead;
 
-    folly::SocketAddress packetPeerAddress;
+    quic::SocketAddress packetPeerAddress;
     {
       auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
       packetPeerAddress.setFromSockaddr(rawAddr, kAddrLen);
@@ -426,7 +426,7 @@ void QuicClientTransport::startHappyEyeballsIfEnabled() {
 }
 
 void QuicClientTransport::happyEyeballsOnDataReceivedIfEnabled(
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& peerAddress) {
   if (happyEyeballsEnabled_) {
     MVCHECK(socket_);
     happyEyeballsOnDataReceived(
@@ -442,7 +442,7 @@ void QuicClientTransport::cancelHappyEyeballsConnAttemptDelayTimeout() {
 }
 
 bool QuicClientTransport::happyEyeballsAddPeerAddressIfEnabled(
-    const folly::SocketAddress& peerAddress) {
+    const quic::SocketAddress& peerAddress) {
   if (happyEyeballsEnabled_) {
     conn_->udpSendPacketLen = std::min(
         conn_->udpSendPacketLen,

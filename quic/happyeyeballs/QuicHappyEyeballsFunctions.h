@@ -19,7 +19,6 @@
 
 namespace folly {
 class EventBase;
-class SocketAddress;
 } // namespace folly
 
 namespace quic {
@@ -27,7 +26,7 @@ struct TransportSettings;
 
 void happyEyeballsAddPeerAddress(
     QuicClientConnectionState& connection,
-    const folly::SocketAddress& peerAddress);
+    const quic::SocketAddress& peerAddress);
 
 void happyEyeballsAddSocket(
     QuicClientConnectionState& connection,
@@ -45,8 +44,8 @@ void startHappyEyeballs(
 
 [[nodiscard]] quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
     QuicAsyncUDPSocket& socket,
-    Optional<folly::SocketAddress> localAddress,
-    const folly::SocketAddress& peerAddress,
+    Optional<quic::SocketAddress> localAddress,
+    const quic::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
     const uint8_t socketTos,
     QuicAsyncUDPSocket::ErrMessageCallback* errMsgCallback,
@@ -60,5 +59,5 @@ void happyEyeballsOnDataReceived(
     QuicClientConnectionState& connection,
     QuicTimerCallback& connAttemptDelayTimeout,
     std::unique_ptr<QuicAsyncUDPSocket>& socket,
-    const folly::SocketAddress& peerAddress);
+    const quic::SocketAddress& peerAddress);
 } // namespace quic

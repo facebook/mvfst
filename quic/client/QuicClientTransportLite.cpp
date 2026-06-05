@@ -125,7 +125,7 @@ QuicClientTransportLite::~QuicClientTransportLite() {
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
-    const folly::SocketAddress& localAddress,
+    const quic::SocketAddress& localAddress,
     ReceivedUdpPacket&& udpPacket) {
   MVCHECK(udpPacket.peerAddress.has_value());
   // Process the arriving UDP packet, which may have coalesced QUIC packets.
@@ -230,7 +230,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
-    const folly::SocketAddress& localAddress,
+    const quic::SocketAddress& localAddress,
     ReceivedUdpPacket& udpPacket) {
   MVCHECK(udpPacket.peerAddress.has_value());
   const auto& peerAddress = *udpPacket.peerAddress;
@@ -1070,7 +1070,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
-    const folly::SocketAddress& localAddress,
+    const quic::SocketAddress& localAddress,
     ReceivedUdpPacket&& udpPacket) {
   if (closeState_ == CloseState::CLOSED) {
     // If we are closed, then we shouldn't process new network data.
@@ -1443,7 +1443,7 @@ void QuicClientTransportLite::getReadBuffer(
 }
 
 void QuicClientTransportLite::onDataAvailable(
-    const folly::SocketAddress& /* server */,
+    const quic::SocketAddress& /* server */,
     size_t /* len */,
     bool /* truncated */,
     OnDataAvailableParams /* params */) noexcept {
@@ -1580,7 +1580,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
     auto bytesRead = size_t(ret);
     totalData += bytesRead;
-    folly::SocketAddress packetPeerAddress;
+    quic::SocketAddress packetPeerAddress;
     packetPeerAddress.setFromSockaddr(MVCHECK_NOTNULL(rawAddr), kAddrLen);
     MVVLOG(10) << "Got data from socket peer=" << packetPeerAddress
                << " len=" << bytesRead;
@@ -1635,7 +1635,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
-    const Optional<folly::SocketAddress>& localAddress,
+    const Optional<quic::SocketAddress>& localAddress,
     NetworkData&& networkData) {
   if (networkData.getPackets().empty()) {
     // recvMmsg and recvMsg might have already set the reason and counter
@@ -1750,7 +1750,7 @@ void QuicClientTransportLite::startHappyEyeballsIfEnabled() {
 }
 
 void QuicClientTransportLite::happyEyeballsOnDataReceivedIfEnabled(
-    const folly::SocketAddress& /* peerAddress */) {
+    const quic::SocketAddress& /* peerAddress */) {
   // Empty implementation for Lite class
   // Overridden in Full class with actual Happy Eyeballs data received logic
 }
@@ -1761,7 +1761,7 @@ void QuicClientTransportLite::cancelHappyEyeballsConnAttemptDelayTimeout() {
 }
 
 bool QuicClientTransportLite::happyEyeballsAddPeerAddressIfEnabled(
-    const folly::SocketAddress& /* peerAddress */) {
+    const quic::SocketAddress& /* peerAddress */) {
   // Empty implementation for Lite class
   // Overridden in Full class with actual peer address addition logic
   return false;
@@ -1819,7 +1819,7 @@ void QuicClientTransportLite::start(
 }
 
 void QuicClientTransportLite::addNewPeerAddress(
-    folly::SocketAddress peerAddress) {
+    quic::SocketAddress peerAddress) {
   MVCHECK(peerAddress.isInitialized());
 
   if (peerAddress.getIPAddress().isZero()) {
@@ -1827,7 +1827,7 @@ void QuicClientTransportLite::addNewPeerAddress(
     // interpreted as pointing to localhost since the address cannot appear on
     // the wire. We update the peer address here to keep the connection
     // state consistent with what will actually be in the IP headers.
-    peerAddress = folly::SocketAddress(
+    peerAddress = quic::SocketAddress(
         peerAddress.getFamily() == AF_INET6 ? folly::IPAddress("::1")
                                             : folly::IPAddress("127.0.0.1"),
         peerAddress.getPort());
@@ -1845,7 +1845,7 @@ void QuicClientTransportLite::addNewPeerAddress(
 }
 
 void QuicClientTransportLite::setLocalAddress(
-    folly::SocketAddress localAddress) {
+    quic::SocketAddress localAddress) {
   MVCHECK(localAddress.isInitialized());
   conn_->localAddress = std::move(localAddress);
 }
