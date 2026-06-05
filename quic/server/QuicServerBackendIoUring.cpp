@@ -43,10 +43,8 @@ std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
           .setMaxSubmit(FLAGS_qs_io_uring_max_submit)
           .setMaxGet(FLAGS_qs_io_uring_max_get)
           .setRegisterRingFd(FLAGS_qs_io_uring_register_ring)
-          .setUseRegisteredFds(FLAGS_qs_io_uring_use_registered_fds);
-      if (folly::IoUringBackend::kernelSupportsRecvmsgMultishot()) {
-        options.setInitialProvidedBuffers(2048, 2000);
-      }
+          .setUseRegisteredFds(FLAGS_qs_io_uring_use_registered_fds)
+          .setInitialProvidedBuffers(2048, 2000);
       auto ret = std::make_unique<folly::IoUringBackend>(std::move(options));
       MVLOG_INFO << "Allocating io_uring backend(" << FLAGS_qs_io_uring_capacity
                  << "," << FLAGS_qs_io_uring_max_submit << ","
