@@ -8,6 +8,7 @@
 #include <quic/api/QuicStreamAsyncTransport.h>
 #include <quic/common/MvfstCheck.h>
 #include <quic/common/MvfstLogging.h>
+#include <quic/common/address/QuicSocketAddressBridge.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 
 namespace quic {
@@ -324,12 +325,12 @@ uint32_t QuicStreamAsyncTransport::getSendTimeout() const {
 
 void QuicStreamAsyncTransport::getLocalAddress(
     folly::SocketAddress* address) const {
-  *address = sock_->getLocalAddress();
+  *address = quic::toFollySocketAddress(sock_->getLocalAddress());
 }
 
 void QuicStreamAsyncTransport::getPeerAddress(
     folly::SocketAddress* address) const {
-  *address = sock_->getPeerAddress();
+  *address = quic::toFollySocketAddress(sock_->getPeerAddress());
 }
 
 bool QuicStreamAsyncTransport::isEorTrackingEnabled() const {

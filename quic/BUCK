@@ -114,12 +114,15 @@ mvfst_cpp_library(
             "//folly/io:iobuf",
         ],
         "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": [
+            ":config",
             ":enum",
             "//folly/chrono:clock",
             "//quic/common:quic_buffer",
             "//quic/common:quic_iobuf_queue",
         ],
-    }),
+    }) + [
+        ":config",  # @manual
+    ],
 )
 
 mvfst_cpp_library(
