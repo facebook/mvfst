@@ -38,7 +38,7 @@ bool GSOPacketBatchWriter::needsFlush(size_t size) {
 bool GSOPacketBatchWriter::append(
     BufPtr&& buf,
     size_t size,
-    const folly::SocketAddress& /*unused*/,
+    const quic::SocketAddress& /*unused*/,
     QuicAsyncUDPSocket* /*unused*/) {
   // first buffer
   if (!buf_) {
@@ -72,7 +72,7 @@ bool GSOPacketBatchWriter::append(
 
 ssize_t GSOPacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   // Even though it's called writeGSO, it can handle individual writes by
   // setting gsoVal = 0.
   int gsoVal = currBufs_ > 1 ? static_cast<int>(prevSize_) : 0;
@@ -107,7 +107,7 @@ bool GSOInplacePacketBatchWriter::needsFlush(size_t size) {
 bool GSOInplacePacketBatchWriter::append(
     BufPtr&& /*buf*/,
     size_t size,
-    const folly::SocketAddress& /* addr */,
+    const quic::SocketAddress& /* addr */,
     QuicAsyncUDPSocket* /* sock */) {
   MVCHECK(!needsFlush(size));
   auto& buf = conn_.bufAccessor->buf();
@@ -136,7 +136,7 @@ bool GSOInplacePacketBatchWriter::append(
  */
 ssize_t GSOInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const quic::SocketAddress& address) {
   MVCHECK(lastPacketEnd_);
   auto& buf = conn_.bufAccessor->buf();
   MVCHECK(!buf->isChained());
@@ -241,7 +241,7 @@ void SendmmsgGSOPacketBatchWriter::reset() {
 bool SendmmsgGSOPacketBatchWriter::append(
     BufPtr&& buf,
     size_t size,
-    const folly::SocketAddress& addr,
+    const quic::SocketAddress& addr,
     QuicAsyncUDPSocket* /*unused*/) {
   currSize_ += size;
 
@@ -286,7 +286,7 @@ bool SendmmsgGSOPacketBatchWriter::append(
 
 ssize_t SendmmsgGSOPacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& /*unused*/) {
+    const quic::SocketAddress& /*unused*/) {
   MVCHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
     iovec vec[kNumIovecBufferChains];
@@ -343,7 +343,7 @@ void SendmmsgGSOInplacePacketBatchWriter::reset() {
 bool SendmmsgGSOInplacePacketBatchWriter::append(
     BufPtr&& /* buf */,
     size_t size,
-    const folly::SocketAddress& addr,
+    const quic::SocketAddress& addr,
     QuicAsyncUDPSocket* /*unused*/) {
   auto& buf = conn_.bufAccessor->buf();
 
@@ -398,7 +398,7 @@ bool SendmmsgGSOInplacePacketBatchWriter::append(
 
 ssize_t SendmmsgGSOInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
-    const folly::SocketAddress& /*unused*/) {
+    const quic::SocketAddress& /*unused*/) {
   MVCHECK_GT(buffers_.size(), 0);
 
   int ret = 0;

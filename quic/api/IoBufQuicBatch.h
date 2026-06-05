@@ -23,7 +23,7 @@ class IOBufQuicBatch {
   IOBufQuicBatch(
       BatchWriterPtr&& batchWriter,
       QuicAsyncUDPSocket& sock,
-      const folly::SocketAddress& peerAddress,
+      const quic::SocketAddress& peerAddress,
       QuicTransportStatsCallback* statsCallback,
       QuicClientConnectionState::HappyEyeballsState* happyEyeballsState);
 
@@ -61,7 +61,7 @@ class IOBufQuicBatch {
 
   BatchWriterPtr batchWriter_;
   QuicAsyncUDPSocket& sock_;
-  const folly::SocketAddress& peerAddress_;
+  const quic::SocketAddress& peerAddress_;
   QuicTransportStatsCallback* statsCallback_{nullptr};
   QuicClientConnectionState::HappyEyeballsState* happyEyeballsState_;
   BufQuicBatchResult result_;

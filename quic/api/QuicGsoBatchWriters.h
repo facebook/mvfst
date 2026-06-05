@@ -24,9 +24,9 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
   bool append(
       BufPtr&& buf,
       size_t size,
-      const folly::SocketAddress& /*unused*/,
+      const quic::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
 
   void setTxTime(std::chrono::microseconds txTime) override {
@@ -56,9 +56,9 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
   bool append(
       BufPtr&& buf,
       size_t size,
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       QuicAsyncUDPSocket* sock) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
   [[nodiscard]] bool empty() const override;
   [[nodiscard]] size_t size() const override;
@@ -98,9 +98,9 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   bool append(
       BufPtr&& buf,
       size_t size,
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       QuicAsyncUDPSocket* sock) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
 
  private:
@@ -114,7 +114,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   std::vector<BufPtr> bufs_;
   std::vector<QuicAsyncUDPSocket::WriteOptions> options_;
   std::vector<size_t> prevSize_;
-  std::vector<folly::SocketAddress> addrs_;
+  std::vector<quic::SocketAddress> addrs_;
 
   struct Index {
     Index& operator=(int idx) {
@@ -133,7 +133,7 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
     int idx_ = -1;
   };
 
-  UnorderedMap<folly::SocketAddress, Index> addrMap_;
+  UnorderedMap<quic::SocketAddress, Index> addrMap_;
 };
 
 class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
@@ -151,9 +151,9 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
   bool append(
       BufPtr&& buf,
       size_t size,
-      const folly::SocketAddress& address,
+      const quic::SocketAddress& address,
       QuicAsyncUDPSocket* sock) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
 
  private:
@@ -177,7 +177,7 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
   // Given an index, buffers_[i] has all packets that need to be sent to
   // indexToAddr_[i] with the write options set to indexToOptions_[i].
   std::vector<std::vector<iovec>> buffers_;
-  std::vector<folly::SocketAddress> indexToAddr_;
+  std::vector<quic::SocketAddress> indexToAddr_;
   std::vector<QuicAsyncUDPSocket::WriteOptions> indexToOptions_;
 
   // An address can correspond to many indices. For instance, consider the
@@ -185,7 +185,7 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
   // have a size of 1000, whereas the third has a size of 1200.
   // The first two would have the same index, with GSO enabled, while the third
   // would have a different index, with GSO disabled.
-  UnorderedMap<folly::SocketAddress, uint32_t> addrToMostRecentIndex_;
+  UnorderedMap<quic::SocketAddress, uint32_t> addrToMostRecentIndex_;
 };
 
 } // namespace quic

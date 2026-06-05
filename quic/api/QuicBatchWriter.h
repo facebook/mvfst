@@ -8,7 +8,6 @@
 #pragma once
 
 #include <folly/Portability.h>
-#include <folly/SocketAddress.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/MvfstLogging.h>
@@ -45,11 +44,11 @@ class BatchWriter {
   virtual bool append(
       BufPtr&& buf,
       size_t bufSize,
-      const folly::SocketAddress& addr,
+      const quic::SocketAddress& addr,
       QuicAsyncUDPSocket* sock) = 0;
   virtual ssize_t write(
       QuicAsyncUDPSocket& sock,
-      const folly::SocketAddress& address) = 0;
+      const quic::SocketAddress& address) = 0;
 };
 
 class IOBufBatchWriter : public BatchWriter {
@@ -78,9 +77,9 @@ class SinglePacketBatchWriter : public IOBufBatchWriter {
   bool append(
       BufPtr&& buf,
       size_t /*unused*/,
-      const folly::SocketAddress& /*unused*/,
+      const quic::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
 };
 
@@ -100,9 +99,9 @@ class SinglePacketInplaceBatchWriter : public IOBufBatchWriter {
   bool append(
       BufPtr&& /* buf */,
       size_t /*unused*/,
-      const folly::SocketAddress& /*unused*/,
+      const quic::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
   [[nodiscard]] bool empty() const override;
 
@@ -123,9 +122,9 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   bool append(
       BufPtr&& buf,
       size_t size,
-      const folly::SocketAddress& /*unused*/,
+      const quic::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
 
  private:
@@ -155,9 +154,9 @@ class SendmmsgInplacePacketBatchWriter : public BatchWriter {
   bool append(
       BufPtr&& /* buf */,
       size_t size,
-      const folly::SocketAddress& /*unused*/,
+      const quic::SocketAddress& /*unused*/,
       QuicAsyncUDPSocket* /*unused*/) override;
-  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+  ssize_t write(QuicAsyncUDPSocket& sock, const quic::SocketAddress& address)
       override;
 
  private:

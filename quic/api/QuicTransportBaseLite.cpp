@@ -282,7 +282,7 @@ std::chrono::microseconds QuicTransportBaseLite::getLooperPacingDelay() {
 }
 
 void QuicTransportBaseLite::onNetworkData(
-    const folly::SocketAddress& localAddress,
+    const quic::SocketAddress& localAddress,
     NetworkData&& networkData) noexcept {
   [[maybe_unused]] auto self = sharedGuard();
   SCOPE_EXIT {
@@ -1064,11 +1064,11 @@ QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
       stream->streamWriteError};
 }
 
-const folly::SocketAddress& QuicTransportBaseLite::getPeerAddress() const {
+const quic::SocketAddress& QuicTransportBaseLite::getPeerAddress() const {
   return conn_->peerAddress;
 }
 
-const folly::SocketAddress& QuicTransportBaseLite::getOriginalPeerAddress()
+const quic::SocketAddress& QuicTransportBaseLite::getOriginalPeerAddress()
     const {
   return conn_->originalPeerAddress;
 }
@@ -3470,7 +3470,7 @@ QuicSocketLite::TransportInfo QuicTransportBaseLite::getTransportInfo() const {
   return transportInfo;
 }
 
-const folly::SocketAddress& QuicTransportBaseLite::getLocalAddress() const {
+const quic::SocketAddress& QuicTransportBaseLite::getLocalAddress() const {
   return socket_ && socket_->isBound() ? socket_->addressRef()
                                        : localFallbackAddress;
 }

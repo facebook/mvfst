@@ -695,18 +695,18 @@ class QuicSocketLite {
   /**
    * Get the peer socket address
    */
-  [[nodiscard]] virtual const folly::SocketAddress& getPeerAddress() const = 0;
+  [[nodiscard]] virtual const quic::SocketAddress& getPeerAddress() const = 0;
 
   /**
    * Get the original peer socket address
    */
-  [[nodiscard]] virtual const folly::SocketAddress& getOriginalPeerAddress()
+  [[nodiscard]] virtual const quic::SocketAddress& getOriginalPeerAddress()
       const = 0;
 
   /**
    * Get the local socket address
    */
-  [[nodiscard]] virtual const folly::SocketAddress& getLocalAddress() const = 0;
+  [[nodiscard]] virtual const quic::SocketAddress& getLocalAddress() const = 0;
 
   /**
    * Get the cert presented by peer

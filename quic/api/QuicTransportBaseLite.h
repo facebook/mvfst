@@ -76,7 +76,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   // Interface with the Transport layer when data is available.
   // This is invoked when new data is received from the UDP socket.
   virtual void onNetworkData(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       NetworkData&& data) noexcept;
 
   /**
@@ -85,7 +85,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    * the packet in which case the connection will be closed.
    */
   virtual quic::Expected<void, QuicError> onReadData(
-      const folly::SocketAddress& localAddress,
+      const quic::SocketAddress& localAddress,
       ReceivedUdpPacket&& udpPacket) = 0;
 
   void close(Optional<QuicError> error) override;
@@ -283,9 +283,9 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
     return conn_.get();
   }
 
-  [[nodiscard]] const folly::SocketAddress& getPeerAddress() const override;
+  [[nodiscard]] const quic::SocketAddress& getPeerAddress() const override;
 
-  [[nodiscard]] const folly::SocketAddress& getOriginalPeerAddress()
+  [[nodiscard]] const quic::SocketAddress& getOriginalPeerAddress()
       const override;
 
   [[nodiscard]] Optional<std::string> getAppProtocol() const override;
@@ -615,7 +615,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   [[nodiscard]] TransportInfo getTransportInfo() const override;
 
-  [[nodiscard]] const folly::SocketAddress& getLocalAddress() const override;
+  [[nodiscard]] const quic::SocketAddress& getLocalAddress() const override;
 
  protected:
   void setConnectionCallbackFromCtor(
@@ -865,7 +865,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   // TODO: This is silly. We need a better solution.
   // Uninitialied local address as a fallback answer when socket isn't bound.
-  folly::SocketAddress localFallbackAddress;
+  quic::SocketAddress localFallbackAddress;
 
   CloseState closeState_{CloseState::OPEN};
 

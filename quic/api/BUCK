@@ -33,7 +33,6 @@ mvfst_cpp_library(
         "//quic/common:buf_accessor",
     ],
     exported_deps = [
-        "//folly:network_address",
         "//folly:portability",
         "//folly/io:iobuf",
         "//quic:config",
@@ -47,13 +46,11 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "quic_callbacks",
-    srcs = [
-    ],
+    srcs = [],
     headers = [
         "QuicCallbacks.h",
     ],
-    deps = [
-    ],
+    deps = [],
     exported_deps = [
         "//quic:exception",
     ],
@@ -61,13 +58,11 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "transport_info",
-    srcs = [
-    ],
+    srcs = [],
     headers = [
         "TransportInfo.h",
     ],
-    deps = [
-    ],
+    deps = [],
     exported_deps = [
         "//quic/common:optional",
         "//quic/congestion_control:congestion_controller",

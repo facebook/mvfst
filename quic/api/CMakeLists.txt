@@ -20,7 +20,6 @@ mvfst_add_library(mvfst_api_quic_batch_writer
     mvfst_constants
     mvfst_state_quic_state_machine
     Folly::folly_io_iobuf
-    Folly::folly_network_address
     Folly::folly_portability
 )
 
