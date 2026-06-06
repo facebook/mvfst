@@ -46,9 +46,14 @@ mvfst_cpp_library(
     exported_deps = [
         "fbsource//third-party/glog:glog",
         ":mvfst_check",
-        "//folly/logging:logging",
         "//quic:logging_config",
-    ],
+    ] + select({
+        "DEFAULT": ["//folly/logging:logging"],
+        "ovr_config//os/constraints:android": [],
+        "ovr_config//os/constraints:iphoneos": [],
+        "ovr_config//os/constraints:macos": [],
+        "ovr_config//os/constraints:windows": [],
+    }),
 )
 
 mvfst_cpp_library(
