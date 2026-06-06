@@ -51,6 +51,15 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "logging_config",
+    headers = select({
+        # @oss-only: "DEFAULT": {"quic-logging-config.h": "//:quic-logging-config.h"},
+        "DEFAULT": {"quic-logging-config.h": "facebook/quic-logging-config-xplat.h"},  # @fb-only
+        "ovr_config//runtime/constraints:fbcode": {"quic-logging-config.h": "facebook/quic-logging-config-fbcode.h"},  # @fb-only
+    }),
+)
+
+mvfst_cpp_library(
     name = "config",
     headers = select({
         # @oss-only: "DEFAULT": {"mvfst-config.h": "//:mvfst-config.h"},

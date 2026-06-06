@@ -7,6 +7,7 @@
 
 mvfst_add_library(mvfst_common_mvfst_check
   EXPORTED_DEPS
+    mvfst_logging_config
     ${GLOG_LIBRARIES}
 )
 
@@ -18,6 +19,8 @@ mvfst_add_library(mvfst_common_function_ref
 mvfst_add_library(mvfst_common_mvfst_logging
   EXPORTED_DEPS
     mvfst_common_mvfst_check
+    mvfst_logging_config
+    Folly::folly_logging_logging
     ${GLOG_LIBRARIES}
 )
 

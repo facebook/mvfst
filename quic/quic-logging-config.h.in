@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/**
+ * <quic/quic-logging-config.h> selects the logging backend used by
+ * quic/common/MvfstLogging.h and quic/common/MvfstCheck.h.
+ */
+#pragma once
+
+// Logging backend. MVFST_LOGGING_BACKEND is one of GLOG, XLOG, DISABLED.
+#define MVFST_LOGGING_@MVFST_LOGGING_BACKEND@ 1

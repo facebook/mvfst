@@ -157,7 +157,7 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
       override;
 
  private:
-  static const size_t kMaxIovecs = 64;
+  static constexpr size_t kMaxIovecs = 64;
 
   QuicConnectionStateBase& conn_;
 
