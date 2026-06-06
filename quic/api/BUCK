@@ -260,7 +260,6 @@ mvfst_cpp_library(
     deps = [
         "//quic/common:mvfst_check",
         "//quic/common:mvfst_logging",
-        "//quic/common/address:quic_socket_address_bridge",
         "//quic/common/events:folly_eventbase",
     ],
     exported_deps = [
