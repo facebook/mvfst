@@ -172,6 +172,7 @@ mvfst_add_library(mvfst_api_stream_async_transport
   SRCS
     QuicStreamAsyncTransport.cpp
   DEPS
+    mvfst_common_address_quic_socket_address_bridge
     mvfst_common_events_folly_eventbase
     mvfst_common_mvfst_check
     mvfst_common_mvfst_logging
