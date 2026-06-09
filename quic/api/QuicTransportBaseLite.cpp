@@ -22,6 +22,7 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <cmath>
+#include <limits>
 
 #include <folly/ScopeGuard.h>
 
@@ -34,6 +35,62 @@ quic::QuicError maybeSetGenericAppError(
     quic::Optional<quic::QuicError>&& error) {
   return std::move(error).value_or(
       quic::QuicError{APP_NO_ERROR, quic::toString(APP_NO_ERROR)});
+}
+
+// Formats the stream-scheduler state for the temporary STREAM/NoFrame
+// empty-write-loop diagnostic OOPS. Includes the head writable stream (control
+// queue first, then the priority write queue) so the offending stream's state
+// is captured, not just aggregate counts.
+// TODO(jbeshay): remove together with the diagnostic OOPS
+[[maybe_unused]] std::string formatStreamNoFrameLoopDiag(
+    quic::QuicConnectionStateBase& conn,
+    uint64_t emptyLoops) {
+  auto& sm = *conn.streamManager;
+  const quic::QuicStreamState* head = nullptr;
+  quic::StreamId headId = 0;
+  bool haveHead = false;
+  if (!sm.controlWriteQueue().empty()) {
+    headId = *sm.controlWriteQueue().begin();
+    haveHead = true;
+    head = sm.findStream(headId);
+  } else if (!sm.writeQueue().empty()) {
+    auto id = sm.writeQueue().peekNextScheduledID();
+    if (id.isStreamID()) {
+      headId = id.asStreamID();
+      haveHead = true;
+      head = sm.findStream(headId);
+    }
+  }
+  std::string headPart = "none";
+  if (head != nullptr) {
+    headPart = fmt::format(
+        "id={} ctrl={} hasWritable={} hasWritableNoFc={} lossBuf={} pending={} streamFc={} writeErr={} sendState={}",
+        headId,
+        head->isControl,
+        head->hasWritableData(true),
+        head->hasWritableData(false),
+        head->lossBuffer.size(),
+        head->pendingWrites.chainLength(),
+        head->flowControlState.peerAdvertisedMaxOffset >=
+                head->currentWriteOffset
+            ? head->flowControlState.peerAdvertisedMaxOffset -
+                head->currentWriteOffset
+            : 0,
+        head->streamWriteError.has_value(),
+        static_cast<int>(head->sendState));
+  } else if (haveHead) {
+    headPart = fmt::format("id={} missing", headId);
+  }
+  return fmt::format(
+      "stream_noframe_empty_write_loop hasLoss={} wqEmpty={} cwqSz={} connFC={} cwnd={} loops={} head=[{}]",
+      sm.hasLoss(),
+      sm.writeQueue().empty(),
+      sm.controlWriteQueue().size(),
+      quic::getSendConnFlowControlBytesWire(conn),
+      conn.congestionController ? conn.congestionController->getWritableBytes()
+                                : std::numeric_limits<uint64_t>::max(),
+      emptyLoops,
+      headPart);
 }
 } // namespace
 
@@ -1530,6 +1587,22 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
             conn_->writeDebugState.writeDataReason,
             conn_->writeDebugState.noWriteReason,
             conn_->writeDebugState.schedulerName);
+        // TODO(jbeshay): temporary diagnostic OOPS to pin
+        // STREAM/NoFrame empty write loops
+        [[maybe_unused]] const auto emptyLoops =
+            conn_->writeDebugState.currentEmptyLoopCount;
+        PROTO_OOPS_LOG_BUILDER_IF(
+            conn_->nodeType == QuicNodeType::Server &&
+                conn_->writeDebugState.writeDataReason ==
+                    WriteDataReason::STREAM &&
+                conn_->writeDebugState.noWriteReason ==
+                    NoWriteReason::NO_FRAME &&
+                conn_->streamManager && emptyLoops >= 16 &&
+                (emptyLoops & (emptyLoops - 1)) == 0,
+            conn_->oopsLogger,
+            proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+            "quic_write_loop",
+            formatStreamNoFrameLoopDiag(*conn_, emptyLoops));
       }
       // If we sent a new packet and the new packet was either the first
       // packet after quiescence or after receiving a new packet.
