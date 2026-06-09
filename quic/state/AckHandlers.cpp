@@ -165,7 +165,17 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
             static_cast<uint64_t>(TransportErrorCode::PROTOCOL_VIOLATION)),
         "quic_ack_handlers",
-        "protocol_violation: future packet number acked");
+        fmt::format(
+            "protocol_violation: future packet number acked space={} "
+            "largestAcked={} nextPacketNum={} smallestAcked={} numBlocks={} "
+            "implicit={}",
+            toString(pnSpace),
+            frame.largestAcked,
+            getAckState(conn, pnSpace).nextPacketNum,
+            frame.ackBlocks.empty() ? frame.largestAcked
+                                    : frame.ackBlocks.back().startPacket,
+            frame.ackBlocks.size(),
+            frame.implicit));
     return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Future packet number acked"));
   }
