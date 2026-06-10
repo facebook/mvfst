@@ -268,7 +268,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !packet_.empty && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
-    QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
+    QuicInteger paddingType(static_cast<uint64_t>(FrameType::PADDING));
     write(paddingType);
     extraDataWritten++;
   }
@@ -448,7 +448,7 @@ RegularSizeEnforcedPacketBuilder::buildPacket() && {
   size_t headerLength = header_.computeChainDataLength();
   while (extraDataWritten + bodyLength + headerLength + cipherOverhead_ <
          enforcedSize_) {
-    QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
+    QuicInteger paddingType(static_cast<uint64_t>(FrameType::PADDING));
     paddingType.encode([&](auto val) { bodyAppender_.writeBE(val); });
     extraDataWritten++;
   }
@@ -491,7 +491,7 @@ InplaceSizeEnforcedPacketBuilder::buildPacket() && {
   size_t headerLength = header_.computeChainDataLength();
   while (extraDataWritten + bodyLength + headerLength + cipherOverhead_ <
          enforcedSize_) {
-    QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
+    QuicInteger paddingType(static_cast<uint64_t>(FrameType::PADDING));
     paddingType.encode([&](auto val) { bodyWriter.writeBE(val); });
     extraDataWritten++;
   }
@@ -745,7 +745,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !packet_.empty && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
-    QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
+    QuicInteger paddingType(static_cast<uint64_t>(FrameType::PADDING));
     write(paddingType);
     extraDataWritten++;
   }

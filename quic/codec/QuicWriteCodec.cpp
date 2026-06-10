@@ -167,7 +167,7 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
     const ChainedByteRangeHead& data,
     PacketBuilderInterface& builder) {
   uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
-  QuicInteger intFrameType(static_cast<uint8_t>(FrameType::CRYPTO_FRAME));
+  QuicInteger intFrameType(static_cast<uint64_t>(FrameType::CRYPTO_FRAME));
   auto intFrameTypeRes = intFrameType.getSize();
   if (intFrameTypeRes.hasError()) {
     return quic::make_unexpected(intFrameTypeRes.error());
@@ -819,7 +819,7 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame: {
       const StopSendingFrame& stopSendingFrame = *frame.asStopSendingFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::STOP_SENDING));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::STOP_SENDING));
       QuicInteger streamId(stopSendingFrame.streamId);
       QuicInteger errorCode(static_cast<uint64_t>(stopSendingFrame.errorCode));
       auto errorSizeRes = errorCode.getSize();
@@ -849,7 +849,7 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
     case QuicSimpleFrame::Type::PathChallengeFrame: {
       const PathChallengeFrame& pathChallengeFrame =
           *frame.asPathChallengeFrame();
-      QuicInteger frameType(static_cast<uint8_t>(FrameType::PATH_CHALLENGE));
+      QuicInteger frameType(static_cast<uint64_t>(FrameType::PATH_CHALLENGE));
       auto frameTypeSize = frameType.getSize();
       if (frameTypeSize.hasError()) {
         return quic::make_unexpected(frameTypeSize.error());
@@ -867,7 +867,7 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
     }
     case QuicSimpleFrame::Type::PathResponseFrame: {
       const PathResponseFrame& pathResponseFrame = *frame.asPathResponseFrame();
-      QuicInteger frameType(static_cast<uint8_t>(FrameType::PATH_RESPONSE));
+      QuicInteger frameType(static_cast<uint64_t>(FrameType::PATH_RESPONSE));
       auto frameTypeSize = frameType.getSize();
       if (frameTypeSize.hasError()) {
         return quic::make_unexpected(frameTypeSize.error());
@@ -886,7 +886,8 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
     case QuicSimpleFrame::Type::NewConnectionIdFrame: {
       const NewConnectionIdFrame& newConnectionIdFrame =
           *frame.asNewConnectionIdFrame();
-      QuicInteger frameType(static_cast<uint8_t>(FrameType::NEW_CONNECTION_ID));
+      QuicInteger frameType(
+          static_cast<uint64_t>(FrameType::NEW_CONNECTION_ID));
       QuicInteger sequenceNumber(newConnectionIdFrame.sequenceNumber);
       QuicInteger retirePriorTo(newConnectionIdFrame.retirePriorTo);
 
@@ -956,7 +957,7 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
       const RetireConnectionIdFrame& retireConnectionIdFrame =
           *frame.asRetireConnectionIdFrame();
       QuicInteger frameType(
-          static_cast<uint8_t>(FrameType::RETIRE_CONNECTION_ID));
+          static_cast<uint64_t>(FrameType::RETIRE_CONNECTION_ID));
       QuicInteger sequence(retireConnectionIdFrame.sequenceNumber);
 
       auto frameTypeSize = frameType.getSize();
@@ -983,7 +984,8 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
       const HandshakeDoneFrame& handshakeDoneFrame =
           *frame.asHandshakeDoneFrame();
       MVCHECK(builder.getPacketHeader().asShort());
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::HANDSHAKE_DONE));
+      QuicInteger intFrameType(
+          static_cast<uint64_t>(FrameType::HANDSHAKE_DONE));
 
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
@@ -1083,7 +1085,7 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
     }
     case QuicSimpleFrame::Type::NewTokenFrame: {
       const auto newTokenFrame = frame.asNewTokenFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::NEW_TOKEN));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::NEW_TOKEN));
 
       auto& token = newTokenFrame->token;
       QuicInteger tokenLength(token->computeChainDataLength());
@@ -1124,7 +1126,7 @@ quic::Expected<size_t, QuicError> writeFrame(
 
   switch (frame.type()) {
     case QuicWriteFrame::Type::PaddingFrame: {
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PADDING));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::PADDING));
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
         return quic::make_unexpected(intFrameTypeSize.error());
@@ -1188,7 +1190,7 @@ quic::Expected<size_t, QuicError> writeFrame(
     }
     case QuicWriteFrame::Type::MaxDataFrame: {
       MaxDataFrame& maxDataFrame = *frame.asMaxDataFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::MAX_DATA));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::MAX_DATA));
       QuicInteger maximumData(maxDataFrame.maximumData);
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
@@ -1210,7 +1212,7 @@ quic::Expected<size_t, QuicError> writeFrame(
     case QuicWriteFrame::Type::MaxStreamDataFrame: {
       MaxStreamDataFrame& maxStreamDataFrame = *frame.asMaxStreamDataFrame();
       QuicInteger intFrameType(
-          static_cast<uint8_t>(FrameType::MAX_STREAM_DATA));
+          static_cast<uint64_t>(FrameType::MAX_STREAM_DATA));
       QuicInteger streamId(maxStreamDataFrame.streamId);
       QuicInteger maximumData(maxStreamDataFrame.maximumData);
       auto intFrameTypeSize = intFrameType.getSize();
@@ -1238,7 +1240,7 @@ quic::Expected<size_t, QuicError> writeFrame(
     }
     case QuicWriteFrame::Type::DataBlockedFrame: {
       DataBlockedFrame& blockedFrame = *frame.asDataBlockedFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::DATA_BLOCKED));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::DATA_BLOCKED));
       QuicInteger dataLimit(blockedFrame.dataLimit);
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
@@ -1261,7 +1263,7 @@ quic::Expected<size_t, QuicError> writeFrame(
       StreamDataBlockedFrame& streamBlockedFrame =
           *frame.asStreamDataBlockedFrame();
       QuicInteger intFrameType(
-          static_cast<uint8_t>(FrameType::STREAM_DATA_BLOCKED));
+          static_cast<uint64_t>(FrameType::STREAM_DATA_BLOCKED));
       QuicInteger streamId(streamBlockedFrame.streamId);
       QuicInteger dataLimit(streamBlockedFrame.dataLimit);
       auto intFrameTypeSize = intFrameType.getSize();
@@ -1388,7 +1390,7 @@ quic::Expected<size_t, QuicError> writeFrame(
     }
     case QuicWriteFrame::Type::PingFrame: {
       const PingFrame& pingFrame = *frame.asPingFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PING));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::PING));
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
         return quic::make_unexpected(intFrameTypeSize.error());
@@ -1406,7 +1408,7 @@ quic::Expected<size_t, QuicError> writeFrame(
     case QuicWriteFrame::Type::DatagramFrame: {
       const DatagramFrame& datagramFrame = *frame.asDatagramFrame();
       QuicInteger frameTypeQuicInt(
-          static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
+          static_cast<uint64_t>(FrameType::DATAGRAM_LEN));
       QuicInteger datagramLenInt(datagramFrame.length);
       auto frameTypeQuicIntSize = frameTypeQuicInt.getSize();
       if (frameTypeQuicIntSize.hasError()) {
@@ -1429,7 +1431,7 @@ quic::Expected<size_t, QuicError> writeFrame(
     }
     case QuicWriteFrame::Type::ImmediateAckFrame: {
       const ImmediateAckFrame& immediateAckFrame = *frame.asImmediateAckFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::IMMEDIATE_ACK));
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::IMMEDIATE_ACK));
       auto intFrameTypeSize = intFrameType.getSize();
       if (intFrameTypeSize.hasError()) {
         return quic::make_unexpected(intFrameTypeSize.error());

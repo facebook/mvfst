@@ -299,8 +299,11 @@ enum class FrameType : uint64_t {
   ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN = 0x03178308,
 };
 
-inline constexpr uint16_t toFrameError(FrameType frame) {
-  return 0x0100 | static_cast<uint8_t>(frame);
+// Returns 0x0100 OR'd with the frame type. uint64_t return preserves the
+// full frame value for draft-ietf-quic-receive-ts-02 frame types above
+// 0xFF (e.g. 0x03178307).
+inline constexpr uint64_t toFrameError(FrameType frame) {
+  return 0x0100ull | static_cast<uint64_t>(frame);
 }
 
 // clang-format on

@@ -109,7 +109,7 @@ std::unique_ptr<folly::IOBuf> createRstStreamFrame(
       reliableSize ? FrameType::RST_STREAM_AT : FrameType::RST_STREAM;
 
   // Write the frame type
-  QuicInteger frameTypeQuicInt(static_cast<uint8_t>(frameType));
+  QuicInteger frameTypeQuicInt(static_cast<uint64_t>(frameType));
   frameTypeQuicInt.encode(appenderOp);
 
   // Write the stream id

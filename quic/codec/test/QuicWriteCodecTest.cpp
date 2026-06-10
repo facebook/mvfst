@@ -2842,6 +2842,20 @@ TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
   EXPECT_EQ(decodedFrame->reorderThreshold, frame.reorderThreshold);
 }
 
+// `toFrameError(FrameType)` must preserve the full frame value for
+// multi-byte (varint > 0xFF) draft-02 frame types. A `static_cast<uint8_t>`
+// narrowing would silently drop the high bytes.
+TEST(QuicConstantsToFrameError, LegacyAndDraft02FrameTypesNotNarrowed) {
+  EXPECT_EQ(
+      toFrameError(FrameType::ACK_RECEIVE_TIMESTAMPS), 0x0100ull | 0xB0ull);
+  EXPECT_EQ(
+      toFrameError(FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02),
+      0x0100ull | 0x03178307ull);
+  EXPECT_EQ(
+      toFrameError(FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN),
+      0x0100ull | 0x03178308ull);
+}
+
 // `maybeWriteAckBaseFields` must write the full FrameType value as a
 // varint. A `static_cast<uint8_t>` narrowing matches legacy frame types
 // (<= 0xFF) by coincidence but reduces `ACK_RECEIVE_TIMESTAMPS_DRAFT_02
