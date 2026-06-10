@@ -3236,6 +3236,315 @@ TEST_F(QuicWriteCodecTest, WriteDraft02AckTruncationRetainsNewest) {
   EXPECT_GT(totalDeltas, 0); // fit at least 1
 }
 
+// Legacy encoder drops out-of-order packets: the `gap`/delta encoding cannot
+// represent negative inter-packet deltas. Filter rule: sort recvdPacketInfos
+// by receive-time desc, then include only packets whose pktNum is strictly
+// less than the last included.
+TEST_F(QuicWriteCodecTest, LegacyAckFiltersOutOfOrderToMonotonicSuffix) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  // Arrival order is NEITHER pktnum-monotonic NOR time-monotonic:
+  //   pkt 96 first at t=350, then 100 at t=200 (backward time),
+  //   then 95 at t=500 (newer time, lower pktnum than 96 and 100),
+  //   then 97 at t=210 (backward time again),
+  //   then 94 at t=520 (newest time).
+  // Sort by time desc: 94@520, 95@500, 96@350, 97@210, 100@200.
+  // Then pktnum-monotonic filter: {94, 100->skip, 95->skip (95>94 but
+  //   filter takes from the OLDER end downward? actually filter picks
+  //   strictly-less-than lastIncluded, walking the sorted-by-time list}.
+  // Walk: 94 included (lastIncluded=94). 95 NOT < 94, skip. 96 NOT < 94,
+  //   skip. 97 NOT < 94, skip. 100 NOT < 94, skip.
+  //   legacyView = {94}. Wire produces 1 timestamp.
+  AckBlocks ackBlocks = {{94, 100}};
+  WriteAckFrameState ackState{
+      .acks = ackBlocks, .largestRecvdPacketInfo = std::nullopt};
+  PacketsReceivedTimestampsDeque infos;
+  const std::vector<std::pair<PacketNum, uint64_t>> arrivalOrder = {
+      {96, 350},
+      {100, 200},
+      {95, 500},
+      {97, 210},
+      {94, 520},
+  };
+  for (auto& p : arrivalOrder) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = p.first;
+    rpi.timings.receiveTimePoint =
+        connTime + std::chrono::microseconds(p.second);
+    infos.emplace_back(std::move(rpi));
+  }
+  ackState.recvdPacketInfos = std::move(infos);
+  ReceivedUdpPacket::Timings tail;
+  tail.receiveTimePoint =
+      ackState.recvdPacketInfos.back().timings.receiveTimePoint;
+  ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{
+      ackState.recvdPacketInfos.back().pktNum, tail};
+
+  WriteAckFrameMetaData metaData{
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+  auto result = writeAckFrame(
+      metaData,
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0},
+      /*maxRecvTimestampsToSend=*/10);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame =
+      parseQuicFrame(queue, /*isAckReceiveTimestampsSupported=*/true);
+  auto& decoded = *decodedFrame.asReadAckFrame();
+
+  // Exactly 1 timestamp (packet 94, the newest by receive time). Pkts 95,
+  // 96, 97, 100 are skipped because they violate the strictly-decreasing
+  // pktnum invariant after sort-by-time-desc.
+  size_t totalDeltas = 0;
+  for (const auto& r : decoded.recvdPacketsTimestampRanges) {
+    totalDeltas += r.timestamp_delta_count;
+  }
+  EXPECT_EQ(totalDeltas, 1);
+}
+
+// Equal-time entries arriving in pktnum-ascending order must all be emitted.
+// stable_sort preserves arrival order on equal keys, so without a pktnum
+// tie-break, pkt 1 is picked first and the pktnum-monotonic filter
+// (pktnum < lastIncluded) silently drops pkts 2-5.
+TEST_F(QuicWriteCodecTest, LegacyAckEqualTimestampsInOrderEmitsAll) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  AckBlocks ackBlocks = {{1, 5}};
+  WriteAckFrameState ackState{
+      .acks = ackBlocks, .largestRecvdPacketInfo = std::nullopt};
+  PacketsReceivedTimestampsDeque infos;
+  const TimePoint equalT = connTime + std::chrono::microseconds(100);
+  for (PacketNum p = 1; p <= 5; ++p) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = p;
+    rpi.timings.receiveTimePoint = equalT;
+    infos.emplace_back(std::move(rpi));
+  }
+  ackState.recvdPacketInfos = std::move(infos);
+  ReceivedUdpPacket::Timings tail;
+  tail.receiveTimePoint = equalT;
+  ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{5, tail};
+
+  WriteAckFrameMetaData metaData{
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+  auto result = writeAckFrame(
+      metaData,
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 0},
+      /*maxRecvTimestampsToSend=*/5);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame =
+      parseQuicFrame(queue, /*isAckReceiveTimestampsSupported=*/true);
+  auto& decoded = *decodedFrame.asReadAckFrame();
+
+  size_t totalDeltas = 0;
+  for (const auto& r : decoded.recvdPacketsTimestampRanges) {
+    totalDeltas += r.timestamp_delta_count;
+  }
+  EXPECT_EQ(totalDeltas, 5);
+}
+
+// Same equal-time invariant but with arrival order shuffled. After
+// (time desc, pktnum desc) sort, pkts come out {5,4,3,2,1} and the filter
+// keeps all 5.
+TEST_F(QuicWriteCodecTest, LegacyAckEqualTimestampsOutOfOrderEmitsAll) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  AckBlocks ackBlocks = {{1, 5}};
+  WriteAckFrameState ackState{
+      .acks = ackBlocks, .largestRecvdPacketInfo = std::nullopt};
+  PacketsReceivedTimestampsDeque infos;
+  const TimePoint equalT = connTime + std::chrono::microseconds(100);
+  for (PacketNum p : {3u, 1u, 5u, 2u, 4u}) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = p;
+    rpi.timings.receiveTimePoint = equalT;
+    infos.emplace_back(std::move(rpi));
+  }
+  ackState.recvdPacketInfos = std::move(infos);
+  ReceivedUdpPacket::Timings tail;
+  tail.receiveTimePoint = equalT;
+  ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{4, tail};
+
+  WriteAckFrameMetaData metaData{
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+  auto result = writeAckFrame(
+      metaData,
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 0},
+      /*maxRecvTimestampsToSend=*/5);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame =
+      parseQuicFrame(queue, /*isAckReceiveTimestampsSupported=*/true);
+  auto& decoded = *decodedFrame.asReadAckFrame();
+
+  size_t totalDeltas = 0;
+  for (const auto& r : decoded.recvdPacketsTimestampRanges) {
+    totalDeltas += r.timestamp_delta_count;
+  }
+  EXPECT_EQ(totalDeltas, 5);
+}
+
+// Locks the legacy encoder's wire output for in-order receive storage
+// against unrelated refactors of the storage layer.
+TEST_F(QuicWriteCodecTest, LegacyAckInOrderStorageWireOutputUnchanged) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  AckBlocks ackBlocks = {{1, 5}};
+  WriteAckFrameState ackState{
+      .acks = ackBlocks, .largestRecvdPacketInfo = std::nullopt};
+  PacketsReceivedTimestampsDeque infos;
+  for (uint64_t i = 1; i <= 5; ++i) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = i;
+    rpi.timings.receiveTimePoint = connTime + std::chrono::microseconds(i * 10);
+    infos.emplace_back(std::move(rpi));
+  }
+  ackState.recvdPacketInfos = std::move(infos);
+  ReceivedUdpPacket::Timings tail;
+  tail.receiveTimePoint =
+      ackState.recvdPacketInfos.back().timings.receiveTimePoint;
+  ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{
+      ackState.recvdPacketInfos.back().pktNum, tail};
+
+  WriteAckFrameMetaData metaData{
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+  auto result = writeAckFrame(
+      metaData,
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0},
+      /*maxRecvTimestampsToSend=*/10);
+  ASSERT_FALSE(result.hasError());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame = parseQuicFrame(queue, true);
+  auto& decoded = *decodedFrame.asReadAckFrame();
+
+  ASSERT_EQ(decoded.recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(decoded.recvdPacketsTimestampRanges[0].timestamp_delta_count, 5);
+  // Encoder uses exponent=0 (raw us); `parseQuicFrame`'s default decoder
+  // exponent is 3, so each raw delta is left-shifted by 3 on read:
+  // 50 -> 400, 10 -> 80.
+  EXPECT_EQ(
+      decoded.recvdPacketsTimestampRanges[0].deltas,
+      std::vector<uint64_t>({400, 80, 80, 80, 80}));
+}
+
+// Draft-02 encoder produces multiple ranges from gapped packet numbers via
+// the natural storage path.
+TEST_F(QuicWriteCodecTest, Draft02EncoderMultipleRangesFromGappedPktNums) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  AckBlocks ackBlocks = {{1, 5}, {10, 15}};
+  WriteAckFrameState ackState{
+      .acks = ackBlocks, .largestRecvdPacketInfo = std::nullopt};
+  PacketsReceivedTimestampsDeque infos;
+  // Packets 1-5 then 10-15, received in pktNum order. Gap at 6-9 forces the
+  // draft-02 encoder to produce two ranges.
+  for (uint64_t i = 1; i <= 5; ++i) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = i;
+    rpi.timings.receiveTimePoint = connTime + std::chrono::microseconds(i * 10);
+    infos.emplace_back(std::move(rpi));
+  }
+  for (uint64_t i = 10; i <= 15; ++i) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = i;
+    rpi.timings.receiveTimePoint = connTime + std::chrono::microseconds(i * 10);
+    infos.emplace_back(std::move(rpi));
+  }
+  ackState.recvdPacketInfos = std::move(infos);
+  ReceivedUdpPacket::Timings tail;
+  tail.receiveTimePoint =
+      ackState.recvdPacketInfos.back().timings.receiveTimePoint;
+  ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{
+      ackState.recvdPacketInfos.back().pktNum, tail};
+
+  WriteAckFrameMetaData metaData{
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+
+  auto result = writeAckFrameDraft02(
+      metaData,
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02,
+      /*peerExponent=*/0,
+      /*peerMaxReceiveTimestampsPerAck=*/15);
+  ASSERT_FALSE(result.hasError());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto wireBuf = std::move(builtOut.second);
+  auto decoded = decodeDraft02FromWire(
+      *wireBuf,
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 15, .receiveTimestampsExponent = 0});
+
+  ASSERT_EQ(decoded.draft02RecvdPacketsTimestampRanges.size(), 2);
+  EXPECT_EQ(
+      decoded.draft02RecvdPacketsTimestampRanges[0].timestamp_delta_count, 6);
+  EXPECT_EQ(
+      decoded.draft02RecvdPacketsTimestampRanges[1].timestamp_delta_count, 5);
+}
+
 // Encoder handles out-of-order receipt: packets 92-95 arriving after 96-100,
 // the canonical draft-02 example. `recvdPacketInfos` is populated in the
 // explicit receive-time sequence (newest receive time at back) so the

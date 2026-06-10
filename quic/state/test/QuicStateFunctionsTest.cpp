@@ -376,26 +376,42 @@ TEST_P(
         false /* pktHasCryptoData */,
         recvdTs);
   }
-  // Packets 1 and 5 are out of order and will not be stored.
+  // Packets are retained in receive order. Packet numbers may be
+  // non-monotonic to support draft-ietf-quic-receive-ts-02 out-of-order
+  // reporting. Receive timestamps are equal so the monotonic-receive-time
+  // invariant doesn't drop any.
   auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
-  ReceivedUdpPacket::Timings timings;
-  timings.receiveTimePoint = recvdTs;
-  std::deque<WriteAckFrameState::ReceivedPacket> expectedPktsInfo;
-  expectedPktsInfo.emplace_back(0, timings);
-  expectedPktsInfo.emplace_back(2, timings);
-  expectedPktsInfo.emplace_back(3, timings);
-  expectedPktsInfo.emplace_back(4, timings);
-  expectedPktsInfo.emplace_back(6, timings);
-  EXPECT_EQ(expectedPktsInfo.size(), ackState.recvdPacketInfos.size());
-  for (unsigned long i = 0; i < expectedPktsInfo.size(); i++) {
-    EXPECT_EQ(expectedPktsInfo[i].pktNum, ackState.recvdPacketInfos[i].pktNum);
-    EXPECT_EQ(
-        expectedPktsInfo[i].timings.receiveTimePoint,
-        ackState.recvdPacketInfos[i].timings.receiveTimePoint);
+  ASSERT_EQ(ackState.recvdPacketInfos.size(), receivedPkts.size());
+  for (size_t i = 0; i < receivedPkts.size(); ++i) {
+    EXPECT_EQ(ackState.recvdPacketInfos[i].pktNum, receivedPkts[i]);
+    EXPECT_EQ(ackState.recvdPacketInfos[i].timings.receiveTimePoint, recvdTs);
   }
   EXPECT_EQ(ackState.lastRecvdPacketInfo.value().pktNum, 5);
   EXPECT_EQ(
       ackState.lastRecvdPacketInfo.value().timings.receiveTimePoint, recvdTs);
+}
+
+// Storage accepts out-of-order receive times. draft-ietf-quic-receive-ts-02
+// allows reporting timestamps for packets received out of order; the encoder
+// (not the storage layer) sorts by receive-time desc before emitting deltas.
+TEST_P(
+    UpdateReceivedUdpPacketTimestampsTest,
+    MaybeAddRecvdTimestampAcceptsBackwardReceiveTimes) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.ackStates = AckStates(0);
+  auto t0 = Clock::now();
+  updateAckState(conn, PacketNumberSpace::AppData, 0, true, false, t0);
+  updateAckState(conn, PacketNumberSpace::AppData, 1, true, false, t0 + 10ms);
+  // Earlier receive time than the back: kept in arrival order.
+  updateAckState(conn, PacketNumberSpace::AppData, 2, true, false, t0 + 5ms);
+
+  auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
+  ASSERT_EQ(ackState.recvdPacketInfos.size(), 3);
+  EXPECT_EQ(ackState.recvdPacketInfos[0].pktNum, 0);
+  EXPECT_EQ(ackState.recvdPacketInfos[1].pktNum, 1);
+  EXPECT_EQ(ackState.recvdPacketInfos[2].pktNum, 2);
+  EXPECT_EQ(ackState.recvdPacketInfos[2].timings.receiveTimePoint, t0 + 5ms);
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -280,20 +280,14 @@ struct WriteAckFrameState {
   // number space tracked by this AckState.
   Optional<ReceivedPacket> lastRecvdPacketInfo;
 
-  // Packet number and timestamp of recently received packets.
-  //
-  // The maximum number of packets stored in pktsReceivedTimestamps is
-  // controlled by maxReceivedPktsTimestampsStored.
-  //
-  // The packet number of entries in the deque is guaranteed to increase
-  // monotonically because an entry is only added for a received packet
-  // if the packet number is greater than the packet number of the last
-  // element in the deque.
-  //
-  // Receive timestamps are guaranteed to increase monotonically. Packets
-  // with receive times earlier than the last entry are skipped to preserve
-  // this invariant.
-  // TODO: update this when we support out-of-order packets.
+  // Bounded arrival-order storage of non-duplicate received packets. Packet
+  // numbers AND receive times may both be non-monotonic; out-of-order receipt
+  // is supported per draft-ietf-quic-receive-ts-02. Encoders sort and filter
+  // this deque at write time to satisfy their wire-format constraints
+  // (legacy keeps the strictly-decreasing-pktnum subsequence of the
+  // time-desc-sorted view; draft-02 sorts by receive-time desc then groups
+  // by pktnum contiguity). Bounded by
+  // `TransportSettings::maxReceiveTimestampsPerAckStored`.
   CircularDeque<ReceivedPacket> recvdPacketInfos;
   // The count of ECN marks seen on received packets.
   uint64_t ecnECT0CountReceived{0};

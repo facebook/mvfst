@@ -447,23 +447,16 @@ Expected<AddPacketToAckStateResult, IntervalSetError> addPacketToAckState(
 
   ackState.lastRecvdPacketInfo = {packetNum, udpPacket.timings};
 
-  if (packetNum >= expectedNextPacket) {
-    // Ensure timestamp monotonicity: only add if receive time is >= last
-    // entry's time. Network reordering can cause packets with higher packet
-    // numbers to have earlier receive times.
-    bool shouldAdd = ackState.recvdPacketInfos.empty() ||
-        udpPacket.timings.receiveTimePoint >=
-            ackState.recvdPacketInfos.back().timings.receiveTimePoint;
-
-    if (shouldAdd) {
-      if (ackState.recvdPacketInfos.size() ==
-          conn.transportSettings.maxReceiveTimestampsPerAckStored) {
-        ackState.recvdPacketInfos.pop_front();
-      }
-      ackState.recvdPacketInfos.emplace_back(
-          WriteAckFrameState::ReceivedPacket{packetNum, udpPacket.timings});
-    }
+  // Store every non-duplicate packet in arrival order. Packet numbers and
+  // receive times may both be non-monotonic; encoders own the wire-format
+  // constraints (legacy filters to a monotonic suffix at write time;
+  // draft-02 sorts the storage view by receive-time desc before grouping).
+  if (ackState.recvdPacketInfos.size() ==
+      conn.transportSettings.maxReceiveTimestampsPerAckStored) {
+    ackState.recvdPacketInfos.pop_front();
   }
+  ackState.recvdPacketInfos.emplace_back(
+      WriteAckFrameState::ReceivedPacket{packetNum, udpPacket.timings});
 
   auto ecnValue = udpPacket.tosValue & 0b11;
   switch (ecnValue) {

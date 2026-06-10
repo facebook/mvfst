@@ -314,18 +314,56 @@ fillFrameWithPacketReceiveTimestamps(
   if (ackFrameMetaData.ackState.recvdPacketInfos.size() == 0) {
     return 0;
   }
-  const auto& recvdPacketInfos = ackFrameMetaData.ackState.recvdPacketInfos;
-  // Insert all received packet timestamps into an interval set, to identify
-  // contiguous ranges
+  // Storage is in arrival order and may contain out-of-order packet numbers
+  // AND out-of-order receive times. The legacy wire format requires monotonic
+  // decreasing packet numbers AND non-negative inter-packet time deltas
+  // across the iteration. Sort by receive-time desc, then take the prefix
+  // whose pktNum stays strictly less than the last included.
+  std::vector<const WriteAckFrameState::ReceivedPacket*> legacyView;
+  legacyView.reserve(ackFrameMetaData.ackState.recvdPacketInfos.size());
+  {
+    std::vector<const WriteAckFrameState::ReceivedPacket*> sortedByTime;
+    sortedByTime.reserve(ackFrameMetaData.ackState.recvdPacketInfos.size());
+    for (const auto& rpi : ackFrameMetaData.ackState.recvdPacketInfos) {
+      sortedByTime.push_back(&rpi);
+    }
+    // Lexicographic (receiveTime desc, pktnum desc): without the pktnum
+    // tie-break, equal-time batches arrive in pktnum-ASCENDING order, the
+    // pktnum-monotonic filter picks pkt 1 first, and pkts 2..N are silently
+    // dropped because they fail the `pktnum < lastIncluded` check.
+    // std::ranges::stable_sort is unavailable on the arvr clang21 toolchain
+    // stdlib, so the portable std::stable_sort is used deliberately.
+    // NOLINTNEXTLINE(modernize-use-ranges,boost-use-ranges)
+    std::stable_sort(
+        sortedByTime.begin(),
+        sortedByTime.end(),
+        [](const WriteAckFrameState::ReceivedPacket* a,
+           const WriteAckFrameState::ReceivedPacket* b) {
+          if (a->timings.receiveTimePoint != b->timings.receiveTimePoint) {
+            return a->timings.receiveTimePoint > b->timings.receiveTimePoint;
+          }
+          return a->pktNum > b->pktNum;
+        });
+    PacketNum lastIncludedPktNum = std::numeric_limits<PacketNum>::max();
+    for (auto* rpi : sortedByTime) {
+      if (rpi->pktNum < lastIncludedPktNum) {
+        legacyView.push_back(rpi);
+        lastIncludedPktNum = rpi->pktNum;
+      }
+    }
+  }
+  if (legacyView.empty()) {
+    return 0;
+  }
 
   uint64_t pktsAdded = 0;
   IntervalSet<PacketNum> receivedPktNumsIntervalSet;
-  for (auto& recvdPkt : recvdPacketInfos) {
+  for (auto* recvdPkt : legacyView) {
     // Add up to the peer requested max ack receive timestamps;
     if (pktsAdded == maxRecvTimestampsToSend) {
       break;
     }
-    auto insertResult = receivedPktNumsIntervalSet.tryInsert(recvdPkt.pktNum);
+    auto insertResult = receivedPktNumsIntervalSet.tryInsert(recvdPkt->pktNum);
     if (insertResult.hasError()) {
       return quic::make_unexpected(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
@@ -334,7 +372,7 @@ fillFrameWithPacketReceiveTimestamps(
     pktsAdded++;
   }
   auto prevPktNum = largestAckedPacketNum;
-  auto timestampIt = recvdPacketInfos.crbegin();
+  auto timestampIt = legacyView.cbegin();
   size_t cumUsedSpace = 0;
   // We start from the latest timestamp intervals
   bool outOfSpace = false;
@@ -356,21 +394,25 @@ fillFrameWithPacketReceiveTimestamps(
     }
     nextTimestampRangeUsedSpace += gapSizeResult.value();
 
-    while (timestampIt != recvdPacketInfos.crend() &&
-           timestampIt->pktNum >= timestampIntervalsIt->start &&
-           timestampIt->pktNum <= timestampIntervalsIt->end) {
+    // Advances timestampIt in tandem with the outer timestampIntervalsIt;
+    // range-for can't express a two-iterator walk, and the suggested fixit
+    // (iterator '.' instead of '->') won't compile.
+    // NOLINTBEGIN(modernize-loop-convert)
+    while (timestampIt != legacyView.cend() &&
+           (*timestampIt)->pktNum >= timestampIntervalsIt->start &&
+           (*timestampIt)->pktNum <= timestampIntervalsIt->end) {
       std::chrono::microseconds deltaDuration;
-      if (timestampIt == recvdPacketInfos.crbegin()) {
-        deltaDuration =
-            (timestampIt->timings.receiveTimePoint > ackFrameMetaData.connTime)
+      if (timestampIt == legacyView.cbegin()) {
+        deltaDuration = ((*timestampIt)->timings.receiveTimePoint >
+                         ackFrameMetaData.connTime)
             ? std::chrono::duration_cast<std::chrono::microseconds>(
-                  timestampIt->timings.receiveTimePoint -
+                  (*timestampIt)->timings.receiveTimePoint -
                   ackFrameMetaData.connTime)
             : 0us;
       } else {
         deltaDuration = std::chrono::duration_cast<std::chrono::microseconds>(
-            (timestampIt - 1)->timings.receiveTimePoint -
-            timestampIt->timings.receiveTimePoint);
+            (*(timestampIt - 1))->timings.receiveTimePoint -
+            (*timestampIt)->timings.receiveTimePoint);
       }
       auto delta = deltaDuration.count() >> receiveTimestampsExponent;
 
@@ -405,6 +447,7 @@ fillFrameWithPacketReceiveTimestamps(
       nextTimestampRangeUsedSpace += deltaSizeResult.value();
       timestampIt++;
     }
+    // NOLINTEND(modernize-loop-convert)
     if (nextTimestampRange.deltas.size() > 0) {
       nextTimestampRange.timestamp_delta_count =
           nextTimestampRange.deltas.size();

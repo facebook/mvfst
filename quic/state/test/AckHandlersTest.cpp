@@ -1527,6 +1527,38 @@ TEST_P(AckHandlersTest, purgeAckReceiveTimestamps) {
   }
 }
 
+// Purge correctly handles a `recvdPacketInfos` deque whose packet numbers
+// are non-monotonic (receive-time-ordered storage may interleave pktNums).
+TEST_P(AckHandlersTest, PurgeAckReceiveTimestampsWithUnsortedPktNums) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  WriteAckFrame ackFrame;
+  // Local ACK state still tracks {10, 20}.
+  conn.ackStates.initialAckState->acks.insert(10, 20);
+  auto expectedTime = Clock::now();
+
+  // Receive-time-ordered storage with non-monotonic packet numbers.
+  const std::vector<PacketNum> receiveOrder = {15, 18, 11, 20, 14, 12, 17};
+  for (auto pktNum : receiveOrder) {
+    ReceivedUdpPacket::Timings timings;
+    timings.receiveTimePoint = expectedTime;
+    conn.ackStates.initialAckState->recvdPacketInfos.emplace_back(
+        WriteAckFrameState::ReceivedPacket{pktNum, timings});
+  }
+
+  // ACK frame in the ACKed packet covers {11, 15}: those entries should be
+  // purged regardless of their position in the unsorted deque.
+  ackFrame.ackBlocks.emplace_back(11, 15);
+  commonAckVisitorForAckFrame(*conn.ackStates.initialAckState, ackFrame);
+
+  // {15, 11, 14, 12} purged; {18, 20, 17} retained in original receive
+  // order.
+  ASSERT_EQ(conn.ackStates.initialAckState->recvdPacketInfos.size(), 3);
+  EXPECT_EQ(conn.ackStates.initialAckState->recvdPacketInfos[0].pktNum, 18);
+  EXPECT_EQ(conn.ackStates.initialAckState->recvdPacketInfos[1].pktNum, 20);
+  EXPECT_EQ(conn.ackStates.initialAckState->recvdPacketInfos[2].pktNum, 17);
+}
+
 TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
