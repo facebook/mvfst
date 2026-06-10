@@ -809,6 +809,291 @@ quic::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrame(
   return Optional<WriteAckFrameResult>(std::move(ackFrameWriteResult));
 }
 
+// === draft-ietf-quic-receive-ts-02 encoder helpers ===
+
+namespace {
+
+// Minimum space the draft-02 timestamp section consumes: just the Timestamp
+// Range Count varint (1 byte for `0`).
+quic::Expected<uint64_t, QuicError>
+computeDraft02ReceiveTimestampsMinimumSpace() {
+  auto sz = getQuicIntegerSize(uint64_t{0});
+  if (sz.hasError()) {
+    return quic::make_unexpected(sz.error());
+  }
+  return sz.value();
+}
+
+// Build draft-02 ranges from `recvdPacketInfos` into `outRanges`, respecting
+// the peer's max count and the available wire-byte budget. Returns the total
+// number of timestamps written (sum across all ranges).
+//
+// Traverses `recvdPacketInfos` in reverse order (newest receive time first)
+// so truncation drops oldest. Groups consecutive packets where
+// `pktNum == expectedNextPkt` into one range; non-contiguous packet numbers
+// close the current range and open a new one with a fresh
+// `deltaLargestAcknowledged`.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the ordered
+// (largestAcked, spaceLeft, peerExponent, peerMaxReceiveTimestampsPerAck)
+// signature mirrors the wire field order in draft-ietf-quic-receive-ts-02.
+quic::Expected<size_t, QuicError> fillFrameWithDraft02PacketReceiveTimestamps(
+    const WriteAckFrameMetaData& metaData,
+    Draft02ReceiveTimestampsRangeVec& outRanges,
+    PacketNum largestAcked,
+    uint64_t spaceLeft,
+    uint64_t peerExponent,
+    uint64_t peerMaxReceiveTimestampsPerAck) {
+  const auto& recvdPacketInfos = metaData.ackState.recvdPacketInfos;
+  if (recvdPacketInfos.empty() || peerMaxReceiveTimestampsPerAck == 0) {
+    return 0;
+  }
+  const TimePoint basis = metaData.connTime;
+  // Clamp peerExponent so the `>> peerExponent` below cannot become UB if a
+  // TP-parser regression sneaks an out-of-range exponent past the validated
+  // cap. Bound matches kDraft02MaxReceiveTimestampsExponent in QuicConstants.h.
+  peerExponent = std::min(peerExponent, kDraft02MaxReceiveTimestampsExponent);
+
+  // Build a receive-time-descending view. Storage is in arrival order and may
+  // contain out-of-order receive times; sorting once here lets the inner walk
+  // assume monotonic non-increasing receive times across iterations, so
+  // chained deltas are always non-negative without a clamp. n is bounded by
+  // kMaxReceivedPktsTimestampsStored (default ~10), so O(n log n) is trivial.
+  std::vector<const WriteAckFrameState::ReceivedPacket*> sortedView;
+  sortedView.reserve(recvdPacketInfos.size());
+  for (const auto& rpi : recvdPacketInfos) {
+    sortedView.push_back(&rpi);
+  }
+  // Lexicographic (receiveTime desc, pktnum desc): the pktnum tie-break is
+  // required so equal-time batches sort into a single pktnum-monotonic run
+  // that the contiguity grouping can coalesce. Without it, stable_sort
+  // preserves arrival order on equal keys and the pktnum=N+1, N+2... follow-up
+  // packets break the expectedNext=N-1 chain.
+  std::stable_sort(
+      sortedView.begin(),
+      sortedView.end(),
+      [](const WriteAckFrameState::ReceivedPacket* a,
+         const WriteAckFrameState::ReceivedPacket* b) {
+        if (a->timings.receiveTimePoint != b->timings.receiveTimePoint) {
+          return a->timings.receiveTimePoint > b->timings.receiveTimePoint;
+        }
+        return a->pktNum > b->pktNum;
+      });
+
+  size_t totalTimestamps = 0;
+  size_t cumUsedSpace = 0;
+  // Range-count varint widens at 63->64, 16383->16384, etc.; charge the
+  // delta when crossing instead of pre-reserving the max width.
+  size_t chargedRangeCountSize = 0;
+  TimePoint previousTimestamp{};
+  bool firstDeltaOverall = true;
+
+  auto it = sortedView.cbegin();
+  while (it != sortedView.cend() &&
+         totalTimestamps < peerMaxReceiveTimestampsPerAck) {
+    // `recvdPacketInfos` invariant: must not contain pkts above
+    // `largestAcked` for this frame.
+    if ((*it)->pktNum > largestAcked) {
+      ++it;
+      continue;
+    }
+    Draft02ReceiveTimestampsRange range;
+    range.deltaLargestAcknowledged = largestAcked - (*it)->pktNum;
+
+    PacketNum expectedNext = (*it)->pktNum;
+    bool outOfSpace = false;
+    while (it != sortedView.cend() && (*it)->pktNum == expectedNext &&
+           totalTimestamps < peerMaxReceiveTimestampsPerAck) {
+      uint64_t deltaUs = 0;
+      if (firstDeltaOverall) {
+        // Clamp to 0 when the receive time precedes connTime. MVDCHECK is a
+        // no-op in opt builds, so an unclamped negative duration would cast to
+        // a huge unsigned delta on the wire. Mirrors the legacy encoder.
+        deltaUs = ((*it)->timings.receiveTimePoint > basis)
+            ? static_cast<uint64_t>(
+                  std::chrono::duration_cast<std::chrono::microseconds>(
+                      (*it)->timings.receiveTimePoint - basis)
+                      .count())
+            : 0;
+      } else {
+        MVDCHECK(previousTimestamp >= (*it)->timings.receiveTimePoint);
+        deltaUs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                previousTimestamp - (*it)->timings.receiveTimePoint)
+                .count());
+      }
+      const uint64_t scaledDelta = deltaUs >> peerExponent;
+
+      // Tentative space accounting for adding this delta.
+      const auto deltaSize = getQuicIntegerSize(scaledDelta);
+      if (deltaSize.hasError()) {
+        return quic::make_unexpected(deltaSize.error());
+      }
+      const auto deltaCountSize = getQuicIntegerSize(range.deltas.size() + 1);
+      if (deltaCountSize.hasError()) {
+        return quic::make_unexpected(deltaCountSize.error());
+      }
+      // Charge the size delta only when crossing a varint-width threshold;
+      // non-zero only when opening a new range (first delta in the range).
+      uint64_t rangeCountSizeDelta = 0;
+      if (range.deltas.empty()) {
+        const auto newRangeCountSize = getQuicIntegerSize(outRanges.size() + 1);
+        if (newRangeCountSize.hasError()) {
+          return quic::make_unexpected(newRangeCountSize.error());
+        }
+        rangeCountSizeDelta = newRangeCountSize.value() - chargedRangeCountSize;
+      }
+      uint64_t tentativeAdd = deltaSize.value();
+      if (range.deltas.empty()) {
+        const auto deltaLargestAckedSize =
+            getQuicIntegerSize(range.deltaLargestAcknowledged);
+        if (deltaLargestAckedSize.hasError()) {
+          return quic::make_unexpected(deltaLargestAckedSize.error());
+        }
+        tentativeAdd += deltaLargestAckedSize.value() + deltaCountSize.value();
+      } else {
+        // Replace prior deltaCountSize estimate with new one (count grew).
+        const auto priorDeltaCountSize =
+            getQuicIntegerSize(range.deltas.size());
+        if (priorDeltaCountSize.hasError()) {
+          return quic::make_unexpected(priorDeltaCountSize.error());
+        }
+        tentativeAdd += (deltaCountSize.value() - priorDeltaCountSize.value());
+      }
+      if (cumUsedSpace + tentativeAdd + rangeCountSizeDelta > spaceLeft) {
+        outOfSpace = true;
+        break;
+      }
+      range.deltas.push_back(scaledDelta);
+      cumUsedSpace += tentativeAdd + rangeCountSizeDelta;
+      if (rangeCountSizeDelta > 0) {
+        chargedRangeCountSize += rangeCountSizeDelta;
+      }
+      previousTimestamp = (*it)->timings.receiveTimePoint;
+      firstDeltaOverall = false;
+      totalTimestamps++;
+      expectedNext = (*it)->pktNum - 1;
+      ++it;
+    }
+    if (!range.deltas.empty()) {
+      range.timestamp_delta_count = range.deltas.size();
+      outRanges.emplace_back(std::move(range));
+    }
+    if (outOfSpace) {
+      break;
+    }
+  }
+  return totalTimestamps;
+}
+
+void writeDraft02ReceiveTimestampFieldsToAck(
+    const Draft02ReceiveTimestampsRangeVec& ranges,
+    PacketBuilderInterface& builder) {
+  builder.write(QuicInteger(ranges.size()));
+  for (const auto& range : ranges) {
+    builder.write(QuicInteger(range.deltaLargestAcknowledged));
+    builder.write(QuicInteger(range.timestamp_delta_count));
+    for (const auto& d : range.deltas) {
+      builder.write(QuicInteger(d));
+    }
+  }
+}
+
+} // namespace
+
+quic::Expected<Optional<WriteAckFrameResult>, QuicError> writeAckFrameDraft02(
+    const WriteAckFrameMetaData& ackFrameMetaData,
+    PacketBuilderInterface& builder,
+    FrameType frameType,
+    uint64_t peerExponent,
+    uint64_t peerMaxReceiveTimestampsPerAck) {
+  CHECK(
+      frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02 ||
+      frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN)
+      << "writeAckFrameDraft02 frameType must be a draft-02 ACK type";
+  // Per draft-ietf-quic-receive-ts-02: ACK_RECEIVE_TIMESTAMPS frames are
+  // 1-RTT only.
+  DCHECK_EQ(
+      builder.getPacketHeader().getPacketNumberSpace(),
+      PacketNumberSpace::AppData)
+      << "draft-02 ACK_RECEIVE_TIMESTAMPS frames are 1-RTT only";
+  // Defensive guard for the shift below; TP parser already rejects exponent
+  // above `kDraft02MaxReceiveTimestampsExponent = 20`.
+  DCHECK_LT(peerExponent, sizeof(uint64_t) * 8);
+  if (ackFrameMetaData.ackState.acks.empty()) {
+    return Optional<WriteAckFrameResult>(std::nullopt);
+  }
+  const uint64_t beginningSpace = builder.remainingSpaceInPkt();
+  uint64_t spaceLeft = beginningSpace;
+
+  const bool ecnEnabled =
+      (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+
+  if (ecnEnabled) {
+    auto ecnSizeRes = computeEcnRequiredSpace(ackFrameMetaData);
+    if (ecnSizeRes.hasError()) {
+      return quic::make_unexpected(ecnSizeRes.error());
+    }
+    if (spaceLeft < ecnSizeRes.value()) {
+      return Optional<WriteAckFrameResult>(std::nullopt);
+    }
+    spaceLeft -= ecnSizeRes.value();
+  }
+
+  auto tsMinSpaceRes = computeDraft02ReceiveTimestampsMinimumSpace();
+  if (tsMinSpaceRes.hasError()) {
+    return quic::make_unexpected(tsMinSpaceRes.error());
+  }
+  if (spaceLeft < tsMinSpaceRes.value()) {
+    return Optional<WriteAckFrameResult>(std::nullopt);
+  }
+  spaceLeft -= tsMinSpaceRes.value();
+
+  // 1. Write base ACK fields.
+  auto baseRes =
+      maybeWriteAckBaseFields(ackFrameMetaData, builder, frameType, spaceLeft);
+  if (baseRes.hasError()) {
+    return quic::make_unexpected(baseRes.error());
+  }
+  if (!baseRes.value().has_value()) {
+    return Optional<WriteAckFrameResult>(std::nullopt);
+  }
+  WriteAckFrame ackFrame = std::move(*baseRes.value());
+  ackFrame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+
+  // 2. ECN counts BEFORE timestamps for the _ECN variant.
+  if (ecnEnabled) {
+    writeECNFieldsToAck(ackFrameMetaData, ackFrame, builder);
+  }
+
+  // 3. Build + write the draft-02 timestamp section.
+  const PacketNum largestAcked = ackFrameMetaData.ackState.acks.back().end;
+  const uint64_t tsBudget = builder.remainingSpaceInPkt();
+  auto fillRes = fillFrameWithDraft02PacketReceiveTimestamps(
+      ackFrameMetaData,
+      ackFrame.draft02RecvdPacketsTimestampRanges,
+      largestAcked,
+      tsBudget,
+      peerExponent,
+      peerMaxReceiveTimestampsPerAck);
+  if (fillRes.hasError()) {
+    return quic::make_unexpected(fillRes.error());
+  }
+  const size_t totalTimestamps = fillRes.value();
+  writeDraft02ReceiveTimestampFieldsToAck(
+      ackFrame.draft02RecvdPacketsTimestampRanges, builder);
+
+  auto result = WriteAckFrameResult(
+      beginningSpace - builder.remainingSpaceInPkt(),
+      ackFrame,
+      ackFrame.ackBlocks.size(),
+      ackFrame.draft02RecvdPacketsTimestampRanges.size(),
+      totalTimestamps,
+      /*extendedAckFeaturesEnabledIn=*/0);
+
+  builder.appendFrame(std::move(ackFrame));
+  return Optional<WriteAckFrameResult>(std::move(result));
+}
+
 quic::Expected<size_t, QuicError> writeSimpleFrame(
     QuicSimpleFrame&& frame,
     PacketBuilderInterface& builder) {

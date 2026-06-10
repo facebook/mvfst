@@ -228,6 +228,10 @@ struct WriteAckFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  // Only the matching range vector (legacy or draft-02) is populated.
+  AckReceiveTimestampsVersion timestampsVersion{
+      AckReceiveTimestampsVersion::None};
+  Draft02ReceiveTimestampsRangeVec draft02RecvdPacketsTimestampRanges;
   uint64_t ecnECT0Count{0};
   uint64_t ecnECT1Count{0};
   uint64_t ecnCECount{0};

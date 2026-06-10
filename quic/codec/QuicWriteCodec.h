@@ -114,6 +114,28 @@ writeAckFrame(
 [[nodiscard]] quic::Expected<size_t, QuicError>
 computeSizeUsedByRecvdTimestamps(quic::WriteAckFrame& writeAckFrame);
 
+/**
+ * Write a draft-ietf-quic-receive-ts-02 ACK_RECEIVE_TIMESTAMPS frame
+ * (0x03178307, or 0x03178308 when ECN counts should be reported) into the
+ * builder.
+ *
+ * `peerExponent`: peer's advertised TP 0x4ac26 (draft default 0 if omitted).
+ * Each emitted timestamp delta is the microsecond value right-shifted by it.
+ * `peerMaxReceiveTimestampsPerAck`: peer's TP 0x4ac07, hard upper bound on
+ * total timestamp count across all ranges. The per-session basis for the
+ * first delta is `conn.connectionTime`.
+ *
+ * Frame type MUST be `ACK_RECEIVE_TIMESTAMPS_DRAFT_02` or its `_ECN`
+ * variant.
+ */
+[[nodiscard]] quic::Expected<Optional<WriteAckFrameResult>, QuicError>
+writeAckFrameDraft02(
+    const WriteAckFrameMetaData& ackFrameMetaData,
+    PacketBuilderInterface& builder,
+    FrameType frameType,
+    uint64_t peerExponent,
+    uint64_t peerMaxReceiveTimestampsPerAck);
+
 } // namespace quic
 
 // namespace quic
