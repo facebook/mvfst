@@ -132,6 +132,10 @@ std::unique_ptr<folly::IOBuf> serializeCachedServerTransportParameters(
   auto buf = folly::IOBuf::create(0);
   folly::io::Appender appender(buf.get(), 512);
   writeCachedServerTransportParameters(params, appender);
+  // Coalesce: the zero-capacity head from `IOBuf::create(0)` has no
+  // tailroom, so `Appender` writes a continuation chain. Callers want a
+  // single contiguous `data()/length()`.
+  buf->coalesce();
   return buf;
 }
 

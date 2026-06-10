@@ -765,4 +765,53 @@ TEST_F(
   EXPECT_EQ(client_->maybePeerReceiveTimestampsConfig->exponent, 2);
 }
 
+// The convenience wrapper must return a coalesced IOBuf so callers can use
+// `data()`/`length()` directly. `Appender(buf, 512)` allocates a fresh chunk
+// when the head has no tailroom; `IOBuf::create(0)` produces a zero-capacity
+// head, so without explicit coalescing the head bytes are empty and naive
+// callers silently lose every byte.
+TEST_F(
+    ClientStateMachineTest,
+    ConvenienceWrappersRoundTripThroughHeadBytesOnly) {
+  CachedServerTransportParameters in;
+  in.idleTimeout = 12345;
+  in.maxRecvPacketSize = 1450;
+  in.initialMaxData = 1024 * 1024;
+  in.initialMaxStreamDataBidiLocal = 512 * 1024;
+  in.initialMaxStreamDataBidiRemote = 512 * 1024;
+  in.initialMaxStreamDataUni = 256 * 1024;
+  in.initialMaxStreamsBidi = 100;
+  in.initialMaxStreamsUni = 100;
+  in.knobFrameSupport = true;
+  in.ackReceiveTimestampsEnabled = true;
+  in.maxReceiveTimestampsPerAck = 7;
+  in.receiveTimestampsExponent = 3;
+  in.extendedAckFeatures = 2;
+  in.cachedReceiveTimestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  in.draft02MaxReceiveTimestampsPerAck = 11;
+  in.draft02ReceiveTimestampsExponent = 5;
+
+  auto serialized = serializeCachedServerTransportParameters(in);
+  ASSERT_NE(serialized, nullptr);
+  EXPECT_FALSE(serialized->isChained());
+  EXPECT_GT(serialized->length(), 0u);
+
+  CachedServerTransportParameters roundTripped;
+  ASSERT_TRUE(deserializeCachedServerTransportParameters(
+      folly::ByteRange(serialized->data(), serialized->length()),
+      roundTripped));
+
+  EXPECT_EQ(roundTripped.idleTimeout, 12345);
+  EXPECT_EQ(roundTripped.maxRecvPacketSize, 1450);
+  EXPECT_EQ(roundTripped.initialMaxData, 1024u * 1024u);
+  EXPECT_EQ(roundTripped.maxReceiveTimestampsPerAck, 7);
+  EXPECT_EQ(roundTripped.receiveTimestampsExponent, 3);
+  EXPECT_EQ(roundTripped.extendedAckFeatures, 2);
+  EXPECT_EQ(
+      roundTripped.cachedReceiveTimestampsVersion,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(roundTripped.draft02MaxReceiveTimestampsPerAck, 11);
+  EXPECT_EQ(roundTripped.draft02ReceiveTimestampsExponent, 5);
+}
+
 } // namespace quic::test
