@@ -2842,6 +2842,43 @@ TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
   EXPECT_EQ(decodedFrame->reorderThreshold, frame.reorderThreshold);
 }
 
+// `maybeWriteAckBaseFields` must write the full FrameType value as a
+// varint. A `static_cast<uint8_t>` narrowing matches legacy frame types
+// (<= 0xFF) by coincidence but reduces `ACK_RECEIVE_TIMESTAMPS_DRAFT_02
+// = 0x03178307` to `0x07` on decode.
+TEST_F(QuicWriteCodecTest, WriteAckFrameLargeFrameTypeNotTruncated) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  AckBlocks ackBlocks = {{10, 20}};
+  auto frameType = FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02;
+  TimePoint connTime = Clock::now();
+  WriteAckFrameState ackState = {.acks = ackBlocks};
+  WriteAckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+
+  auto result = writeAckFrame(
+      ackFrameMetaData,
+      pktBuilder,
+      frameType,
+      defaultAckReceiveTimestmpsConfig,
+      0);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto wireBuf = std::move(builtOut.second);
+  ContiguousReadCursor cursor(wireBuf->data(), wireBuf->length());
+  auto decodedFrameType = decodeQuicInteger(cursor);
+  ASSERT_TRUE(decodedFrameType.has_value());
+  EXPECT_EQ(decodedFrameType->first, static_cast<uint64_t>(frameType));
+  EXPECT_EQ(decodedFrameType->first, 0x03178307u);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicWriteCodecTests,
     QuicWriteCodecTest,

@@ -460,8 +460,11 @@ maybeWriteAckBaseFields(
   QuicInteger minAdditionalAckBlockCount(0);
 
   // Required fields are Type, LargestAcked, AckDelay, AckBlockCount,
-  // firstAckBlockLength
-  QuicInteger encodedintFrameType(static_cast<uint8_t>(frameType));
+  // firstAckBlockLength. FrameType encodes as the full underlying type
+  // (uint64_t); draft-ietf-quic-receive-ts-02 frame types are above 0xFF
+  // (e.g. 0x03178307) and would silently truncate if down-cast to uint8_t.
+  QuicInteger encodedintFrameType(
+      static_cast<std::underlying_type_t<FrameType>>(frameType));
 
   auto largestAckedPacketIntSize = largestAckedPacketInt.getSize();
   if (largestAckedPacketIntSize.hasError()) {
