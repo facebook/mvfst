@@ -143,6 +143,9 @@ class TPerfServer {
       bool overridePacketSize,
       double latencyFactor,
       bool useAckReceiveTimestamps,
+      bool useDraft02AckReceiveTimestamps,
+      bool advertiseLegacyAckReceiveTimestamps,
+      bool sendDraft02AckReceiveTimestamps,
       uint32_t maxAckReceiveTimestampsToSend,
       bool useL4sEcn,
       bool readEcn,
@@ -168,6 +171,9 @@ class TPerfServer {
   std::shared_ptr<quic::QuicServer> server_;
   double latencyFactor_;
   bool useAckReceiveTimestamps_{false};
+  bool useDraft02AckReceiveTimestamps_{false};
+  bool advertiseLegacyAckReceiveTimestamps_{true};
+  bool sendDraft02AckReceiveTimestamps_{true};
   uint32_t maxAckReceiveTimestampsToSend_;
   bool useL4sEcn_{false};
   bool readEcn_{false};

@@ -222,10 +222,54 @@ folly::dynamic RetireConnectionIdFrameLog::toDynamic() const {
   return d;
 }
 
+namespace {
+
+// Serialize legacy `RecvdPacketsTimestampsRangeVec` ranges using the legacy
+// `gap` semantics into a folly::dynamic array.
+folly::dynamic legacyTimestampRangesToDynamic(
+    const RecvdPacketsTimestampsRangeVec& ranges) {
+  folly::dynamic out = folly::dynamic::array();
+  for (const auto& r : ranges) {
+    folly::dynamic obj = folly::dynamic::object();
+    obj["gap"] = r.gap;
+    obj["timestamp_delta_count"] = r.timestamp_delta_count;
+    obj["deltas"] = folly::dynamic::array(r.deltas.begin(), r.deltas.end());
+    out.push_back(std::move(obj));
+  }
+  return out;
+}
+
+// Serialize draft-ietf-quic-receive-ts-02 ranges. Each range is keyed off
+// `delta_largest_acknowledged` (not a chained gap) per the spec.
+folly::dynamic draft02TimestampRangesToDynamic(
+    const Draft02ReceiveTimestampsRangeVec& ranges) {
+  folly::dynamic out = folly::dynamic::array();
+  for (const auto& r : ranges) {
+    folly::dynamic obj = folly::dynamic::object();
+    obj["delta_largest_acknowledged"] = r.deltaLargestAcknowledged;
+    obj["timestamp_delta_count"] = r.timestamp_delta_count;
+    obj["deltas"] = folly::dynamic::array(r.deltas.begin(), r.deltas.end());
+    out.push_back(std::move(obj));
+  }
+  return out;
+}
+
+bool isDraft02AckFrameType(FrameType frameType) {
+  return frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02 ||
+      frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN;
+}
+
+bool ackFrameTypeCarriesEcnCounts(FrameType frameType) {
+  return frameType == FrameType::ACK_EXTENDED ||
+      frameType == FrameType::ACK_ECN ||
+      frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN;
+}
+
+} // namespace
+
 folly::dynamic ReadAckFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   folly::dynamic ackRangeDynamic = folly::dynamic::array();
-  folly::dynamic recvdPacketsTimestampRangesDynamic = folly::dynamic::array();
 
   for (const auto& b : ackBlocks) {
     ackRangeDynamic.push_back(
@@ -233,7 +277,7 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
   }
   d["acked_ranges"] = ackRangeDynamic;
   d["frame_type"] = toQlogString(frameType);
-  if (frameType == FrameType::ACK_EXTENDED || frameType == FrameType::ACK_ECN) {
+  if (ackFrameTypeCarriesEcnCounts(frameType)) {
     d["ecn_ect0"] = ecnECT0Count;
     d["ecn_ect1"] = ecnECT1Count;
     d["ecn_ce"] = ecnCECount;
@@ -247,19 +291,11 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
     if (maybeLatestRecvdPacketNum.has_value()) {
       d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
     }
-    for (auto it = recvdPacketsTimestampRanges.cbegin();
-         it != recvdPacketsTimestampRanges.cend();
-         ++it) {
-      folly::dynamic currentRxTimestampRange = folly::dynamic::object();
-      currentRxTimestampRange["gap"] = it->gap;
-      currentRxTimestampRange["timestamp_delta_count"] =
-          it->timestamp_delta_count;
-      currentRxTimestampRange["deltas"] =
-          folly::dynamic::array(it->deltas.begin(), it->deltas.end());
-
-      recvdPacketsTimestampRangesDynamic.push_back(currentRxTimestampRange);
-    }
-    d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
+    d["timestamp_ranges"] =
+        legacyTimestampRangesToDynamic(recvdPacketsTimestampRanges);
+  } else if (isDraft02AckFrameType(frameType)) {
+    d["draft02_timestamp_ranges"] =
+        draft02TimestampRangesToDynamic(draft02RecvdPacketsTimestampRanges);
   }
   d["ack_delay"] = ackDelay.count();
 
@@ -269,14 +305,13 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
 folly::dynamic WriteAckFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   folly::dynamic ackRangeDynamic = folly::dynamic::array();
-  folly::dynamic recvdPacketsTimestampRangesDynamic = folly::dynamic::array();
 
   for (auto it = ackBlocks.cbegin(); it != ackBlocks.cend(); ++it) {
     ackRangeDynamic.push_back(folly::dynamic::array(it->start, it->end));
   }
   d["acked_ranges"] = ackRangeDynamic;
   d["frame_type"] = toQlogString(frameType);
-  if (frameType == FrameType::ACK_EXTENDED || frameType == FrameType::ACK_ECN) {
+  if (ackFrameTypeCarriesEcnCounts(frameType)) {
     d["ecn_ect0"] = ecnECT0Count;
     d["ecn_ect1"] = ecnECT1Count;
     d["ecn_ce"] = ecnCECount;
@@ -290,20 +325,11 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
     if (maybeLatestRecvdPacketNum.has_value()) {
       d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
     }
-
-    for (auto it = recvdPacketsTimestampRanges.cbegin();
-         it != recvdPacketsTimestampRanges.cend();
-         ++it) {
-      folly::dynamic currentRxTimestampRange = folly::dynamic::object();
-      currentRxTimestampRange["gap"] = it->gap;
-      currentRxTimestampRange["timestamp_delta_count"] =
-          it->timestamp_delta_count;
-
-      currentRxTimestampRange["deltas"] =
-          folly::dynamic::array(it->deltas.begin(), it->deltas.end());
-      recvdPacketsTimestampRangesDynamic.push_back(currentRxTimestampRange);
-    }
-    d["timestamp_ranges"] = recvdPacketsTimestampRangesDynamic;
+    d["timestamp_ranges"] =
+        legacyTimestampRangesToDynamic(recvdPacketsTimestampRanges);
+  } else if (isDraft02AckFrameType(frameType)) {
+    d["draft02_timestamp_ranges"] =
+        draft02TimestampRangesToDynamic(draft02RecvdPacketsTimestampRanges);
   }
   d["ack_delay"] = ackDelay.count();
   return d;

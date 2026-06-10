@@ -78,12 +78,38 @@ DEFINE_string(
 DEFINE_bool(
     use_ack_receive_timestamps,
     false,
-    "Replace the ACK frame with ACK_RECEIVE_TIMESTAMPS frame"
-    "which carries the received packet timestamps");
+    "Request the peer to attach receive timestamps to outgoing ACKs. By "
+    "default the legacy mvfst transport parameters and 0xB0/0xB1 wire "
+    "format are advertised. Combine with --use_draft02_ack_receive_timestamps "
+    "to also advertise draft-ietf-quic-receive-ts-02; when both formats are "
+    "negotiated end-to-end, the scheduler prefers draft-02.");
+DEFINE_bool(
+    use_draft02_ack_receive_timestamps,
+    false,
+    "Advertise draft-ietf-quic-receive-ts-02 receive-timestamp transport "
+    "parameters (0x4ac07 / 0x4ac26) and accept the 0x03178307/0x03178308 "
+    "wire format. Implies requesting receive timestamps from the peer; can "
+    "be set without --use_ack_receive_timestamps for a draft-02-only run.");
+DEFINE_bool(
+    advertise_legacy_ack_receive_timestamps,
+    true,
+    "Advertise the legacy mvfst receive-timestamp transport parameters "
+    "(0xff0a001 / 0xff0a002 / 0xff0a003). Set to false to migrate to a "
+    "draft-02-only peer. Applies whenever --use_ack_receive_timestamps or "
+    "--use_draft02_ack_receive_timestamps is set.");
+DEFINE_bool(
+    send_draft02_ack_receive_timestamps,
+    true,
+    "Per-direction send opt-out for draft-02 ACK_RECEIVE_TIMESTAMPS. When "
+    "false, this endpoint will NOT send draft-02 frames even if the peer "
+    "advertised; useful for asymmetric setups where this endpoint wants to "
+    "receive timestamps but not send any. No effect on the legacy mvfst "
+    "wire format.");
 DEFINE_uint32(
     max_ack_receive_timestamps_to_send,
     quic::kMaxReceivedPktsTimestampsStored,
-    "Controls how many packet receive timestamps the peer should send");
+    "Controls how many packet receive timestamps the peer should send "
+    "(applies to both legacy and draft-02 advertisements).");
 DEFINE_bool(use_l4s_ecn, false, "Whether to use L4S for ECN marking");
 DEFINE_bool(
     read_ecn,
@@ -147,6 +173,9 @@ int main(int argc, char* argv[]) {
         FLAGS_override_packet_size,
         FLAGS_latency_factor,
         FLAGS_use_ack_receive_timestamps,
+        FLAGS_use_draft02_ack_receive_timestamps,
+        FLAGS_advertise_legacy_ack_receive_timestamps,
+        FLAGS_send_draft02_ack_receive_timestamps,
         FLAGS_max_ack_receive_timestamps_to_send,
         FLAGS_use_l4s_ecn,
         FLAGS_read_ecn,
@@ -185,6 +214,9 @@ int main(int argc, char* argv[]) {
         FLAGS_use_inplace_write,
         FLAGS_transport_knob_params,
         FLAGS_use_ack_receive_timestamps,
+        FLAGS_use_draft02_ack_receive_timestamps,
+        FLAGS_advertise_legacy_ack_receive_timestamps,
+        FLAGS_send_draft02_ack_receive_timestamps,
         FLAGS_max_ack_receive_timestamps_to_send,
         FLAGS_use_l4s_ecn,
         FLAGS_read_ecn,

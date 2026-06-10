@@ -212,6 +212,12 @@ class ReadAckFrameLog : public QLogFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  // Populated only when `frameType` is
+  // `ACK_RECEIVE_TIMESTAMPS_DRAFT_02[_ECN]`. Per-range
+  // `deltaLargestAcknowledged` is a per-range delta from the ACK frame's
+  // `Largest Acknowledged`, not a chained gap, so the JSON serializer uses
+  // a distinct key.
+  Draft02ReceiveTimestampsRangeVec draft02RecvdPacketsTimestampRanges;
   uint64_t ecnECT0Count;
   uint64_t ecnECT1Count;
   uint64_t ecnCECount;
@@ -223,6 +229,8 @@ class ReadAckFrameLog : public QLogFrame {
       OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
       OptionalIntegral<PacketNum> maybeLatestRecvdPacketNumIn = std::nullopt,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
+      Draft02ReceiveTimestampsRangeVec draft02RecvdPacketsTimestampRangesIn =
+          {},
       uint64_t ecnECT0CountIn = 0,
       uint64_t ecnECT1CountIn = 0,
       uint64_t ecnCECountIn = 0)
@@ -232,6 +240,8 @@ class ReadAckFrameLog : public QLogFrame {
         maybeLatestRecvdPacketTime{std::move(maybeLatestRecvdPacketTimeIn)},
         maybeLatestRecvdPacketNum{std::move(maybeLatestRecvdPacketNumIn)},
         recvdPacketsTimestampRanges(std::move(recvdPacketsTimestampRangesIn)),
+        draft02RecvdPacketsTimestampRanges(
+            std::move(draft02RecvdPacketsTimestampRangesIn)),
         ecnECT0Count(ecnECT0CountIn),
         ecnECT1Count(ecnECT1CountIn),
         ecnCECount(ecnCECountIn) {}
@@ -248,6 +258,7 @@ class WriteAckFrameLog : public QLogFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  Draft02ReceiveTimestampsRangeVec draft02RecvdPacketsTimestampRanges;
   uint64_t ecnECT0Count;
   uint64_t ecnECT1Count;
   uint64_t ecnCECount;
@@ -259,6 +270,8 @@ class WriteAckFrameLog : public QLogFrame {
       OptionalMicros maybeLatestRecvdPacketTimeIn = std::nullopt,
       OptionalIntegral<PacketNum> maybeLatestRecvdPacketNumIn = std::nullopt,
       RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRangesIn = {},
+      Draft02ReceiveTimestampsRangeVec draft02RecvdPacketsTimestampRangesIn =
+          {},
       uint64_t ecnECT0CountIn = 0,
       uint64_t ecnECT1CountIn = 0,
       uint64_t ecnCECountIn = 0)
@@ -268,6 +281,8 @@ class WriteAckFrameLog : public QLogFrame {
         maybeLatestRecvdPacketTime{std::move(maybeLatestRecvdPacketTimeIn)},
         maybeLatestRecvdPacketNum{std::move(maybeLatestRecvdPacketNumIn)},
         recvdPacketsTimestampRanges{std::move(recvdPacketsTimestampRangesIn)},
+        draft02RecvdPacketsTimestampRanges{
+            std::move(draft02RecvdPacketsTimestampRangesIn)},
         ecnECT0Count(ecnECT0CountIn),
         ecnECT1Count(ecnECT1CountIn),
         ecnCECount(ecnCECountIn) {}

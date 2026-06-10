@@ -495,6 +495,9 @@ TPerfServer::TPerfServer(
     bool overridePacketSize,
     double latencyFactor,
     bool useAckReceiveTimestamps,
+    bool useDraft02AckReceiveTimestamps,
+    bool advertiseLegacyAckReceiveTimestamps,
+    bool sendDraft02AckReceiveTimestamps,
     uint32_t maxAckReceiveTimestampsToSend,
     bool useL4sEcn,
     bool readEcn,
@@ -518,6 +521,9 @@ TPerfServer::TPerfServer(
               logRttSample)),
       latencyFactor_(latencyFactor),
       useAckReceiveTimestamps_(useAckReceiveTimestamps),
+      useDraft02AckReceiveTimestamps_(useDraft02AckReceiveTimestamps),
+      advertiseLegacyAckReceiveTimestamps_(advertiseLegacyAckReceiveTimestamps),
+      sendDraft02AckReceiveTimestamps_(sendDraft02AckReceiveTimestamps),
       maxAckReceiveTimestampsToSend_(maxAckReceiveTimestampsToSend),
       useL4sEcn_(useL4sEcn),
       readEcn_(readEcn),
@@ -550,11 +556,19 @@ TPerfServer::TPerfServer(
   settings.maxRecvPacketSize = maxReceivePacketSize;
   settings.canIgnorePathMTU = overridePacketSize;
   settings.copaDeltaParam = latencyFactor_;
-  if (useAckReceiveTimestamps_) {
-    MVLOG_INFO << " Using ACK receive timestamps on server";
+  // `--use_draft02_*` implies requesting timestamps and so populates the
+  // local config; the flag alone would be a no-op.
+  if (useAckReceiveTimestamps_ || useDraft02AckReceiveTimestamps_) {
+    MVLOG_INFO << " Using ACK receive timestamps on server"
+               << " (legacy=" << advertiseLegacyAckReceiveTimestamps_
+               << " draft02=" << useDraft02AckReceiveTimestamps_ << ")";
     settings.maybeAckReceiveTimestampsConfigSentToPeer = {
         .maxReceiveTimestampsPerAck = maxAckReceiveTimestampsToSend_,
         .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
+    settings.enableIetfAckReceiveTimestamps = useDraft02AckReceiveTimestamps_;
+    settings.advertiseLegacyAckReceiveTimestamps =
+        advertiseLegacyAckReceiveTimestamps_;
+    settings.sendDraft02AckReceiveTimestamps = sendDraft02AckReceiveTimestamps_;
   }
 
   if (useL4sEcn_) {

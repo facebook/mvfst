@@ -175,6 +175,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
                 frame.maybeLatestRecvdPacketTime,
                 frame.maybeLatestRecvdPacketNum,
                 frame.recvdPacketsTimestampRanges,
+                frame.draft02RecvdPacketsTimestampRanges,
                 frame.ecnECT0Count,
                 frame.ecnECT1Count,
                 frame.ecnCECount));
@@ -311,6 +312,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
                 frame.maybeLatestRecvdPacketTime,
                 frame.maybeLatestRecvdPacketNum,
                 frame.recvdPacketsTimestampRanges,
+                frame.draft02RecvdPacketsTimestampRanges,
                 frame.ecnECT0Count,
                 frame.ecnECT1Count,
                 frame.ecnCECount));

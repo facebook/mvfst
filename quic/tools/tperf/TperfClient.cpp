@@ -30,6 +30,9 @@ TPerfClient::TPerfClient(
     bool useInplaceWrite,
     std::string knobsStr,
     bool useAckReceiveTimestamps,
+    bool useDraft02AckReceiveTimestamps,
+    bool advertiseLegacyAckReceiveTimestamps,
+    bool sendDraft02AckReceiveTimestamps,
     uint32_t maxAckReceiveTimestampsToSend,
     bool useL4sEcn,
     bool readEcn,
@@ -47,6 +50,9 @@ TPerfClient::TPerfClient(
       useInplaceWrite_(useInplaceWrite),
       knobsStr_(knobsStr),
       useAckReceiveTimestamps_(useAckReceiveTimestamps),
+      useDraft02AckReceiveTimestamps_(useDraft02AckReceiveTimestamps),
+      advertiseLegacyAckReceiveTimestamps_(advertiseLegacyAckReceiveTimestamps),
+      sendDraft02AckReceiveTimestamps_(sendDraft02AckReceiveTimestamps),
       maxAckReceiveTimestampsToSend_(maxAckReceiveTimestampsToSend),
       useL4sEcn_(useL4sEcn),
       readEcn_(readEcn),
@@ -211,12 +217,20 @@ void TPerfClient::start() {
          knobsStr_});
   }
 
-  if (useAckReceiveTimestamps_) {
-    MVLOG_INFO << " Using ACK receive timestamps on client";
+  // `--use_draft02_*` implies requesting timestamps and so populates the
+  // local config; the flag alone would be a no-op.
+  if (useAckReceiveTimestamps_ || useDraft02AckReceiveTimestamps_) {
+    MVLOG_INFO << " Using ACK receive timestamps on client"
+               << " (legacy=" << advertiseLegacyAckReceiveTimestamps_
+               << " draft02=" << useDraft02AckReceiveTimestamps_ << ")";
 
     settings.maybeAckReceiveTimestampsConfigSentToPeer = {
         .maxReceiveTimestampsPerAck = maxAckReceiveTimestampsToSend_,
         .receiveTimestampsExponent = kDefaultReceiveTimestampsExponent};
+    settings.enableIetfAckReceiveTimestamps = useDraft02AckReceiveTimestamps_;
+    settings.advertiseLegacyAckReceiveTimestamps =
+        advertiseLegacyAckReceiveTimestamps_;
+    settings.sendDraft02AckReceiveTimestamps = sendDraft02AckReceiveTimestamps_;
   }
   if (useInplaceWrite_) {
     settings.maxBatchSize = 1;

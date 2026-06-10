@@ -815,6 +815,256 @@ TEST_F(QLoggerTest, AddingAckReceiveTimestampFrame) {
   EXPECT_EQ(expected, gotEvents);
 }
 
+// draft-02 ACK frame logging uses `delta_largest_acknowledged` (not `gap`)
+// per range and inline `ecn_*` fields for the `_ECN` variant. Legacy
+// `latest_recvd_packet_*` fields and the `timestamp_ranges` key are absent.
+TEST_F(QLoggerTest, AddingDraft02AckReceiveTimestampsFrame) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+           {
+         "time": 0,
+         "name": "quic:packet_sent",
+         "data": {
+               "frames": [
+                 {
+                   "ack_delay": 222,
+                   "acked_ranges": [
+                     [
+                       300,
+                       400
+                     ]
+                   ],
+                   "frame_type": "ack_receive_timestamps_draft_02_ecn",
+                   "ecn_ect0": 1,
+                   "ecn_ect1": 2,
+                   "ecn_ce": 3,
+                   "draft02_timestamp_ranges": [
+                    {
+                      "deltas": [500, 10, 5],
+                      "delta_largest_acknowledged": 0,
+                      "timestamp_delta_count": 3
+                    },
+                    {
+                      "deltas": [20],
+                      "delta_largest_acknowledged": 50,
+                      "timestamp_delta_count": 1
+                    }
+                  ]
+                 }
+               ],
+               "header": {
+                 "packet_number": 100,
+                 "packet_type": "initial"
+               },
+               "raw": {
+                 "length": 10
+               }
+             }
+           }
+  ])");
+
+  FileQLogger q(VantagePoint::Client);
+  RegularQuicWritePacket packet =
+      createNewPacket(100, PacketNumberSpace::Initial);
+
+  WriteAckFrame ackFrame;
+  ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN;
+  ackFrame.ackDelay = 222us;
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  ackFrame.draft02RecvdPacketsTimestampRanges = {
+      Draft02ReceiveTimestampsRange{
+          .deltaLargestAcknowledged = 0,
+          .timestamp_delta_count = 3,
+          .deltas = {500, 10, 5}},
+      Draft02ReceiveTimestampsRange{
+          .deltaLargestAcknowledged = 50,
+          .timestamp_delta_count = 1,
+          .deltas = {20}}};
+  ackFrame.ecnECT0Count = 1;
+  ackFrame.ecnECT1Count = 2;
+  ackFrame.ecnCECount = 3;
+  packet.frames.emplace_back(std::move(ackFrame));
+
+  q.addPacket(packet, 10);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0]["time"] = 0;
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, AddingDraft02AckReceiveTimestampsFrameNoEcn) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+           {
+         "time": 0,
+         "name": "quic:packet_sent",
+         "data": {
+               "frames": [
+                 {
+                   "ack_delay": 222,
+                   "acked_ranges": [[300, 400]],
+                   "frame_type": "ack_receive_timestamps_draft_02",
+                   "draft02_timestamp_ranges": [
+                    {
+                      "deltas": [500, 10, 5],
+                      "delta_largest_acknowledged": 0,
+                      "timestamp_delta_count": 3
+                    }
+                  ]
+                 }
+               ],
+               "header": {
+                 "packet_number": 100,
+                 "packet_type": "initial"
+               },
+               "raw": {
+                 "length": 10
+               }
+             }
+           }
+  ])");
+
+  FileQLogger q(VantagePoint::Client);
+  RegularQuicWritePacket packet =
+      createNewPacket(100, PacketNumberSpace::Initial);
+
+  WriteAckFrame ackFrame;
+  ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02;
+  ackFrame.ackDelay = 222us;
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  ackFrame.draft02RecvdPacketsTimestampRanges = {Draft02ReceiveTimestampsRange{
+      .deltaLargestAcknowledged = 0,
+      .timestamp_delta_count = 3,
+      .deltas = {500, 10, 5}}};
+  packet.frames.emplace_back(std::move(ackFrame));
+
+  q.addPacket(packet, 10);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0]["time"] = 0;
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+// Draft-02 read path (no ECN). Exercises
+// `BaseQLogger::createPacketEvent`'s received-packet overload end-to-end.
+TEST_F(QLoggerTest, ReadDraft02AckReceiveTimestampsFrame) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+           {
+         "time": 0,
+         "name": "quic:packet_received",
+         "data": {
+               "frames": [
+                 {
+                   "ack_delay": 222,
+                   "acked_ranges": [[300, 400]],
+                   "frame_type": "ack_receive_timestamps_draft_02",
+                   "draft02_timestamp_ranges": [
+                    {
+                      "deltas": [500, 10, 5],
+                      "delta_largest_acknowledged": 0,
+                      "timestamp_delta_count": 3
+                    }
+                  ]
+                 }
+               ],
+               "header": {
+                 "packet_number": 100,
+                 "packet_type": "1RTT"
+               },
+               "raw": {
+                 "length": 10
+               }
+             }
+           }
+  ])");
+
+  FileQLogger q(VantagePoint::Server);
+  RegularQuicPacket packet(
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 100));
+
+  ReadAckFrame ackFrame;
+  ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02;
+  ackFrame.ackDelay = 222us;
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  ackFrame.draft02RecvdPacketsTimestampRanges = {Draft02ReceiveTimestampsRange{
+      .deltaLargestAcknowledged = 0,
+      .timestamp_delta_count = 3,
+      .deltas = {500, 10, 5}}};
+  packet.frames.emplace_back(std::move(ackFrame));
+
+  q.addPacket(packet, 10);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0]["time"] = 0;
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+// Draft-02 read path, `_ECN` variant: inline ECN counts surface on the
+// received-packet path.
+TEST_F(QLoggerTest, ReadDraft02AckReceiveTimestampsEcnFrame) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+           {
+         "time": 0,
+         "name": "quic:packet_received",
+         "data": {
+               "frames": [
+                 {
+                   "ack_delay": 222,
+                   "acked_ranges": [[300, 400]],
+                   "frame_type": "ack_receive_timestamps_draft_02_ecn",
+                   "ecn_ect0": 4,
+                   "ecn_ect1": 5,
+                   "ecn_ce": 6,
+                   "draft02_timestamp_ranges": [
+                    {
+                      "deltas": [500],
+                      "delta_largest_acknowledged": 10,
+                      "timestamp_delta_count": 1
+                    }
+                  ]
+                 }
+               ],
+               "header": {
+                 "packet_number": 200,
+                 "packet_type": "1RTT"
+               },
+               "raw": {
+                 "length": 10
+               }
+             }
+           }
+  ])");
+
+  FileQLogger q(VantagePoint::Server);
+  RegularQuicPacket packet(
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 200));
+
+  ReadAckFrame ackFrame;
+  ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN;
+  ackFrame.ackDelay = 222us;
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  ackFrame.draft02RecvdPacketsTimestampRanges = {Draft02ReceiveTimestampsRange{
+      .deltaLargestAcknowledged = 10,
+      .timestamp_delta_count = 1,
+      .deltas = {500}}};
+  ackFrame.ecnECT0Count = 4;
+  ackFrame.ecnECT1Count = 5;
+  ackFrame.ecnCECount = 6;
+  packet.frames.emplace_back(std::move(ackFrame));
+
+  q.addPacket(packet, 10);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0]["time"] = 0;
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
 TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"([{

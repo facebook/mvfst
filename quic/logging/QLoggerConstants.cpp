@@ -88,8 +88,9 @@ folly::StringPiece toQlogString(FrameType frame) {
     case FrameType::ACK_EXTENDED:
       return "ack_extended";
     // Distinct qlog strings so legacy and draft-02 receive-timestamp ACKs
-    // not conflated in traces. Diff 9 will revisit the qlog field structure for
-    // draft-02 (delta_largest_acknowledged vs legacy gap).
+    // are not conflated. Draft-02 ranges use `draft02_timestamp_ranges`
+    // with `delta_largest_acknowledged`; legacy uses `timestamp_ranges`
+    // with `gap`.
     case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02:
       return "ack_receive_timestamps_draft_02";
     case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN:

@@ -34,6 +34,9 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       bool useInplaceWrite,
       std::string knobsStr,
       bool useAckReceiveTimestamps,
+      bool useDraft02AckReceiveTimestamps,
+      bool advertiseLegacyAckReceiveTimestamps,
+      bool sendDraft02AckReceiveTimestamps,
       uint32_t maxAckReceiveTimestampsToSend,
       bool useL4sEcn,
       bool readEcn,
@@ -87,6 +90,9 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
   bool useInplaceWrite_{false};
   std::string knobsStr_;
   bool useAckReceiveTimestamps_{false};
+  bool useDraft02AckReceiveTimestamps_{false};
+  bool advertiseLegacyAckReceiveTimestamps_{true};
+  bool sendDraft02AckReceiveTimestamps_{true};
   uint32_t maxAckReceiveTimestampsToSend_;
   bool useL4sEcn_{false};
   bool readEcn_{false};
