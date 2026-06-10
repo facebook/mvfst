@@ -115,6 +115,7 @@ mvfst_add_library(mvfst_api_ack_scheduler
   SRCS
     QuicAckScheduler.cpp
   DEPS
+    mvfst_codec
     mvfst_logging_oops_logger
     mvfst_state_connection_oops_fields
   EXPORTED_DEPS

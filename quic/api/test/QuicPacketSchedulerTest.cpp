@@ -2837,7 +2837,10 @@ TEST_F(QuicAckSchedulerTest, WriteAckEcnWhenReadingEcnOnEgress) {
 TEST_F(QuicAckSchedulerTest, WriteAckReceiveTimestampsWhenEnabled) {
   conn_->transportSettings.readEcnOnIngress = false;
 
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
@@ -2870,7 +2873,10 @@ TEST_F(QuicAckSchedulerTest, WriteAckReceiveTimestampsWhenEnabled) {
 TEST_F(QuicAckSchedulerTest, AckEcnTakesPrecedenceOverReceiveTimestamps) {
   conn_->transportSettings.readEcnOnIngress = true;
 
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
@@ -2971,7 +2977,10 @@ TEST_F(
   conn_->peerAdvertisedExtendedAckFeatures =
       2; // Peer supports ReceiveTimestamps but not ECN in extended ack
   // Peer sent ART config
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   // We don't have an ART config (i.e. we can't sent ART)
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       std::nullopt;
@@ -3008,7 +3017,10 @@ TEST_F(QuicAckSchedulerTest, AckExtendedNotSentIfECNFeatureNotSupported) {
       1; // Peer supports ECN but not ReceiveTimestamps in extended ack
 
   // ART support negotiated
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
@@ -3046,7 +3058,10 @@ TEST_F(QuicAckSchedulerTest, AckExtendedWithAllFeatures) {
       3; // Peer supports ECN + ReceiveTimestamps
 
   // ART support negotiated
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
@@ -3087,7 +3102,10 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverECN) {
       2; // Peer supports extended ack with only ReceiveTimestamps
 
   // ART support negotiated
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
@@ -3128,7 +3146,10 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
       1; // Peer supports extended ack with only ECN
 
   // ART support negotiated
-  conn_->maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig();
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
   conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
       AckReceiveTimestampsConfig();
 
@@ -3159,6 +3180,240 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
   EXPECT_EQ(ackFrame->ecnECT0Count, 1);
   EXPECT_EQ(ackFrame->ecnECT1Count, 2);
   EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+// draft-ietf-quic-receive-ts-02 scheduler dispatch. The scheduler emits the
+// draft-02 frame type at highest priority when
+// `negotiatedOutgoingAckReceiveTimestampsVersion == DraftIetf02`. The `_ECN`
+// variant is selected by the same predicate as `ACK_ECN` over `ACK`
+// (read-ECN enabled + any ECN count received).
+
+namespace {
+void setDraft02PeerReceiveTimestamps(
+    QuicClientConnectionState& conn,
+    uint64_t max = kMaxReceivedPktsTimestampsStored,
+    uint64_t exponent = 0) {
+  conn.transportSettings.enableIetfAckReceiveTimestamps = true;
+  conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = max,
+          .receiveTimestampsExponent = exponent};
+  conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::DraftIetf02,
+      .maxReceiveTimestampsPerAck = max,
+      .exponent = exponent};
+}
+} // namespace
+
+TEST_F(QuicAckSchedulerTest, Draft02NegotiatedProducesDraft02Frame) {
+  conn_->transportSettings.readEcnOnIngress = false;
+  setDraft02PeerReceiveTimestamps(*conn_);
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+  ASSERT_EQ(ackFrame->draft02RecvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(ackFrame->ecnECT0Count, 0);
+}
+
+TEST_F(QuicAckSchedulerTest, Draft02WithEcnProducesDraft02EcnFrame) {
+  conn_->transportSettings.readEcnOnIngress = true;
+  setDraft02PeerReceiveTimestamps(*conn_);
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_EQ(
+      ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+  ASSERT_EQ(ackFrame->draft02RecvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
+TEST_F(QuicAckSchedulerTest, Draft02TakesPrecedenceOverAckExtendedAndAckEcn) {
+  // Peer advertises ACK_EXTENDED with ECN+RT bits AND draft-02. Local enables
+  // all three. Expected: a single draft-02_ECN frame; no ACK_EXTENDED.
+  conn_->transportSettings.readEcnOnIngress = true;
+  conn_->transportSettings.enableExtendedAckFeatures = 3;
+  conn_->peerAdvertisedExtendedAckFeatures = 3;
+  setDraft02PeerReceiveTimestamps(*conn_);
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_EQ(
+      ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+}
+
+TEST_F(QuicAckSchedulerTest, Draft02NotEmittedWhenLocalKnobDisabled) {
+  // Peer advertises draft-02 but local `enableIetfAckReceiveTimestamps` is
+  // off, so the negotiated outgoing version stays None and no draft-02
+  // frame is emitted.
+  conn_->transportSettings.readEcnOnIngress = false;
+  conn_->transportSettings.enableIetfAckReceiveTimestamps = false;
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::DraftIetf02,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{};
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_NE(ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  EXPECT_NE(
+      ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK);
+}
+
+// Per spec, ACK_RECEIVE_TIMESTAMPS frames (draft-02 and legacy mvfst) are
+// 1-RTT only. The scheduler must not emit them in Initial/Handshake spaces;
+// it falls through to plain ACK / ACK_ECN. Without the space gate this
+// crashed `writeAckFrameDraft02`'s DCHECK.
+TEST_F(
+    QuicAckSchedulerTest,
+    Draft02NegotiatedButInitialSpaceFallsBackToPlainAck) {
+  conn_->transportSettings.readEcnOnIngress = false;
+  setDraft02PeerReceiveTimestamps(*conn_);
+  updateNegotiatedAckFeatures(*conn_);
+  // Use an Initial-space LongHeader instead of the AppData-space header
+  // from `SetUp()`.
+  mockPacketHeader_ = std::make_unique<PacketHeader>(LongHeader(
+      LongHeader::Types::Initial,
+      ConnectionId::createZeroLength(),
+      getTestConnectionId(),
+      getNextPacketNum(*conn_, PacketNumberSpace::Initial),
+      QuicVersion::MVFST));
+  EXPECT_CALL(*builder_, getPacketHeader())
+      .WillRepeatedly(ReturnRef(*mockPacketHeader_));
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_EQ(builder_->frames_.size(), 1);
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK);
+}
+
+// Inconsistent state: the negotiated outgoing version is draft-02 but the peer
+// config is absent. `updateNegotiatedAckFeatures` normally keeps these in
+// sync; the scheduler must guard the deref locally and degrade to a plain ACK
+// instead of dereferencing a nullopt peer config.
+TEST_F(
+    QuicAckSchedulerTest,
+    Draft02NegotiatedButPeerConfigMissingDegradesToPlainAck) {
+  conn_->transportSettings.readEcnOnIngress = false;
+  conn_->negotiatedOutgoingAckReceiveTimestampsVersion =
+      AckReceiveTimestampsVersion::DraftIetf02;
+  conn_->maybePeerReceiveTimestampsConfig = std::nullopt;
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_NE(ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  EXPECT_NE(
+      ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK);
+}
+
+TEST_F(
+    QuicAckSchedulerTest,
+    LegacyNegotiatedButHandshakeSpaceFallsBackToPlainAck) {
+  conn_->transportSettings.readEcnOnIngress = false;
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{};
+  updateNegotiatedAckFeatures(*conn_);
+  mockPacketHeader_ = std::make_unique<PacketHeader>(LongHeader(
+      LongHeader::Types::Handshake,
+      ConnectionId::createZeroLength(),
+      getTestConnectionId(),
+      getNextPacketNum(*conn_, PacketNumberSpace::Handshake),
+      QuicVersion::MVFST));
+  EXPECT_CALL(*builder_, getPacketHeader())
+      .WillRepeatedly(ReturnRef(*mockPacketHeader_));
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_EQ(builder_->frames_.size(), 1);
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK);
+}
+
+TEST_F(QuicAckSchedulerTest, LegacyPeerProducesLegacyFrame) {
+  // Peer advertises LegacyMvfst (and no draft-02 support); local does not
+  // enable draft-02. Scheduler emits the legacy ACK_RECEIVE_TIMESTAMPS frame
+  // and sources `peerRequestedTimestampsCount` from the versioned config.
+  conn_->transportSettings.readEcnOnIngress = false;
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{};
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_RECEIVE_TIMESTAMPS);
+  ASSERT_EQ(ackFrame->recvdPacketsTimestampRanges.size(), 1);
 }
 
 // Tests for Expected result handling bug fix

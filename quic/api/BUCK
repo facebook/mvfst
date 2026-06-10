@@ -182,6 +182,7 @@ mvfst_cpp_library(
         "QuicAckScheduler.h",
     ],
     deps = [
+        "//quic/codec:codec",
         "//quic/logging/oops_logger:oops_logger",
         "//quic/state:connection_oops_fields",
     ],

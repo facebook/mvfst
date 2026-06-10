@@ -7,6 +7,7 @@
 
 #include <quic/api/QuicAckScheduler.h>
 
+#include <quic/codec/QuicWriteCodec.h>
 #include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/state/ConnectionOopsFields.h>
 
@@ -75,11 +76,41 @@ quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
 
   auto ackWriteResult =
       [&]() -> quic::Expected<Optional<WriteAckFrameResult>, QuicError> {
-    uint64_t peerRequestedTimestampsCount =
-        conn_.maybePeerAckReceiveTimestampsConfig.has_value()
-        ? conn_.maybePeerAckReceiveTimestampsConfig.value()
-              .maxReceiveTimestampsPerAck
+    const uint64_t peerRequestedTimestampsCount =
+        conn_.maybePeerReceiveTimestampsConfig.has_value()
+        ? conn_.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck
         : 0;
+    const bool ecnRequiresReporting =
+        conn_.transportSettings.readEcnOnIngress &&
+        (meta.ackState.ecnECT0CountReceived ||
+         meta.ackState.ecnECT1CountReceived ||
+         meta.ackState.ecnCECountReceived);
+    // ACK_RECEIVE_TIMESTAMPS (both draft-02 and legacy mvfst) is 1-RTT only
+    // per spec. Initial/Handshake spaces fall through to plain
+    // `ACK`/`ACK_ECN`.
+    const bool isAppDataSpace =
+        builder.getPacketHeader().getPacketNumberSpace() ==
+        PacketNumberSpace::AppData;
+
+    // Priority: draft-02 wins over ACK_EXTENDED and ACK_ECN because the
+    // draft-02 _ECN variant inlines the ECN counts in a single frame.
+    // draft-02 selection implies a populated peer config (both set together in
+    // updateNegotiatedAckFeatures). Guard the deref locally so an inconsistent
+    // state degrades to a plain ACK instead of a null deref in opt builds.
+    if (isAppDataSpace &&
+        conn_.negotiatedOutgoingAckReceiveTimestampsVersion ==
+            AckReceiveTimestampsVersion::DraftIetf02 &&
+        conn_.maybePeerReceiveTimestampsConfig.has_value()) {
+      const FrameType ft = ecnRequiresReporting
+          ? FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN
+          : FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02;
+      return writeAckFrameDraft02(
+          meta,
+          builder,
+          ft,
+          conn_.maybePeerReceiveTimestampsConfig->exponent,
+          peerRequestedTimestampsCount);
+    }
 
     if (conn_.negotiatedExtendedAckFeatures > 0) {
       // The peer supports extended ACKs and we have them enabled.
@@ -91,18 +122,12 @@ quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
               .value_or(AckReceiveTimestampsConfig()),
           peerRequestedTimestampsCount,
           conn_.negotiatedExtendedAckFeatures);
-    } else if (
-        conn_.transportSettings.readEcnOnIngress &&
-        (meta.ackState.ecnECT0CountReceived ||
-         meta.ackState.ecnECT1CountReceived ||
-         meta.ackState.ecnCECountReceived)) {
-      // We have to report ECN counts, but we can't use the extended ACK
-      // frame. In this case, we give ACK_ECN precedence over
-      // ACK_RECEIVE_TIMESTAMPS.
+    } else if (ecnRequiresReporting) {
+      // Legacy mvfst format can't carry ECN counts, so prefer ACK_ECN over
+      // ACK_RECEIVE_TIMESTAMPS when both apply (draft-02 case above already
+      // handles the combined form).
       return writeAckFrame(meta, builder, FrameType::ACK_ECN);
-    } else if (conn_.negotiatedAckReceiveTimestampSupport) {
-      // Use ACK_RECEIVE_TIMESTAMPS if its enabled on both endpoints AND the
-      // peer requests at least 1 timestamp
+    } else if (isAppDataSpace && conn_.negotiatedAckReceiveTimestampSupport) {
       return writeAckFrame(
           meta,
           builder,

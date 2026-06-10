@@ -713,14 +713,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // GSO supported on conn.
   Optional<bool> gsoSupported;
 
-  Optional<AckReceiveTimestampsConfig> maybePeerAckReceiveTimestampsConfig;
-
-  // Versioned replacement for `maybePeerAckReceiveTimestampsConfig`. Populated
-  // during transport-parameter negotiation alongside the legacy field;
-  // consumers are migrated in Diff 7 (ACK processing) and Diff 8 (scheduler),
-  // at which point `maybePeerAckReceiveTimestampsConfig` is removed. The
-  // transient parallelism is intentional — see plan section "Backward
-  // Compatibility Strategy".
+  // Peer's receive-timestamp configuration. Populated during TP negotiation
+  // and consumed by the scheduler + encoder.
   Optional<PeerReceiveTimestampsConfig> maybePeerReceiveTimestampsConfig;
 
   bool peerAdvertisedReliableStreamResetSupport{false};

@@ -2633,18 +2633,25 @@ void maybeScheduleAckForCongestionFeedback(
 }
 
 void updateNegotiatedAckFeatures(QuicConnectionStateBase& conn) {
-  bool isAckReceiveTimestampsSupported =
-      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer &&
-      conn.maybePeerAckReceiveTimestampsConfig;
+  // Legacy-format gate. `advertiseLegacyAckReceiveTimestamps=false` blocks
+  // both sending and accepting (incoming accept is enforced at the frame
+  // validation gate). Draft-02 has its own gate below.
+  const bool isLegacyAckReceiveTimestampsSupported =
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+          .has_value() &&
+      conn.transportSettings.advertiseLegacyAckReceiveTimestamps &&
+      conn.maybePeerReceiveTimestampsConfig.has_value() &&
+      conn.maybePeerReceiveTimestampsConfig->version ==
+          AckReceiveTimestampsVersion::LegacyMvfst;
 
-  uint64_t peerRequestedTimestampsCount =
-      conn.maybePeerAckReceiveTimestampsConfig.has_value()
-      ? conn.maybePeerAckReceiveTimestampsConfig.value()
-            .maxReceiveTimestampsPerAck
+  const uint64_t peerRequestedTimestampsCount =
+      conn.maybePeerReceiveTimestampsConfig.has_value()
+      ? conn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck
       : 0;
 
   conn.negotiatedAckReceiveTimestampSupport =
-      isAckReceiveTimestampsSupported && (peerRequestedTimestampsCount > 0);
+      isLegacyAckReceiveTimestampsSupported &&
+      (peerRequestedTimestampsCount > 0);
 
   conn.negotiatedExtendedAckFeatures = conn.peerAdvertisedExtendedAckFeatures &
       conn.transportSettings.enableExtendedAckFeatures;

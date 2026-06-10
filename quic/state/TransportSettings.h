@@ -153,10 +153,9 @@ struct AckReceiveTimestampsConfig {
 };
 
 // Versioned representation of the peer's receive-timestamp configuration.
-// Replaces the unversioned Optional<AckReceiveTimestampsConfig>
-// maybePeerAckReceiveTimestampsConfig once Diff 2 finishes wiring negotiation.
-// In Diff 1 the struct is defined but not yet populated; both the old and new
-// fields coexist briefly so this diff is a pure addition.
+// The `version` discriminates the wire format negotiated during the
+// transport-parameter handshake (legacy mvfst vs
+// draft-ietf-quic-receive-ts-02).
 struct PeerReceiveTimestampsConfig {
   AckReceiveTimestampsVersion version{AckReceiveTimestampsVersion::None};
   // Maximum number of receive timestamps the peer wants us to include in each

@@ -166,9 +166,6 @@ void cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxStreamsBidi,
     uint64_t peerAdvertisedInitialMaxStreamUni,
     bool peerAdvertisedKnobFrameSupport,
-    bool peerAdvertisedAckReceiveTimestampsEnabled,
-    uint64_t peerAdvertisedMaxRecvTimestampsPerAck,
-    uint64_t peerAdvertisedReceiveTimestampsExponent,
     bool peerAdvertisedReliableStreamResetSupport,
     ExtendedAckFeatureMaskType peerAdvertisedExtendedAckSupport);
 

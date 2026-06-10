@@ -699,13 +699,10 @@ TEST(ServerStateMachineTest, ProcessClientParamsNoTimestampTps) {
   EXPECT_FALSE(serverConn.maybePeerReceiveTimestampsConfig.has_value());
 }
 
-// Defensive clear of both peer-receive-timestamps fields on the server
-// side. Symmetric with the client's `processServerInitialParams` reset.
-// The server processes client TPs only once today (no 0-RTT-reject
-// reprocess path equivalent to the client), so this is hygiene rather
-// than a known live bug, but the reset costs nothing and removes the
-// landmine if a reprocess path is ever introduced.
-TEST(ServerStateMachineTest, ProcessClientParamsClearsStalePeerConfigs) {
+// Reset the peer-receive-timestamps field before populate so stale state
+// cannot leak through a caller that bypasses once-per-handshake TP
+// processing.
+TEST(ServerStateMachineTest, ProcessClientParamsClearsStalePeerConfig) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
   serverConn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
@@ -713,17 +710,12 @@ TEST(ServerStateMachineTest, ProcessClientParamsClearsStalePeerConfigs) {
       .maxReceiveTimestampsPerAck = 5,
       .exponent = 2,
   };
-  serverConn.maybePeerAckReceiveTimestampsConfig = AckReceiveTimestampsConfig{
-      .maxReceiveTimestampsPerAck = 5,
-      .receiveTimestampsExponent = 2,
-  };
   auto clientParams = buildClientTpsWithTimestampParams(
       std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
 
   ASSERT_FALSE(processClientInitialParams(serverConn, clientParams).hasError());
 
   EXPECT_FALSE(serverConn.maybePeerReceiveTimestampsConfig.has_value());
-  EXPECT_FALSE(serverConn.maybePeerAckReceiveTimestampsConfig.has_value());
 }
 
 // Without `enableIetfAckReceiveTimestamps`, an incoming
@@ -735,6 +727,15 @@ TEST(ServerStateMachineTest, ProcessClientParamsClearsStalePeerConfigs) {
 // is only reachable via an encrypted 1-RTT packet routed through the server
 // receive path.
 TEST(ServerStateMachineTest, DISABLED_RejectsDraft02FrameWhenNotAdvertised) {
+  GTEST_SKIP() << "blocked on Task #21 (move gate to dispatch boundary)";
+}
+
+// With `enableIetfAckReceiveTimestamps=true` but local config's
+// `maxReceiveTimestampsPerAck=0`, an incoming ACK_RECEIVE_TIMESTAMPS_DRAFT_02
+// frame must close the connection with PROTOCOL_VIOLATION. Peer that
+// advertised max=0 should not be sending these frames per spec; if it does
+// anyway, reject. Same reachability blocker as the test above.
+TEST(ServerStateMachineTest, DISABLED_RejectsDraft02FrameWhenLocalMaxIsZero) {
   GTEST_SKIP() << "blocked on Task #21 (move gate to dispatch boundary)";
 }
 

@@ -491,35 +491,24 @@ quic::Expected<void, QuicError> processClientInitialParams(
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 
-  // Reset both peer-receive-timestamps fields before deciding what to
-  // populate. Defensive — matches the symmetric client-side reset in
+  // Reset the peer-receive-timestamps field before deciding what to populate.
+  // Defensive — matches the symmetric client-side reset in
   // `processServerInitialParams`. Server-side handshake processes client TPs
   // once today, but the reset costs nothing and removes the stale-state
   // landmine if a reprocess path is ever introduced.
-  conn.maybePeerAckReceiveTimestampsConfig = std::nullopt;
   conn.maybePeerReceiveTimestampsConfig = std::nullopt;
-
-  if (isAckReceiveTimestampsEnabled.has_value() &&
-      isAckReceiveTimestampsEnabled.value() == 1) {
-    if (maxReceiveTimestampsPerAck.has_value() &&
-        receiveTimestampsExponent.has_value()) {
-      conn.maybePeerAckReceiveTimestampsConfig = {
-          .maxReceiveTimestampsPerAck = std::min(
-              static_cast<uint8_t>(maxReceiveTimestampsPerAck.value()),
-              static_cast<uint8_t>(
-                  conn.transportSettings.maxReceiveTimestampsPerAckStored)),
-          .receiveTimestampsExponent = std::max(
-              static_cast<uint8_t>(receiveTimestampsExponent.value()),
-              static_cast<uint8_t>(0))};
-    }
-  }
 
   // Populate the versioned peer-config field. Draft-02 wins when both formats
   // are advertised; "exponent without max" in draft-02 is ignored per spec.
+  // The peer-advertised max is capped by our locally-configured stored max
+  // for memory safety.
+  const uint64_t storedCap =
+      conn.transportSettings.maxReceiveTimestampsPerAckStored;
   if (draft02MaxReceiveTimestampsPerAck.has_value()) {
     conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
         .version = AckReceiveTimestampsVersion::DraftIetf02,
-        .maxReceiveTimestampsPerAck = *draft02MaxReceiveTimestampsPerAck,
+        .maxReceiveTimestampsPerAck =
+            std::min(*draft02MaxReceiveTimestampsPerAck, storedCap),
         .exponent = draft02ReceiveTimestampsExponent.value_or(0),
     };
   } else if (
@@ -529,7 +518,8 @@ quic::Expected<void, QuicError> processClientInitialParams(
       receiveTimestampsExponent.has_value()) {
     conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
         .version = AckReceiveTimestampsVersion::LegacyMvfst,
-        .maxReceiveTimestampsPerAck = *maxReceiveTimestampsPerAck,
+        .maxReceiveTimestampsPerAck =
+            std::min(*maxReceiveTimestampsPerAck, storedCap),
         .exponent = *receiveTimestampsExponent,
     };
   }
@@ -1545,11 +1535,25 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
                 "Received unexpected ACK_EXTENDED frame"));
           } else if (
               ackFrame.frameType == FrameType::ACK_RECEIVE_TIMESTAMPS &&
-              !conn.transportSettings
-                   .maybeAckReceiveTimestampsConfigSentToPeer) {
+              (!conn.transportSettings
+                    .maybeAckReceiveTimestampsConfigSentToPeer ||
+               !conn.transportSettings.advertiseLegacyAckReceiveTimestamps)) {
             return quic::make_unexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Received unexpected ACK_RECEIVE_TIMESTAMPS frame"));
+          } else if (
+              (ackFrame.frameType ==
+                   FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02 ||
+               ackFrame.frameType ==
+                   FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN) &&
+              (!conn.transportSettings.enableIetfAckReceiveTimestamps ||
+               !conn.transportSettings
+                    .maybeAckReceiveTimestampsConfigSentToPeer ||
+               conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                       ->maxReceiveTimestampsPerAck == 0)) {
+            return quic::make_unexpected(QuicError(
+                TransportErrorCode::PROTOCOL_VIOLATION,
+                "Received unexpected ACK_RECEIVE_TIMESTAMPS_DRAFT_02 frame"));
           }
           auto result = processAckFrame(
               conn,

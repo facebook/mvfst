@@ -50,9 +50,6 @@ quic::Expected<void, QuicError> ClientHandshake::connect(
         cachedServerTransportParams->initialMaxStreamsBidi,
         cachedServerTransportParams->initialMaxStreamsUni,
         cachedServerTransportParams->knobFrameSupport,
-        cachedServerTransportParams->ackReceiveTimestampsEnabled,
-        cachedServerTransportParams->maxReceiveTimestampsPerAck,
-        cachedServerTransportParams->receiveTimestampsExponent,
         cachedServerTransportParams->reliableStreamResetSupport,
         cachedServerTransportParams->extendedAckFeatures);
     auto result = updateTransportParamsFromCachedEarlyParams(

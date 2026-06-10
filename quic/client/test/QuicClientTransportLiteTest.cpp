@@ -557,4 +557,29 @@ TEST_F(QuicClientTransportLiteTest, SendPingSetsPendingEvent) {
   EXPECT_TRUE(quicClient_->getWriteLooper()->isLoopCallbackScheduled());
 }
 
+// Without `enableIetfAckReceiveTimestamps`, an incoming
+// ACK_RECEIVE_TIMESTAMPS_DRAFT_02[_ECN] frame on the 1-RTT receive path must
+// close the connection with PROTOCOL_VIOLATION.
+//
+// TODO(Task #21): re-enable after the gate moves to the decoder-dispatch
+// boundary; the current gate inside `processRegularPacket` is only reachable
+// via an encrypted 1-RTT packet routed through the public `networkData`
+// entry point.
+TEST_F(
+    QuicClientTransportLiteTest,
+    DISABLED_RejectsDraft02FrameWhenNotAdvertised) {
+  GTEST_SKIP() << "blocked on Task #21 (move gate to dispatch boundary)";
+}
+
+// With `enableIetfAckReceiveTimestamps=true` but local config's
+// `maxReceiveTimestampsPerAck=0`, an incoming ACK_RECEIVE_TIMESTAMPS_DRAFT_02
+// frame must close the connection with PROTOCOL_VIOLATION. Peer that
+// advertised max=0 should not be sending these frames per spec; if it does
+// anyway, reject. Same reachability blocker as the test above.
+TEST_F(
+    QuicClientTransportLiteTest,
+    DISABLED_RejectsDraft02FrameWhenLocalMaxIsZero) {
+  GTEST_SKIP() << "blocked on Task #21 (move gate to dispatch boundary)";
+}
+
 } // namespace quic::test

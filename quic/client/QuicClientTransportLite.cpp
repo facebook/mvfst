@@ -627,11 +627,24 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
               "Received unexpected ACK_EXTENDED frame"));
         } else if (
             ackFrame.frameType == FrameType::ACK_RECEIVE_TIMESTAMPS &&
-            !conn_->transportSettings
-                 .maybeAckReceiveTimestampsConfigSentToPeer) {
+            (!conn_->transportSettings
+                  .maybeAckReceiveTimestampsConfigSentToPeer ||
+             !conn_->transportSettings.advertiseLegacyAckReceiveTimestamps)) {
           return quic::make_unexpected(QuicError(
               TransportErrorCode::PROTOCOL_VIOLATION,
               "Received unexpected ACK_RECEIVE_TIMESTAMPS frame"));
+        } else if (
+            (ackFrame.frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02 ||
+             ackFrame.frameType ==
+                 FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN) &&
+            (!conn_->transportSettings.enableIetfAckReceiveTimestamps ||
+             !conn_->transportSettings
+                  .maybeAckReceiveTimestampsConfigSentToPeer ||
+             conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+                     ->maxReceiveTimestampsPerAck == 0)) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::PROTOCOL_VIOLATION,
+              "Received unexpected ACK_RECEIVE_TIMESTAMPS_DRAFT_02 frame"));
         }
 
         auto result = processAckFrame(
@@ -965,15 +978,6 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
             maxStreamsBidi.value().value_or(0),
             maxStreamsUni.value().value_or(0),
             conn_->peerAdvertisedKnobFrameSupport,
-            conn_->maybePeerAckReceiveTimestampsConfig.has_value(),
-            conn_->maybePeerAckReceiveTimestampsConfig
-                ? conn_->maybePeerAckReceiveTimestampsConfig
-                      ->maxReceiveTimestampsPerAck
-                : 0,
-            conn_->maybePeerAckReceiveTimestampsConfig
-                ? conn_->maybePeerAckReceiveTimestampsConfig
-                      ->receiveTimestampsExponent
-                : 3,
             conn_->peerAdvertisedReliableStreamResetSupport,
             conn_->peerAdvertisedExtendedAckFeatures);
 
