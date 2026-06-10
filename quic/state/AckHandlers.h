@@ -64,11 +64,18 @@ void commonAckVisitorForAckFrame(
     const WriteAckFrame& frame);
 
 /**
- * Parse Receive timestamps from ACK frame into a UnorderedMap of packet
- * number to timestamps and return the latest received packet with timestamp if
- * any.
+ * Parse receive timestamps from an ACK frame into a packet-number to
+ * timestamp map. Dispatches on `ReadAckFrame::timestampsVersion`:
+ *   - `LegacyMvfst`: legacy `gap` / `maybeLatestRecvdPacketNum` layout.
+ *     Over-limit is soft-logged.
+ *   - `DraftIetf02`: draft-ietf-quic-receive-ts-02's
+ *     `deltaLargestAcknowledged` layout. Over-limit returns
+ *     `FRAME_ENCODING_ERROR`.
+ *   - `None`: no-op, except for a fallback that runs the legacy parser when
+ *     the legacy ranges vector is populated. Production decoders always set
+ *     the version; the fallback covers in-tree test constructors.
  */
-void parseAckReceiveTimestamps(
+quic::Expected<void, QuicError> parseAckReceiveTimestamps(
     const QuicConnectionStateBase& conn,
     const quic::ReadAckFrame& frame,
     UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,

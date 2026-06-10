@@ -2857,7 +2857,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsPartialDuplicates) {
     }
 
     UnorderedMap<PacketNum, uint64_t> receivedTimestamps;
-    parseAckReceiveTimestamps(conn, ackFrame2, receivedTimestamps, 6);
+    auto res =
+        parseAckReceiveTimestamps(conn, ackFrame2, receivedTimestamps, 6);
+    ASSERT_FALSE(res.hasError());
     // Ack Event will not have the old packets anyway so to unit-test
     // duplicate  detection, we will directly call parseAckReceiveTimestamps
     if (GetParam().frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
@@ -3118,8 +3120,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsInvalidCases) {
 
     UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
 
-    parseAckReceiveTimestamps(
+    auto res = parseAckReceiveTimestamps(
         conn, ackFrame, expectedReceiveTimestamps, firstPacketNum);
+    ASSERT_FALSE(res.hasError());
     // No packets should be parsed/stored.
     EXPECT_EQ(expectedReceiveTimestamps.size(), 0);
   }
@@ -3141,8 +3144,9 @@ TEST_P(AckHandlersTest, AckEventReceiveTimestampsInvalidCases) {
     }
 
     UnorderedMap<PacketNum, uint64_t> expectedReceiveTimestamps;
-    parseAckReceiveTimestamps(
+    auto res = parseAckReceiveTimestamps(
         conn, ackFrame, expectedReceiveTimestamps, firstPacketNum);
+    ASSERT_FALSE(res.hasError());
     // No packets should be stored.
     EXPECT_EQ(expectedReceiveTimestamps.size(), 0);
   }
@@ -7593,4 +7597,225 @@ INSTANTIATE_TEST_SUITE_P(
         AckHandlersTestParam{
             PacketNumberSpace::AppData,
             FrameType::ACK_RECEIVE_TIMESTAMPS}));
+
+// draft-ietf-quic-receive-ts-02 ACK processing dispatch tests.
+// `parseAckReceiveTimestamps` dispatches on `ReadAckFrame::timestampsVersion`.
+
+namespace {
+
+ReadAckFrame makeDraft02AckFrame(
+    PacketNum largestAcked,
+    Draft02ReceiveTimestampsRangeVec ranges) {
+  ReadAckFrame frame;
+  frame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02;
+  frame.largestAcked = largestAcked;
+  frame.ackBlocks.emplace_back(0, largestAcked);
+  frame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  frame.draft02RecvdPacketsTimestampRanges = std::move(ranges);
+  return frame;
+}
+
+void setReceiveTimestampsConfig(
+    QuicServerConnectionState& conn,
+    uint64_t maxReceiveTimestamps) {
+  conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = maxReceiveTimestamps,
+          .receiveTimestampsExponent = 0};
+}
+
+} // namespace
+
+TEST(Draft02AckProcessing, UsesDraft02ParserAndComputesPktNumsFromDelta) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // Single range: deltaLargestAcked = 0 (range top == largestAcked),
+  // 3 deltas -> packets {100, 99, 98} with timestamps {500, 490, 485}.
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 3,
+        .deltas = {500, 10, 5}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_FALSE(res.hasError());
+  ASSERT_EQ(out.size(), 3);
+  EXPECT_EQ(out[100], 500);
+  EXPECT_EQ(out[99], 490);
+  EXPECT_EQ(out[98], 485);
+}
+
+TEST(Draft02AckProcessing, NonMonotonicPktNumAcrossRanges) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // largestAcked = 100. Two ranges:
+  //   range 1: deltaLargestAcked = 5  -> range top = 95, deltas [200] -> pkt 95
+  //   range 2: deltaLargestAcked = 0  -> range top = 100, deltas [180] -> pkt
+  //   100
+  // Per spec, ranges are descending receive-time order but packet numbers can
+  // be non-monotonic (range 2's pktNum > range 1's because range 2 was
+  // received earlier in time but has a higher pktNum).
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 5,
+        .timestamp_delta_count = 1,
+        .deltas = {200}},
+       {.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 1,
+        .deltas = {20}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_FALSE(res.hasError());
+  ASSERT_EQ(out.size(), 2);
+  EXPECT_EQ(out[95], 200);
+  EXPECT_EQ(out[100], 180); // 200 - 20 (previousTimestamp chains across ranges)
+}
+
+TEST(Draft02AckProcessing, ChainedTimestampDeltasAcrossRangeBoundary) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // Range 1: pkt 100, 99 -> timestamps {500, 490}
+  // Range 2: pkt 50 -> timestamp 490 - 5 = 485 (chained from range 1's last).
+  // No extra decrement between ranges.
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 2,
+        .deltas = {500, 10}},
+       {.deltaLargestAcknowledged = 50,
+        .timestamp_delta_count = 1,
+        .deltas = {5}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_FALSE(res.hasError());
+  ASSERT_EQ(out.size(), 3);
+  EXPECT_EQ(out[100], 500);
+  EXPECT_EQ(out[99], 490);
+  EXPECT_EQ(out[50], 485);
+}
+
+TEST(Draft02AckProcessing, OverLimitReturnsFrameEncodingError) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, /*maxReceiveTimestamps=*/3);
+  // Total deltas across ranges = 4 > advertised max 3.
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 2,
+        .deltas = {500, 10}},
+       {.deltaLargestAcknowledged = 5,
+        .timestamp_delta_count = 2,
+        .deltas = {5, 5}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+TEST(LegacyAckProcessing, OverLimitDoesNotError) {
+  // Legacy parser preserves the soft-log/return behavior: over-limit must
+  // not surface as FRAME_ENCODING_ERROR.
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, /*maxReceiveTimestamps=*/3);
+  ReadAckFrame frame;
+  frame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS;
+  frame.largestAcked = 100;
+  frame.ackBlocks.emplace_back(0, 100);
+  frame.timestampsVersion = AckReceiveTimestampsVersion::LegacyMvfst;
+  frame.maybeLatestRecvdPacketNum = 100;
+  frame.maybeLatestRecvdPacketTime = 500us;
+  // 4 deltas total in one range (exceeds max=3).
+  frame.recvdPacketsTimestampRanges = {
+      {.gap = 0, .timestamp_delta_count = 4, .deltas = {500, 10, 10, 10}}};
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_FALSE(res.hasError());
+  // Legacy soft-return stops at the advertised max (no error).
+  EXPECT_LE(out.size(), 3u);
+}
+
+TEST(Draft02AckProcessing, IgnoresPreviouslyAckedTimestamps) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // largestAcked = 100; firstPacketNum = 99 means packets below 99 were
+  // already acked. Per spec, their timestamps must be ignored but processing
+  // must continue for the still-outstanding packets.
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 3,
+        .deltas = {500, 10, 5}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/99);
+  ASSERT_FALSE(res.hasError());
+  // pkts 100 and 99 still outstanding -> kept; pkt 98 < 99 -> dropped.
+  EXPECT_EQ(out.count(100), 1);
+  EXPECT_EQ(out.count(99), 1);
+  EXPECT_EQ(out.count(98), 0);
+}
+
+TEST(
+    Draft02AckProcessing,
+    CapturesOutstandingPacketsInLaterRangesAfterAllAckedRange) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // largestAcked = 100; firstPacketNum = 50.
+  //   range 1: deltaLargestAcked = 70 -> range top = 30, deltas [600, 5, 5]
+  //            covers packets {30, 29, 28}. All below firstPacketNum (50),
+  //            all skipped.
+  //   range 2: deltaLargestAcked = 40 -> range top = 60, deltas [100, 5, 5]
+  //            covers packets {60, 59, 58}. All >= firstPacketNum (50), all
+  //            captured. Timestamps chain from range 1's previousTimestamp.
+  // The draft-02 parser must SKIP (continue) past acked packets rather than
+  // RETURN like the legacy parser, so range 2's outstanding packets are
+  // captured.
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 70,
+        .timestamp_delta_count = 3,
+        .deltas = {600, 5, 5}},
+       {.deltaLargestAcknowledged = 40,
+        .timestamp_delta_count = 3,
+        .deltas = {100, 5, 5}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/50);
+  ASSERT_FALSE(res.hasError());
+  ASSERT_EQ(out.size(), 3);
+  // range 1 packets all dropped (below firstPacketNum).
+  EXPECT_EQ(out.count(30), 0);
+  EXPECT_EQ(out.count(29), 0);
+  EXPECT_EQ(out.count(28), 0);
+  // previousTimestamp progression across both ranges:
+  //   range 1: 600 -> 595 -> 590  (computed but skipped, packets < 50)
+  //   range 2: 590 - 100 = 490 -> 485 -> 480
+  EXPECT_EQ(out[60], 490);
+  EXPECT_EQ(out[59], 485);
+  EXPECT_EQ(out[58], 480);
+}
+
+TEST(Draft02AckProcessing, RejectsTimestampUnderflow) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // Second delta (200) exceeds previousTimestamp (100): `100 - 200` would
+  // underflow uint64_t. A valid peer cannot encode a negative timestamp, so
+  // this is a protocol violation.
+  auto frame = makeDraft02AckFrame(
+      100,
+      {{.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 2,
+        .deltas = {100, 200}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
 } // namespace quic::test

@@ -386,8 +386,11 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   // Store any (new) Rx timestamps reported by the peer.
   UnorderedMap<PacketNum, uint64_t> packetReceiveTimeStamps;
   if (pnSpace == PacketNumberSpace::AppData) {
-    parseAckReceiveTimestamps(
+    auto tsResult = parseAckReceiveTimestamps(
         conn, frame, packetReceiveTimeStamps, firstPacketNum);
+    if (tsResult.hasError()) {
+      return quic::make_unexpected(tsResult.error());
+    }
   }
 
   // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
@@ -659,19 +662,20 @@ void clearOldOutstandingPackets(
   }
 }
 
-void parseAckReceiveTimestamps(
+namespace {
+
+PacketNum decrementPacketNum(PacketNum pktNum) {
+  return pktNum > 0 ? pktNum - 1 : 0;
+}
+
+// Legacy mvfst receive-timestamp parser. Uses `recvdPacketsTimestampRanges`
+// with `gap` semantics derived from `maybeLatestRecvdPacketNum`. Over-limit
+// is soft-logged and the parser returns early without raising an error.
+void parseAckReceiveTimestampsLegacy(
     const QuicConnectionStateBase& conn,
     const quic::ReadAckFrame& frame,
     UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
     Optional<PacketNum> firstPacketNum) {
-  // Ignore if we didn't request packet receive timestamps from the peer.
-  if (!conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
-           .has_value()) {
-    return;
-  }
-
-  // Confirm there is at least one timestamp range and one timestamp delta
-  // within that range.
   if (frame.recvdPacketsTimestampRanges.empty() ||
       frame.recvdPacketsTimestampRanges[0].deltas.empty()) {
     return;
@@ -691,7 +695,6 @@ void parseAckReceiveTimestamps(
 
   auto receivedPacketNum = frame.maybeLatestRecvdPacketNum.value();
 
-  // Don't parse for packets already ACKed.
   if (!firstPacketNum.has_value() ||
       receivedPacketNum < firstPacketNum.value()) {
     return;
@@ -701,38 +704,20 @@ void parseAckReceiveTimestamps(
       conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.value()
           .maxReceiveTimestampsPerAck;
 
-  auto decrementPacketNum = [](PacketNum pktNum) {
-    return pktNum > 0 ? --pktNum : 0;
-  };
-
-  /*
-   * From RFC, the first delta timestamp is relative to connection start time on
-   * the peer while the rest of the timestamps are relative to the previous
-   * delta timestamp. Since peer's connection start time isn't known, receive
-   * timestamps will be stored as deltas to previous packet's receive timestamp.
-   * We do not want to use our connection start time as a proxy for the peer's,
-   * as the two clocks might not be in sync and propagation delay isn't
-   * accounted for.
-   */
-
-  // First delta timestamp is relative to connection start time, so multiply by
-  // 2 to keep loop semantics consistent for this first timestamp as well. T0 =
-  // 2D0 - D0 = D0 for the first timestamp.
-  // Tn = Tn-1 - Dn for other timestamps.
+  // Peer's connection start time is unknown, so timestamps are stored as
+  // deltas relative to the previous packet's receive time. The first delta
+  // is relative to the peer's connection start; collapse it to itself via
+  // `T0 = 2*D0 - D0 = D0` so the per-delta loop body is uniform.
+  // `Tn = Tn-1 - Dn` for subsequent timestamps.
   auto receiveTimeStamp = 2 * frame.recvdPacketsTimestampRanges[0].deltas[0];
-  // Walk through each timestamp range (separated by gaps) and calculate the
-  // Rx timestamp.
   for (auto& timeStampRange : frame.recvdPacketsTimestampRanges) {
     receivedPacketNum -= timeStampRange.gap;
 
     for (const auto& delta : timeStampRange.deltas) {
-      // // Don't parse for packets already ACKed.
       if (!firstPacketNum.has_value() ||
           receivedPacketNum < firstPacketNum.value()) {
         return;
       }
-      // We don't need to process more than the requested Receive timestamps
-      // sent by peer.
       if (packetReceiveTimeStamps.size() >=
           maxReceiveTimestampsRequestedFromPeer) {
         PROTO_OOPS_LOG_BUILDER_IF(
@@ -754,10 +739,120 @@ void parseAckReceiveTimestamps(
       packetReceiveTimeStamps[receivedPacketNum] = receiveTimeStamp;
       receivedPacketNum = decrementPacketNum(receivedPacketNum);
     }
-    // Additional decrement to maintain a gap of "2" for subsequent timestamp
-    // ranges per RFC.
+    // Extra packet-number decrement between ranges: legacy `gap` semantics
+    // assume descending packet number with an implicit -1 across the range
+    // boundary.
     receivedPacketNum = decrementPacketNum(receivedPacketNum);
   }
+}
+
+// draft-ietf-quic-receive-ts-02 receive-timestamp parser. Per spec:
+// (1) per-range starting packet is `largestAcked - deltaLargestAcknowledged`;
+// (2) `previousTimestamp` chains across range boundaries (no per-range
+// reset); (3) no extra packet-number decrement between ranges. Over-limit
+// returns FRAME_ENCODING_ERROR.
+quic::Expected<void, QuicError> parseAckReceiveTimestampsDraft02(
+    const QuicConnectionStateBase& conn,
+    const quic::ReadAckFrame& frame,
+    UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
+    Optional<PacketNum> firstPacketNum) {
+  if (frame.draft02RecvdPacketsTimestampRanges.empty()) {
+    return {};
+  }
+  const auto& maxRequested =
+      conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer.value()
+          .maxReceiveTimestampsPerAck;
+
+  uint64_t previousTimestamp = 0;
+  bool firstDeltaOverall = true;
+  uint64_t totalCount = 0;
+  for (const auto& range : frame.draft02RecvdPacketsTimestampRanges) {
+    if (frame.largestAcked < range.deltaLargestAcknowledged) {
+      return quic::make_unexpected(QuicError(
+          TransportErrorCode::FRAME_ENCODING_ERROR,
+          fmt::format(
+              "draft-02 deltaLargestAcknowledged {} exceeds largestAcked {}",
+              range.deltaLargestAcknowledged,
+              frame.largestAcked)));
+    }
+    PacketNum currentPacketNum =
+        frame.largestAcked - range.deltaLargestAcknowledged;
+    for (const auto& delta : range.deltas) {
+      totalCount++;
+      if (totalCount > maxRequested) {
+        return quic::make_unexpected(QuicError(
+            TransportErrorCode::FRAME_ENCODING_ERROR,
+            fmt::format(
+                "draft-02 timestamp count {} exceeds advertised max {}",
+                totalCount,
+                maxRequested)));
+      }
+      uint64_t timestamp;
+      if (firstDeltaOverall) {
+        timestamp = delta;
+        firstDeltaOverall = false;
+      } else {
+        // Underflow guard: `delta` must not exceed `previousTimestamp`
+        // because timestamps are unsigned. A peer violating this would wrap
+        // `uint64_t` and feed garbage to receive-timestamp consumers.
+        if (delta > previousTimestamp) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::FRAME_ENCODING_ERROR,
+              fmt::format(
+                  "draft-02 delta {} exceeds previousTimestamp {}",
+                  delta,
+                  previousTimestamp)));
+        }
+        timestamp = previousTimestamp - delta;
+      }
+      previousTimestamp = timestamp;
+
+      // Cannot stop on the first `currentPacketNum < firstPacketNum`
+      // because out-of-order packet numbers across ranges mean subsequent
+      // ranges may carry still-outstanding packets. Skip the entry but
+      // continue.
+      const bool packetStillOutstanding = firstPacketNum.has_value() &&
+          currentPacketNum >= firstPacketNum.value();
+      if (packetStillOutstanding) {
+        packetReceiveTimeStamps[currentPacketNum] = timestamp;
+      }
+      currentPacketNum = decrementPacketNum(currentPacketNum);
+    }
+  }
+  return {};
+}
+
+} // namespace
+
+quic::Expected<void, QuicError> parseAckReceiveTimestamps(
+    const QuicConnectionStateBase& conn,
+    const quic::ReadAckFrame& frame,
+    UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
+    Optional<PacketNum> firstPacketNum) {
+  if (!conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+           .has_value()) {
+    return {};
+  }
+  switch (frame.timestampsVersion) {
+    case AckReceiveTimestampsVersion::DraftIetf02:
+      return parseAckReceiveTimestampsDraft02(
+          conn, frame, packetReceiveTimeStamps, firstPacketNum);
+    case AckReceiveTimestampsVersion::LegacyMvfst:
+      parseAckReceiveTimestampsLegacy(
+          conn, frame, packetReceiveTimeStamps, firstPacketNum);
+      return {};
+    case AckReceiveTimestampsVersion::None:
+      // Fallback for callers that construct `ReadAckFrame` directly and
+      // populate the legacy ranges vector without setting the version field.
+      // Production decoders always set the version; this covers in-tree
+      // test constructors.
+      if (!frame.recvdPacketsTimestampRanges.empty()) {
+        parseAckReceiveTimestampsLegacy(
+            conn, frame, packetReceiveTimeStamps, firstPacketNum);
+      }
+      return {};
+  }
+  return {};
 }
 
 void commonAckVisitorForAckFrame(
