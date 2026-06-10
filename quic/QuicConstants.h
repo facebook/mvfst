@@ -293,7 +293,10 @@ enum class FrameType : uint64_t {
   IMMEDIATE_ACK = 0xAC,
   ACK_FREQUENCY = 0xAF,
   ACK_RECEIVE_TIMESTAMPS = 0xB0,
-  ACK_EXTENDED = 0xB1
+  ACK_EXTENDED = 0xB1,
+  // draft-ietf-quic-receive-ts-02 frame types.
+  ACK_RECEIVE_TIMESTAMPS_DRAFT_02 = 0x03178307,
+  ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN = 0x03178308,
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {
@@ -310,6 +313,16 @@ enum class ExtendedAckFeatureMask : uint8_t {
 
 using ExtendedAckFeatureMaskType =
     std::underlying_type<ExtendedAckFeatureMask>::type;
+
+// Identifies which wire format an endpoint uses for receive-timestamp ACK
+// frames in a given direction. Tracked independently from the ACK_EXTENDED
+// feature bits because draft-02 uses distinct frame types
+// (0x03178307/0x03178308) rather than ACK_EXTENDED features.
+enum class AckReceiveTimestampsVersion : uint8_t {
+  None = 0,
+  LegacyMvfst = 1,
+  DraftIetf02 = 2,
+};
 
 enum class TransportErrorCode : uint64_t {
   NO_ERROR = 0x0000,
@@ -856,6 +869,23 @@ constexpr size_t kShortHeaderPaddingModulo = 32;
 // Maximum packet receive timestamps stored.
 constexpr uint8_t kMaxReceivedPktsTimestampsStored = 10;
 constexpr uint8_t kDefaultReceiveTimestampsExponent = 3;
+
+// draft-ietf-quic-receive-ts-02 transport parameter IDs (temporary values
+// allocated for draft use). Mirrored into the `TransportParameterId` enum in
+// handshake/TransportParameters.h.
+constexpr uint64_t kDraft02MaxReceiveTimestampsPerAckTpId = 0x4ac07;
+constexpr uint64_t kDraft02ReceiveTimestampsExponentTpId = 0x4ac26;
+// draft-02 declares receive_timestamps_exponent values above 20 as invalid.
+constexpr uint64_t kDraft02MaxReceiveTimestampsExponent = 20;
+
+// Defense-in-depth upper bound on the total number of receive timestamps the
+// decoder will materialize from a single ACK frame. Caps pre-allocation so
+// an attacker-controlled `Timestamp Range Count` varint can't trigger a
+// giant `reserve()`, and gates the absent-local-config over-limit check.
+// Production deployments cap stored timestamps via
+// `kMaxReceivedPktsTimestampsStored = 10`, so 256 is well above any
+// realistic peer-advertised max while preventing OOM.
+constexpr uint64_t kMaxReceiveTimestampsHardLimit = 256;
 
 // ECN field values
 constexpr uint8_t kEcnECT1 = 0b01;

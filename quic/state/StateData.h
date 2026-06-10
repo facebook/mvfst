@@ -728,6 +728,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   bool negotiatedAckReceiveTimestampSupport{false};
   ExtendedAckFeatureMaskType negotiatedExtendedAckFeatures{0};
 
+  // Outgoing receive-timestamps wire format. Tracked separately from
+  // `negotiatedExtendedAckFeatures` because draft-02 uses distinct frame
+  // types rather than ACK_EXTENDED feature bits.
+  AckReceiveTimestampsVersion negotiatedOutgoingAckReceiveTimestampsVersion{
+      AckReceiveTimestampsVersion::None};
+
   struct SocketCmsgsState {
     Optional<folly::SocketCmsgMap> additionalCmsgs;
     // The write count which this SocketCmsgs state is intended for.

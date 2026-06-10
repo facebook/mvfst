@@ -948,6 +948,17 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     case FrameType::ACK_EXTENDED:
       return decodeFrameAndTrimBufQueue(
           queue, contiguousCursor, decodeAckExtendedFrame, header, params);
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02:
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN:
+      // Diff 4 will add the draft-ietf-quic-receive-ts-02 decoder. Until then
+      // the dispatch is intentionally absent: receiving these frame types is a
+      // protocol violation because no peer can have negotiated the wire format
+      // yet (Diff 2 wires up the transport parameters).
+      return quic::make_unexpected(QuicError(
+          TransportErrorCode::FRAME_ENCODING_ERROR,
+          fmt::format(
+              "ACK_RECEIVE_TIMESTAMPS_DRAFT_02 decode not yet implemented, type={}",
+              frameTypeInt->first)));
   }
 
   return quic::make_unexpected(QuicError(

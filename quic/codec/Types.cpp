@@ -443,6 +443,10 @@ std::string_view toString(FrameType frame) {
       return "ACK_RECEIVE_TIMESTAMPS";
     case quic::FrameType::ACK_EXTENDED:
       return "ACK_EXTENDED";
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02:
+      return "ACK_RECEIVE_TIMESTAMPS_DRAFT_02";
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN:
+      return "ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN";
   }
   MVLOG_WARNING << "toString has unhandled frame type";
   return "UNKNOWN";

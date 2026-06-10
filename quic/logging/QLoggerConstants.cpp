@@ -87,6 +87,13 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "ack_receive_timestamps";
     case FrameType::ACK_EXTENDED:
       return "ack_extended";
+    // Distinct qlog strings so legacy and draft-02 receive-timestamp ACKs
+    // not conflated in traces. Diff 9 will revisit the qlog field structure for
+    // draft-02 (delta_largest_acknowledged vs legacy gap).
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02:
+      return "ack_receive_timestamps_draft_02";
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN:
+      return "ack_receive_timestamps_draft_02_ecn";
   }
   folly::assume_unreachable();
 }

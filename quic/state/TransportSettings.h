@@ -152,6 +152,21 @@ struct AckReceiveTimestampsConfig {
   uint64_t receiveTimestampsExponent{kDefaultReceiveTimestampsExponent};
 };
 
+// Versioned representation of the peer's receive-timestamp configuration.
+// Replaces the unversioned Optional<AckReceiveTimestampsConfig>
+// maybePeerAckReceiveTimestampsConfig once Diff 2 finishes wiring negotiation.
+// In Diff 1 the struct is defined but not yet populated; both the old and new
+// fields coexist briefly so this diff is a pure addition.
+struct PeerReceiveTimestampsConfig {
+  AckReceiveTimestampsVersion version{AckReceiveTimestampsVersion::None};
+  // Maximum number of receive timestamps the peer wants us to include in each
+  // ACK frame we send back to it.
+  uint64_t maxReceiveTimestampsPerAck{0};
+  // Exponent advertised by the peer. Encoded timestamp deltas we send to the
+  // peer must be scaled by 2^exponent.
+  uint64_t exponent{0};
+};
+
 // JSON-serialized transport knobs
 struct SerializedKnob {
   uint64_t space;
@@ -399,6 +414,23 @@ struct TransportSettings {
   // are enabled or not and should not a part of
   //  maybeAckReceiveTimestampsConfigSentToPeer optional.
   uint64_t maxReceiveTimestampsPerAckStored{kMaxReceivedPktsTimestampsStored};
+
+  // When true, advertise the draft-ietf-quic-receive-ts-02 transport
+  // parameters (TP 0x4ac07, 0x4ac26) whenever
+  // `maybeAckReceiveTimestampsConfigSentToPeer` is set, and accept incoming
+  // draft-02 ACK_RECEIVE_TIMESTAMPS frames.
+  bool enableIetfAckReceiveTimestamps{false};
+  // When true, advertise the legacy mvfst receive-timestamps transport
+  // parameters (ack_receive_timestamps_enabled = 0xff0a001 and friends).
+  bool advertiseLegacyAckReceiveTimestamps{true};
+  // Per-direction send opt-out for draft-02 ACK_RECEIVE_TIMESTAMPS. When
+  // false, this endpoint will NOT send draft-02 frames even if the peer
+  // advertised the receive-timestamps TPs (draft-ietf-quic-receive-ts-02
+  // negotiation is one-way; the peer advertising governs the peer->us
+  // direction independently). Lets an operator say "we want timestamps from
+  // the peer but won't send any" without flipping the global enableIetf
+  // kill-switch.
+  bool sendDraft02AckReceiveTimestamps{true};
   // Close the connection completely if a migration occurs during the handshake.
   bool closeIfMigrationDuringHandshake{true};
   // Whether to use writable bytes to apply app backpressure via the callbacks
