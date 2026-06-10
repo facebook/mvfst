@@ -491,20 +491,24 @@ quic::Expected<void, QuicError> processClientInitialParams(
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 
-  // Reset the peer-receive-timestamps field before deciding what to populate.
-  // Defensive — matches the symmetric client-side reset in
-  // `processServerInitialParams`. Server-side handshake processes client TPs
-  // once today, but the reset costs nothing and removes the stale-state
-  // landmine if a reprocess path is ever introduced.
+  // Reset before populate so stale state can't leak into a reprocess path.
   conn.maybePeerReceiveTimestampsConfig = std::nullopt;
 
-  // Populate the versioned peer-config field. Draft-02 wins when both formats
-  // are advertised; "exponent without max" in draft-02 is ignored per spec.
-  // The peer-advertised max is capped by our locally-configured stored max
-  // for memory safety.
+  // Draft-02 wins when peer advertises a positive draft-02 max AND local can
+  // speak it; otherwise fall back to legacy. Selection keys on max>0 (not
+  // mere presence): a draft-02 max of 0 means the peer is not requesting
+  // draft-02 timestamps, so a peer advertising draft-02 max=0 alongside a
+  // legacy max>0 must negotiate LegacyMvfst rather than DraftIetf02{max=0}
+  // (which the outbound gate would downgrade to None, silently dropping the
+  // legacy timestamps the peer asked for). This matches the wire-TP parser
+  // (`getSupportedExtTransportParams`) and the outbound gate, both of which
+  // gate on max>0. "Exponent without max" in draft-02 is ignored per spec.
+  // Peer max is capped by local stored max for memory safety.
   const uint64_t storedCap =
       conn.transportSettings.maxReceiveTimestampsPerAckStored;
-  if (draft02MaxReceiveTimestampsPerAck.has_value()) {
+  if (draft02MaxReceiveTimestampsPerAck.has_value() &&
+      *draft02MaxReceiveTimestampsPerAck > 0 &&
+      conn.transportSettings.enableIetfAckReceiveTimestamps) {
     conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
         .version = AckReceiveTimestampsVersion::DraftIetf02,
         .maxReceiveTimestampsPerAck =

@@ -113,7 +113,6 @@ quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
     }
 
     if (conn_.negotiatedExtendedAckFeatures > 0) {
-      // The peer supports extended ACKs and we have them enabled.
       return writeAckFrame(
           meta,
           builder,

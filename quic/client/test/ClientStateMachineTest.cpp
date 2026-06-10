@@ -526,6 +526,38 @@ TEST_F(ClientStateMachineTest, ProcessServerParamsBothFormatsDraftPreferred) {
   EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 2);
 }
 
+// When the peer advertises draft-02 with max=0 (it does not actually want
+// draft-02 timestamps) AND legacy with max>0, selection must NOT classify the
+// connection as DraftIetf02{max=0} — that would make the outbound gate (which
+// requires max>0) negotiate None and silently drop the legacy timestamps the
+// peer requested. The draft-02 branch must require max>0; with max=0 it falls
+// through to the legacy branch and negotiates LegacyMvfst.
+TEST_F(
+    ClientStateMachineTest,
+    ProcessServerParamsDraft02MaxZeroFallsBackToLegacy) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.enableIetfAckReceiveTimestamps = true;
+  auto serverParams = buildServerTpsWithTimestampParams(
+      /*legacyEnabled=*/1,
+      /*legacyMax=*/9,
+      /*legacyExponent=*/3,
+      /*draftMax=*/0,
+      /*draftExponent=*/2);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  ASSERT_TRUE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
+      9);
+  EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 3);
+}
+
 TEST_F(ClientStateMachineTest, ProcessServerParamsNoTimestampTps) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -667,6 +699,70 @@ TEST_F(
   EXPECT_EQ(
       client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck, 6);
   EXPECT_EQ(client_->maybePeerReceiveTimestampsConfig->exponent, 4);
+}
+
+// When the peer advertises both legacy and draft-02 TPs but the local
+// endpoint has `enableIetfAckReceiveTimestamps=false`, the parser must
+// populate `maybePeerReceiveTimestampsConfig` with the legacy version. Local
+// cannot speak draft-02, so picking it would strand the negotiated outgoing
+// version at None even though legacy is mutually supported.
+TEST_F(
+    ClientStateMachineTest,
+    ProcessServerParamsBothFormatsDraftDisabledFallsBackToLegacy) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.enableIetfAckReceiveTimestamps = false;
+  auto serverParams = buildServerTpsWithTimestampParams(
+      /*legacyEnabled=*/1,
+      /*legacyMax=*/7,
+      /*legacyExponent=*/3,
+      /*draftMax=*/9,
+      /*draftExponent=*/0);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  ASSERT_TRUE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
+      7);
+  EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 3);
+}
+
+// 0-RTT cached-TP restore: a cache with
+// `cachedReceiveTimestampsVersion=DraftIetf02` falls back to LegacyMvfst
+// (using the legacy cache fields) when the restoring client does not enable
+// draft-02.
+TEST_F(
+    ClientStateMachineTest,
+    UpdateTransportParamsFromCachedEarlyParamsDraft02DisabledFallsBack) {
+  client_->transportSettings.canIgnorePathMTU = true;
+  client_->transportSettings.enableIetfAckReceiveTimestamps = false;
+  CachedServerTransportParameters params{};
+  params.idleTimeout = std::chrono::milliseconds(kDefaultIdleTimeout).count();
+  params.cachedReceiveTimestampsVersion =
+      AckReceiveTimestampsVersion::DraftIetf02;
+  params.draft02MaxReceiveTimestampsPerAck = 6;
+  params.draft02ReceiveTimestampsExponent = 4;
+  // Legacy cache fields populated as well: a cache from a dual-advertising
+  // server carries both.
+  params.ackReceiveTimestampsEnabled = true;
+  params.maxReceiveTimestampsPerAck = 5;
+  params.receiveTimestampsExponent = 2;
+
+  ASSERT_FALSE(
+      updateTransportParamsFromCachedEarlyParams(*client_, params).hasError());
+
+  ASSERT_TRUE(client_->maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      client_->maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(
+      client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck, 5);
+  EXPECT_EQ(client_->maybePeerReceiveTimestampsConfig->exponent, 2);
 }
 
 } // namespace quic::test

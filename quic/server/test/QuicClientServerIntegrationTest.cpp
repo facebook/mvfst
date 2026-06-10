@@ -424,17 +424,16 @@ TEST_F(
       clientConn->maybePeerReceiveTimestampsConfig->version,
       AckReceiveTimestampsVersion::LegacyMvfst);
 
-  // Server side: client advertised both formats, parser records the peer
-  // version as DraftIetf02 ("draft-02 wins" in the TP decode), but server's
-  // `enableIetf=false` means it can't speak draft-02 — so outgoing stays
-  // None. The peer-version-vs-local-capability mismatch is tracked by Task
-  // #28; closing it would let the server fall back to LegacyMvfst here.
+  // Server side: client advertised both formats, but server's
+  // `enableIetf=false` falls the parser back to LegacyMvfst. Mutual
+  // LegacyMvfst negotiation succeeds.
   auto serverConn = snapshotServerConnState();
   ASSERT_TRUE(serverConn.hasConn);
-  EXPECT_EQ(serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::None);
+  EXPECT_EQ(
+      serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::LegacyMvfst);
   ASSERT_TRUE(serverConn.hasPeerConfig);
   EXPECT_EQ(
-      serverConn.peerConfigVersion, AckReceiveTimestampsVersion::DraftIetf02);
+      serverConn.peerConfigVersion, AckReceiveTimestampsVersion::LegacyMvfst);
 }
 
 // Scenario C: client advertises only draft-02 (legacy off); server
@@ -474,18 +473,13 @@ TEST_F(
       kTestTimestampsMax);
 }
 
-// Scenario D: legacy-only client + dual-advertise server. The TP parser
-// always picks DraftIetf02 as the peer version when both formats are
-// advertised, regardless of whether the LOCAL endpoint can speak draft-02.
-// With local `enableIetfAckReceiveTimestamps=false`, the draft-02 outgoing
-// branch is gated off and the legacy branch is skipped (peerVersion isn't
-// LegacyMvfst), so the client ends up with no negotiated outgoing version.
-// Asymmetric: server-side sees client's legacy-only advertise and emits
-// legacy frames to client; client emits nothing. Task #28 tracks the parser
-// fix — closing that gap would let scenario D produce mutual LEGACY.
+// Scenario D: legacy-only client + dual-advertise server. The client does
+// not enable draft-02, so the parser falls back to LegacyMvfst. The server
+// only sees the client's legacy advertise. Both sides negotiate mutual
+// LegacyMvfst.
 TEST_F(
     ServerTransportParameters,
-    AckRxTsLegacyClientDualAdvertiseServerNoOutgoingVersion) {
+    AckRxTsLegacyClientDualAdvertiseServerNegotiatesLegacy) {
   serverTs_.enableIetfAckReceiveTimestamps = true;
   serverTs_.advertiseLegacyAckReceiveTimestamps = true;
   serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
@@ -503,11 +497,11 @@ TEST_F(
       dynamic_cast<const QuicClientConnectionState*>(client_->getState());
   EXPECT_EQ(
       clientConn->negotiatedOutgoingAckReceiveTimestampsVersion,
-      AckReceiveTimestampsVersion::None);
+      AckReceiveTimestampsVersion::LegacyMvfst);
   ASSERT_TRUE(clientConn->maybePeerReceiveTimestampsConfig.has_value());
   EXPECT_EQ(
       clientConn->maybePeerReceiveTimestampsConfig->version,
-      AckReceiveTimestampsVersion::DraftIetf02);
+      AckReceiveTimestampsVersion::LegacyMvfst);
 
   auto serverConn = snapshotServerConnState();
   ASSERT_TRUE(serverConn.hasConn);
