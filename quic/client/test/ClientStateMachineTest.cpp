@@ -5,9 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <fizz/record/Types.h>
+#include <fizz/util/Status.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
+#include <quic/client/handshake/CachedServerTransportParametersSerialization.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/client/test/Mocks.h>
@@ -83,8 +86,10 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   client_->transportSettings.canIgnorePathMTU = true;
   client_->peerAdvertisedKnobFrameSupport = false;
   client_->peerAdvertisedExtendedAckFeatures = 0;
-  client_->maybePeerAckReceiveTimestampsConfig = {
-      .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0};
+  client_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = 10,
+      .exponent = 0};
 
   ASSERT_FALSE(
       updateTransportParamsFromCachedEarlyParams(*client_, kParams).hasError());
@@ -102,14 +107,15 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
       initialMaxStreamDataUni);
   EXPECT_EQ(client_->peerAdvertisedKnobFrameSupport, knobFrameSupport);
   EXPECT_EQ(client_->peerAdvertisedExtendedAckFeatures, extendedAckSupport);
-  ASSERT_TRUE(client_->maybePeerAckReceiveTimestampsConfig.has_value());
+  ASSERT_TRUE(client_->maybePeerReceiveTimestampsConfig.has_value());
   EXPECT_EQ(
-      client_->maybePeerAckReceiveTimestampsConfig.value()
-          .maxReceiveTimestampsPerAck,
+      client_->maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(
+      client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
       maxReceiveTimestampsPerAck);
   EXPECT_EQ(
-      client_->maybePeerAckReceiveTimestampsConfig.value()
-          .receiveTimestampsExponent,
+      client_->maybePeerReceiveTimestampsConfig->exponent,
       ackReceiveTimestampsExponent);
 
   for (unsigned long i = 0; i < initialMaxStreamsBidi; i++) {
@@ -361,6 +367,306 @@ TEST_F(
           testing::Field(
               &TransportParameter::parameter,
               testing::Eq(TransportParameterId::reliable_stream_reset)))));
+}
+
+// draft-ietf-quic-receive-ts-02 transport-parameter parsing on the client.
+
+namespace {
+// Builds a `ServerTransportParameters` blob with the requested timestamp TPs
+// encoded; `std::nullopt` skips that TP.
+ServerTransportParameters buildServerTpsWithTimestampParams(
+    Optional<uint64_t> legacyEnabled,
+    Optional<uint64_t> legacyMax,
+    Optional<uint64_t> legacyExponent,
+    Optional<uint64_t> draftMax,
+    Optional<uint64_t> draftExponent) {
+  std::vector<TransportParameter> transportParams;
+  auto push = [&](TransportParameterId id, Optional<uint64_t> value) {
+    if (!value.has_value()) {
+      return;
+    }
+    auto r = encodeIntegerParameter(id, *value);
+    CHECK(!r.hasError());
+    transportParams.push_back(std::move(r.value()));
+  };
+  push(TransportParameterId::ack_receive_timestamps_enabled, legacyEnabled);
+  push(TransportParameterId::max_receive_timestamps_per_ack, legacyMax);
+  push(TransportParameterId::receive_timestamps_exponent, legacyExponent);
+  push(TransportParameterId::draft_02_max_receive_timestamps_per_ack, draftMax);
+  push(
+      TransportParameterId::draft_02_receive_timestamps_exponent,
+      draftExponent);
+  return ServerTransportParameters{std::move(transportParams)};
+}
+} // namespace
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsDraft02MaxOnly) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.enableIetfAckReceiveTimestamps = true;
+  auto serverParams = buildServerTpsWithTimestampParams(
+      /*legacyEnabled=*/std::nullopt,
+      /*legacyMax=*/std::nullopt,
+      /*legacyExponent=*/std::nullopt,
+      /*draftMax=*/4,
+      /*draftExponent=*/std::nullopt);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  ASSERT_TRUE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
+      4);
+  EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 0);
+}
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsDraft02MaxAndExponent) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.enableIetfAckReceiveTimestamps = true;
+  auto serverParams = buildServerTpsWithTimestampParams(
+      std::nullopt,
+      std::nullopt,
+      std::nullopt,
+      /*draftMax=*/8,
+      /*draftExponent=*/5);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  ASSERT_TRUE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
+      8);
+  EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 5);
+}
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsDraft02ExponentTooLarge) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto serverParams = buildServerTpsWithTimestampParams(
+      std::nullopt,
+      std::nullopt,
+      std::nullopt,
+      /*draftMax=*/4,
+      /*draftExponent=*/21);
+
+  auto result = processServerInitialParams(clientConn, serverParams, 0);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+}
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsDraft02ExponentWithoutMax) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto serverParams = buildServerTpsWithTimestampParams(
+      std::nullopt,
+      std::nullopt,
+      std::nullopt,
+      /*draftMax=*/std::nullopt,
+      /*draftExponent=*/3);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  EXPECT_FALSE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+}
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsLegacyOnly) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto serverParams = buildServerTpsWithTimestampParams(
+      /*legacyEnabled=*/1,
+      /*legacyMax=*/9,
+      /*legacyExponent=*/3,
+      std::nullopt,
+      std::nullopt);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  ASSERT_TRUE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
+      9);
+  EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 3);
+}
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsBothFormatsDraftPreferred) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.transportSettings.enableIetfAckReceiveTimestamps = true;
+  auto serverParams = buildServerTpsWithTimestampParams(
+      /*legacyEnabled=*/1,
+      /*legacyMax=*/9,
+      /*legacyExponent=*/3,
+      /*draftMax=*/4,
+      /*draftExponent=*/2);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  ASSERT_TRUE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(
+      clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
+      4);
+  EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 2);
+}
+
+TEST_F(ClientStateMachineTest, ProcessServerParamsNoTimestampTps) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto serverParams = buildServerTpsWithTimestampParams(
+      std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  EXPECT_FALSE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+}
+
+// A legacy cache without the draft-02 trailer must throw inside
+// `readCachedServerTransportParameters`. The production caller
+// (`PersistentQuicPskCache::getPsk`) feeds a cursor whose tail contains app
+// params written via `fizz::detail::writeBuf<uint16_t>`; making the trailer
+// optional via `canAdvance` would silently consume the app-params length
+// bytes as the trailer and corrupt both. The outer `try/catch` discards the
+// cache, and the next connection does a full handshake.
+TEST_F(ClientStateMachineTest, DeserializeLegacyCachedTransportParamsThrows) {
+  // Build a legacy buffer using the same fizz primitives as the production
+  // writer. `to<std::string>()` collects chained IOBufs into a contiguous
+  // byte range, mirroring `PersistentQuicPskCache::putPsk`.
+  auto legacyOut = folly::IOBuf::create(0);
+  {
+    folly::io::Appender appender(legacyOut.get(), 512);
+    fizz::Error err;
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, uint64_t{12345}, appender), err);
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, uint64_t{1450}, appender), err);
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, uint64_t{65536}, appender), err);
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, uint64_t{32768}, appender), err);
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, uint64_t{32768}, appender), err);
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, uint64_t{32768}, appender), err);
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, uint64_t{100}, appender), err);
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, uint64_t{100}, appender), err);
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, uint8_t{1}, appender), err);
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, uint8_t{1}, appender), err);
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, uint64_t{7}, appender), err);
+    FIZZ_THROW_ON_ERROR(fizz::detail::write(err, uint64_t{3}, appender), err);
+    FIZZ_THROW_ON_ERROR(
+        fizz::detail::write(err, ExtendedAckFeatureMaskType{2}, appender), err);
+    // Intentionally no draft-02 trailer.
+  }
+  std::string legacyBytes = legacyOut->to<std::string>();
+
+  auto buf = folly::IOBuf::wrapBuffer(legacyBytes.data(), legacyBytes.length());
+  folly::io::Cursor cursor(buf.get());
+  CachedServerTransportParameters params;
+  EXPECT_ANY_THROW(readCachedServerTransportParameters(cursor, params));
+}
+
+// A buffer written with the draft-02 trailer round-trips with all trailer
+// fields preserved.
+TEST_F(
+    ClientStateMachineTest,
+    RoundTripCachedTransportParamsWithDraft02Trailer) {
+  CachedServerTransportParameters in;
+  in.idleTimeout = 12345;
+  in.maxRecvPacketSize = 1450;
+  in.ackReceiveTimestampsEnabled = true;
+  in.maxReceiveTimestampsPerAck = 7;
+  in.receiveTimestampsExponent = 3;
+  in.extendedAckFeatures = 2;
+  in.cachedReceiveTimestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
+  in.draft02MaxReceiveTimestampsPerAck = 11;
+  in.draft02ReceiveTimestampsExponent = 5;
+
+  auto out = folly::IOBuf::create(0);
+  {
+    folly::io::Appender appender(out.get(), 512);
+    writeCachedServerTransportParameters(in, appender);
+  }
+  std::string bytes = out->to<std::string>();
+
+  auto buf = folly::IOBuf::wrapBuffer(bytes.data(), bytes.length());
+  folly::io::Cursor cursor(buf.get());
+  CachedServerTransportParameters roundTripped;
+  ASSERT_NO_THROW(readCachedServerTransportParameters(cursor, roundTripped));
+
+  EXPECT_EQ(roundTripped.idleTimeout, 12345);
+  EXPECT_EQ(roundTripped.maxReceiveTimestampsPerAck, 7);
+  EXPECT_EQ(
+      roundTripped.cachedReceiveTimestampsVersion,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(roundTripped.draft02MaxReceiveTimestampsPerAck, 11);
+  EXPECT_EQ(roundTripped.draft02ReceiveTimestampsExponent, 5);
+}
+
+// On 0-RTT reject, `processServerInitialParams` runs against the real server
+// TPs after `updateTransportParamsFromCachedEarlyParams` has populated the
+// peer receive-timestamps fields from cache. When the real server advertises
+// no timestamp support, the populate block must clear the cached value so
+// `updateNegotiatedAckFeatures` does not enable a wire format the server
+// never agreed to.
+TEST_F(
+    ClientStateMachineTest,
+    ProcessServerParamsClearsStalePeerReceiveTimestampsConfig) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  clientConn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::DraftIetf02,
+      .maxReceiveTimestampsPerAck = 5,
+      .exponent = 2,
+  };
+  ServerTransportParameters serverParams = buildServerTpsWithTimestampParams(
+      std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
+
+  ASSERT_FALSE(
+      processServerInitialParams(clientConn, serverParams, 0).hasError());
+
+  EXPECT_FALSE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
+}
+
+TEST_F(
+    ClientStateMachineTest,
+    UpdateTransportParamsFromCachedEarlyParamsDraft02) {
+  client_->transportSettings.canIgnorePathMTU = true;
+  client_->transportSettings.enableIetfAckReceiveTimestamps = true;
+  CachedServerTransportParameters params{};
+  params.idleTimeout = std::chrono::milliseconds(kDefaultIdleTimeout).count();
+  params.cachedReceiveTimestampsVersion =
+      AckReceiveTimestampsVersion::DraftIetf02;
+  params.draft02MaxReceiveTimestampsPerAck = 6;
+  params.draft02ReceiveTimestampsExponent = 4;
+
+  ASSERT_FALSE(
+      updateTransportParamsFromCachedEarlyParams(*client_, params).hasError());
+
+  ASSERT_TRUE(client_->maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      client_->maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(
+      client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck, 6);
+  EXPECT_EQ(client_->maybePeerReceiveTimestampsConfig->exponent, 4);
 }
 
 } // namespace quic::test

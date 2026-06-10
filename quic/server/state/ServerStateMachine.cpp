@@ -286,6 +286,32 @@ quic::Expected<void, QuicError> processClientInitialParams(
   }
   auto receiveTimestampsExponent = receiveTimestampsExponentResult.value();
 
+  auto draft02MaxResult = getIntegerParameter(
+      TransportParameterId::draft_02_max_receive_timestamps_per_ack,
+      clientParams.parameters);
+  if (draft02MaxResult.hasError()) {
+    return quic::make_unexpected(draft02MaxResult.error());
+  }
+  auto draft02MaxReceiveTimestampsPerAck = draft02MaxResult.value();
+
+  auto draft02ExpResult = getIntegerParameter(
+      TransportParameterId::draft_02_receive_timestamps_exponent,
+      clientParams.parameters);
+  if (draft02ExpResult.hasError()) {
+    return quic::make_unexpected(draft02ExpResult.error());
+  }
+  auto draft02ReceiveTimestampsExponent = draft02ExpResult.value();
+  if (draft02ReceiveTimestampsExponent.has_value() &&
+      *draft02ReceiveTimestampsExponent >
+          kDraft02MaxReceiveTimestampsExponent) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        fmt::format(
+            "draft-02 receive_timestamps_exponent above max: {} > {}",
+            *draft02ReceiveTimestampsExponent,
+            kDraft02MaxReceiveTimestampsExponent)));
+  }
+
   if (conn.version == QuicVersion::QUIC_V1 ||
       conn.version == QuicVersion::QUIC_V1_ALIAS ||
       conn.version == QuicVersion::QUIC_V1_ALIAS2 ||
@@ -465,6 +491,14 @@ quic::Expected<void, QuicError> processClientInitialParams(
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 
+  // Reset both peer-receive-timestamps fields before deciding what to
+  // populate. Defensive — matches the symmetric client-side reset in
+  // `processServerInitialParams`. Server-side handshake processes client TPs
+  // once today, but the reset costs nothing and removes the stale-state
+  // landmine if a reprocess path is ever introduced.
+  conn.maybePeerAckReceiveTimestampsConfig = std::nullopt;
+  conn.maybePeerReceiveTimestampsConfig = std::nullopt;
+
   if (isAckReceiveTimestampsEnabled.has_value() &&
       isAckReceiveTimestampsEnabled.value() == 1) {
     if (maxReceiveTimestampsPerAck.has_value() &&
@@ -478,6 +512,26 @@ quic::Expected<void, QuicError> processClientInitialParams(
               static_cast<uint8_t>(receiveTimestampsExponent.value()),
               static_cast<uint8_t>(0))};
     }
+  }
+
+  // Populate the versioned peer-config field. Draft-02 wins when both formats
+  // are advertised; "exponent without max" in draft-02 is ignored per spec.
+  if (draft02MaxReceiveTimestampsPerAck.has_value()) {
+    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+        .version = AckReceiveTimestampsVersion::DraftIetf02,
+        .maxReceiveTimestampsPerAck = *draft02MaxReceiveTimestampsPerAck,
+        .exponent = draft02ReceiveTimestampsExponent.value_or(0),
+    };
+  } else if (
+      isAckReceiveTimestampsEnabled.has_value() &&
+      isAckReceiveTimestampsEnabled.value() == 1 &&
+      maxReceiveTimestampsPerAck.has_value() &&
+      receiveTimestampsExponent.has_value()) {
+    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+        .version = AckReceiveTimestampsVersion::LegacyMvfst,
+        .maxReceiveTimestampsPerAck = *maxReceiveTimestampsPerAck,
+        .exponent = *receiveTimestampsExponent,
+    };
   }
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;

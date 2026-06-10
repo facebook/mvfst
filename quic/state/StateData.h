@@ -715,6 +715,14 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   Optional<AckReceiveTimestampsConfig> maybePeerAckReceiveTimestampsConfig;
 
+  // Versioned replacement for `maybePeerAckReceiveTimestampsConfig`. Populated
+  // during transport-parameter negotiation alongside the legacy field;
+  // consumers are migrated in Diff 7 (ACK processing) and Diff 8 (scheduler),
+  // at which point `maybePeerAckReceiveTimestampsConfig` is removed. The
+  // transient parallelism is intentional — see plan section "Backward
+  // Compatibility Strategy".
+  Optional<PeerReceiveTimestampsConfig> maybePeerReceiveTimestampsConfig;
+
   bool peerAdvertisedReliableStreamResetSupport{false};
 
   bool peerAdvertisedKnobFrameSupport{false};

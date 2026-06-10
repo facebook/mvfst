@@ -307,6 +307,164 @@ TEST_F(TransportParametersTest, SconeSupportedParameter) {
   EXPECT_FALSE(getSconeSupportedParameter(paramListWithoutScone));
 }
 
+// draft-ietf-quic-receive-ts-02 transport-parameter encoding. The two
+// TransportSettings knobs `enableIetfAckReceiveTimestamps` and
+// `advertiseLegacyAckReceiveTimestamps` gate the emitted TPs.
+
+TEST_F(TransportParametersTest, EncodeDraft02TpsWhenIetfEnabledAndConfigSet) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto& ts = clientConn.transportSettings;
+  ts.enableIetfAckReceiveTimestamps = true;
+  ts.maybeAckReceiveTimestampsConfigSentToPeer = AckReceiveTimestampsConfig{
+      .maxReceiveTimestampsPerAck = 7, .receiveTimestampsExponent = 3};
+
+  auto params = getSupportedExtTransportParams(clientConn);
+
+  auto maxParam = getIntegerParameter(
+      TransportParameterId::draft_02_max_receive_timestamps_per_ack, params);
+  ASSERT_FALSE(maxParam.hasError());
+  ASSERT_TRUE(maxParam.value().has_value());
+  EXPECT_EQ(*maxParam.value(), 7);
+
+  auto expParam = getIntegerParameter(
+      TransportParameterId::draft_02_receive_timestamps_exponent, params);
+  ASSERT_FALSE(expParam.hasError());
+  ASSERT_TRUE(expParam.value().has_value());
+  EXPECT_EQ(*expParam.value(), 3);
+}
+
+TEST_F(TransportParametersTest, OmitDraft02TpsWhenIetfDisabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto& ts = clientConn.transportSettings;
+  ts.enableIetfAckReceiveTimestamps = false; // default
+  ts.maybeAckReceiveTimestampsConfigSentToPeer = AckReceiveTimestampsConfig{};
+
+  auto params = getSupportedExtTransportParams(clientConn);
+
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::draft_02_max_receive_timestamps_per_ack)))));
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::draft_02_receive_timestamps_exponent)))));
+}
+
+TEST_F(TransportParametersTest, OmitDraft02TpsWhenIetfEnabledButConfigNotSet) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto& ts = clientConn.transportSettings;
+  ts.enableIetfAckReceiveTimestamps = true;
+  // No maybeAckReceiveTimestampsConfigSentToPeer: caller is not requesting
+  // any receive timestamps from the peer.
+
+  auto params = getSupportedExtTransportParams(clientConn);
+
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::draft_02_max_receive_timestamps_per_ack)))));
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::draft_02_receive_timestamps_exponent)))));
+}
+
+TEST_F(TransportParametersTest, OmitLegacyTpsWhenLegacyAdvertiseDisabled) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto& ts = clientConn.transportSettings;
+  ts.advertiseLegacyAckReceiveTimestamps = false;
+  ts.enableIetfAckReceiveTimestamps = true;
+  ts.maybeAckReceiveTimestampsConfigSentToPeer = AckReceiveTimestampsConfig{
+      .maxReceiveTimestampsPerAck = 6, .receiveTimestampsExponent = 4};
+
+  auto params = getSupportedExtTransportParams(clientConn);
+
+  // No legacy receive-timestamp TPs at all.
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::ack_receive_timestamps_enabled)))));
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::max_receive_timestamps_per_ack)))));
+  EXPECT_THAT(
+      params,
+      Not(Contains(Field(
+          &TransportParameter::parameter,
+          Eq(TransportParameterId::receive_timestamps_exponent)))));
+
+  // Draft-02 TPs are present with the configured values: guards against an
+  // implementation that suppresses all receive-timestamp TPs when only the
+  // legacy knob is off.
+  auto draftMax = getIntegerParameter(
+      TransportParameterId::draft_02_max_receive_timestamps_per_ack, params);
+  ASSERT_FALSE(draftMax.hasError());
+  ASSERT_TRUE(draftMax.value().has_value());
+  EXPECT_EQ(*draftMax.value(), 6);
+  auto draftExp = getIntegerParameter(
+      TransportParameterId::draft_02_receive_timestamps_exponent, params);
+  ASSERT_FALSE(draftExp.hasError());
+  ASSERT_TRUE(draftExp.value().has_value());
+  EXPECT_EQ(*draftExp.value(), 4);
+}
+
+TEST_F(TransportParametersTest, EmitsBothFormatsWhenBothEnabledAndConfigSet) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto& ts = clientConn.transportSettings;
+  // Defaults: advertiseLegacyAckReceiveTimestamps=true.
+  ts.enableIetfAckReceiveTimestamps = true;
+  ts.maybeAckReceiveTimestampsConfigSentToPeer = AckReceiveTimestampsConfig{
+      .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 2};
+
+  auto params = getSupportedExtTransportParams(clientConn);
+
+  // All five dual-advertise TPs must be present with the configured values
+  // (legacy enabled + legacy max + legacy exponent + draft-02 max + draft-02
+  // exponent), so a partial-emission bug cannot pass.
+  auto legacyEnabled = getIntegerParameter(
+      TransportParameterId::ack_receive_timestamps_enabled, params);
+  ASSERT_FALSE(legacyEnabled.hasError());
+  ASSERT_TRUE(legacyEnabled.value().has_value());
+  EXPECT_EQ(*legacyEnabled.value(), 1);
+
+  auto legacyMax = getIntegerParameter(
+      TransportParameterId::max_receive_timestamps_per_ack, params);
+  ASSERT_FALSE(legacyMax.hasError());
+  ASSERT_TRUE(legacyMax.value().has_value());
+  EXPECT_EQ(*legacyMax.value(), 5);
+
+  auto legacyExp = getIntegerParameter(
+      TransportParameterId::receive_timestamps_exponent, params);
+  ASSERT_FALSE(legacyExp.hasError());
+  ASSERT_TRUE(legacyExp.value().has_value());
+  EXPECT_EQ(*legacyExp.value(), 2);
+
+  auto draftMax = getIntegerParameter(
+      TransportParameterId::draft_02_max_receive_timestamps_per_ack, params);
+  ASSERT_FALSE(draftMax.hasError());
+  ASSERT_TRUE(draftMax.value().has_value());
+  EXPECT_EQ(*draftMax.value(), 5);
+
+  auto draftExp = getIntegerParameter(
+      TransportParameterId::draft_02_receive_timestamps_exponent, params);
+  ASSERT_FALSE(draftExp.hasError());
+  ASSERT_TRUE(draftExp.value().has_value());
+  EXPECT_EQ(*draftExp.value(), 2);
+}
+
 // Test SCONE parameter included when enabled.
 TEST_F(TransportParametersTest, SconeTPIncluded) {
   QuicClientConnectionState clientConn(

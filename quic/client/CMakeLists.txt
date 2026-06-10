@@ -70,7 +70,6 @@ mvfst_add_library(mvfst_client_state_and_handshake
     mvfst_congestion_control_congestion_controller_factory
     mvfst_logging_qlogger_macros
     mvfst_loss
-    mvfst_state_quic_stream_utilities
     mvfst_state_stream_functions
   EXPORTED_DEPS
     mvfst_common_expected

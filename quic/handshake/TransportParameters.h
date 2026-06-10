@@ -43,6 +43,13 @@ enum class TransportParameterId : uint64_t {
   max_receive_timestamps_per_ack = 0xff0a002,
   receive_timestamps_exponent = 0xff0a003,
   extended_ack_features = 0xff0a004,
+  // draft-ietf-quic-receive-ts-02 transport parameter IDs. Underlying
+  // values live in QuicConstants.h. The draft has no `_enabled` boolean;
+  // support is implied by the presence of
+  // `draft_02_max_receive_timestamps_per_ack`.
+  draft_02_max_receive_timestamps_per_ack =
+      kDraft02MaxReceiveTimestampsPerAckTpId,
+  draft_02_receive_timestamps_exponent = kDraft02ReceiveTimestampsExponentTpId,
   knob_frames_supported = 0x00005178,
   cwnd_hint_bytes = 0x00007492,
   rtt_hint_ms = 0x00007493,

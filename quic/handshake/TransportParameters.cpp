@@ -116,28 +116,54 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     }
   }
 
-  auto ackTimestampsResult = encodeIntegerParameter(
-      TpId::ack_receive_timestamps_enabled,
-      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);
-  if (ackTimestampsResult.has_value()) {
-    customTps.push_back(ackTimestampsResult.value());
-  }
-
-  if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
-    auto maxTimestampsResult = encodeIntegerParameter(
-        TpId::max_receive_timestamps_per_ack,
-        ts.maybeAckReceiveTimestampsConfigSentToPeer
-            ->maxReceiveTimestampsPerAck);
-    if (maxTimestampsResult.has_value()) {
-      customTps.push_back(maxTimestampsResult.value());
+  // Legacy mvfst receive-timestamp transport parameters. Gated on
+  // `advertiseLegacyAckReceiveTimestamps` so the legacy wire format can be
+  // disabled independently of draft-02.
+  if (ts.advertiseLegacyAckReceiveTimestamps) {
+    auto ackTimestampsResult = encodeIntegerParameter(
+        TpId::ack_receive_timestamps_enabled,
+        ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value() ? 1 : 0);
+    if (ackTimestampsResult.has_value()) {
+      customTps.push_back(ackTimestampsResult.value());
     }
 
-    auto exponentResult = encodeIntegerParameter(
-        TpId::receive_timestamps_exponent,
+    if (ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
+      auto maxTimestampsResult = encodeIntegerParameter(
+          TpId::max_receive_timestamps_per_ack,
+          ts.maybeAckReceiveTimestampsConfigSentToPeer
+              ->maxReceiveTimestampsPerAck);
+      if (maxTimestampsResult.has_value()) {
+        customTps.push_back(maxTimestampsResult.value());
+      }
+
+      auto exponentResult = encodeIntegerParameter(
+          TpId::receive_timestamps_exponent,
+          ts.maybeAckReceiveTimestampsConfigSentToPeer
+              ->receiveTimestampsExponent);
+      if (exponentResult.has_value()) {
+        customTps.push_back(exponentResult.value());
+      }
+    }
+  }
+
+  // Emit draft-02 max + exponent together. The draft requires receivers to
+  // ignore exponent-without-max.
+  if (ts.enableIetfAckReceiveTimestamps &&
+      ts.maybeAckReceiveTimestampsConfigSentToPeer.has_value()) {
+    auto draftMaxResult = encodeIntegerParameter(
+        TpId::draft_02_max_receive_timestamps_per_ack,
+        ts.maybeAckReceiveTimestampsConfigSentToPeer
+            ->maxReceiveTimestampsPerAck);
+    if (draftMaxResult.has_value()) {
+      customTps.push_back(draftMaxResult.value());
+    }
+
+    auto draftExpResult = encodeIntegerParameter(
+        TpId::draft_02_receive_timestamps_exponent,
         ts.maybeAckReceiveTimestampsConfigSentToPeer
             ->receiveTimestampsExponent);
-    if (exponentResult.has_value()) {
-      customTps.push_back(exponentResult.value());
+    if (draftExpResult.has_value()) {
+      customTps.push_back(draftExpResult.value());
     }
   }
 

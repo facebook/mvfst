@@ -2661,6 +2661,41 @@ void updateNegotiatedAckFeatures(QuicConnectionStateBase& conn) {
         ~static_cast<ExtendedAckFeatureMaskType>(
             ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
   }
+
+  // Compute outgoing wire format. Peer-side "draft-02 wins" is already
+  // baked into `maybePeerReceiveTimestampsConfig.version`; this applies the
+  // local rollout knob gates.
+  //
+  // draft-ietf-quic-receive-ts-02 negotiation is ONE-WAY per direction: an
+  // endpoint sends ACK_RECEIVE_TIMESTAMPS frames if its PEER advertised the
+  // receive-timestamps TPs (peer wants timestamps from us). The endpoint's
+  // own advertisement governs only the reverse direction. So the draft-02
+  // outbound gate requires peer-advertisement + the local enableIetf
+  // kill-switch, NOT the local's own sent-to-peer config. Legacy mvfst is
+  // not IETF-spec-governed and keeps the two-way requirement.
+  conn.negotiatedOutgoingAckReceiveTimestampsVersion =
+      AckReceiveTimestampsVersion::None;
+  if (conn.maybePeerReceiveTimestampsConfig.has_value() &&
+      conn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck > 0) {
+    const auto peerVersion = conn.maybePeerReceiveTimestampsConfig->version;
+    if (peerVersion == AckReceiveTimestampsVersion::DraftIetf02 &&
+        conn.transportSettings.enableIetfAckReceiveTimestamps &&
+        conn.transportSettings.sendDraft02AckReceiveTimestamps) {
+      // `sendDraft02AckReceiveTimestamps` is the per-direction operator
+      // opt-out. Spec one-way semantics let an endpoint receive timestamps
+      // without sending any; this knob suppresses sending even after peer
+      // advertised.
+      conn.negotiatedOutgoingAckReceiveTimestampsVersion =
+          AckReceiveTimestampsVersion::DraftIetf02;
+    } else if (
+        peerVersion == AckReceiveTimestampsVersion::LegacyMvfst &&
+        conn.transportSettings.advertiseLegacyAckReceiveTimestamps &&
+        conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer
+            .has_value()) {
+      conn.negotiatedOutgoingAckReceiveTimestampsVersion =
+          AckReceiveTimestampsVersion::LegacyMvfst;
+    }
+  }
 }
 
 quic::Expected<WriteQuicDataResult, QuicError>

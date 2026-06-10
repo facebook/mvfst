@@ -29,6 +29,13 @@ struct CachedServerTransportParameters {
   bool knobFrameSupport{false};
   bool ackReceiveTimestampsEnabled{false};
   bool reliableStreamResetSupport{false};
+  // Disambiguates whether the cached max/exponent above came from the
+  // legacy TPs or the draft-02 TPs so 0-RTT resumption restores the right
+  // `maybePeerReceiveTimestampsConfig`.
+  AckReceiveTimestampsVersion cachedReceiveTimestampsVersion{
+      AckReceiveTimestampsVersion::None};
+  uint64_t draft02MaxReceiveTimestampsPerAck{0};
+  uint64_t draft02ReceiveTimestampsExponent{0};
 };
 
 } // namespace quic

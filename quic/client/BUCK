@@ -88,7 +88,6 @@ mvfst_cpp_library(
         "//quic/congestion_control:congestion_controller_factory",
         "//quic/logging:qlogger_macros",
         "//quic/loss:loss",
-        "//quic/state:quic_stream_utilities",
         "//quic/state:stream_functions",
     ],
     exported_deps = [

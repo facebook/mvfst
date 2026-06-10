@@ -255,6 +255,32 @@ quic::Expected<void, QuicError> processServerInitialParams(
   }
   auto receiveTimestampsExponent = receiveTimestampsExponentResult.value();
 
+  auto draft02MaxResult = getIntegerParameter(
+      TransportParameterId::draft_02_max_receive_timestamps_per_ack,
+      serverParams.parameters);
+  if (draft02MaxResult.hasError()) {
+    return quic::make_unexpected(draft02MaxResult.error());
+  }
+  auto draft02MaxReceiveTimestampsPerAck = draft02MaxResult.value();
+
+  auto draft02ExpResult = getIntegerParameter(
+      TransportParameterId::draft_02_receive_timestamps_exponent,
+      serverParams.parameters);
+  if (draft02ExpResult.hasError()) {
+    return quic::make_unexpected(draft02ExpResult.error());
+  }
+  auto draft02ReceiveTimestampsExponent = draft02ExpResult.value();
+  if (draft02ReceiveTimestampsExponent.has_value() &&
+      *draft02ReceiveTimestampsExponent >
+          kDraft02MaxReceiveTimestampsExponent) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        fmt::format(
+            "draft-02 receive_timestamps_exponent above max: {} > {}",
+            *draft02ReceiveTimestampsExponent,
+            kDraft02MaxReceiveTimestampsExponent)));
+  }
+
   auto knobFrameSupportedResult = getIntegerParameter(
       static_cast<TransportParameterId>(
           TransportParameterId::knob_frames_supported),
@@ -425,6 +451,15 @@ quic::Expected<void, QuicError> processServerInitialParams(
     conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
   }
 
+  // Reset both peer-receive-timestamps fields before deciding what to
+  // populate. On a 0-RTT reject, this function runs after
+  // `updateTransportParamsFromCachedEarlyParams` has already populated them
+  // from the cached server TPs; if the real server TPs omit timestamp support
+  // we must NOT leave the cached value behind, or `updateNegotiatedAckFeatures`
+  // would later enable a wire format the server never advertised.
+  conn.maybePeerAckReceiveTimestampsConfig = std::nullopt;
+  conn.maybePeerReceiveTimestampsConfig = std::nullopt;
+
   if (isAckReceiveTimestampsEnabled.has_value() &&
       isAckReceiveTimestampsEnabled.value() == 1) {
     if (maxReceiveTimestampsPerAck.has_value() &&
@@ -438,6 +473,26 @@ quic::Expected<void, QuicError> processServerInitialParams(
               static_cast<uint8_t>(receiveTimestampsExponent.value()),
               static_cast<uint8_t>(0))};
     }
+  }
+
+  // Populate the versioned peer-config field. Draft-02 wins when both formats
+  // are advertised; "exponent without max" in draft-02 is ignored per spec.
+  if (draft02MaxReceiveTimestampsPerAck.has_value()) {
+    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+        .version = AckReceiveTimestampsVersion::DraftIetf02,
+        .maxReceiveTimestampsPerAck = *draft02MaxReceiveTimestampsPerAck,
+        .exponent = draft02ReceiveTimestampsExponent.value_or(0),
+    };
+  } else if (
+      isAckReceiveTimestampsEnabled.has_value() &&
+      isAckReceiveTimestampsEnabled.value() == 1 &&
+      maxReceiveTimestampsPerAck.has_value() &&
+      receiveTimestampsExponent.has_value()) {
+    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+        .version = AckReceiveTimestampsVersion::LegacyMvfst,
+        .maxReceiveTimestampsPerAck = *maxReceiveTimestampsPerAck,
+        .exponent = *receiveTimestampsExponent,
+    };
   }
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
@@ -522,6 +577,22 @@ CachedServerTransportParameters getServerCachedTransportParameters(
   }
   transportParams.extendedAckFeatures = conn.peerAdvertisedExtendedAckFeatures;
 
+  // Cache the versioned peer-receive-timestamps state so 0-RTT can restore the
+  // right wire format. We only populate the draft-02 cache fields when the
+  // negotiated version was draft-02; otherwise the legacy fields above carry
+  // the state.
+  if (conn.maybePeerReceiveTimestampsConfig.has_value()) {
+    transportParams.cachedReceiveTimestampsVersion =
+        conn.maybePeerReceiveTimestampsConfig->version;
+    if (conn.maybePeerReceiveTimestampsConfig->version ==
+        AckReceiveTimestampsVersion::DraftIetf02) {
+      transportParams.draft02MaxReceiveTimestampsPerAck =
+          conn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck;
+      transportParams.draft02ReceiveTimestampsExponent =
+          conn.maybePeerReceiveTimestampsConfig->exponent;
+    }
+  }
+
   return transportParams;
 }
 
@@ -563,6 +634,42 @@ quic::Expected<void, QuicError> updateTransportParamsFromCachedEarlyParams(
     conn.maybePeerAckReceiveTimestampsConfig = std::nullopt;
   }
   conn.peerAdvertisedExtendedAckFeatures = transportParams.extendedAckFeatures;
+
+  // Restore the versioned peer-receive-timestamps state.
+  switch (transportParams.cachedReceiveTimestampsVersion) {
+    case AckReceiveTimestampsVersion::DraftIetf02:
+      conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+          .version = AckReceiveTimestampsVersion::DraftIetf02,
+          .maxReceiveTimestampsPerAck =
+              transportParams.draft02MaxReceiveTimestampsPerAck,
+          .exponent = transportParams.draft02ReceiveTimestampsExponent,
+      };
+      break;
+    case AckReceiveTimestampsVersion::LegacyMvfst:
+      conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+          .version = AckReceiveTimestampsVersion::LegacyMvfst,
+          .maxReceiveTimestampsPerAck =
+              transportParams.maxReceiveTimestampsPerAck,
+          .exponent = transportParams.receiveTimestampsExponent,
+      };
+      break;
+    case AckReceiveTimestampsVersion::None:
+      // Backward compat: a cache from before this field existed reports None
+      // here. Fall back to the legacy boolean to decide whether to populate the
+      // versioned field with legacy semantics.
+      if (transportParams.ackReceiveTimestampsEnabled) {
+        conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+            .version = AckReceiveTimestampsVersion::LegacyMvfst,
+            .maxReceiveTimestampsPerAck =
+                transportParams.maxReceiveTimestampsPerAck,
+            .exponent = transportParams.receiveTimestampsExponent,
+        };
+      } else {
+        conn.maybePeerReceiveTimestampsConfig = std::nullopt;
+      }
+      break;
+  }
+
   return {};
 }
 } // namespace quic

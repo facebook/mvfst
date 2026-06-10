@@ -48,6 +48,19 @@ void writeCachedServerTransportParameters(
       err);
   FIZZ_THROW_ON_ERROR(
       fizz::detail::write(err, params.extendedAckFeatures, appender), err);
+  // draft-ietf-quic-receive-ts-02 trailer.
+  uint8_t cachedReceiveTimestampsVersion =
+      static_cast<uint8_t>(params.cachedReceiveTimestampsVersion);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(err, cachedReceiveTimestampsVersion, appender), err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(
+          err, params.draft02MaxReceiveTimestampsPerAck, appender),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::write(
+          err, params.draft02ReceiveTimestampsExponent, appender),
+      err);
 }
 
 void readCachedServerTransportParameters(
@@ -92,6 +105,26 @@ void readCachedServerTransportParameters(
       err);
   FIZZ_THROW_ON_ERROR(
       fizz::detail::read(len, err, params.extendedAckFeatures, cursor), err);
+  // draft-ietf-quic-receive-ts-02 trailer. A remaining-bytes "is there more
+  // data?" guard is NOT safe: `PersistentQuicPskCache` (proxygen) writes
+  // `[TPs][u16 appParamsLen][appParams]` into one contiguous buffer, so the
+  // guard would consume app-param bytes as the trailer on a cache without
+  // the trailer and corrupt both. Throw-and-discard instead: caches without
+  // the trailer fail deserialization and lose 0-RTT once per PSK.
+  uint8_t cachedReceiveTimestampsVersion = 0;
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(len, err, cachedReceiveTimestampsVersion, cursor),
+      err);
+  params.cachedReceiveTimestampsVersion =
+      static_cast<AckReceiveTimestampsVersion>(cachedReceiveTimestampsVersion);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(
+          len, err, params.draft02MaxReceiveTimestampsPerAck, cursor),
+      err);
+  FIZZ_THROW_ON_ERROR(
+      fizz::detail::read(
+          len, err, params.draft02ReceiveTimestampsExponent, cursor),
+      err);
 }
 
 std::unique_ptr<folly::IOBuf> serializeCachedServerTransportParameters(
