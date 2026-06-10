@@ -29,6 +29,18 @@ ShortHeader makeHeader() {
   return {ProtectionType::KeyPhaseZero, getTestConnectionId(), packetNum};
 }
 
+// Long header in a non-AppData packet-number space (Initial). draft-02 ACK
+// receive-timestamp frames are 1-RTT only and must be rejected here.
+LongHeader makeLongHeader(LongHeader::Types type = LongHeader::Types::Initial) {
+  PacketNum packetNum = 100;
+  return LongHeader(
+      type,
+      getTestConnectionId(),
+      getTestConnectionId(),
+      packetNum,
+      QuicVersion::MVFST);
+}
+
 // NormalizedAckBlocks are in order needed.
 struct NormalizedAckBlock {
   QuicInteger gap; // Gap to previous AckBlock
@@ -1189,6 +1201,478 @@ TEST_F(DecodeTest, RstStreamAtTruncated) {
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
   EXPECT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+// draft-ietf-quic-receive-ts-02 decoder tests. The hand-built wire bytes
+// avoid any dependency on the encoder; the helper writes everything after
+// the frame-type varint:
+//   - base ACK: largestAcked, ackDelay, ackBlockCount, firstAckBlockLength,
+//     additional blocks
+//   - [optional ECN counts for `_ECN` variant]
+//   - timestamp range count
+//   - per range: deltaLargestAcknowledged, timestampDeltaCount, deltas
+
+namespace {
+
+struct Draft02NormalizedTimestampRange {
+  QuicInteger deltaLargestAcknowledged;
+  std::vector<QuicInteger> deltas;
+};
+
+// Builds the post-type bytes of a draft-02 ACK_RECEIVE_TIMESTAMPS frame.
+// Caller writes the frame-type varint or passes the buffer to a function
+// that already knows the frame type.
+std::unique_ptr<folly::IOBuf> createDraft02AckFrame(
+    QuicInteger largestAcked,
+    QuicInteger ackDelay,
+    QuicInteger numAdditionalBlocks,
+    QuicInteger firstAckBlockLength,
+    const std::vector<NormalizedAckBlock>& ackBlocks,
+    bool addEcnCounts,
+    const std::vector<Draft02NormalizedTimestampRange>& timestampRanges) {
+  auto buf = folly::IOBuf::create(0);
+  BufAppender wcursor(buf.get(), 32);
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+
+  largestAcked.encode(appenderOp);
+  ackDelay.encode(appenderOp);
+  numAdditionalBlocks.encode(appenderOp);
+  firstAckBlockLength.encode(appenderOp);
+  for (const auto& b : ackBlocks) {
+    b.gap.encode(appenderOp);
+    b.blockLen.encode(appenderOp);
+  }
+  if (addEcnCounts) {
+    QuicInteger(1).encode(appenderOp); // ECT-0
+    QuicInteger(2).encode(appenderOp); // ECT-1
+    QuicInteger(3).encode(appenderOp); // CE
+  }
+  QuicInteger rangeCount(timestampRanges.size());
+  rangeCount.encode(appenderOp);
+  for (const auto& range : timestampRanges) {
+    range.deltaLargestAcknowledged.encode(appenderOp);
+    QuicInteger(range.deltas.size()).encode(appenderOp);
+    for (const auto& delta : range.deltas) {
+      delta.encode(appenderOp);
+    }
+  }
+  buf->coalesce();
+  return buf;
+}
+
+// Build CodecParameters with a local advertised draft-02 config.
+CodecParameters draft02Params(
+    uint64_t advertisedMax = 10,
+    uint8_t advertisedExponent = 0) {
+  return CodecParameters(
+      kDefaultAckDelayExponent,
+      QuicVersion::MVFST,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = advertisedMax,
+          .receiveTimestampsExponent = advertisedExponent},
+      /*extendedAckFeaturesIn=*/0);
+}
+
+} // namespace
+
+TEST_F(DecodeTest, Draft02AckZeroRangesIsValid) {
+  auto buf = createDraft02AckFrame(
+      QuicInteger(1000),
+      QuicInteger(100),
+      QuicInteger(0), // numAdditionalBlocks
+      QuicInteger(10), // firstAckBlockLength
+      /*ackBlocks=*/{},
+      /*addEcnCounts=*/false,
+      /*timestampRanges=*/{});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.has_value());
+  const auto& frame = *res->asReadAckFrame();
+  EXPECT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 0);
+  EXPECT_EQ(frame.timestampsVersion, AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(frame.frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+}
+
+TEST_F(DecodeTest, Draft02AckBasicSingleRange) {
+  Draft02NormalizedTimestampRange range{
+      .deltaLargestAcknowledged = QuicInteger(0),
+      .deltas = {QuicInteger(380), QuicInteger(10), QuicInteger(10)},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(4), // largestAcked - 4 = 96 ... 100
+      {},
+      /*addEcnCounts=*/false,
+      {range});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.has_value());
+  const auto& frame = *res->asReadAckFrame();
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 1);
+  const auto& decodedRange = frame.draft02RecvdPacketsTimestampRanges[0];
+  EXPECT_EQ(decodedRange.deltaLargestAcknowledged, 0);
+  EXPECT_EQ(decodedRange.timestamp_delta_count, 3);
+  EXPECT_EQ(decodedRange.deltas, std::vector<uint64_t>({380, 10, 10}));
+}
+
+TEST_F(DecodeTest, Draft02AckMultipleRanges) {
+  std::vector<Draft02NormalizedTimestampRange> ranges{
+      {.deltaLargestAcknowledged = QuicInteger(0),
+       .deltas = {QuicInteger(1), QuicInteger(2)}},
+      {.deltaLargestAcknowledged = QuicInteger(5), .deltas = {QuicInteger(3)}},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(20),
+      {},
+      false,
+      ranges);
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.has_value());
+  const auto& frame = *res->asReadAckFrame();
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 2);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltaLargestAcknowledged, 0);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[1].deltaLargestAcknowledged, 5);
+  EXPECT_EQ(frame.draft02RecvdPacketsTimestampRanges[1].deltas.size(), 1);
+}
+
+TEST_F(DecodeTest, Draft02AckEcnVariantDecodesEcnBeforeTimestamps) {
+  Draft02NormalizedTimestampRange range{
+      .deltaLargestAcknowledged = QuicInteger(0),
+      .deltas = {QuicInteger(100)},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      /*addEcnCounts=*/true,
+      {range});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+  ASSERT_TRUE(res.has_value());
+  const auto& frame = *res->asReadAckFrame();
+  EXPECT_EQ(frame.ecnECT0Count, 1);
+  EXPECT_EQ(frame.ecnECT1Count, 2);
+  EXPECT_EQ(frame.ecnCECount, 3);
+  EXPECT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(frame.frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+}
+
+TEST_F(DecodeTest, Draft02AckExponentDefaultZeroWhenNoLocalConfig) {
+  // No local AckReceiveTimestampsConfig: draft-02 default exponent is 0, not
+  // the legacy mvfst default of 3.
+  Draft02NormalizedTimestampRange range{
+      .deltaLargestAcknowledged = QuicInteger(0),
+      .deltas = {QuicInteger(7)},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      false,
+      {range});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.has_value());
+  const auto& frame = *res->asReadAckFrame();
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(frame.draft02RecvdPacketsTimestampRanges[0].deltas[0], 7);
+}
+
+TEST_F(DecodeTest, Draft02AckExponentScalingApplied) {
+  // Local advertised exponent = 3, peer encodes delta as 5, decoded as 40us.
+  Draft02NormalizedTimestampRange range{
+      .deltaLargestAcknowledged = QuicInteger(0),
+      .deltas = {QuicInteger(5)},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      false,
+      {range});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/3),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.has_value());
+  const auto& frame = *res->asReadAckFrame();
+  EXPECT_EQ(frame.draft02RecvdPacketsTimestampRanges[0].deltas[0], 40);
+}
+
+TEST_F(DecodeTest, Draft02AckOverLimitReturnsFrameEncodingError) {
+  // Advertised max = 3; frame carries 4 deltas total, must error.
+  Draft02NormalizedTimestampRange range{
+      .deltaLargestAcknowledged = QuicInteger(0),
+      .deltas =
+          {QuicInteger(1), QuicInteger(2), QuicInteger(3), QuicInteger(4)},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      false,
+      {range});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/3, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+TEST_F(DecodeTest, Draft02AckSetsTimestampsVersionDraftIetf02) {
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      false,
+      {});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.has_value());
+  EXPECT_EQ(
+      res->asReadAckFrame()->timestampsVersion,
+      AckReceiveTimestampsVersion::DraftIetf02);
+}
+
+// `ACK_EXTENDED` with the `RECEIVE_TIMESTAMPS` feature bit must set
+// `ReadAckFrame::timestampsVersion = LegacyMvfst` so consumers dispatch on
+// one source of truth regardless of which legacy carrier (`0xB0` or `0xB1`
+// with feature bit) delivered the timestamps.
+TEST_F(
+    DecodeTest,
+    AckExtendedWithReceiveTimestampsFeatureSetsLegacyMvfstVersion) {
+  std::unique_ptr<folly::IOBuf> buf = folly::IOBuf::create(0);
+  BufAppender wcursor(buf.get(), 64);
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+  QuicInteger(100).encode(appenderOp); // largestAcked
+  QuicInteger(0).encode(appenderOp); // ackDelay
+  QuicInteger(0).encode(appenderOp); // numAdditionalBlocks
+  QuicInteger(0).encode(appenderOp); // firstAckBlockLength
+  // Extended-ack feature bits: RECEIVE_TIMESTAMPS only (no ECN).
+  const auto features = static_cast<ExtendedAckFeatureMaskType>(
+      ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
+  QuicInteger(features).encode(appenderOp);
+  QuicInteger(100).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  buf->coalesce();
+
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  CodecParameters params(
+      kDefaultAckDelayExponent,
+      QuicVersion::MVFST,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0},
+      /*extendedAckFeaturesIn=*/features);
+  auto res = decodeAckExtendedFrame(cursor, makeHeader(), params);
+  ASSERT_TRUE(res.has_value());
+  EXPECT_EQ(res->timestampsVersion, AckReceiveTimestampsVersion::LegacyMvfst);
+}
+
+// A peer-controlled giant `Timestamp Range Count` must not trigger a large
+// pre-allocation before per-range parsing surfaces the error. A count of
+// 2^61 with no range bytes must return FRAME_ENCODING_ERROR fast.
+TEST_F(DecodeTest, Draft02AckOverLargeRangeCountFailsFastWithoutOOM) {
+  auto buf = folly::IOBuf::create(0);
+  BufAppender wcursor(buf.get(), 32);
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+  QuicInteger(100).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  // Huge range count, no range bytes follow.
+  QuicInteger(uint64_t{1} << 61).encode(appenderOp);
+  buf->coalesce();
+
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+// A range with `timestamp_delta_count == 0` consumes ~32 bytes per
+// materialized range vs ~2 wire bytes. A malformed peer could push
+// allocation past `kMaxReceiveTimestampsHardLimit` without the over-limit
+// check firing (it keys on total deltas, not range count). Reject empty
+// ranges as FRAME_ENCODING_ERROR. The spec's "0 or more receive timestamps"
+// allowance applies to the total count (covered by
+// `Draft02AckZeroRangesIsValid`), not per-range.
+TEST_F(DecodeTest, Draft02AckEmptyRangeRejected) {
+  // Single range with 0 deltas.
+  std::vector<Draft02NormalizedTimestampRange> ranges{
+      {.deltaLargestAcknowledged = QuicInteger(0), .deltas = {}},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      /*addEcnCounts=*/false,
+      ranges);
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+// A frame declaring many empty ranges must error out on the first one
+// rather than materializing all of them, guarding against memory
+// amplification.
+TEST_F(DecodeTest, Draft02AckManyEmptyRangesFailsFast) {
+  std::vector<Draft02NormalizedTimestampRange> ranges;
+  ranges.reserve(1000);
+  for (int i = 0; i < 1000; ++i) {
+    ranges.push_back(
+        {.deltaLargestAcknowledged = QuicInteger(0), .deltas = {}});
+  }
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      /*addEcnCounts=*/false,
+      ranges);
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+// The over-limit check sums delta counts across ranges. Two ranges of 2
+// deltas each (total 4) against advertised max 3 must fail with
+// FRAME_ENCODING_ERROR.
+TEST_F(DecodeTest, Draft02AckCrossRangeOverLimitReturnsFrameEncodingError) {
+  std::vector<Draft02NormalizedTimestampRange> ranges{
+      {.deltaLargestAcknowledged = QuicInteger(0),
+       .deltas = {QuicInteger(1), QuicInteger(2)}},
+      {.deltaLargestAcknowledged = QuicInteger(5),
+       .deltas = {QuicInteger(3), QuicInteger(4)}},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      /*addEcnCounts=*/false,
+      ranges);
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeHeader(),
+      draft02Params(/*advertisedMax=*/3, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+// draft-ietf-quic-receive-ts-02 ACK frames are 1-RTT only. A draft-02 frame
+// in a non-AppData packet-number space (Initial/Handshake) must be rejected
+// with FRAME_ENCODING_ERROR rather than silently decoded as a plain ACK.
+TEST_F(DecodeTest, Draft02AckInNonAppDataSpaceRejected) {
+  Draft02NormalizedTimestampRange range{
+      .deltaLargestAcknowledged = QuicInteger(0),
+      .deltas = {QuicInteger(100)},
+  };
+  auto buf = createDraft02AckFrame(
+      QuicInteger(100),
+      QuicInteger(0),
+      QuicInteger(0),
+      QuicInteger(0),
+      {},
+      /*addEcnCounts=*/false,
+      {range});
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameDraft02WithReceiveTimestamps(
+      cursor,
+      makeLongHeader(LongHeader::Types::Initial),
+      draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+TEST_F(DecodeTest, LegacyAckSetsTimestampsVersionLegacyMvfst) {
+  std::unique_ptr<folly::IOBuf> buf = folly::IOBuf::create(0);
+  BufAppender wcursor(buf.get(), 32);
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+  QuicInteger(100).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  // Legacy timestamp prefix: latest packet number + latest time + range count.
+  QuicInteger(100).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  QuicInteger(0).encode(appenderOp);
+  buf->coalesce();
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  auto res = decodeAckFrameWithReceivedTimestamps(
+      cursor, makeHeader(), draft02Params(), FrameType::ACK_RECEIVE_TIMESTAMPS);
+  ASSERT_TRUE(res.has_value());
+  EXPECT_EQ(
+      res->asReadAckFrame()->timestampsVersion,
+      AckReceiveTimestampsVersion::LegacyMvfst);
 }
 
 } // namespace quic::test

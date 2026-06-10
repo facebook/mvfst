@@ -170,6 +170,18 @@ decodeAckFrameWithReceivedTimestamps(
     const CodecParameters& params,
     FrameType frameType);
 
+// Decodes a draft-ietf-quic-receive-ts-02 ACK_RECEIVE_TIMESTAMPS frame
+// (frame types 0x03178307 and 0x03178308). The `_ECN` variant interleaves
+// ECN counts between the base ACK fields and the timestamp section.
+// Returns FRAME_ENCODING_ERROR if the total timestamp count exceeds the max
+// this endpoint advertised via the draft-02 transport parameter.
+[[nodiscard]] quic::Expected<QuicFrame, QuicError>
+decodeAckFrameDraft02WithReceiveTimestamps(
+    ContiguousReadCursor& cursor,
+    const PacketHeader& header,
+    const CodecParameters& params,
+    FrameType frameType);
+
 [[nodiscard]] quic::Expected<QuicFrame, QuicError> decodeAckFrameWithECN(
     ContiguousReadCursor& cursor,
     const PacketHeader& header,

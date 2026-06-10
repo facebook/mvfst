@@ -156,6 +156,18 @@ struct RecvdPacketsTimestampsRange {
 
 using RecvdPacketsTimestampsRangeVec = std::vector<RecvdPacketsTimestampsRange>;
 
+// draft-ietf-quic-receive-ts-02 timestamp range. `deltaLargestAcknowledged`
+// is a per-range delta from the ACK frame's `Largest Acknowledged`, not a
+// chained gap from the previous range.
+struct Draft02ReceiveTimestampsRange {
+  uint64_t deltaLargestAcknowledged{};
+  uint64_t timestamp_delta_count{};
+  std::vector<uint64_t> deltas;
+};
+
+using Draft02ReceiveTimestampsRangeVec =
+    std::vector<Draft02ReceiveTimestampsRange>;
+
 /**
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -189,6 +201,12 @@ struct ReadAckFrame {
   OptionalMicros maybeLatestRecvdPacketTime;
   OptionalIntegral<PacketNum> maybeLatestRecvdPacketNum;
   RecvdPacketsTimestampsRangeVec recvdPacketsTimestampRanges;
+  // Disambiguates legacy `gap` semantics from draft-02
+  // `Delta Largest Acknowledged`. Only one of `recvdPacketsTimestampRanges`
+  // (legacy) or `draft02RecvdPacketsTimestampRanges` is populated per frame.
+  AckReceiveTimestampsVersion timestampsVersion{
+      AckReceiveTimestampsVersion::None};
+  Draft02ReceiveTimestampsRangeVec draft02RecvdPacketsTimestampRanges;
   uint64_t ecnECT0Count{0};
   uint64_t ecnECT1Count{0};
   uint64_t ecnCECount{0};

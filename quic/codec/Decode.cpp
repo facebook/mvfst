@@ -394,6 +394,7 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckExtendedFrame(
     if (tsResult.hasError()) {
       return quic::make_unexpected(tsResult.error());
     }
+    frame.timestampsVersion = AckReceiveTimestampsVersion::LegacyMvfst;
   }
   return frame;
 }
@@ -414,6 +415,140 @@ quic::Expected<QuicFrame, QuicError> decodeAckFrameWithReceivedTimestamps(
   if (ts.hasError()) {
     return quic::make_unexpected(ts.error());
   }
+  frame.timestampsVersion = AckReceiveTimestampsVersion::LegacyMvfst;
+
+  return QuicFrame(frame);
+}
+
+static quic::Expected<void, QuicError> decodeDraft02ReceiveTimestampsInAck(
+    ReadAckFrame& frame,
+    ContiguousReadCursor& cursor,
+    const CodecParameters& params) {
+  auto timestampRangeCount = quic::decodeQuicInteger(cursor);
+  if (!timestampRangeCount) {
+    return quic::make_unexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "Bad draft-02 timestamp range count"));
+  }
+  // Exponent this endpoint advertised (TP 0x4ac26); the peer scaled its
+  // deltas by it. Absent local config falls back to draft-02's default of 0
+  // (not the legacy mvfst default of 3).
+  const uint8_t exponent = params.maybeAckReceiveTimestampsConfig
+      ? static_cast<uint8_t>(
+            params.maybeAckReceiveTimestampsConfig->receiveTimestampsExponent)
+      : 0;
+  // Defense-in-depth: absent local config caps at the hard limit so an
+  // attacker can't exploit the absent branch to bypass the per-frame max.
+  const uint64_t effectiveMax = params.maybeAckReceiveTimestampsConfig
+      ? params.maybeAckReceiveTimestampsConfig->maxReceiveTimestampsPerAck
+      : kMaxReceiveTimestampsHardLimit;
+  uint64_t totalDeltaCount = 0;
+  // Cap the reserve by `rangeCount`, the effective max, AND the hard limit so
+  // a peer-controlled varint up to 2^62 can't drive a giant allocation before
+  // per-range parsing finds the real violation. When local config is present
+  // `effectiveMax` is an unconstrained peer-advertised value, so the hard
+  // limit must bound the reserve too.
+  frame.draft02RecvdPacketsTimestampRanges.reserve(
+      std::min(
+          {timestampRangeCount->first,
+           effectiveMax,
+           kMaxReceiveTimestampsHardLimit}));
+  for (uint64_t r = 0; r < timestampRangeCount->first; r++) {
+    Draft02ReceiveTimestampsRange range;
+    auto deltaLargestAcked = quic::decodeQuicInteger(cursor);
+    if (!deltaLargestAcked) {
+      return quic::make_unexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Bad draft-02 delta_largest_acknowledged"));
+    }
+    range.deltaLargestAcknowledged = deltaLargestAcked->first;
+    auto deltaCount = quic::decodeQuicInteger(cursor);
+    if (!deltaCount) {
+      return quic::make_unexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "Bad draft-02 timestamp_delta_count"));
+    }
+    // Reject zero-delta ranges: the total-delta limit below keys on actual
+    // deltas, so empty ranges would bypass it and allow memory amplification.
+    if (deltaCount->first == 0) {
+      return quic::make_unexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          "draft-02 timestamp range has zero deltas"));
+    }
+    range.timestamp_delta_count = deltaCount->first;
+    // Per draft-ietf-quic-receive-ts-02: total delta count across all ranges
+    // MUST NOT exceed max_receive_timestamps_per_ack. Check BEFORE adding so a
+    // pair of near-2^62 counts can't wrap the uint64 sum below `effectiveMax`
+    // and slip past the guard. `effectiveMax - totalDeltaCount` cannot
+    // underflow: `totalDeltaCount <= effectiveMax` is an invariant maintained
+    // by this check on every prior iteration (it starts at 0).
+    if (deltaCount->first > effectiveMax - totalDeltaCount) {
+      return quic::make_unexpected(QuicError(
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          fmt::format(
+              "draft-02 timestamp count {} exceeds max {}",
+              totalDeltaCount + deltaCount->first,
+              effectiveMax)));
+    }
+    totalDeltaCount += deltaCount->first;
+    // Intentionally NOT calling `range.deltas.reserve(deltaCount->first)`:
+    // peer-controlled varint up to 2^62. Vector growth bounded by what the
+    // cursor actually contains.
+    for (uint64_t i = 0; i < deltaCount->first; i++) {
+      auto delta = quic::decodeQuicInteger(cursor);
+      if (!delta) {
+        return quic::make_unexpected(QuicError(
+            quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+            "Bad draft-02 timestamp delta"));
+      }
+      DCHECK_LT(exponent, sizeof(delta->first) * 8);
+      auto scaled =
+          convertEncodedDurationToMicroseconds(exponent, delta->first);
+      if (scaled.hasError()) {
+        return quic::make_unexpected(scaled.error());
+      }
+      range.deltas.push_back(*scaled);
+    }
+    frame.draft02RecvdPacketsTimestampRanges.emplace_back(std::move(range));
+  }
+  return {};
+}
+
+quic::Expected<QuicFrame, QuicError> decodeAckFrameDraft02WithReceiveTimestamps(
+    ContiguousReadCursor& cursor,
+    const PacketHeader& header,
+    const CodecParameters& params,
+    FrameType frameType) {
+  // draft-ietf-quic-receive-ts-02 frames are 1-RTT only. Reject them in
+  // Initial/Handshake space (the outbound writer DCHECKs AppData; this is the
+  // inbound counterpart) so a malformed frame isn't silently accepted as a
+  // plain ACK with its timestamp section dropped.
+  if (header.getPacketNumberSpace() != PacketNumberSpace::AppData) {
+    return quic::make_unexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        "draft-02 receive-timestamps ACK outside AppData space"));
+  }
+  auto ack = decodeAckFrame(cursor, header, params, frameType);
+  if (ack.hasError()) {
+    return quic::make_unexpected(ack.error());
+  }
+  ReadAckFrame frame = std::move(*ack);
+  frame.frameType = frameType;
+
+  // _ECN variant interleaves ECN counts between the base ACK fields and the
+  // timestamp section.
+  if (frameType == FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN) {
+    auto ecn = decodeEcnCountsInAck(frame, cursor);
+    if (ecn.hasError()) {
+      return quic::make_unexpected(ecn.error());
+    }
+  }
+
+  auto ts = decodeDraft02ReceiveTimestampsInAck(frame, cursor, params);
+  if (ts.hasError()) {
+    return quic::make_unexpected(ts.error());
+  }
+  frame.timestampsVersion = AckReceiveTimestampsVersion::DraftIetf02;
 
   return QuicFrame(frame);
 }
@@ -949,16 +1084,15 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
       return decodeFrameAndTrimBufQueue(
           queue, contiguousCursor, decodeAckExtendedFrame, header, params);
     case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02:
-    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN:
-      // Diff 4 will add the draft-ietf-quic-receive-ts-02 decoder. Until then
-      // the dispatch is intentionally absent: receiving these frame types is a
-      // protocol violation because no peer can have negotiated the wire format
-      // yet (Diff 2 wires up the transport parameters).
-      return quic::make_unexpected(QuicError(
-          TransportErrorCode::FRAME_ENCODING_ERROR,
-          fmt::format(
-              "ACK_RECEIVE_TIMESTAMPS_DRAFT_02 decode not yet implemented, type={}",
-              frameTypeInt->first)));
+    case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN: {
+      auto draft02Res = decodeAckFrameDraft02WithReceiveTimestamps(
+          contiguousCursor, header, params, frameType);
+      if (draft02Res.hasError()) {
+        return draft02Res;
+      }
+      queue.trimStart(contiguousCursor.getCurrentPosition());
+      return draft02Res;
+    }
   }
 
   return quic::make_unexpected(QuicError(
