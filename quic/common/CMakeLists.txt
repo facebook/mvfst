@@ -111,6 +111,7 @@ mvfst_add_library(mvfst_common_network_data
     mvfst_common_time_points
     mvfst_config
     mvfst_constants
+    Folly::folly_portability_sockets
 )
 
 mvfst_add_library(mvfst_common_time_points

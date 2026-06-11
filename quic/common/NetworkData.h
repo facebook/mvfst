@@ -13,7 +13,10 @@
 #include <quic/common/TimePoints.h>
 #include <quic/mvfst-config.h>
 
+#include <folly/portability/Sockets.h>
+
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace quic {
@@ -80,6 +83,31 @@ struct ReceivedUdpPacket {
         timings(std::forward<TimingsType>(timingsIn)),
         tosValue(tosValueIn) {}
 
+  template <typename TimingsType>
+  ReceivedUdpPacket(
+      BufPtr&& bufIn,
+      TimingsType&& timingsIn,
+      uint8_t tosValueIn,
+      const sockaddr* peerAddressIn,
+      socklen_t peerAddressLen)
+      : buf(std::move(bufIn)),
+        timings(std::forward<TimingsType>(timingsIn)),
+        tosValue(tosValueIn) {
+    emplacePeerAddress(peerAddressIn, peerAddressLen);
+  }
+
+  void emplacePeerAddress(const sockaddr* peerAddressIn, socklen_t len) {
+    if constexpr (std::is_constructible_v<
+                      quic::SocketAddress,
+                      const sockaddr*,
+                      socklen_t>) {
+      peerAddress.emplace(peerAddressIn, len);
+    } else {
+      peerAddress.emplace();
+      peerAddress->setFromSockaddr(peerAddressIn, len);
+    }
+  }
+
   BufQueue buf;
   Timings timings;
 
@@ -144,6 +172,14 @@ struct NetworkData {
     packets_.emplace_back(std::move(packetIn));
     packets_.back().timings.receiveTimePoint = receiveTimePoint_;
     totalData_ += packets_.back().buf.chainLength();
+  }
+
+  template <typename... Args>
+  ReceivedUdpPacket& emplacePacket(Args&&... args) {
+    auto& packet = packets_.emplace_back(std::forward<Args>(args)...);
+    packet.timings.receiveTimePoint = receiveTimePoint_;
+    totalData_ += packet.buf.chainLength();
+    return packet;
   }
 
   [[nodiscard]] const std::vector<ReceivedUdpPacket>& getPackets() const {

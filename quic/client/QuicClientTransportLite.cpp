@@ -1584,10 +1584,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
     auto bytesRead = size_t(ret);
     totalData += bytesRead;
-    quic::SocketAddress packetPeerAddress;
-    packetPeerAddress.setFromSockaddr(MVCHECK_NOTNULL(rawAddr), kAddrLen);
-    MVVLOG(10) << "Got data from socket peer=" << packetPeerAddress
-               << " len=" << bytesRead;
+    MVVLOG(10) << "Got data from socket len=" << bytesRead;
     readBuffer->append(bytesRead);
     if (params.gro > 0) {
       size_t len = bytesRead;
@@ -1596,6 +1593,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
       size_t totalNumPackets = networkData.getPackets().size() +
           ((len + params.gro - 1) / params.gro);
       networkData.reserve(totalNumPackets);
+      quic::SocketAddress packetPeerAddress;
+      packetPeerAddress.setFromSockaddr(rawAddr, kAddrLen);
       while (remaining) {
         if (static_cast<int>(remaining) > params.gro) {
           auto tmp = readBuffer->cloneOne();
@@ -1608,27 +1607,26 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
           offset += params.gro;
           remaining -= params.gro;
-          ReceivedUdpPacket pkt(std::move(tmp), timings, params.tos);
-          pkt.peerAddress = packetPeerAddress;
-          networkData.addPacket(std::move(pkt));
+          auto& packet =
+              networkData.emplacePacket(std::move(tmp), timings, params.tos);
+          packet.peerAddress = packetPeerAddress;
         } else {
           // do not clone the last packet
           // start at offset, use all the remaining data
           readBuffer->trimStart(offset);
           MVDCHECK_EQ(readBuffer->length(), remaining);
           remaining = 0;
-          ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
-          pkt.peerAddress = packetPeerAddress;
-          networkData.addPacket(std::move(pkt));
+          auto& packet = networkData.emplacePacket(
+              std::move(readBuffer), timings, params.tos);
+          packet.peerAddress = packetPeerAddress;
           // This is the last packet. Break here to silence the linter's warning
           // about a use-after-move in the next iteration of the loop
           break;
         }
       }
     } else {
-      ReceivedUdpPacket pkt(std::move(readBuffer), timings, params.tos);
-      pkt.peerAddress = std::move(packetPeerAddress);
-      networkData.addPacket(std::move(pkt));
+      networkData.emplacePacket(
+          std::move(readBuffer), timings, params.tos, rawAddr, kAddrLen);
     }
     maybeQlogDatagram(bytesRead);
   }
