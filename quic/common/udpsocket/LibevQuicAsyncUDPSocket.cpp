@@ -310,6 +310,16 @@ const quic::SocketAddress& LibevQuicAsyncUDPSocket::addressRef() const {
   return localAddress_;
 }
 
+quic::Expected<sa_family_t, QuicError>
+LibevQuicAsyncUDPSocket::getLocalAddressFamily() const {
+  if (!bound_) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "socket is not bound"));
+  }
+  return localAddress_.getFamily();
+}
+
 void LibevQuicAsyncUDPSocket::attachEventBase(
     std::shared_ptr<QuicEventBase> /* evb */) {
   MVCHECK(false, __func__ << "is not implemented in LibevQuicAsyncUDPSocket");

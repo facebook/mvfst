@@ -123,6 +123,9 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
    */
   [[nodiscard]] const quic::SocketAddress& addressRef() const override;
 
+  [[nodiscard]] quic::Expected<sa_family_t, QuicError> getLocalAddressFamily()
+      const override;
+
   /**
    * Manage the eventbase driving this socket
    */
