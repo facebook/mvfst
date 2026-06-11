@@ -220,6 +220,16 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
     flags |= MSG_TRUNC;
   }
 #endif
+  auto localAddressFamilyResult = sock.getLocalAddressFamily();
+  if (!localAddressFamilyResult.has_value()) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "Failed to get address family: {}",
+            localAddressFamilyResult.error().message)));
+  }
+  const auto localAddressFamily = localAddressFamilyResult.value();
+
   for (uint16_t i = 0; i < numPackets; ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
     auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
@@ -236,14 +246,7 @@ quic::Expected<void, QuicError> QuicClientTransport::recvMmsg(
     MVCHECK(readBuffer != nullptr);
 
     auto* rawAddr = reinterpret_cast<sockaddr*>(&addr);
-    auto addrResult = sock.address();
-    if (!addrResult.has_value()) {
-      return quic::make_unexpected(QuicError(
-          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-          fmt::format(
-              "Failed to get socket address: {}", addrResult.error().message)));
-    }
-    rawAddr->sa_family = addrResult.value().getFamily();
+    rawAddr->sa_family = localAddressFamily;
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE

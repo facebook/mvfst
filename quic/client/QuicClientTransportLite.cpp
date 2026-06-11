@@ -1464,6 +1464,16 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
     int numPackets,
     NetworkData& networkData,
     size_t& totalData) {
+  auto localAddressFamilyResult = sock.getLocalAddressFamily();
+  if (!localAddressFamilyResult.has_value()) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        fmt::format(
+            "Failed to get address family: {}",
+            localAddressFamilyResult.error().message)));
+  }
+  const auto localAddressFamily = localAddressFamilyResult.value();
+
   for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place.
@@ -1474,17 +1484,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 
     struct sockaddr_storage addrStorage{};
     auto* rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
-    {
-      auto familyResult = sock.getLocalAddressFamily();
-      if (!familyResult.has_value()) {
-        return quic::make_unexpected(QuicError(
-            QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
-            fmt::format(
-                "Failed to get address family: {}",
-                familyResult.error().message)));
-      }
-      rawAddr->sa_family = familyResult.value();
-    }
+    rawAddr->sa_family = localAddressFamily;
 
     int flags = 0;
     QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams params;

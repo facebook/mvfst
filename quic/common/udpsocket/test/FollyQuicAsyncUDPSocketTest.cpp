@@ -9,8 +9,35 @@
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/common/udpsocket/test/QuicAsyncUDPSocketTestBase.h>
 #include <array>
+#include <cstdint>
+#include <utility>
 
 using namespace ::testing;
+
+class AddressCountingFollyQuicAsyncUDPSocket
+    : public quic::FollyQuicAsyncUDPSocket {
+ public:
+  explicit AddressCountingFollyQuicAsyncUDPSocket(
+      std::shared_ptr<quic::FollyQuicEventBase> qEvb)
+      : quic::FollyQuicAsyncUDPSocket(std::move(qEvb)) {}
+
+  quic::Expected<quic::SocketAddress, quic::QuicError> address()
+      const override {
+    ++addressCallCount_;
+    return quic::FollyQuicAsyncUDPSocket::address();
+  }
+
+  void resetAddressCallCount() {
+    addressCallCount_ = 0;
+  }
+
+  uint32_t getAddressCallCount() const {
+    return addressCallCount_;
+  }
+
+ private:
+  mutable uint32_t addressCallCount_{0};
+};
 
 class FollyQuicAsyncUDPSocketProvider {
  public:
@@ -27,6 +54,26 @@ INSTANTIATE_TYPED_TEST_SUITE_P(
     FollyQuicAsyncUDPSocketTest, // Instance name
     QuicAsyncUDPSocketTest, // Test case name
     FollyQuicAsyncUDPSocketType); // Type list
+
+TEST(FollyQuicAsyncUDPSocketTest, RecvmmsgNetworkDataGetsLocalAddressOnce) {
+  folly::EventBase fEvb;
+  auto qEvb = std::make_shared<quic::FollyQuicEventBase>(&fEvb);
+  AddressCountingFollyQuicAsyncUDPSocket sock(qEvb);
+
+  ASSERT_FALSE(sock.bind(folly::SocketAddress("127.0.0.1", 0)).hasError());
+  sock.resetAddressCallCount();
+
+  quic::NetworkData networkData;
+  size_t totalData = 0;
+  auto result = sock.recvmmsgNetworkData(
+      /*readBufferSize=*/2048,
+      /*numPackets=*/8,
+      networkData,
+      totalData);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(sock.getAddressCallCount(), 1u);
+}
 
 // Two senders on distinct local ports each send one datagram to a receiver
 // socket; assert recvmmsgNetworkData populates ReceivedUdpPacket::peerAddress

@@ -58,6 +58,12 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     flags |= MSG_TRUNC;
   }
 #endif
+  auto localAddressFamilyResult = getLocalAddressFamily();
+  if (FOLLY_UNLIKELY(localAddressFamilyResult.hasError())) {
+    return quic::make_unexpected(localAddressFamilyResult.error());
+  }
+  const auto localAddressFamily = localAddressFamilyResult.value();
+
   for (uint16_t i = 0; i < numPackets; ++i) {
     auto& addr = recvmmsgStorage_.impl_[i].addr;
     auto& readBuffer = recvmmsgStorage_.impl_[i].readBuffer;
@@ -73,13 +79,9 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
     }
     MVCHECK(readBuffer != nullptr);
 
-    auto localAddrResult = address();
-    if (FOLLY_UNLIKELY(localAddrResult.hasError())) {
-      return quic::make_unexpected(localAddrResult.error());
-    }
     auto* rawAddr =
         reinterpret_cast<sockaddr*>(&addr); // Assuming addr is large enough
-    rawAddr->sa_family = localAddrResult->getFamily();
+    rawAddr->sa_family = localAddressFamily;
     msg->msg_name = rawAddr;
     msg->msg_namelen = kAddrLen;
 #if defined(FOLLY_HAVE_MSG_ERRQUEUE) || defined(_WIN32)

@@ -49,6 +49,17 @@ class QuicClientTransportMock : public QuicClientTransport {
                .hasError());
   }
 
+  quic::Expected<void, QuicError> recvMmsgForTest(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      uint16_t numPackets,
+      NetworkData& networkData,
+      size_t& totalData) {
+    recvmmsgStorage_.resize(numPackets);
+    return QuicClientTransport::recvMmsg(
+        sock, readBufferSize, numPackets, networkData, totalData);
+  }
+
   quic::Expected<void, QuicError> processPackets(
       const Optional<quic::SocketAddress>& /*localAddress*/,
       NetworkData&& networkData) override {
@@ -154,6 +165,29 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsg) {
       *sockPtr_, 1024 /* readBufferSize */, 128 /* numPackets */);
   EXPECT_EQ(quicClient_->networkDataVec_.size(), 1);
   EXPECT_EQ(quicClient_->networkDataVec_[0].getPackets().size(), 1);
+}
+
+TEST_F(QuicClientTransportTest, RecvMmsgGetsLocalAddressFamilyOnce) {
+  constexpr uint16_t kNumPackets = 8;
+
+  EXPECT_CALL(*sockPtr_, getLocalAddressFamily())
+      .Times(1)
+      .WillOnce(Return(AF_INET6));
+  EXPECT_CALL(*sockPtr_, recvmmsg(_, kNumPackets, _, nullptr))
+      .WillOnce(Return(0));
+
+  NetworkData networkData;
+  size_t totalData = 0;
+  auto result = quicClient_->recvMmsgForTest(
+      *sockPtr_,
+      1024 /* readBufferSize */,
+      kNumPackets,
+      networkData,
+      totalData);
+
+  EXPECT_FALSE(result.hasError());
+  EXPECT_TRUE(networkData.getPackets().empty());
+  EXPECT_EQ(totalData, 0);
 }
 
 TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {

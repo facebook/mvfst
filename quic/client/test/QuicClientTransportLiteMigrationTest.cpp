@@ -45,6 +45,16 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
   QuicClientConnectionState* getConn() {
     return clientConn_;
   }
+
+  quic::Expected<void, QuicError> recvMsgForTest(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize,
+      int numPackets,
+      NetworkData& networkData,
+      size_t& totalData) {
+    return QuicClientTransportLite::recvMsg(
+        sock, readBufferSize, numPackets, networkData, totalData);
+  }
 };
 
 class TestPathValidationCallback
@@ -501,6 +511,35 @@ TEST_F(
       res.error().message.find("available") != std::string::npos ||
       res.error().message.find("connection id") != std::string::npos)
       << "Error message should mention connection IDs or availability";
+}
+
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    RecvMsgGetsLocalAddressFamilyOnce) {
+  constexpr int kNumPackets = 4;
+
+  ON_CALL(*sockPtr_, getGRO()).WillByDefault(Return(0));
+  ON_CALL(*sockPtr_, getTimestamping()).WillByDefault(Return(0));
+  EXPECT_CALL(*sockPtr_, getLocalAddressFamily())
+      .Times(1)
+      .WillOnce(Return(AF_INET6));
+  EXPECT_CALL(*sockPtr_, recvmsg(_, _))
+      .Times(kNumPackets)
+      .WillRepeatedly(
+          Invoke([](struct msghdr*, int) -> ssize_t { return 10; }));
+
+  NetworkData networkData;
+  size_t totalData = 0;
+  auto result = quicClient_->recvMsgForTest(
+      *sockPtr_,
+      1024 /* readBufferSize */,
+      kNumPackets,
+      networkData,
+      totalData);
+
+  EXPECT_FALSE(result.hasError());
+  EXPECT_EQ(networkData.getPackets().size(), kNumPackets);
+  EXPECT_EQ(totalData, 10 * kNumPackets);
 }
 
 // Transport mock that triggers closeImpl with drain on the first processPackets
