@@ -334,7 +334,7 @@ class QuicClientTransportLite
       const ReadAckFrame&);
 
   [[nodiscard]] virtual quic::Expected<void, QuicError> processPackets(
-      const Optional<quic::SocketAddress>& localAddress,
+      const quic::SocketAddress& localAddress,
       NetworkData&& networkData);
 
   [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmsgSinglePacketLoop(

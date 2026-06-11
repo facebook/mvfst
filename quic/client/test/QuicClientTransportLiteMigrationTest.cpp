@@ -556,7 +556,7 @@ class QuicClientTransportLiteMockWithClose
         QuicClientTransportLiteMock(evb, nullptr, handshakeFactory) {}
 
   quic::Expected<void, QuicError> processPackets(
-      const Optional<quic::SocketAddress>&,
+      const quic::SocketAddress&,
       NetworkData&&) override {
     ++processPacketsCount;
     if (processPacketsCount == 1) {

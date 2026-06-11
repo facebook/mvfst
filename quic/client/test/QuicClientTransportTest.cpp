@@ -49,6 +49,13 @@ class QuicClientTransportMock : public QuicClientTransport {
                .hasError());
   }
 
+  quic::Expected<void, QuicError> readWithRecvmsgSinglePacketLoopForTest(
+      QuicAsyncUDPSocket& sock,
+      uint64_t readBufferSize) {
+    return QuicClientTransport::readWithRecvmsgSinglePacketLoop(
+        sock, readBufferSize);
+  }
+
   quic::Expected<void, QuicError> recvMmsgForTest(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,
@@ -61,7 +68,7 @@ class QuicClientTransportMock : public QuicClientTransport {
   }
 
   quic::Expected<void, QuicError> processPackets(
-      const Optional<quic::SocketAddress>& /*localAddress*/,
+      const quic::SocketAddress& /*localAddress*/,
       NetworkData&& networkData) override {
     if (!networkData.getPackets().empty()) {
       server_ = networkData.getPackets().front().peerAddress;
@@ -212,6 +219,10 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
         ++numRecvmsgCalls;
         return numRecvmsgCalls > numCallsExpected ? 0 : 42;
       }));
+  quic::SocketAddress localAddress("::1", 12345);
+  EXPECT_CALL(*sockPtr_, address())
+      .WillOnce(
+          Return(quic::Expected<quic::SocketAddress, QuicError>{localAddress}));
   // update WriteLooper() will call runInLoop() only once.
   EXPECT_CALL(*evb_, runInLoopWithCbPtr(_, _)).WillOnce(Return());
   quicClient_->readWithRecvmsgSinglePacketLoop(
@@ -220,6 +231,26 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
   for (const auto& networkData : quicClient_->networkDataVec_) {
     EXPECT_EQ(networkData.getPackets().size(), 1);
   }
+}
+
+TEST_F(
+    QuicClientTransportTest,
+    ReadWithRecvmsgSinglePacketLoopReturnsLocalAddressError) {
+  EXPECT_CALL(*sockPtr_, recvmsg(_, _))
+      .WillOnce(
+          Invoke([](struct msghdr* /* msg */, int /* flags */) { return 42; }));
+  EXPECT_CALL(*sockPtr_, address()).WillOnce(Invoke([] {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "local address unavailable"));
+  }));
+
+  auto result = quicClient_->readWithRecvmsgSinglePacketLoopForTest(
+      *sockPtr_, 1024 /* readBufferSize */);
+
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error().code, TransportErrorCode::INTERNAL_ERROR);
+  EXPECT_EQ(result.error().message, "local address unavailable");
 }
 
 } // namespace quic::test

@@ -1639,7 +1639,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::recvMsg(
 }
 
 quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
-    const Optional<quic::SocketAddress>& localAddress,
+    const quic::SocketAddress& localAddress,
     NetworkData&& networkData) {
   if (networkData.getPackets().empty()) {
     // recvMmsg and recvMsg might have already set the reason and counter
@@ -1655,14 +1655,13 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processPackets(
     }
     return {};
   }
-  MVDCHECK(localAddress.has_value());
   MVDCHECK(networkData.getPackets().front().peerAddress.has_value());
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
   networkData.setReceiveTimePoint(packetReceiveTime);
 
-  onNetworkData(*localAddress, std::move(networkData));
+  onNetworkData(localAddress, std::move(networkData));
   return {};
 }
 
@@ -1671,6 +1670,7 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
     QuicAsyncUDPSocket& sock,
     uint64_t readBufferSize) {
   size_t totalData = 0;
+  Optional<quic::SocketAddress> localAddress;
   for (size_t i = 0; i < conn_->transportSettings.maxRecvBatchSize; i++) {
     auto networkDataSinglePacket = NetworkData();
     networkDataSinglePacket.reserve(1);
@@ -1695,13 +1695,16 @@ QuicClientTransportLite::readWithRecvmsgSinglePacketLoop(
       break;
     }
 
-    auto localAddressRes = sock.address();
-    if (localAddressRes.hasError()) {
-      return quic::make_unexpected(localAddressRes.error());
+    if (!localAddress.has_value()) {
+      auto localAddressRes = sock.address();
+      if (localAddressRes.hasError()) {
+        return quic::make_unexpected(localAddressRes.error());
+      }
+      localAddress = std::move(localAddressRes.value());
     }
 
     auto processResult = processPackets(
-        localAddressRes.value(), std::move(networkDataSinglePacket));
+        localAddress.value(), std::move(networkDataSinglePacket));
     if (!processResult.has_value()) {
       return processResult;
     }
