@@ -14,6 +14,21 @@ fb_native.constraint_value(
     visibility = ["PUBLIC"],
 )
 
+# Deps for the `config` target's exported_deps, split by which mvfst-config
+# header the `headers` select picks. Keep these on the same select axes as
+# `headers` so ARVR Android can keep the server address aliases.
+_CONFIG_SERVER_DEPS = [
+    "//folly:network_address",  # @manual
+    "//folly:small_vector",  # @manual
+    "//folly/container:f14_hash",  # @manual
+    "//folly/container:heap_vector_types",  # @manual
+    "//quic/common/third-party:tiny_optional",  # @manual
+]
+
+_CONFIG_SOCKET_ADDRESS_MOBILE_DEPS = [
+    "//quic/common/address:quic_socket_address",  # @manual
+]
+
 mvfst_cpp_library(
     name = "enum",
     headers = select({
@@ -64,37 +79,74 @@ mvfst_cpp_library(
     headers = select({
         # @oss-only: "DEFAULT": {"mvfst-config.h": "//:mvfst-config.h"},
         "DEFAULT": select({
-            "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
-            "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-            "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+            "DEFAULT": select({
+                "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
+                "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+                "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
+            }),
+            "ovr_config//build_mode:arvr_mode[enabled]": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
         }),
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": {"mvfst-config.h": "facebook/mvfst-config-fbcode.h"},  # @fb-only
             "fbcode//quic:use_alt_crypto-enabled": {"mvfst-config.h": "facebook/mvfst-config-alt-crypto.h"},  # @fb-only
-            "ovr_config//build_mode:arvr_mode[enabled]": select({
-                "DEFAULT": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
-                "ovr_config//os/constraints:android": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-                "ovr_config//os/constraints:iphoneos": {"mvfst-config.h": "facebook/mvfst-config-mobile.h"},  # @fb-only
-            }),  # @fb-only
+            "ovr_config//build_mode:arvr_mode[enabled]": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
             "ovr_config//runtime/constraints:android-host-test": {"mvfst-config.h": "mvfst-config.h"},  # @fb-only
         }),  # @fb-only
     }),
     exported_deps = select({
-        "DEFAULT": [
-            "//folly:network_address",  # @manual
-            "//folly:small_vector",  # @manual
-            "//folly/container:f14_hash",  # @manual
-            "//folly/container:heap_vector_types",  # @manual
-            "//quic/common/third-party:tiny_optional",  # @manual
-        ],
-        "ovr_config//os/constraints:android": [
-            "//folly:network_address",  # @manual
-        ],
-        "ovr_config//os/constraints:iphoneos": [
-            "//folly:network_address",  # @manual
-        ],
+        # @oss-only: "DEFAULT": _CONFIG_SERVER_DEPS,
+        "DEFAULT": select({
+            "DEFAULT": select({
+                "DEFAULT": _CONFIG_SERVER_DEPS,  # @fb-only
+                "ovr_config//os/constraints:android": _CONFIG_SOCKET_ADDRESS_MOBILE_DEPS,  # @fb-only
+                "ovr_config//os/constraints:iphoneos": _CONFIG_SOCKET_ADDRESS_MOBILE_DEPS,  # @fb-only
+            }),
+            "ovr_config//build_mode:arvr_mode[enabled]": _CONFIG_SERVER_DEPS,  # @fb-only
+        }),
+        "ovr_config//runtime/constraints:fbcode": select({
+            "DEFAULT": _CONFIG_SERVER_DEPS,  # @fb-only
+            "fbcode//quic:use_alt_crypto-enabled": _CONFIG_SERVER_DEPS,  # @fb-only
+            "ovr_config//build_mode:arvr_mode[enabled]": _CONFIG_SERVER_DEPS,  # @fb-only
+            "ovr_config//runtime/constraints:android-host-test": _CONFIG_SERVER_DEPS,  # @fb-only
+        }),  # @fb-only
     }),
 )
+
+_CONSTANTS_SERVER_HEADERS = {
+    "QuicConstants.h": "QuicConstants.h",
+    "QuicTypealiases.h": "QuicTypealiases.h",
+}
+
+_CONSTANTS_SOCKET_ADDRESS_MOBILE_HEADERS = {
+    "QuicConstants.h": "QuicConstants.h",
+    "QuicTypealiases.h": "QuicTypealiasesSocketAddressMobile.h",
+}
+
+_CONSTANTS_TYPEALIASES_MOBILE_HEADERS = {
+    "QuicConstants.h": "QuicConstants.h",
+    "QuicTypealiases.h": "QuicTypealiasesMobile.h",
+}
+
+_CONSTANTS_SERVER_DEPS = [
+    ":enum",
+    "//folly/chrono:clock",
+    "//folly/io:iobuf",
+]
+
+_CONSTANTS_SOCKET_ADDRESS_MOBILE_DEPS = [
+    ":config",
+    ":enum",
+    "//folly/chrono:clock",
+    "//folly/io:iobuf",
+]
+
+_CONSTANTS_TYPEALIASES_MOBILE_DEPS = [
+    ":config",
+    ":enum",
+    "//folly/chrono:clock",
+    "//quic/common:quic_buffer",
+    "//quic/common:quic_iobuf_queue",
+]
 
 mvfst_cpp_library(
     name = "constants",
@@ -104,31 +156,45 @@ mvfst_cpp_library(
         "ovr_config//os/constraints:iphoneos": ["facebook/QuicConstantsMobile.cpp"],
     }),
     headers = select({
-        "DEFAULT": {
-            "QuicConstants.h": "QuicConstants.h",
-            "QuicTypealiases.h": "QuicTypealiases.h",
-        },
-        "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": {
-            "QuicConstants.h": "QuicConstants.h",
-            "QuicTypealiases.h": "QuicTypealiasesMobile.h",
-        },
+        "DEFAULT": select({
+            "DEFAULT": select({
+                "DEFAULT": select({
+                    "DEFAULT": _CONSTANTS_SERVER_HEADERS,
+                    "ovr_config//os/constraints:android": _CONSTANTS_SOCKET_ADDRESS_MOBILE_HEADERS,
+                    "ovr_config//os/constraints:iphoneos": _CONSTANTS_SOCKET_ADDRESS_MOBILE_HEADERS,
+                }),
+                "ovr_config//build_mode:arvr_mode[enabled]": _CONSTANTS_SERVER_HEADERS,
+            }),
+            "ovr_config//runtime/constraints:fbcode": select({
+                "DEFAULT": _CONSTANTS_SERVER_HEADERS,
+                "fbcode//quic:use_alt_crypto-enabled": _CONSTANTS_SERVER_HEADERS,
+                "ovr_config//build_mode:arvr_mode[enabled]": _CONSTANTS_SERVER_HEADERS,
+                "ovr_config//runtime/constraints:android-host-test": _CONSTANTS_SERVER_HEADERS,
+            }),
+        }),
+        "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": _CONSTANTS_TYPEALIASES_MOBILE_HEADERS,
     }),
     deps = [
         "//folly/lang:assume",
     ],
     exported_deps = select({
-        "DEFAULT": [
-            ":enum",
-            "//folly/chrono:clock",
-            "//folly/io:iobuf",
-        ],
-        "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": [
-            ":config",
-            ":enum",
-            "//folly/chrono:clock",
-            "//quic/common:quic_buffer",
-            "//quic/common:quic_iobuf_queue",
-        ],
+        "DEFAULT": select({
+            "DEFAULT": select({
+                "DEFAULT": select({
+                    "DEFAULT": _CONSTANTS_SERVER_DEPS,
+                    "ovr_config//os/constraints:android": _CONSTANTS_SOCKET_ADDRESS_MOBILE_DEPS,
+                    "ovr_config//os/constraints:iphoneos": _CONSTANTS_SOCKET_ADDRESS_MOBILE_DEPS,
+                }),
+                "ovr_config//build_mode:arvr_mode[enabled]": _CONSTANTS_SERVER_DEPS,
+            }),
+            "ovr_config//runtime/constraints:fbcode": select({
+                "DEFAULT": _CONSTANTS_SERVER_DEPS,
+                "fbcode//quic:use_alt_crypto-enabled": _CONSTANTS_SERVER_DEPS,
+                "ovr_config//build_mode:arvr_mode[enabled]": _CONSTANTS_SERVER_DEPS,
+                "ovr_config//runtime/constraints:android-host-test": _CONSTANTS_SERVER_DEPS,
+            }),
+        }),
+        "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": _CONSTANTS_TYPEALIASES_MOBILE_DEPS,
     }),
 )
 

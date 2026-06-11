@@ -177,7 +177,8 @@ quic::Expected<void, QuicError> happyEyeballsSetUpSocket(
   }
   if (!socket.isBound()) {
     auto addr = quic::SocketAddress(
-        peerAddress.getFamily() == AF_INET ? "0.0.0.0" : "::", 0);
+        folly::IPAddress(peerAddress.getFamily() == AF_INET ? "0.0.0.0" : "::"),
+        0);
     auto initResult = initSockAndApplyOpts();
     if (!initResult) {
       return quic::make_unexpected(initResult.error());
