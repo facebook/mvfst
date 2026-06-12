@@ -24,6 +24,21 @@ namespace {
 bool packetSpaceCheck(uint64_t limit, size_t require) {
   return (static_cast<uint64_t>(require) <= limit);
 }
+
+// Receive-time-descending, packet-number-descending order for received-packet
+// timestamps. Shared by the legacy and draft-02 receive-timestamp encoders: a
+// single named comparator type makes std::stable_sort instantiate once for the
+// whole TU instead of once per call-site lambda closure.
+struct RecvTimeDescComparator {
+  bool operator()(
+      const quic::WriteAckFrameState::ReceivedPacket* a,
+      const quic::WriteAckFrameState::ReceivedPacket* b) const {
+    if (a->timings.receiveTimePoint != b->timings.receiveTimePoint) {
+      return a->timings.receiveTimePoint > b->timings.receiveTimePoint;
+    }
+    return a->pktNum > b->pktNum;
+  }
+};
 } // namespace
 
 namespace quic {
@@ -335,15 +350,7 @@ fillFrameWithPacketReceiveTimestamps(
     // stdlib, so the portable std::stable_sort is used deliberately.
     // NOLINTNEXTLINE(modernize-use-ranges,boost-use-ranges)
     std::stable_sort(
-        sortedByTime.begin(),
-        sortedByTime.end(),
-        [](const WriteAckFrameState::ReceivedPacket* a,
-           const WriteAckFrameState::ReceivedPacket* b) {
-          if (a->timings.receiveTimePoint != b->timings.receiveTimePoint) {
-            return a->timings.receiveTimePoint > b->timings.receiveTimePoint;
-          }
-          return a->pktNum > b->pktNum;
-        });
+        sortedByTime.begin(), sortedByTime.end(), RecvTimeDescComparator{});
     PacketNum lastIncludedPktNum = std::numeric_limits<PacketNum>::max();
     for (auto* rpi : sortedByTime) {
       if (rpi->pktNum < lastIncludedPktNum) {
@@ -912,15 +919,7 @@ quic::Expected<size_t, QuicError> fillFrameWithDraft02PacketReceiveTimestamps(
   // preserves arrival order on equal keys and the pktnum=N+1, N+2... follow-up
   // packets break the expectedNext=N-1 chain.
   std::stable_sort(
-      sortedView.begin(),
-      sortedView.end(),
-      [](const WriteAckFrameState::ReceivedPacket* a,
-         const WriteAckFrameState::ReceivedPacket* b) {
-        if (a->timings.receiveTimePoint != b->timings.receiveTimePoint) {
-          return a->timings.receiveTimePoint > b->timings.receiveTimePoint;
-        }
-        return a->pktNum > b->pktNum;
-      });
+      sortedView.begin(), sortedView.end(), RecvTimeDescComparator{});
 
   size_t totalTimestamps = 0;
   size_t cumUsedSpace = 0;
