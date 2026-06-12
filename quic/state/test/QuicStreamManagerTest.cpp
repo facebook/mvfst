@@ -144,6 +144,29 @@ TEST_P(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
           !currentPriority->incremental)));
 }
 
+TEST_P(QuicStreamManagerTest, OnMaxDataSkipsDrainedConnFcBlockedStream) {
+  auto& manager = *conn.streamManager;
+  auto* stream = manager.createNextBidirectionalStream().value();
+  auto id = PriorityQueue::Identifier::fromStreamID(stream->id);
+
+  stream->pendingWrites =
+      ChainedByteRangeHead(folly::IOBuf::copyBuffer(std::string(100, 'a')));
+  manager.updateWritableStreams(*stream);
+  ASSERT_TRUE(manager.writeQueue().contains(id));
+
+  // Stream gets conn-FC-blocked, then its data drains before MAX_DATA arrives.
+  manager.writeQueue().erase(id);
+  manager.addConnFCBlockedStream(stream->id);
+  stream->pendingWrites = ChainedByteRangeHead();
+  manager.updateWritableStreams(*stream);
+  ASSERT_FALSE(manager.writeQueue().contains(id));
+
+  // onMaxData must not re-add the drained stream, else it spins the write loop.
+  manager.onMaxData();
+  EXPECT_TRUE(manager.writeQueue().empty());
+  EXPECT_FALSE(manager.hasWritable());
+}
+
 TEST_P(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());

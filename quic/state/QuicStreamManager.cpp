@@ -445,7 +445,10 @@ void QuicStreamManager::addConnFCBlockedStream(StreamId id) {
 void QuicStreamManager::onMaxData() {
   for (auto id : connFlowControlBlocked_) {
     auto stream = findStream(id);
-    if (stream) {
+    // Skip streams that drained (or were reset) while blocked: re-adding one
+    // with nothing to write leaves a stale write-queue entry that spins the
+    // write loop (shouldWriteData keeps returning STREAM).
+    if (stream && stream->hasSchedulableData(true)) {
       writeQueue().insertOrUpdate(
           PriorityQueue::Identifier::fromStreamID(id), stream->priority);
     }
