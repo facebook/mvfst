@@ -35,6 +35,18 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "QuicExceptionFormatTest",
+    srcs = [
+        "QuicExceptionFormatTest.cpp",
+    ],
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//folly/portability:gtest",
+        "//quic:exception",
+    ],
+)
+
+mvfst_cpp_test(
     name = "BufAccessorTest",
     srcs = [
         "BufAccessorTest.cpp",

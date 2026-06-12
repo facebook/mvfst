@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <fmt/format.h>
 #include <folly/Range.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicTLSException.h>
@@ -114,3 +115,48 @@ std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error);
 std::ostream& operator<<(std::ostream& os, const QuicError& error);
 
 } // namespace quic
+
+// Render these QUIC error types through quic::toString() for any fmt-based
+// formatting ("{}" in XR_LOG / folly logging / fmt::format), instead of fmt's
+// std::ostream fallback. That fallback dispatches into the out-of-line
+// quic::operator<< defined in a separate shared library, crossing the .so
+// boundary on an iostream whose streambuf vtable the two translation units
+// disagree on -- a latent ABI hazard that SIGSEGVs on some builds (e.g. the XR
+// cloud-browser client on QUIC connection teardown). An explicit formatter
+// specialization is also strictly more specialized than the ostream fallback,
+// so selection is unambiguous.
+namespace fmt {
+
+template <>
+struct formatter<quic::QuicErrorCode> : formatter<std::string> {
+  template <typename FormatContext>
+  auto format(const quic::QuicErrorCode& code, FormatContext& ctx) const {
+    return formatter<std::string>::format(quic::toString(code), ctx);
+  }
+};
+
+template <>
+struct formatter<quic::QuicError> : formatter<std::string> {
+  template <typename FormatContext>
+  auto format(const quic::QuicError& error, FormatContext& ctx) const {
+    return formatter<std::string>::format(quic::toString(error), ctx);
+  }
+};
+
+template <>
+struct formatter<quic::LocalErrorCode> : formatter<std::string> {
+  template <typename FormatContext>
+  auto format(quic::LocalErrorCode code, FormatContext& ctx) const {
+    return formatter<std::string>::format(quic::toString(code), ctx);
+  }
+};
+
+template <>
+struct formatter<quic::TransportErrorCode> : formatter<std::string> {
+  template <typename FormatContext>
+  auto format(quic::TransportErrorCode code, FormatContext& ctx) const {
+    return formatter<std::string>::format(quic::toString(code), ctx);
+  }
+};
+
+} // namespace fmt

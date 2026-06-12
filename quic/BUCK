@@ -215,6 +215,7 @@ mvfst_cpp_library(
     }) + [
     ],
     exported_deps = [
+        "fbsource//third-party/fmt:fmt",
         ":constants",
         ":tls_exception",
         "//folly:range",
