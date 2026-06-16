@@ -11,11 +11,11 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 #include <fizz/client/AsyncFizzClient.h>
 #include <fizz/client/FizzClientContext.h>
@@ -24,6 +24,7 @@
 #include <fizz/server/AsyncFizzServer.h>
 #include <fizz/server/FizzServerContext.h>
 #include <folly/SocketAddress.h>
+#include <folly/container/F14Map.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncServerSocket.h>
 #include <folly/io/async/AsyncSocket.h>
@@ -211,11 +212,14 @@ class TcpServerConnection
       public folly::AsyncTransportWrapper::WriteCallback {
  public:
   TcpServerConnection(
-      folly::EventBase* eventBase,
+      folly::EventBase* _Nonnull eventBase,
       folly::NetworkSocket fd,
       std::shared_ptr<const fizz::server::FizzServerContext> serverCtx,
-      const TPerfTcpServerConfig& config)
-      : blockSize_(config.blockSize),
+      const TPerfTcpServerConfig& config,
+      std::function<void(TcpServerConnection*)> onClose)
+      : eventBase_(eventBase),
+        onClose_(std::move(onClose)),
+        blockSize_(config.blockSize),
         writesPerLoop_(std::max<uint64_t>(config.writesPerLoop, 1)),
         writeBuffer_(folly::IOBuf::createCombined(blockSize_)) {
     auto socket = folly::AsyncSocket::newSocket(eventBase, fd);
@@ -312,8 +316,17 @@ class TcpServerConnection
     if (tcpServer_) {
       tcpServer_->closeNow();
     }
+    if (onClose_) {
+      // Defer erase until after the current callback stack unwinds — closeNow
+      // is reached from read/write/handshake callbacks where *this is on the
+      // stack, so a synchronous erase would delete *this mid-callback.
+      eventBase_->runInLoop(
+          [cb = std::move(onClose_), self = this] { cb(self); });
+    }
   }
 
+  folly::EventBase* _Nonnull eventBase_;
+  std::function<void(TcpServerConnection*)> onClose_;
   fizz::server::AsyncFizzServer::UniquePtr tcpServer_;
   std::array<uint8_t, kReadBufferSize> readBuffer_{};
   uint64_t blockSize_;
@@ -361,9 +374,12 @@ class TPerfTcpServer::Impl : public folly::AsyncServerSocket::AcceptCallback {
     MVLOG_INFO << "TPerfTcpServer accepted connection from "
                << clientAddr.describe();
     auto connection = std::make_unique<TcpServerConnection>(
-        &eventBase_, fd, serverCtx_, config_);
+        &eventBase_, fd, serverCtx_, config_, [this](TcpServerConnection* ptr) {
+          connections_.erase(ptr);
+        });
+    auto* raw = connection.get();
     connection->start();
-    connections_.push_back(std::move(connection));
+    connections_.emplace(raw, std::move(connection));
   }
 
   void acceptError(folly::exception_wrapper ex) noexcept override {
@@ -375,7 +391,8 @@ class TPerfTcpServer::Impl : public folly::AsyncServerSocket::AcceptCallback {
   folly::EventBase eventBase_;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx_;
   folly::AsyncServerSocket::UniquePtr serverSocket_;
-  std::vector<std::unique_ptr<TcpServerConnection>> connections_;
+  folly::F14FastMap<TcpServerConnection*, std::unique_ptr<TcpServerConnection>>
+      connections_;
 };
 
 TPerfTcpClient::TPerfTcpClient(TPerfTcpClientConfig config)
