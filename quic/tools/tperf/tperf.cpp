@@ -12,10 +12,15 @@
 
 #include <quic/tools/tperf/TperfClient.h>
 #include <quic/tools/tperf/TperfServer.h>
+#include <quic/tools/tperf/TperfTcp.h>
 
 DEFINE_string(host, "::1", "TPerf server hostname/IP");
 DEFINE_int32(port, 6666, "TPerf server port");
 DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
+DEFINE_string(
+    transport,
+    "quic",
+    "Transport to run: 'quic' or 'tcp'. TCP mode uses TLS over TCP via Fizz.");
 DEFINE_int32(duration, 10, "Duration of test in seconds");
 DEFINE_uint64(
     block_size,
@@ -137,6 +142,19 @@ namespace {} // namespace
 
 using namespace quic::tperf;
 
+enum class TperfTransportMode : uint8_t { Quic, Tcp };
+
+TperfTransportMode flagsToTransportMode(const std::string& transportFlag) {
+  if (transportFlag == "quic") {
+    return TperfTransportMode::Quic;
+  }
+  if (transportFlag == "tcp") {
+    return TperfTransportMode::Tcp;
+  }
+  throw std::invalid_argument(
+      fmt::format("Unknown transport {}", transportFlag));
+}
+
 quic::CongestionControlType flagsToCongestionControlType(
     const std::string& congestionControlFlag) {
   auto ccType = quic::congestionControlStrToType(congestionControlFlag);
@@ -156,7 +174,25 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, false);
   folly::Init init(&argc, &argv);
 
+  TperfTransportMode transportMode = TperfTransportMode::Quic;
+  try {
+    transportMode = flagsToTransportMode(FLAGS_transport);
+  } catch (const std::invalid_argument& ex) {
+    MVLOG_ERROR << ex.what();
+    return 1;
+  }
   if (FLAGS_mode == "server") {
+    if (transportMode == TperfTransportMode::Tcp) {
+      TPerfTcpServer server(
+          TPerfTcpServerConfig{
+              .host = FLAGS_host,
+              .port = static_cast<uint16_t>(FLAGS_port),
+              .blockSize = FLAGS_block_size,
+              .writesPerLoop = FLAGS_writes_per_loop,
+          });
+      server.start();
+      return 0;
+    }
     TPerfServer server(
         FLAGS_host,
         FLAGS_port,
@@ -193,6 +229,16 @@ int main(int argc, char* argv[]) {
             FLAGS_static_cwnd_bytes, FLAGS_pacer_interval_source));
     server.start();
   } else if (FLAGS_mode == "client") {
+    if (transportMode == TperfTransportMode::Tcp) {
+      TPerfTcpClient client(
+          TPerfTcpClientConfig{
+              .host = FLAGS_host,
+              .port = static_cast<uint16_t>(FLAGS_port),
+              .duration = FLAGS_duration,
+          });
+      client.start();
+      return 0;
+    }
     if (FLAGS_num_streams != 1) {
       MVLOG_ERROR << "num_streams option is server only";
       return 1;
@@ -222,6 +268,9 @@ int main(int argc, char* argv[]) {
         FLAGS_read_ecn,
         FLAGS_dscp);
     client.start();
+  } else {
+    MVLOG_ERROR << "Unknown mode " << FLAGS_mode;
+    return 1;
   }
   return 0;
 }

@@ -12,6 +12,7 @@ add_executable(
   tperf.cpp
   TperfClient.cpp
   TperfServer.cpp
+  TperfTcp.cpp
 )
 
 target_compile_options(
