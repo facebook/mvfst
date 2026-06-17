@@ -11,6 +11,8 @@ mvfst_add_library(mvfst_server_handshake
   DEPS
     mvfst_common_mvfst_logging
     mvfst_fizz_handshake_fizz_bridge
+    mvfst_logging_oops_logger
+    mvfst_state_connection_oops_fields
     mvfst_state_stream_functions
   EXPORTED_DEPS
     mvfst_constants

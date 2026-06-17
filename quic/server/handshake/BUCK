@@ -14,6 +14,8 @@ mvfst_cpp_library(
     deps = [
         "//quic/common:mvfst_logging",
         "//quic/fizz/handshake:fizz_bridge",  # @manual direct include from ServerHandshake.cpp
+        "//quic/logging/oops_logger:oops_logger",
+        "//quic/state:connection_oops_fields",
         "//quic/state:stream_functions",
     ],
     exported_deps = [

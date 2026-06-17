@@ -9,10 +9,13 @@
 #include <quic/server/handshake/ServerHandshake.h>
 
 #include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <cstdint>
 
 namespace quic {
+
 ServerHandshake::ServerHandshake(QuicConnectionStateBase* conn)
     : conn_(conn), actionGuard_(nullptr), cryptoState_(*conn->cryptoState) {}
 
@@ -104,6 +107,13 @@ ServerHandshake::getNextOneRttWriteCipher() {
     return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !writeTrafficSecret_,
+      conn_->oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+      "quic_server_handshake",
+      "invariant_violation: next one-rtt write cipher missing traffic "
+      "secret");
   MVCHECK(writeTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
       << "Server read and write secrets are out of sync";
@@ -128,6 +138,12 @@ ServerHandshake::getNextOneRttReadCipher() {
     return quic::make_unexpected(
         QuicError(error_->second, std::move(error_->first)));
   }
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !readTrafficSecret_,
+      conn_->oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+      "quic_server_handshake",
+      "invariant_violation: next one-rtt read cipher missing traffic secret");
   MVCHECK(readTrafficSecret_);
   LOG_IF(WARNING, trafficSecretSync_ > 1 || trafficSecretSync_ < -1)
       << "Server read and write secrets are out of sync";
@@ -260,6 +276,12 @@ void ServerHandshake::onWriteData(fizz::WriteToSocket& write) {
   }
   for (auto& content : write.contents) {
     auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
+    PROTO_OOPS_LOG_BUILDER_IF(
+        encryptionLevel == EncryptionLevel::EarlyData,
+        conn_->oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+        "quic_server_handshake",
+        "invariant_violation: server attempted to write early data");
     MVCHECK(
         encryptionLevel != EncryptionLevel::EarlyData,
         "Server cannot write early data");
