@@ -256,7 +256,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLost) {
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // mark the packet lost
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.addLostPacket(pkt);
   quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
@@ -279,7 +279,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostFullCwnd) {
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // mark the packet lost
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.addLostPacket(pkt);
   quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
@@ -302,7 +302,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketSentThenLostOvershoot) {
   EXPECT_EQ(cwndInBytes, cca.getCongestionWindow());
 
   // mark the packet lost
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.addLostPacket(pkt);
   quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
   EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
@@ -335,7 +335,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLost) {
 
   // mark packet1 lost
   {
-    CongestionController::LossEvent lossEvent;
+    LossEvent lossEvent;
     lossEvent.addLostPacket(pkt1);
     quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(cwndInBytes - bytesSentPkt2, cca.getWritableBytes());
@@ -344,7 +344,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLost) {
 
   // mark packet2 lost
   {
-    CongestionController::LossEvent lossEvent;
+    LossEvent lossEvent;
     lossEvent.addLostPacket(pkt2);
     quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(cwndInBytes, cca.getWritableBytes());
@@ -377,7 +377,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLostOvershoot) {
 
   // mark packet1 lost
   {
-    CongestionController::LossEvent lossEvent;
+    LossEvent lossEvent;
     lossEvent.addLostPacket(pkt1);
     quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(0, cca.getWritableBytes());
@@ -386,7 +386,7 @@ TEST_F(StaticCwndCongestionControllerTest, PacketsSentThenLostOvershoot) {
 
   // mark packet2 lost
   {
-    CongestionController::LossEvent lossEvent;
+    LossEvent lossEvent;
     lossEvent.addLostPacket(pkt2);
     quic::test::onPacketAckOrLossWrapper(&conn, &cca, std::nullopt, lossEvent);
     EXPECT_EQ(cwndInBytes, cca.getWritableBytes());

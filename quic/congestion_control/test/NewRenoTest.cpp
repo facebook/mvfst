@@ -18,9 +18,9 @@ namespace quic::test {
 
 class NewRenoTest : public Test {};
 
-CongestionController::LossEvent createLossEvent(
+LossEvent createLossEvent(
     std::vector<std::pair<PacketNum, size_t>> lostPackets) {
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   auto connId = getTestConnectionId();
   for (auto packetData : lostPackets) {
     RegularQuicWritePacket packet(
@@ -263,7 +263,7 @@ TEST_F(NewRenoTest, PersistentCongestion) {
   uint32_t ackedSize = 10;
   auto pkt = createPacket(ackPacketNum, ackedSize, Clock::now());
   quic::test::onPacketsSentWrapper(&conn, &reno, pkt);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
   quic::test::onPacketAckOrLossWrapper(&conn, &reno, std::nullopt, loss);

@@ -72,7 +72,7 @@ TEST_F(BbrTest, Recovery) {
 
   // This also makes sure recoveryWindow_ is larger than inflightBytes
   uint64_t ackedBytes = 1000 * conn.transportSettings.minCwndInMss * 2;
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.lostBytes = 100;
   inflightBytes -= (loss.lostBytes + ackedBytes);
   uint64_t expectedRecoveryWindow = std::max(
@@ -99,7 +99,7 @@ TEST_F(BbrTest, Recovery) {
   // Sleep 1ms to make next now() a bit far from previous now().
   std::this_thread::sleep_for(1ms);
 
-  CongestionController::LossEvent loss2;
+  LossEvent loss2;
   loss2.lostBytes = 100;
   inflightBytes -= loss2.lostBytes;
   expectedRecoveryWindow -= loss2.lostBytes;
@@ -126,7 +126,7 @@ TEST_F(BbrTest, Recovery) {
   EXPECT_EQ(expectedRecoveryWindow, bbr.getCongestionWindow());
   inflightBytes -= ackedBytes;
 
-  CongestionController::LossEvent loss3;
+  LossEvent loss3;
   loss3.persistentCongestion = true;
   loss3.lostBytes = inflightBytes / 2;
   expectedRecoveryWindow = conn.udpSendPacketLen * kMinCwndInMssForBbr;
@@ -446,7 +446,7 @@ TEST_F(BbrTest, ProbeRtt) {
 TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrash) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto pn = 0;
   auto ackTime = Clock::now();
@@ -463,7 +463,7 @@ TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrash) {
 TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto pn = 0;
   auto ackTime = Clock::now();
@@ -480,7 +480,7 @@ TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
 TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto pn = 0;
   auto ackTime = Clock::now();
@@ -497,7 +497,7 @@ TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
 TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrashPn1) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto pn = 1;
   auto ackTime = Clock::now();
@@ -514,7 +514,7 @@ TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrashPn1) {
 TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrashPn1) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto pn = 1;
   auto ackTime = Clock::now();
@@ -531,7 +531,7 @@ TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrashPn1) {
 TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrashPn1) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto pn = 1;
   auto ackTime = Clock::now();
@@ -777,7 +777,7 @@ TEST_F(BbrTest, PacketLossInvokesPacer) {
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   quic::test::onPacketsSentWrapper(&conn, &bbr, packet);
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(&conn, &bbr, std::nullopt, lossEvent);
 }

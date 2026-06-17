@@ -358,8 +358,7 @@ void Bbr2Shared::advanceLatestDeliverySignals() {
   }
 }
 
-void Bbr2Shared::updateLossSignals(
-    const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent) {
+void Bbr2Shared::updateLossSignals(const LossEvent* FOLLY_NULLABLE lossEvent) {
   if (lossEvent && lossEvent->lostBytes > 0 &&
       !lossEvent->lostPacketNumbers.empty()) {
     lossBytesInRound_ += lossEvent->lostBytes;
@@ -413,9 +412,7 @@ void Bbr2Shared::updateShortTermModelOnLoss(
 
 // ===== Recovery State =====
 
-void Bbr2Shared::onPacketLoss(
-    const CongestionController::LossEvent& lossEvent,
-    uint64_t ackedBytes) {
+void Bbr2Shared::onPacketLoss(const LossEvent& lossEvent, uint64_t ackedBytes) {
   saveCwnd();
   recoveryStartTime_ = Clock::now();
   if (recoveryState_ == RecoveryState::NOT_RECOVERY) {
@@ -494,7 +491,7 @@ void Bbr2Shared::sampleBandwidthFromAck(const AckEvent& ackEvent) {
 }
 
 void Bbr2Shared::updateModelFromDeliveryAndLoss(
-    const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent) {
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
   updateLatestDeliverySignals();
   updateRound();
   updateRecoveryOnAck();

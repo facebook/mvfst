@@ -10,6 +10,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/state/ClonedPacketIdentifier.h>
+#include <quic/state/LossEvent.h>
 #include <quic/state/OutstandingPacket.h>
 #include <sys/types.h>
 
@@ -46,51 +47,12 @@ union CongestionControllerStats {
 struct CongestionController {
  public:
   using AckEvent = quic::AckEvent;
+  using LossEvent = quic::LossEvent;
 
   struct State {
     uint64_t writableBytes{0};
     uint64_t congestionWindowBytes{0};
     Optional<uint64_t> maybeBandwidthBitsPerSec{std::nullopt};
-  };
-
-  // Helper struct to group multiple lost packets into one event
-  struct LossEvent {
-    Optional<PacketNum> largestLostPacketNum;
-    std::vector<PacketNum> lostPacketNumbers;
-    uint64_t lostBytes{0};
-    uint32_t lostPackets{0};
-    const TimePoint lossTime;
-    // The packet sent time of the lost packet with largest packet sent time in
-    // this LossEvent
-    Optional<TimePoint> largestLostSentTime;
-    // The packet sent time of the lost packet with smallest packet sent time in
-    // the LossEvent
-    Optional<TimePoint> smallestLostSentTime;
-    // Whether this LossEvent also indicates persistent congestion
-    bool persistentCongestion{false};
-
-    explicit LossEvent(TimePoint time = Clock::now()) : lossTime(time) {}
-
-    void addLostPacket(const OutstandingPacketWrapper& packet) {
-      if (std::numeric_limits<uint64_t>::max() - lostBytes <
-          packet.metadata.encodedSize) {
-        throw QuicInternalException(
-            "LossEvent: lostBytes overflow",
-            LocalErrorCode::LOST_BYTES_OVERFLOW);
-      }
-      PacketNum packetNum = packet.packet.header.getPacketSequenceNum();
-      largestLostPacketNum =
-          std::max(packetNum, largestLostPacketNum.value_or(packetNum));
-      lostPacketNumbers.push_back(packetNum);
-      lostBytes += packet.metadata.encodedSize;
-      lostPackets++;
-      largestLostSentTime = std::max(
-          packet.metadata.time,
-          largestLostSentTime.value_or(packet.metadata.time));
-      smallestLostSentTime = std::min(
-          packet.metadata.time,
-          smallestLostSentTime.value_or(packet.metadata.time));
-    }
   };
 
   virtual ~CongestionController() = default;

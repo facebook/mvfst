@@ -345,7 +345,7 @@ TEST_F(CubicHystartTest, ReduceByCubicReductionFactor) {
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   EXPECT_EQ(initCwnd - 1000, cubic.getWritableBytes());
   // this decreases inflight by 1000, and then decreases cwnd by Cubic:
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));

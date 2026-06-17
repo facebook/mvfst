@@ -41,7 +41,7 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   conn.lossState.largestSent = 1;
   cubic.onPacketSent(packet1);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet1);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));

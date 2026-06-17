@@ -22,7 +22,7 @@ TEST_F(CubicStateTest, HystartLoss) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   TestingCubic cubic(conn);
   auto packet = makeTestingWritePacket(0, 0, 0);
-  CongestionController::LossEvent lossEvent(Clock::now());
+  LossEvent lossEvent(Clock::now());
   lossEvent.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(&conn, &cubic, std::nullopt, lossEvent);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
@@ -52,7 +52,7 @@ TEST_F(CubicStateTest, FastRecoveryAck) {
   conn.lossState.largestSent = 2;
   cubic.onPacketSent(packet);
   cubic.onPacketSent(packet1);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));
@@ -70,7 +70,7 @@ TEST_F(CubicStateTest, FastRecoveryAckToSteady) {
   auto packet = makeTestingWritePacket(0, 1, 1);
   // This moves the state machine to recovery, and mark endOfRecovery = 0
   cubic.onPacketSent(packet);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));
@@ -89,7 +89,7 @@ TEST_F(CubicStateTest, FastRecoveryLoss) {
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::FastRecovery);
   auto packet = makeTestingWritePacket(0, 0, 0);
-  CongestionController::LossEvent lossEvent(Clock::now());
+  LossEvent lossEvent(Clock::now());
   lossEvent.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(&conn, &cubic, std::nullopt, lossEvent);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
@@ -116,7 +116,7 @@ TEST_F(CubicStateTest, SteadyLoss) {
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::Steady);
   auto packet = makeTestingWritePacket(0, 0, 0);
-  CongestionController::LossEvent lossEvent(Clock::now());
+  LossEvent lossEvent(Clock::now());
   lossEvent.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(&conn, &cubic, std::nullopt, lossEvent);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());

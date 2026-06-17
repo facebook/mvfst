@@ -197,7 +197,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor, // Visitor now returns Expected
     std::chrono::microseconds& delayUntilLost,
-    CongestionController::LossEvent& lossEvent,
+    LossEvent& lossEvent,
     Optional<SocketObserverInterface::LossEvent>& observerLossEvent);
 
 /*
@@ -205,14 +205,12 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
  * Returns a LossEvent on success (possibly empty), or a QuicError if
  * processing encountered an error (e.g., from the lossVisitor).
  */
-[[nodiscard]] quic::
-    Expected<Optional<CongestionController::LossEvent>, QuicError>
-    detectLossPackets(
-        QuicConnectionStateBase& conn,
-        const AckState& ackState,
-        const LossVisitor& lossVisitor,
-        const TimePoint lossTime,
-        const PacketNumberSpace pnSpace);
+[[nodiscard]] quic::Expected<Optional<LossEvent>, QuicError> detectLossPackets(
+    QuicConnectionStateBase& conn,
+    const AckState& ackState,
+    const LossVisitor& lossVisitor,
+    const TimePoint lossTime,
+    const PacketNumberSpace pnSpace);
 
 /*
  * Function invoked when PTO alarm fires. Handles errors internally.
@@ -305,13 +303,11 @@ template <class ClockType = Clock>
  * Returns a LossEvent on success (possibly empty), or QuicError if processing
  * failed.
  */
-[[nodiscard]] quic::
-    Expected<Optional<CongestionController::LossEvent>, QuicError>
-    handleAckForLoss(
-        QuicConnectionStateBase& conn,
-        const LossVisitor& lossVisitor, // Visitor now returns Expected
-        CongestionController::AckEvent& ack,
-        PacketNumberSpace pnSpace);
+[[nodiscard]] quic::Expected<Optional<LossEvent>, QuicError> handleAckForLoss(
+    QuicConnectionStateBase& conn,
+    const LossVisitor& lossVisitor, // Visitor now returns Expected
+    CongestionController::AckEvent& ack,
+    PacketNumberSpace pnSpace);
 
 /**
  * Force marks zero rtt packets as lost during zero rtt rejection.
@@ -321,7 +317,7 @@ template <class ClockType = Clock>
 [[nodiscard]] quic::Expected<void, QuicError> markZeroRttPacketsLost(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor) {
-  CongestionController::LossEvent lossEvent(ClockType::now());
+  LossEvent lossEvent(ClockType::now());
 
   auto iter = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   while (iter != conn.outstandings.packets.end()) {

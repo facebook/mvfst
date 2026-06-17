@@ -67,7 +67,7 @@ Optional<uint64_t> getAckIntervalSetVersion(
 void updateCongestionControllerForAck(
     QuicConnectionStateBase& conn,
     AckEvent& ack,
-    Optional<CongestionController::LossEvent>& lossEvent) {
+    Optional<LossEvent>& lossEvent) {
   if (conn.congestionController &&
       (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {

@@ -122,8 +122,7 @@ class Bbr2Shared {
   void resetCongestionSignals();
   void updateLatestDeliverySignals();
   void advanceLatestDeliverySignals();
-  void updateLossSignals(
-      const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent);
+  void updateLossSignals(const LossEvent* FOLLY_NULLABLE lossEvent);
 
   // ===== Short-Term Model Helper =====
   void updateShortTermModelOnLoss(
@@ -131,9 +130,7 @@ class Bbr2Shared {
       Optional<uint64_t>& inflightShortTerm);
 
   // ===== Recovery State =====
-  void onPacketLoss(
-      const CongestionController::LossEvent& lossEvent,
-      uint64_t ackedBytes);
+  void onPacketLoss(const LossEvent& lossEvent, uint64_t ackedBytes);
   void updateRecoveryOnAck();
 
   // ===== Last Acked Packet State =====
@@ -153,7 +150,7 @@ class Bbr2Shared {
   // round tracking, recovery state, loss signals, max bandwidth filter,
   // and ACK aggregation.
   void updateModelFromDeliveryAndLoss(
-      const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent);
+      const LossEvent* FOLLY_NULLABLE lossEvent);
 
   // Updates MinRTT from latest RTT sample and advances delivery signals
   // to prepare for the next round.

@@ -75,7 +75,7 @@ TEST_F(Bbr2Test, BytesInFlightAccounting) {
   EXPECT_EQ(conn_->lossState.inflightBytes, 6000);
 
   // Mark 1 packet as lost
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.lostPackets = 1;
   lossEvent.lostBytes = 3000;
   quic::test::onPacketAckOrLossWrapper(
@@ -169,7 +169,7 @@ TEST_F(Bbr2Test, GracefullyHandleMissingFields) {
       quic::test::onPacketAckOrLossWrapper(
           conn_.get(), &bbr2, ackEvent, std::nullopt));
 
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   quic::test::onPacketAckOrLossWrapper(
       conn_.get(), &bbr2, std::nullopt, lossEvent);
   EXPECT_NO_THROW(

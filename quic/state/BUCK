@@ -16,6 +16,18 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "loss_event",
+    headers = [
+        "LossEvent.h",
+    ],
+    exported_deps = [
+        ":outstanding_packet",
+        "//quic:constants",
+        "//quic/common:optional",
+    ],
+)
+
+mvfst_cpp_library(
     name = "early_data_app_params_handler",
     headers = [
         "EarlyDataAppParamsHandler.h",

@@ -322,7 +322,7 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
     const std::chrono::microseconds& rttSample,
     const LossVisitor& lossVisitor,
     std::chrono::microseconds& delayUntilLost,
-    CongestionController::LossEvent& lossEvent,
+    LossEvent& lossEvent,
     Optional<SocketObserverInterface::LossEvent>& observerLossEvent) {
   bool shouldSetTimer = false;
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
@@ -444,8 +444,7 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
  * This function should be invoked after some event that is possible to
  * trigger loss detection, for example: packets are acked
  */
-quic::Expected<Optional<CongestionController::LossEvent>, QuicError>
-detectLossPackets(
+quic::Expected<Optional<LossEvent>, QuicError> detectLossPackets(
     QuicConnectionStateBase& conn,
     const AckState& ackState,
     const LossVisitor& lossVisitor,
@@ -462,7 +461,7 @@ detectLossPackets(
              << " largestAcked=" << ackState.largestAckedByPeer.value_or(0)
              << " delayUntilLost=" << delayUntilLost.count() << "us" << " "
              << conn;
-  CongestionController::LossEvent lossEvent(lossTime);
+  LossEvent lossEvent(lossTime);
   Optional<SocketObserverInterface::LossEvent> observerLossEvent;
   {
     const auto socketObserverContainer = conn.getSocketObserverContainer();
@@ -554,8 +553,7 @@ detectLossPackets(
   return std::nullopt;
 }
 
-quic::Expected<Optional<CongestionController::LossEvent>, QuicError>
-handleAckForLoss(
+quic::Expected<Optional<LossEvent>, QuicError> handleAckForLoss(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor,
     CongestionController::AckEvent& ack,

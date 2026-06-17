@@ -26,7 +26,7 @@ void onPacketAckOrLossWrapper(
     quic::QuicConnectionStateBase* conn,
     quic::CongestionController* cc,
     quic::Optional<quic::AckEvent> ack,
-    quic::Optional<quic::CongestionController::LossEvent> loss);
+    quic::Optional<quic::LossEvent> loss);
 
 void removeBytesFromInflight(
     quic::QuicConnectionStateBase* conn,

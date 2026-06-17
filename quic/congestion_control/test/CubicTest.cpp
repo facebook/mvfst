@@ -52,7 +52,7 @@ TEST_F(CubicTest, PersistentCongestion) {
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   // Sent and lost, inflight = 0
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet);
   loss.persistentCongestion = true;
   quic::test::onPacketAckOrLossWrapper(
@@ -129,7 +129,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
       std::nullopt);
   // Cwnd >= 3000, inflight = 2000:
   EXPECT_GE(cubic.getWritableBytes(), 1000);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet2);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));
@@ -170,7 +170,7 @@ TEST_F(CubicTest, AppIdle) {
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   auto reductionTime = Clock::now();
   auto maxCwnd = cubic.getCongestionWindow();
-  CongestionController::LossEvent loss(reductionTime);
+  LossEvent loss(reductionTime);
   loss.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));
@@ -259,7 +259,7 @@ TEST_F(CubicTest, PacingGain) {
 
   auto packet1 = makeTestingWritePacket(1, 1500, 3000);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet1);
   // reduce cwnd to 9 MSS
   EXPECT_CALL(*rawPacer, refreshPacingRate(_, _, _))
@@ -299,7 +299,7 @@ TEST_F(CubicTest, PacetLossInvokesPacer) {
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(&conn, &cubic, std::nullopt, lossEvent);
 }
@@ -319,7 +319,7 @@ TEST_F(CubicTest, LossEventWithEmptyOptionals) {
   Cubic cubic(conn);
 
   // Create a loss event with empty optionals (no packets added)
-  CongestionController::LossEvent loss;
+  LossEvent loss;
 
 #if !defined(NDEBUG) && !defined(_WIN32)
   EXPECT_DEATH(
@@ -371,7 +371,7 @@ TEST_F(CubicTest, RecoveryWithEmptyLastMaxCwndOrLastReductionTime) {
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet2);
 
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet1);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));
@@ -380,7 +380,7 @@ TEST_F(CubicTest, RecoveryWithEmptyLastMaxCwndOrLastReductionTime) {
   auto packet3 = makeTestingWritePacket(3, 1000, 4000);
   conn.lossState.largestSent = 3;
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet3);
-  CongestionController::LossEvent persistentLoss;
+  LossEvent persistentLoss;
   persistentLoss.addLostPacket(packet3);
   persistentLoss.persistentCongestion = true;
   quic::test::onPacketAckOrLossWrapper(

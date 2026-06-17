@@ -13,6 +13,13 @@ mvfst_add_library(mvfst_state_outstanding_packet
     Folly::folly_io_socket_option_map
 )
 
+mvfst_add_library(mvfst_state_loss_event
+  EXPORTED_DEPS
+    mvfst_common_optional
+    mvfst_constants
+    mvfst_state_outstanding_packet
+)
+
 mvfst_add_library(mvfst_state_early_data_app_params_handler
   EXPORTED_DEPS
     mvfst_common_buf_util

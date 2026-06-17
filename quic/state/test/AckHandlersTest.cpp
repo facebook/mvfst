@@ -2017,7 +2017,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       .Times(1)
       .WillOnce(Invoke(
           [&](const CongestionController::AckEvent* FOLLY_NULLABLE ackEvent,
-              const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent) {
+              const LossEvent* FOLLY_NULLABLE lossEvent) {
             EXPECT_FALSE(
                 CHECK_NOTNULL(ackEvent)->largestNewlyAckedPacket.has_value());
             EXPECT_TRUE(

@@ -18,6 +18,7 @@ mvfst_add_library(mvfst_congestion_control_congestion_controller
     mvfst_congestion_control_bandwidth
     mvfst_constants
     mvfst_state_cloned_packet_identifier
+    mvfst_state_loss_event
     mvfst_state_outstanding_packet
 )
 

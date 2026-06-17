@@ -20,9 +20,9 @@ namespace quic::test {
 // TODO: Add UT for different latency factor values
 class CopaTest : public Test {
  public:
-  CongestionController::LossEvent createLossEvent(
+  LossEvent createLossEvent(
       std::vector<std::pair<PacketNum, size_t>> lostPackets) {
-    CongestionController::LossEvent loss;
+    LossEvent loss;
     auto connId = getTestConnectionId();
     uint64_t totalSentBytes = 0;
     for (auto packetData : lostPackets) {
@@ -208,7 +208,7 @@ TEST_F(CopaTest, PersistentCongestion) {
   EXPECT_EQ(*event->bytesInFlight, 10);
   EXPECT_EQ(*event->congestionWindow, kDefaultCwnd);
 
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
   quic::test::onPacketAckOrLossWrapper(&conn, &copa, std::nullopt, loss);
@@ -591,7 +591,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.largestLostPacketNum = 0;
   const auto now = TimePoint::clock::now();
   auto ack = AckEvent::Builder()
@@ -624,7 +624,7 @@ TEST_F(CopaTest, PacketLossInvokesPacer) {
   auto packet = createPacket(0 /* pacetNum */, 1000, 1000);
   quic::test::onPacketsSentWrapper(&conn, &copa, packet);
   EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
-  CongestionController::LossEvent lossEvent;
+  LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
   quic::test::onPacketAckOrLossWrapper(&conn, &copa, std::nullopt, lossEvent);
 }

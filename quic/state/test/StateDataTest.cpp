@@ -132,7 +132,7 @@ TEST_F(StateDataTest, AppLimitedTracker) {
 }
 
 TEST_F(StateDataTest, EmptyLossEvent) {
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   EXPECT_EQ(0, loss.lostBytes);
   EXPECT_FALSE(loss.largestLostPacketNum);
 }
@@ -155,7 +155,7 @@ TEST_F(StateDataTest, SingleLostPacketEvent) {
       LossState(),
       0,
       OutstandingPacketMetadata::DetailsPerStream());
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(outstandingPacket);
   EXPECT_EQ(1234, loss.lostBytes);
   EXPECT_EQ(100, *loss.largestLostPacketNum);
@@ -198,7 +198,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       0,
       OutstandingPacketMetadata::DetailsPerStream());
 
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(outstandingPacket1);
   loss.addLostPacket(outstandingPacket2);
   EXPECT_EQ(1234 + 1357, loss.lostBytes);

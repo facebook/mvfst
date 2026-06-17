@@ -24,7 +24,7 @@ TEST_F(CubicRecoveryTest, LossBurst) {
   // Send and loss immediately
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet0);
   totalSent += 1000;
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   loss.addLostPacket(packet0);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss));
@@ -32,7 +32,7 @@ TEST_F(CubicRecoveryTest, LossBurst) {
   auto cwndAfterLoss = cubic.getCongestionWindow();
 
   // Then lose a few more:
-  CongestionController::LossEvent loss2;
+  LossEvent loss2;
   for (size_t i = 1; i < 5; i++) {
     auto packet = makeTestingWritePacket(i, 1000, 1000 + totalSent);
     quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
@@ -75,7 +75,7 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet2);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet3);
   conn.lossState.largestSent = 3;
-  CongestionController::LossEvent loss2;
+  LossEvent loss2;
   loss2.addLostPacket(packet2);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss2));
@@ -101,7 +101,7 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
   // Now lose packet1, which should be ignored.
-  CongestionController::LossEvent loss1;
+  LossEvent loss1;
   loss1.addLostPacket(packet1);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss1));
@@ -125,7 +125,7 @@ TEST_F(CubicRecoveryTest, LossAfterRecovery) {
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   conn.lossState.largestSent = 1;
-  CongestionController::LossEvent loss1;
+  LossEvent loss1;
   loss1.addLostPacket(packet1);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss1));
@@ -136,7 +136,7 @@ TEST_F(CubicRecoveryTest, LossAfterRecovery) {
   auto packet2 = makeTestingWritePacket(2, 1000, 3000);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   conn.lossState.largestSent = 2;
-  CongestionController::LossEvent loss2;
+  LossEvent loss2;
   loss2.addLostPacket(packet2);
   quic::test::onPacketAckOrLossWrapper(
       &conn, &cubic, std::nullopt, std::move(loss2));
@@ -153,7 +153,7 @@ TEST_F(CubicRecoveryTest, AckNotLargestNotChangeCwnd) {
   auto packet4 = makeTestingWritePacket(3, 1000, 4000);
   auto packet5 = makeTestingWritePacket(4, 1000, 5000);
 
-  CongestionController::LossEvent loss;
+  LossEvent loss;
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet2);
   quic::test::onPacketsSentWrapper(&conn, &cubic, packet3);

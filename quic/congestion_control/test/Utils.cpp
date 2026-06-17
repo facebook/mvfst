@@ -26,7 +26,7 @@ void onPacketAckOrLossWrapper(
     quic::QuicConnectionStateBase* conn,
     quic::CongestionController* cc,
     quic::Optional<quic::AckEvent> ack,
-    quic::Optional<quic::CongestionController::LossEvent> loss) {
+    quic::Optional<quic::LossEvent> loss) {
   if (loss) {
     quic::subtractAndCheckUnderflow(
         conn->lossState.inflightBytes, loss->lostBytes);
@@ -37,8 +37,7 @@ void onPacketAckOrLossWrapper(
         conn->lossState.inflightBytes, ack->ackedBytes);
   }
   quic::AckEvent* ackEvent = (ack ? &(*ack) : nullptr);
-  quic::CongestionController::LossEvent* lossEvent =
-      (loss ? &(*loss) : nullptr);
+  quic::LossEvent* lossEvent = (loss ? &(*loss) : nullptr);
   cc->onPacketAckOrLoss(ackEvent, lossEvent);
 }
 
