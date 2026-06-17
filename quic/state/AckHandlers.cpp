@@ -159,23 +159,10 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
                  .build();
 
   if (frame.largestAcked >= getAckState(conn, pnSpace).nextPacketNum) {
-    PROTO_OOPS_LOG_BUILDER_IF(
-        conn.nodeType == QuicNodeType::Server,
-        conn.oopsLogger,
-        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setErrorCode(
-            static_cast<uint64_t>(TransportErrorCode::PROTOCOL_VIOLATION)),
-        "quic_ack_handlers",
-        fmt::format(
-            "protocol_violation: future packet number acked space={} "
-            "largestAcked={} nextPacketNum={} smallestAcked={} numBlocks={} "
-            "implicit={}",
-            toString(pnSpace),
-            frame.largestAcked,
-            getAckState(conn, pnSpace).nextPacketNum,
-            frame.ackBlocks.empty() ? frame.largestAcked
-                                    : frame.ackBlocks.back().startPacket,
-            frame.ackBlocks.size(),
-            frame.implicit));
+    // NOTE: This rejects an ACK whose largestAcked is at or above the next
+    // unused packet number, i.e. the peer acked a packet we never sent. This is
+    // optimistic-ACK mitigation working as intended. The OOPS log that used to
+    // live here was investigated and deemed benign.
     return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Future packet number acked"));
   }
