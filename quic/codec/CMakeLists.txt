@@ -50,6 +50,7 @@ mvfst_add_library(mvfst_codec_packet_number_cipher
     mvfst_codec_decode
     mvfst_codec_types
     mvfst_common_mvfst_logging
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_common_buf_util
     mvfst_common_expected
@@ -65,6 +66,7 @@ mvfst_add_library(mvfst_codec_decode
   DEPS
     mvfst_common_mvfst_logging
     mvfst_exception
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_codec_packet_number
     mvfst_codec_types
@@ -128,6 +130,7 @@ mvfst_add_library(mvfst_codec
     mvfst_common_mvfst_logging
     mvfst_common_string_utils
     mvfst_exception
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_codec_decode
     mvfst_codec_packet_number

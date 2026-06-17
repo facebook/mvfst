@@ -11,6 +11,7 @@
 #include <quic/codec/Decode.h>
 
 #include <quic/codec/Types.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 
 namespace quic {
 
@@ -20,6 +21,11 @@ quic::Expected<void, QuicError> PacketNumberCipher::decipherHeader(
     MutableByteRange packetNumberBytes,
     uint8_t initialByteMask,
     uint8_t /* packetNumLengthMask */) const {
+  PROTO_OOPS_LOG_IF(
+      packetNumberBytes.size() != kMaxPacketNumEncodingSize,
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_packet_number_cipher",
+      "invariant_violation: packet number decrypt buffer has invalid size");
   MVCHECK_EQ(packetNumberBytes.size(), kMaxPacketNumEncodingSize);
   auto maskResult = mask(sample);
   if (maskResult.hasError()) {
@@ -27,6 +33,11 @@ quic::Expected<void, QuicError> PacketNumberCipher::decipherHeader(
   }
   HeaderProtectionMask headerMask = std::move(maskResult.value());
   // Mask size should be > packet number length + 1.
+  PROTO_OOPS_LOG_IF(
+      headerMask.size() < 5,
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_packet_number_cipher",
+      "invariant_violation: packet number decrypt mask is too short");
   DCHECK_GE(headerMask.size(), 5);
   initialByte.data()[0] ^= headerMask.data()[0] & initialByteMask;
   size_t packetNumLength = parsePacketNumberLength(*initialByte.data());
@@ -48,6 +59,11 @@ quic::Expected<void, QuicError> PacketNumberCipher::cipherHeader(
   }
   HeaderProtectionMask headerMask = std::move(maskResult.value());
   // Mask size should be > packet number length + 1.
+  PROTO_OOPS_LOG_IF(
+      headerMask.size() < kMaxPacketNumEncodingSize + 1,
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_packet_number_cipher",
+      "invariant_violation: packet number encrypt mask is too short");
   DCHECK_GE(headerMask.size(), kMaxPacketNumEncodingSize + 1);
   size_t packetNumLength = parsePacketNumberLength(*initialByte.data());
   initialByte.data()[0] ^= headerMask.data()[0] & initialByteMask;

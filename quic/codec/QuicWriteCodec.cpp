@@ -13,6 +13,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <cstdint>
 
 namespace {
@@ -469,6 +470,12 @@ fillFrameWithPacketReceiveTimestamps(
           nextTimestampRangeUsedSpace + deltasCountSizeResult.value();
       ackFrame.recvdPacketsTimestampRanges.push_back(nextTimestampRange);
       prevPktNum = timestampIntervalsIt->start;
+      PROTO_OOPS_LOG_IF(
+          cumUsedSpace > spaceLeft,
+          proto_oops::getThreadLocalOopsLogger(),
+          "quic_write_codec",
+          "invariant_violation: ACK receive timestamp encoding exceeded "
+          "available packet space");
       MVDCHECK(cumUsedSpace <= spaceLeft);
     }
     if (outOfSpace) {
@@ -480,6 +487,11 @@ fillFrameWithPacketReceiveTimestamps(
   if (computedSizeResult.hasError()) {
     return quic::make_unexpected(computedSizeResult.error());
   }
+  PROTO_OOPS_LOG_IF(
+      cumUsedSpace != computedSizeResult.value(),
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_write_codec",
+      "invariant_violation: ACK receive timestamp encoded size mismatch");
   MVDCHECK(cumUsedSpace == computedSizeResult.value());
   return ackFrame.recvdPacketsTimestampRanges.size();
 }

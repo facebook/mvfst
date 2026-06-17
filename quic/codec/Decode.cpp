@@ -12,6 +12,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <chrono>
 
 namespace {
@@ -217,6 +218,12 @@ quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
   uint8_t ackDelayExponentToUse = (header.getHeaderForm() == HeaderForm::Long)
       ? kDefaultAckDelayExponent
       : params.peerAckDelayExponent;
+  PROTO_OOPS_LOG_IF(
+      ackDelayExponentToUse >= sizeof(ackDelay->first) * 8,
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_read_codec",
+      "invariant_violation: ACK delay exponent exceeds encoded ACK delay "
+      "width");
   DCHECK_LT(ackDelayExponentToUse, sizeof(ackDelay->first) * 8);
 
   auto res = nextAckedPacketLen(largestAcked, firstAckBlockLen->first);
@@ -327,6 +334,12 @@ static quic::Expected<void, QuicError> decodeReceiveTimestampsInAck(
             quic::TransportErrorCode::FRAME_ENCODING_ERROR,
             "Bad receive timestamps delta"));
       }
+      PROTO_OOPS_LOG_IF(
+          receiveTimestampsExponentToUse >= sizeof(delta->first) * 8,
+          proto_oops::getThreadLocalOopsLogger(),
+          "quic_read_codec",
+          "invariant_violation: receive timestamp exponent exceeds encoded "
+          "delta width");
       DCHECK_LT(receiveTimestampsExponentToUse, sizeof(delta->first) * 8);
       auto res = convertEncodedDurationToMicroseconds(
           receiveTimestampsExponentToUse, delta->first);

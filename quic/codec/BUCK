@@ -69,6 +69,7 @@ mvfst_cpp_library(
         ":decode",
         ":types",
         "//quic/common:mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
     ],
     exported_deps = [
         "//folly:unit",
@@ -94,6 +95,7 @@ mvfst_cpp_library(
     deps = [
         "//quic:exception",
         "//quic/common:mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
     ],
     exported_deps = [
         ":packet_number",
@@ -189,6 +191,7 @@ mvfst_cpp_library(
         "//quic:exception",
         "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
+        "//quic/logging/oops_logger:oops_logger",
     ],
     exported_deps = [
         ":decode",
