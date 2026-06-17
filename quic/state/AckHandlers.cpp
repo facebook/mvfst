@@ -105,6 +105,8 @@ void updateCongestionControllerForAck(
         &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     for (auto& packetProcessor : conn.packetProcessors) {
       packetProcessor->onPacketAck(&ack);
+      packetProcessor->onPacketAckOrLoss(
+          &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
     }
 
     ack.ccState = conn.congestionController->getState();

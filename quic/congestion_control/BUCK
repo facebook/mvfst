@@ -332,9 +332,9 @@ mvfst_cpp_library(
         "PacketProcessor.h",
     ],
     exported_deps = [
-        ":congestion_controller",
         "//folly/io:socket_option_map",
         "//quic/common:network_data",
+        "//quic/common:optional",
         "//quic/state:cloned_packet_identifier",
         "//quic/state:outstanding_packet",
     ],

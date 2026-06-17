@@ -9,11 +9,14 @@
 
 #include <folly/io/SocketOptionMap.h>
 #include <quic/common/NetworkData.h>
-#include <quic/congestion_control/CongestionController.h>
+#include <quic/common/Optional.h>
 #include <quic/state/ClonedPacketIdentifier.h>
 #include <quic/state/OutstandingPacket.h>
 
 namespace quic {
+
+struct AckEvent;
+struct LossEvent;
 
 class PacketProcessor {
  public:
@@ -65,6 +68,17 @@ class PacketProcessor {
    * Called when an OutstandingPacket is ACKed.
    */
   virtual void onPacketAck(const AckEvent* FOLLY_NULLABLE /* ackEvent */) {}
+
+  /**
+   * Called when an AckEvent and/or LossEvent is processed.
+   *
+   * This callback is independent from onPacketAck() while callers migrate to
+   * the paired ACK/loss API. Implementations may receive ACK-only, ACK+loss, or
+   * loss-only invocations.
+   */
+  virtual void onPacketAckOrLoss(
+      const AckEvent* FOLLY_NULLABLE /* ackEvent */,
+      const LossEvent* FOLLY_NULLABLE /* lossEvent */) {}
 
   /**
    * Called when an OutstandingPacket is being destroyed.

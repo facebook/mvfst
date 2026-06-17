@@ -1225,6 +1225,14 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
 TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   std::vector<PacketNum> lostPackets;
   auto conn = createConn();
+  // Loss alarm notifications are gated on a congestion controller today; add a
+  // packet processor to verify it receives the same loss-only event.
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn->packetProcessors.push_back(std::move(mockPacketProcessor));
   conn->lossState.srtt = 100ms;
   conn->lossState.lrtt = 100ms;
   auto expectedDelayUntilLost =
@@ -1265,6 +1273,15 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   getAckState(*conn, PacketNumberSpace::Handshake).largestAckedByPeer = second;
   conn->outstandings.packets.pop_back();
   MockClock::mockNow = [=]() { return sendTime + expectedDelayUntilLost + 5s; };
+  EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(IsNull(), NotNull()))
+      .Times(1);
+  EXPECT_CALL(*rawPacketProcessor, onPacketAckOrLoss(IsNull(), NotNull()))
+      .Times(1)
+      .WillOnce(Invoke([&](const AckEvent* FOLLY_NULLABLE ackEvent,
+                           const LossEvent* FOLLY_NULLABLE lossEvent) {
+        EXPECT_EQ(nullptr, ackEvent);
+        EXPECT_EQ(second - 1, CHECK_NOTNULL(lossEvent)->largestLostPacketNum);
+      }));
   ASSERT_FALSE(
       onLossDetectionAlarm<MockClock>(
           *conn, TESTING_LOSS_MARK_FUNC(lostPackets))

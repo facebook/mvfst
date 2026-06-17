@@ -2024,6 +2024,14 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
                 CHECK_NOTNULL(lossEvent)->largestLostPacketNum.has_value());
           }));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
+  EXPECT_CALL(*rawPacketProcessor, onPacketAckOrLoss(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const AckEvent* FOLLY_NULLABLE ackEvent,
+                           const LossEvent* FOLLY_NULLABLE lossEvent) {
+        EXPECT_FALSE(
+            CHECK_NOTNULL(ackEvent)->largestNewlyAckedPacket.has_value());
+        EXPECT_TRUE(CHECK_NOTNULL(lossEvent)->largestLostPacketNum.has_value());
+      }));
   // But packet 1 has been outstanding for longer than delayUntilLost:
   PacketNum packetNum = 1;
   auto regularPacket = createNewPacket(packetNum, GetParam().pnSpace);

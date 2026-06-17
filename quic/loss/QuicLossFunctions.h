@@ -267,6 +267,10 @@ template <class ClockType = Clock>
           conn.lossState.inflightBytes, lossEvent->lostBytes);
       conn.congestionController->onPacketAckOrLoss(
           nullptr, lossEvent.has_value() ? &lossEvent.value() : nullptr);
+      for (auto& packetProcessor : conn.packetProcessors) {
+        packetProcessor->onPacketAckOrLoss(
+            nullptr, lossEvent.has_value() ? &lossEvent.value() : nullptr);
+      }
     }
   } else {
     auto result = onPTOAlarm(conn);
