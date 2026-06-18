@@ -116,7 +116,11 @@ bool GSOInplacePacketBatchWriter::append(
     prevSize_ = size;
     lastPacketEnd_ = buf->tail();
     numPackets_ = 1;
-    return false;
+    // When maxPackets_ == 1 the buffer is sized for a single packet, so the
+    // first packet already fills the batch and must be flushed. Without this,
+    // the next packet would be built starting at the full buffer's tail and
+    // overrun it.
+    return numPackets_ == maxPackets_;
   }
 
   MVCHECK(prevSize_ && prevSize_ >= size);
