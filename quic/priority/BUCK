@@ -23,7 +23,10 @@ mvfst_cpp_library(
     headers = [
         "RoundRobin.h",
     ],
-    deps = ["//quic/common:mvfst_logging"],
+    deps = [
+        "//quic/common:mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
+    ],
     exported_deps = [
         ":priority_queue",
         "//quic:config",
@@ -39,7 +42,10 @@ mvfst_cpp_library(
     headers = [
         "HTTPPriorityQueue.h",
     ],
-    deps = ["//quic/common:mvfst_logging"],
+    deps = [
+        "//quic/common:mvfst_logging",
+        "//quic/logging/oops_logger:oops_logger",
+    ],
     exported_deps = [
         ":priority_queue",
         ":round_robin",

@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 
 namespace {
@@ -200,6 +201,11 @@ HTTPPriorityQueue::top() const {
   if (lowestRoundRobin_ < topPri && !roundRobins_[lowestRoundRobin_].empty()) {
     return nullptr;
   }
+  PROTO_OOPS_LOG_IF(
+      !topElem,
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_http_priority_queue",
+      "invariant_violation: HTTP priority queue top called while empty");
   MVCHECK(topElem, "Empty");
   return topElem;
 }
@@ -282,6 +288,12 @@ void HTTPPriorityQueue::heapifyDown(size_t index) {
 }
 
 void HTTPPriorityQueue::assignIndex(Element& element, size_t index) {
+  PROTO_OOPS_LOG_IF(
+      element.priority->incremental,
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_http_priority_queue",
+      "invariant_violation: incremental HTTP priority queue element assigned "
+      "to heap index");
   MVCHECK(!element.priority->incremental);
   addIndex(element.identifier, {.incremental = false, .index = index});
 }

@@ -6,7 +6,10 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/priority/RoundRobin.h>
+
+#include <algorithm>
 
 namespace {
 static constexpr size_t kBuildIndexThreshold = 30;
@@ -75,6 +78,11 @@ bool RoundRobin::erase(quic::PriorityQueue::Identifier value) {
 
 quic::PriorityQueue::Identifier RoundRobin::getNext(
     const quic::Optional<uint64_t>& bytes) {
+  PROTO_OOPS_LOG_IF(
+      list_.empty(),
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_round_robin_priority_queue",
+      "invariant_violation: priority queue getNext called on empty queue");
   MVCHECK(!list_.empty());
   auto ret = *nextIt_;
   consume(bytes);
@@ -82,6 +90,11 @@ quic::PriorityQueue::Identifier RoundRobin::getNext(
 }
 
 [[nodiscard]] quic::PriorityQueue::Identifier RoundRobin::peekNext() const {
+  PROTO_OOPS_LOG_IF(
+      list_.empty(),
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_round_robin_priority_queue",
+      "invariant_violation: priority queue peekNext called on empty queue");
   MVCHECK(!list_.empty());
   return *nextIt_;
 }
@@ -115,6 +128,11 @@ void RoundRobin::erase(ListType::iterator eraseIt) {
 }
 
 void RoundRobin::maybeAdvance() {
+  PROTO_OOPS_LOG_IF(
+      list_.empty(),
+      proto_oops::getThreadLocalOopsLogger(),
+      "quic_round_robin_priority_queue",
+      "invariant_violation: priority queue advanced while empty");
   MVCHECK(!list_.empty());
   ++nextIt_;
   if (nextIt_ == list_.end()) {

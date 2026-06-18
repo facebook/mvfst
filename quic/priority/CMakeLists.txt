@@ -16,6 +16,7 @@ mvfst_add_library(mvfst_priority_round_robin
     RoundRobin.cpp
   DEPS
     mvfst_common_mvfst_logging
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_common_optional
     mvfst_config
@@ -27,6 +28,7 @@ mvfst_add_library(mvfst_priority_http_priority_queue
     HTTPPriorityQueue.cpp
   DEPS
     mvfst_common_mvfst_logging
+    mvfst_logging_oops_logger
   EXPORTED_DEPS
     mvfst_config
     mvfst_priority_priority_queue
