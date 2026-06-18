@@ -76,7 +76,8 @@ mvfst_cpp_library(
             ":copa",
             ":cubic",
         ],
-    }) + [
+    })
+    + [
         "//quic/common:mvfst_logging",
     ],
     exported_deps = [

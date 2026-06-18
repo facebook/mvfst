@@ -212,8 +212,8 @@ mvfst_cpp_library(
         "DEFAULT": ["//quic/common:mvfst_logging"],
         "ovr_config//os/constraints:android": [],
         "ovr_config//os/constraints:iphoneos": [],
-    }) + [
-    ],
+    })
+    + [],
     exported_deps = [
         "fbsource//third-party/fmt:fmt",
         ":constants",

@@ -16,8 +16,7 @@ mvfst_cpp_library(
 
 mvfst_cpp_library(
     name = "quic_timer",
-    srcs = [
-    ],
+    srcs = [],
     headers = [
         "QuicTimer.h",
     ],

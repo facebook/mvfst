@@ -59,10 +59,12 @@ mvfst_cpp_library(
         "//quic/handshake:handshake",
         "//quic/handshake:retry_integrity_tag_generator",
         "//quic/handshake:transport_parameters",
-    ] + select({
+    ]
+    + select({
         "DEFAULT": ["//folly/ssl:openssl_ptr_types"],
         "fbsource//xplat/fizz/constraints:mnscrypto-only": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
-    }) + select({
+    })
+    + select({
         "DEFAULT": [],
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": [],  # @fb-only
