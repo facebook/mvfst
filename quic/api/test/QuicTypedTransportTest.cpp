@@ -792,6 +792,58 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    PacketProcessorAckOrLossCarriesLostPacketDetails) {
+  this->getNonConstConn().outstandings.reset();
+  this->getNonConstConn().lossState.reorderingThreshold = 1;
+  this->getNonConstConn().transportSettings.timeReorderingThreshDividend =
+      100000000;
+  this->getNonConstConn().transportSettings.timeReorderingThreshDivisor = 1;
+
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  auto typedTestWriteChain1 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("hello"), false);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+  auto typedTestWriteChain2 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("world"), false);
+  const auto maybeWrittenPackets2 = this->loopForWrites();
+  auto typedTestWriteChain3 = this->getTransport()->writeChain(
+      streamId, IOBuf::copyBuffer("again"), false);
+  const auto maybeWrittenPackets3 = this->loopForWrites();
+
+  ASSERT_TRUE(maybeWrittenPackets1.has_value());
+  ASSERT_TRUE(maybeWrittenPackets2.has_value());
+  ASSERT_TRUE(maybeWrittenPackets3.has_value());
+  const auto firstPacketNum = maybeWrittenPackets1->start;
+  const auto thirdPacketNum = maybeWrittenPackets3->start;
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketAckOrLoss(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const auto* ackEvent, const auto* lossEvent) {
+        ASSERT_THAT(ackEvent, Not(IsNull()));
+        EXPECT_EQ(thirdPacketNum, ackEvent->largestAckedPacket);
+        ASSERT_THAT(lossEvent, Not(IsNull()));
+        EXPECT_EQ(1, lossEvent->lostPackets);
+        EXPECT_EQ(1, lossEvent->lostPacketDetails.size());
+        EXPECT_THAT(
+            lossEvent->lostPacketDetails,
+            ElementsAre(AllOf(
+                Field(&LossEvent::LostPacket::packetNum, firstPacketNum),
+                Field(&LossEvent::LostPacket::encodedSize, 44))));
+      }));
+
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPacket(thirdPacketNum),
+      std::chrono::steady_clock::time_point());
+  this->destroyTransport();
+}
+
 /**
  * Verify app limited time tracking and annotation.
  */

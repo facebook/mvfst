@@ -476,13 +476,12 @@ void Bbr2CongestionController::updateCongestionSignals(
   }
 
   // Update loss signal
-  if (lossEvent && lossEvent->lostBytes > 0 &&
-      !lossEvent->lostPacketNumbers.empty()) {
+  if (lossEvent && lossEvent->lostBytes > 0 && lossEvent->lostPackets > 0) {
     lossBytesInRound_ += lossEvent->lostBytes;
 
     // Only count non-contiguous losses as lossEvents
     auto lastLossPn = largestLostPacketNumInRound_;
-    for (auto& pn : lossEvent->lostPacketNumbers) {
+    for (const auto pn : lossEvent->lostPacketNumbers()) {
       if (pn > lastLossPn + 1) {
         lossEventsInRound_ += 1;
       }
@@ -559,7 +558,7 @@ void Bbr2CongestionController::checkStartupHighLoss() {
   2. The loss rate over the time scale of a single full round trip exceeds
   BBRLossThresh (2%).
   3. There are at least BBRStartupFullLossCnt=6
-  discontiguous sequence ranges lost in that round trip.
+  noncontiguous sequence ranges lost in that round trip.
 
   For 1,2 we use the loss pct from the last loss round which means we could exit
   before a full RTT.

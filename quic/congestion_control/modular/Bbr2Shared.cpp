@@ -359,13 +359,12 @@ void Bbr2Shared::advanceLatestDeliverySignals() {
 }
 
 void Bbr2Shared::updateLossSignals(const LossEvent* FOLLY_NULLABLE lossEvent) {
-  if (lossEvent && lossEvent->lostBytes > 0 &&
-      !lossEvent->lostPacketNumbers.empty()) {
+  if (lossEvent && lossEvent->lostBytes > 0 && lossEvent->lostPackets > 0) {
     lossBytesInRound_ += lossEvent->lostBytes;
 
     // Only count non-contiguous losses as lossEvents
     auto lastLossPn = largestLostPacketNumInRound_;
-    for (auto& pn : lossEvent->lostPacketNumbers) {
+    for (const auto pn : lossEvent->lostPacketNumbers()) {
       if (pn > lastLossPn + 1) {
         lossEventsInRound_ += 1;
       }

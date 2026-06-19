@@ -135,6 +135,7 @@ TEST_F(StateDataTest, EmptyLossEvent) {
   LossEvent loss;
   EXPECT_EQ(0, loss.lostBytes);
   EXPECT_FALSE(loss.largestLostPacketNum);
+  EXPECT_TRUE(loss.lostPacketDetails.empty());
 }
 
 TEST_F(StateDataTest, SingleLostPacketEvent) {
@@ -159,6 +160,12 @@ TEST_F(StateDataTest, SingleLostPacketEvent) {
   loss.addLostPacket(outstandingPacket);
   EXPECT_EQ(1234, loss.lostBytes);
   EXPECT_EQ(100, *loss.largestLostPacketNum);
+  EXPECT_THAT(
+      loss.lostPacketDetails,
+      ElementsAre(AllOf(
+          Field(&LossEvent::LostPacket::packetNum, 100),
+          Field(&LossEvent::LostPacket::encodedSize, 1234))));
+  EXPECT_THAT(loss.lostPacketNumbers(), ElementsAre(100));
 }
 
 TEST_F(StateDataTest, MultipleLostPacketsEvent) {
@@ -203,6 +210,16 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
   loss.addLostPacket(outstandingPacket2);
   EXPECT_EQ(1234 + 1357, loss.lostBytes);
   EXPECT_EQ(110, *loss.largestLostPacketNum);
+  EXPECT_THAT(
+      loss.lostPacketDetails,
+      ElementsAre(
+          AllOf(
+              Field(&LossEvent::LostPacket::packetNum, 100),
+              Field(&LossEvent::LostPacket::encodedSize, 1234)),
+          AllOf(
+              Field(&LossEvent::LostPacket::packetNum, 110),
+              Field(&LossEvent::LostPacket::encodedSize, 1357))));
+  EXPECT_THAT(loss.lostPacketNumbers(), ElementsAre(100, 110));
 }
 
 } // namespace quic::test
