@@ -161,7 +161,9 @@ mvfst_add_library(mvfst_state_state_functions
   DEPS
     mvfst_common_mvfst_logging
     mvfst_common_time_util
+    mvfst_logging_oops_logger
     mvfst_logging_qlogger_macros
+    mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_codec_pktbuilder
     mvfst_codec_types

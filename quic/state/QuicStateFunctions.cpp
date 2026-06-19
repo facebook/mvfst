@@ -7,6 +7,8 @@
 
 #include <quic/common/MvfstLogging.h>
 #include <quic/logging/QLoggerMacros.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
+#include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 
 #include <quic/common/TimeUtil.h>
@@ -110,6 +112,13 @@ void updateAckSendStateOnRecvPacket(
     bool pktHasRetransmittableData,
     bool pktHasCryptoData,
     bool initPktNumSpace) {
+  PROTO_OOPS_LOG_BUILDER_IF(
+      conn.nodeType == QuicNodeType::Server && pktHasCryptoData &&
+          !pktHasRetransmittableData,
+      conn.oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn),
+      "quic_state_functions",
+      "invariant_violation: crypto data packet not marked retransmittable");
   MVDCHECK(!pktHasCryptoData || pktHasRetransmittableData);
   auto thresh = kNonRtxRxPacketsPendingBeforeAck;
   if (pktHasRetransmittableData || ackState.numRxPacketsRecvd) {
