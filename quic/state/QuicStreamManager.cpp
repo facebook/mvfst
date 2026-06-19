@@ -329,6 +329,12 @@ void QuicStreamManager::removeLoss(StreamId id) {
   auto* stream = findStream(id);
   if (stream && stream->inLossSet_) {
     stream->inLossSet_ = false;
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && numStreamsWithLoss_ == 0,
+        conn_.oopsLogger,
+        proto_oops::OopsFieldsBuilder().setStreamId(id),
+        "quic_stream_manager",
+        "loss stream count underflow");
     MVCHECK_GT(numStreamsWithLoss_, 0);
     numStreamsWithLoss_--;
   }
@@ -1135,6 +1141,12 @@ void QuicStreamManager::updateWritableStreams(
     numStreamsWithLoss_++;
   } else if (stream.inLossSet_ && !newHasLoss) {
     stream.inLossSet_ = false;
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn_.nodeType == QuicNodeType::Server && numStreamsWithLoss_ == 0,
+        conn_.oopsLogger,
+        proto_oops::OopsFieldsBuilder().setStreamId(stream.id),
+        "quic_stream_manager",
+        "loss stream count underflow");
     MVCHECK_GT(numStreamsWithLoss_, 0);
     numStreamsWithLoss_--;
   }
