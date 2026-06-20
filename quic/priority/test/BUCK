@@ -44,6 +44,7 @@ mvfst_cpp_test(
 mvfst_cpp_benchmark(
     name = "priority_queue_benchmark",
     srcs = ["QuicPriorityQueueBenchmark.cpp"],
+    compatible_with = ["config//os:linux"],
     deps = [
         "//common/init:init",
         "//folly:benchmark",
