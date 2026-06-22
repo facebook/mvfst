@@ -172,7 +172,7 @@ void TakeoverPacketHandler::forwardPacket(BufPtr writeBuffer) {
     localAddress.setFromHostPort("::1", 0);
     pktForwardingSocket_->bind(localAddress);
   }
-  pktForwardingSocket_->write(pktForwardDestAddr_, std::move(writeBuffer));
+  pktForwardingSocket_->write(pktForwardDestAddr_, writeBuffer);
 }
 
 std::unique_ptr<FollyAsyncUDPSocketAlias> TakeoverPacketHandler::makeSocket(
