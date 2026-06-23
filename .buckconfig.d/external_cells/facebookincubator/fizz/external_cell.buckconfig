@@ -6,4 +6,4 @@ gh_facebookincubator_fizz = git
 
 [external_cell_gh_facebookincubator_fizz]
 git_origin = https://github.com/facebookincubator/fizz.git
-commit_hash = 3bea3668fd6051c6b1cd9b97e8c4dff9b27b3bac
+commit_hash = 308e422913c8a8ce493e401e9ba5caaf0b088a68
