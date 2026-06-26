@@ -221,6 +221,13 @@ struct TransportSettings {
   // Can we ignore the path mtu when sending a packet. This is useful for
   // testing.
   bool canIgnorePathMTU{false};
+  // When non-zero (and canIgnorePathMTU is set), caps the server's outgoing UDP
+  // payload size to min(peer's advertised max_udp_payload_size, this). The
+  // configured value is clamped to [kMinMaxUDPPayload, kDefaultMaxUDPPayload]
+  // (1200..1452) at use time, so a too-small value cannot drive the send MTU
+  // below the QUIC minimum. 0 = unset (use kDefaultMaxUDPPayload). Plumbed from
+  // QuicTransportSettings.max_udp_payload_size.
+  uint64_t maxUdpSendPayloadSize{0};
   // Whether or not to use a connected UDP socket on the client. This should
   // only be used in environments where you know your IP address does not
   // change. See AsyncUDPSocket::connect for the caveats.

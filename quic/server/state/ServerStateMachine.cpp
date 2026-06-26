@@ -28,6 +28,8 @@
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
+#include <algorithm>
+
 namespace quic {
 using namespace std::chrono_literals;
 
@@ -483,7 +485,13 @@ quic::Expected<void, QuicError> processClientInitialParams(
     maxUdpPayloadSize = std::min(*packetSize, maxUdpPayloadSize);
     conn.peerMaxUdpPayloadSize = maxUdpPayloadSize;
     if (conn.transportSettings.canIgnorePathMTU) {
-      *packetSize = std::min<uint64_t>(*packetSize, kDefaultMaxUDPPayload);
+      uint64_t cap = conn.transportSettings.maxUdpSendPayloadSize > 0
+          ? std::clamp<uint64_t>(
+                conn.transportSettings.maxUdpSendPayloadSize,
+                kMinMaxUDPPayload,
+                kDefaultMaxUDPPayload)
+          : kDefaultMaxUDPPayload;
+      *packetSize = std::min<uint64_t>(*packetSize, cap);
       conn.udpSendPacketLen = *packetSize;
     }
   }

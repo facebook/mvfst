@@ -197,6 +197,62 @@ TEST(ServerStateMachineTest, TestProcessMaxRecvPacketSizeParamBelowMin) {
   EXPECT_EQ(result.error().code, TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
 }
 
+TEST(ServerStateMachineTest, TestMaxUdpSendPayloadSizeCapsSendMtu) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.canIgnorePathMTU = true;
+  serverConn.transportSettings.maxUdpSendPayloadSize = 1338;
+  std::vector<TransportParameter> transportParams;
+  auto encodeResult =
+      encodeIntegerParameter(TransportParameterId::max_packet_size, 1472);
+  ASSERT_FALSE(encodeResult.hasError());
+  transportParams.push_back(encodeResult.value());
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
+  // min(peer advertised 1472, configured cap 1338) == 1338.
+  EXPECT_EQ(serverConn.udpSendPacketLen, 1338);
+}
+
+TEST(ServerStateMachineTest, TestMaxUdpSendPayloadSizeBelowFloorClampedToMin) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.canIgnorePathMTU = true;
+  // Below the floor: a misconfigured tiny value must not drive the send MTU
+  // below the QUIC minimum.
+  serverConn.transportSettings.maxUdpSendPayloadSize = 800;
+  std::vector<TransportParameter> transportParams;
+  auto encodeResult =
+      encodeIntegerParameter(TransportParameterId::max_packet_size, 1472);
+  ASSERT_FALSE(encodeResult.hasError());
+  transportParams.push_back(encodeResult.value());
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
+  // Configured cap 800 is clamped up to kMinMaxUDPPayload (1200), not 800.
+  EXPECT_EQ(serverConn.udpSendPacketLen, kMinMaxUDPPayload);
+}
+
+TEST(ServerStateMachineTest, TestMaxUdpSendPayloadSizeUnsetUsesDefaultCap) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  serverConn.transportSettings.canIgnorePathMTU = true;
+  // maxUdpSendPayloadSize left at its default of 0 (unset).
+  std::vector<TransportParameter> transportParams;
+  auto encodeResult =
+      encodeIntegerParameter(TransportParameterId::max_packet_size, 1472);
+  ASSERT_FALSE(encodeResult.hasError());
+  transportParams.push_back(encodeResult.value());
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  auto result = processClientInitialParams(serverConn, clientTransportParams);
+  ASSERT_FALSE(result.hasError());
+  // min(peer advertised 1472, kDefaultMaxUDPPayload 1452) == 1452.
+  EXPECT_EQ(serverConn.udpSendPacketLen, kDefaultMaxUDPPayload);
+}
+
 TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
