@@ -873,11 +873,36 @@ size_t LibevQuicAsyncUDPSocket::handleSocketErrors() {
 
 void LibevQuicAsyncUDPSocket::addEvent(int event) {
   MVCHECK(evb_, "EventBase not initialized");
+  // ev_set_priority must only be called while the watcher is stopped, so apply
+  // the configured priority here, right before the watcher is (re)armed.
   if (event & EV_READ) {
+    ev_set_priority(&readWatcher_, ioPriority_);
     ev_io_start(evb_->getLibevLoop(), &readWatcher_);
   }
   if (event & EV_WRITE) {
+    ev_set_priority(&writeWatcher_, ioPriority_);
     ev_io_start(evb_->getLibevLoop(), &writeWatcher_);
+  }
+}
+
+void LibevQuicAsyncUDPSocket::setIoPriority(int priority) {
+  MVCHECK(evb_ && evb_->isInEventBaseThread());
+  ioPriority_ = priority;
+  // Apply immediately to any already-active watcher. ev_set_priority requires
+  // the watcher be stopped, so stop/set/start each active watcher; armed-state
+  // is preserved. Inactive watchers pick up the new priority when next armed in
+  // addEvent.
+  if (evb_) {
+    if (ev_is_active(&readWatcher_)) {
+      ev_io_stop(evb_->getLibevLoop(), &readWatcher_);
+      ev_set_priority(&readWatcher_, ioPriority_);
+      ev_io_start(evb_->getLibevLoop(), &readWatcher_);
+    }
+    if (ev_is_active(&writeWatcher_)) {
+      ev_io_stop(evb_->getLibevLoop(), &writeWatcher_);
+      ev_set_priority(&writeWatcher_, ioPriority_);
+      ev_io_start(evb_->getLibevLoop(), &writeWatcher_);
+    }
   }
 }
 

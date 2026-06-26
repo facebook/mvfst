@@ -150,6 +150,15 @@ void LibevQuicEventBase::checkCallbacks() {
   runOnceCallbackWrappers_ = nullptr;
 }
 
+void LibevQuicEventBase::setLoopCallbackPriority(int priority) {
+  MVCHECK(isInEventBaseThread());
+  // prepareWatcher_ is started in the ctor, so it must be stopped before its
+  // priority can be changed and restarted afterwards for the change to apply.
+  ev_prepare_stop(ev_loop_, &prepareWatcher_);
+  ev_set_priority(&prepareWatcher_, priority);
+  ev_prepare_start(ev_loop_, &prepareWatcher_);
+}
+
 bool LibevQuicEventBase::isInEventBaseThread() const {
   auto eventLoopThread = loopWeak_->getEventLoopThread();
   MVCHECK(eventLoopThread != std::nullopt);

@@ -131,6 +131,13 @@ class LibevQuicEventBase
   // This is public so the libev callback can access it
   void checkCallbacks();
 
+  // Sets the libev priority of the per-iteration loop-callback driver
+  // (prepareWatcher_), which runs the work queued via runInLoop (including the
+  // QUIC write loop). Higher priority watchers are dispatched earlier within a
+  // loop iteration. Used to order one event base's QUIC work ahead of another's
+  // when several event bases share a single libev loop.
+  void setLoopCallbackPriority(int priority);
+
   // This is public so the libev callback can access it
   class TimerCallbackWrapper : public QuicTimerCallback::TimerCallbackImpl {
    public:

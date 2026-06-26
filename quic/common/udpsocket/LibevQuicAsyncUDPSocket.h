@@ -217,6 +217,13 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
 
   [[nodiscard]] bool isWritableCallbackSet() const override;
 
+  // Sets the libev priority applied to this socket's read and write watchers.
+  // Higher priority watchers are dispatched earlier within a loop iteration.
+  // The priority is applied whenever a watcher is (re)armed, and immediately to
+  // any watcher that is already active. Used to order one connection's socket
+  // I/O ahead of another's when several connections share a single libev loop.
+  void setIoPriority(int priority);
+
  private:
   static void
   sockEventsWatcherCallback(struct ev_loop* loop, ev_io* w, int revents);
@@ -235,6 +242,7 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   std::shared_ptr<LibevQuicEventBase> evb_{nullptr};
   ev_io readWatcher_;
   ev_io writeWatcher_;
+  int ioPriority_{0};
 
   bool bound_{false};
   bool connected_{false};
