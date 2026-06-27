@@ -10,12 +10,15 @@
 #include <memory>
 #include <vector>
 
+#include <folly/Function.h>
 #include <folly/ThreadLocal.h>
 #include <folly/container/F14Map.h>
 #include <folly/io/SocketOptionMap.h>
+#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 
 #include <quic/QuicConstants.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/server/QuicServerTransportFactory.h>
@@ -113,6 +116,36 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> ccFactory);
+
+  /**
+   * Install a `BatchWriterFactoryOverride` propagated to every accepted
+   * connection. Must be set before `start()`; empty (the default) disables.
+   * See `quic::BatchWriterFactoryOverride` for the per-server rationale.
+   */
+  void setBatchWriterFactoryOverride(quic::BatchWriterFactoryOverride override);
+
+  /**
+   * Returns the override installed by `setBatchWriterFactoryOverride`. Like
+   * the setter, intended to be called from the main thread before `start()`;
+   * the returned reference aliases an `std::function` whose assignment is not
+   * atomic, so concurrent reads racing with `setBatchWriterFactoryOverride`
+   * on another thread are undefined behavior.
+   */
+  const quic::BatchWriterFactoryOverride& getBatchWriterFactoryOverride()
+      const noexcept;
+
+  /**
+   * Invoke `fn` once per worker with that worker's listener
+   * `const folly::AsyncUDPSocket*`. Unbound workers are skipped — `fn` is
+   * never called with `nullptr`. Runs on the caller's thread; pointers are
+   * owned by the worker and must not outlive the callback. Intended for
+   * observation only (e.g. aggregating per-fd MSG_ZEROCOPY counters across
+   * the alias-socket model's one-listener-fd-per-worker layout); callers
+   * needing to mutate worker socket state should use the non-const
+   * `QuicServerWorker::getListenerSocket()` directly.
+   */
+  void forEachListenerSocket(
+      folly::FunctionRef<void(const folly::AsyncUDPSocket*)> fn) const;
 
   void setRateLimit(
       std::function<uint64_t()> count,
@@ -467,6 +500,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::unique_ptr<QuicUDPSocketFactory> socketFactory_;
   // factory used to create specific instance of Congestion control algorithm
   std::shared_ptr<CongestionControllerFactory> ccFactory_;
+  quic::BatchWriterFactoryOverride batchWriterFactoryOverride_;
 
   Optional<std::string> healthCheckToken_;
   // vector of all the listening fds on each quic server worker

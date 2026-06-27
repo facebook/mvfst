@@ -278,6 +278,17 @@ using FrameList = std::vector<QuicSimpleFrame>;
 class CongestionControllerFactory;
 class LoopDetectorCallback;
 class EcnL4sTracker;
+class BatchWriter;
+
+// Full definition required (not just a forward decl) because libc++'s
+// std::unique_ptr stores the deleter in a __compressed_pair whose default
+// template argument eagerly instantiates is_empty<D> and __libcpp_is_final<D>,
+// forcing D to be complete at every TU that instantiates the std::function
+// member below. The out-of-line operator() body lives in
+// QuicBatchWriterFactory*.cpp.
+struct BatchWriterDeleter {
+  void operator()(BatchWriter* batchWriter);
+};
 
 struct ReadDatagram {
   ReadDatagram(TimePoint recvTimePoint, BufQueue data)
@@ -336,6 +347,17 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Congestion Controller factory to create specific impl of cc algorithm
   std::shared_ptr<CongestionControllerFactory> congestionControllerFactory;
+
+  // Per-connection `BatchWriterFactoryOverride` (see
+  // `quic/api/QuicBatchWriterFactory.h`). Server-side installed by
+  // `QuicServerWorker` from `QuicServer::setBatchWriterFactoryOverride`.
+  std::function<std::unique_ptr<BatchWriter, BatchWriterDeleter>(
+      const quic::QuicBatchingMode& batchingMode,
+      uint32_t batchSize,
+      DataPathType dataPathType,
+      QuicConnectionStateBase& conn,
+      bool gsoSupported)>
+      batchWriterFactoryOverride;
 
   std::unique_ptr<QuicStreamManager> streamManager;
 

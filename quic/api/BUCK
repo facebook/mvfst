@@ -154,6 +154,7 @@ mvfst_cpp_library(
         "//quic/state/stream:stream",
     ],
     exported_deps = [
+        ":quic_batch_writer",
         ":quic_callbacks",
         ":transport_helpers",
         ":transport_info",

@@ -3262,6 +3262,12 @@ void QuicTransportBaseLite::setCongestionControllerFactory(
   conn_->congestionController.reset();
 }
 
+void QuicTransportBaseLite::setBatchWriterFactoryOverride(
+    quic::BatchWriterFactoryOverride override) {
+  MVCHECK(conn_);
+  conn_->batchWriterFactoryOverride = std::move(override);
+}
+
 void QuicTransportBaseLite::addPacketProcessor(
     std::shared_ptr<PacketProcessor> packetProcessor) {
   MVDCHECK(conn_);

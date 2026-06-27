@@ -93,6 +93,7 @@ mvfst_add_library(mvfst_api_transport_lite
     mvfst_state_stream_functions
     Folly::folly_scope_guard
   EXPORTED_DEPS
+    mvfst_api_quic_batch_writer
     mvfst_api_quic_callbacks
     mvfst_api_transport_helpers
     mvfst_api_transport_info

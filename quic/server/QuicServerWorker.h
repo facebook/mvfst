@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <type_traits>
 
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/BufAccessor.h>
@@ -148,6 +149,21 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * Returns the File Descriptor of the listening socket
    */
   int getFD();
+
+  /**
+   * Returns this worker's listener `folly::AsyncUDPSocket` (the same socket
+   * passed to `setSocket()` and bound by `bind()`), or `nullptr` if no
+   * listener socket has been set yet (e.g. before `start()`).
+   *
+   * Intended for observability consumers (e.g. tperf MSG_ZEROCOPY counter
+   * aggregation) that want to read per-fd accessors on `folly::AsyncUDPSocket`
+   * — for example `getZeroCopyCompletionsZc()` / `zeroCopyEnabled()` — across
+   * all of a `QuicServer`'s workers via `QuicServer::forEachListenerSocket`.
+   * The returned pointer is owned by this worker; do not free it.
+   */
+  [[nodiscard]] FollyAsyncUDPSocketAlias* getListenerSocket() const noexcept {
+    return socket_.get();
+  }
 
   /*
    * Apply all the socket options (pre/post bind).
@@ -286,6 +302,15 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
+
+  /**
+   * Set the per-server batch writer factory override. It will be copied onto
+   * each accepted connection's `QuicConnectionStateBase` so the override is
+   * scoped to this worker's connections only.
+   *
+   * Empty (default-constructed `std::function`) disables the override.
+   */
+  void setBatchWriterFactoryOverride(quic::BatchWriterFactoryOverride override);
 
   /**
    * Set the rate limiter which will be used to rate limit new connections.
@@ -593,6 +618,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   QuicUDPSocketFactory* socketFactory_;
   QuicServerTransportFactory* transportFactory_;
   std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
+  // Per-server `BatchWriterFactoryOverride` propagated to each accepted
+  // connection's `QuicConnectionStateBase::batchWriterFactoryOverride`.
+  quic::BatchWriterFactoryOverride batchWriterFactoryOverride_;
 
   // A server transport's membership is exclusive to only one of these maps.
   ConnIdToTransportMap connectionIdMap_;

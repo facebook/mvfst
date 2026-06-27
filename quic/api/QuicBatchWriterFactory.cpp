@@ -7,8 +7,21 @@
 
 #include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicGsoBatchWriters.h>
+#include <quic/state/StateData.h>
 
 namespace quic {
+
+// Pin the inline `batchWriterFactoryOverride` signature in `StateData.h`
+// against the canonical `BatchWriterFactoryOverride` alias declared in
+// `QuicBatchWriterFactory.h`. The two are deliberately duplicated to keep
+// `StateData.h` from transitively including the batch-writer headers; this
+// assert ensures the duplication does not silently drift apart.
+static_assert(
+    std::is_same_v<
+        decltype(QuicConnectionStateBase::batchWriterFactoryOverride),
+        BatchWriterFactoryOverride>,
+    "QuicConnectionStateBase::batchWriterFactoryOverride must match "
+    "quic::BatchWriterFactoryOverride");
 
 // BatchWriterDeleter
 void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
@@ -42,6 +55,14 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
     bool gsoSupported) {
+  if (conn.batchWriterFactoryOverride) {
+    auto batchWriter = conn.batchWriterFactoryOverride(
+        batchingMode, batchSize, dataPathType, conn, gsoSupported);
+    if (batchWriter) {
+      return batchWriter;
+    }
+  }
+
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
       if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {

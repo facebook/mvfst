@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/api/QuicSocketLite.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/FunctionRef.h>
@@ -238,6 +239,16 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
    */
   virtual void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
+
+  /**
+   * Install a per-connection `BatchWriterFactoryOverride` on the underlying
+   * `QuicConnectionStateBase`. The override is consulted by
+   * `BatchWriterFactory::makeBatchWriter` before the default switch.
+   *
+   * Pass an empty `std::function` (the default) to clear.
+   */
+  virtual void setBatchWriterFactoryOverride(
+      quic::BatchWriterFactoryOverride override);
 
   void addPacketProcessor(
       std::shared_ptr<PacketProcessor> packetProcessor) override;

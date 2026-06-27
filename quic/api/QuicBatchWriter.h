@@ -172,10 +172,6 @@ class SendmmsgInplacePacketBatchWriter : public BatchWriter {
   std::array<iovec, kMaxIovecs> iovecs_{};
 };
 
-struct BatchWriterDeleter {
-  void operator()(BatchWriter* batchWriter);
-};
-
 using BatchWriterPtr = std::unique_ptr<BatchWriter, BatchWriterDeleter>;
 
 bool useSinglePacketInplaceBatchWriter(

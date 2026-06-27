@@ -210,6 +210,11 @@ void QuicServerWorker::setCongestionControllerFactory(
   ccFactory_ = ccFactory;
 }
 
+void QuicServerWorker::setBatchWriterFactoryOverride(
+    quic::BatchWriterFactoryOverride override) {
+  batchWriterFactoryOverride_ = std::move(override);
+}
+
 void QuicServerWorker::setRateLimiter(
     std::unique_ptr<RateLimiter> rateLimiter) {
   newConnRateLimiter_ = std::move(rateLimiter);
@@ -764,6 +769,9 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
       trans->verifiedClientAddress();
     }
     trans->setCongestionControllerFactory(ccFactory_);
+    if (batchWriterFactoryOverride_) {
+      trans->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
+    }
     trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
 
     auto transportSettingsCopy = transportSettings_;

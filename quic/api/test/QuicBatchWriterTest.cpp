@@ -35,6 +35,93 @@ struct QuicBatchWriterTest : public ::testing::Test {
   bool gsoSupported_{false};
 };
 
+class TestOverrideBatchWriter : public BatchWriter {
+ public:
+  [[nodiscard]] bool empty() const override {
+    return false;
+  }
+
+  [[nodiscard]] size_t size() const override {
+    return kOverrideSize;
+  }
+
+  void reset() override {}
+
+  bool append(
+      BufPtr&&,
+      size_t,
+      const folly::SocketAddress&,
+      QuicAsyncUDPSocket*) override {
+    return true;
+  }
+
+  ssize_t write(QuicAsyncUDPSocket&, const folly::SocketAddress&) override {
+    return 0;
+  }
+
+  static constexpr size_t kOverrideSize = 12345;
+};
+
+TEST_F(QuicBatchWriterTest, TestPerConnBatchWriterFactoryOverride) {
+  bool overrideCalled = false;
+  conn_.batchWriterFactoryOverride = [&](const quic::QuicBatchingMode&,
+                                         uint32_t,
+                                         DataPathType,
+                                         QuicConnectionStateBase&,
+                                         bool) {
+    overrideCalled = true;
+    return BatchWriterPtr(new TestOverrideBatchWriter());
+  };
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_NONE,
+      kBatchNum,
+      DataPathType::ChainedMemory,
+      conn_,
+      gsoSupported_);
+
+  EXPECT_TRUE(overrideCalled);
+  ASSERT_TRUE(batchWriter);
+  EXPECT_EQ(batchWriter->size(), TestOverrideBatchWriter::kOverrideSize);
+
+  // Clearing the override returns to the default factory.
+  conn_.batchWriterFactoryOverride = nullptr;
+  auto defaultBatchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_NONE,
+      kBatchNum,
+      DataPathType::ChainedMemory,
+      conn_,
+      gsoSupported_);
+  ASSERT_TRUE(defaultBatchWriter);
+  EXPECT_EQ(defaultBatchWriter->size(), 0);
+}
+
+TEST_F(QuicBatchWriterTest, TestPerConnBatchWriterFactoryOverrideFallthrough) {
+  // An override returning nullptr must fall through to the default factory.
+  bool overrideCalled = false;
+  conn_.batchWriterFactoryOverride = [&](const quic::QuicBatchingMode&,
+                                         uint32_t,
+                                         DataPathType,
+                                         QuicConnectionStateBase&,
+                                         bool) {
+    overrideCalled = true;
+    return BatchWriterPtr(nullptr);
+  };
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      quic::QuicBatchingMode::BATCHING_MODE_NONE,
+      kBatchNum,
+      DataPathType::ChainedMemory,
+      conn_,
+      gsoSupported_);
+
+  EXPECT_TRUE(overrideCalled);
+  ASSERT_TRUE(batchWriter);
+  // Default writer for BATCHING_MODE_NONE / ChainedMemory is a single packet
+  // writer whose size is 0, not the override sentinel.
+  EXPECT_EQ(batchWriter->size(), 0);
+}
+
 TEST_F(QuicBatchWriterTest, TestBatchingNone) {
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       quic::QuicBatchingMode::BATCHING_MODE_NONE,

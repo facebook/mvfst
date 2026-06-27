@@ -43,7 +43,15 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     uint32_t batchSize,
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
-    bool /* gsoSupported */) {
+    bool gsoSupported) {
+  if (conn.batchWriterFactoryOverride) {
+    auto batchWriter = conn.batchWriterFactoryOverride(
+        batchingMode, batchSize, dataPathType, conn, gsoSupported);
+    if (batchWriter) {
+      return batchWriter;
+    }
+  }
+
   // Mobile only supports single-packet writers
   // GSO and sendmmsg batching are not available on mobile platforms
   switch (batchingMode) {

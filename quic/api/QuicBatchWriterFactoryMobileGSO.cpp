@@ -40,6 +40,14 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     DataPathType dataPathType,
     QuicConnectionStateBase& conn,
     bool gsoSupported) {
+  if (conn.batchWriterFactoryOverride) {
+    auto batchWriter = conn.batchWriterFactoryOverride(
+        batchingMode, batchSize, dataPathType, conn, gsoSupported);
+    if (batchWriter) {
+      return batchWriter;
+    }
+  }
+
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_GSO:
       if (gsoSupported) {

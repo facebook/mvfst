@@ -170,6 +170,23 @@ TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWithoutSocket) {
   ASSERT_TRUE(result.hasError());
 }
 
+TEST_F(
+    SimpleQuicServerWorkerTest,
+    GetListenerSocketReturnsNullBeforeSetSocket) {
+  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  EXPECT_EQ(worker_->getListenerSocket(), nullptr);
+}
+
+TEST_F(SimpleQuicServerWorkerTest, GetListenerSocketReturnsBoundSocket) {
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
+  auto* expectedSock = sock.get();
+  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  worker_->setSocket(std::move(sock));
+  EXPECT_EQ(worker_->getListenerSocket(), expectedSock);
+}
+
 std::unique_ptr<folly::IOBuf> createData(size_t size) {
   std::string data;
   data.resize(size);

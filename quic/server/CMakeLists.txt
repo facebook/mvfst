@@ -55,6 +55,7 @@ mvfst_add_library(mvfst_server_server
     Folly::folly_token_bucket
     fmt::fmt
   EXPORTED_DEPS
+    mvfst_api_quic_batch_writer
     mvfst_api_transport
     mvfst_api_transport_helpers
     mvfst_codec_types
@@ -77,6 +78,7 @@ mvfst_add_library(mvfst_server_server
     fizz::fizz
     Folly::folly_container_evicting_cache_map
     Folly::folly_container_f14_hash
+    Folly::folly_function
     Folly::folly_io_async_async_base
     Folly::folly_io_async_async_transport_certificate
     Folly::folly_io_async_async_udp_socket

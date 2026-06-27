@@ -32,6 +32,7 @@ fb_dirsync_cpp_unittest(
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic/api:transport",
+        "//quic/api/test:api_mocks",
         "//quic/api/test:mocks",
         "//quic/client:client",
         "//quic/codec:header_codec",

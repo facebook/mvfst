@@ -104,6 +104,28 @@ void QuicServer::setCongestionControllerFactory(
   ccFactory_ = std::move(ccFactory);
 }
 
+void QuicServer::setBatchWriterFactoryOverride(
+    quic::BatchWriterFactoryOverride override) {
+  checkRunningInThread(mainThreadId_);
+  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
+  batchWriterFactoryOverride_ = std::move(override);
+}
+
+const quic::BatchWriterFactoryOverride&
+QuicServer::getBatchWriterFactoryOverride() const noexcept {
+  return batchWriterFactoryOverride_;
+}
+
+void QuicServer::forEachListenerSocket(
+    folly::FunctionRef<void(const folly::AsyncUDPSocket*)> fn) const {
+  for (const auto& worker : workers_) {
+    const auto* sock = worker->getListenerSocket();
+    if (sock != nullptr) {
+      fn(sock);
+    }
+  }
+}
+
 void QuicServer::setRateLimit(
     std::function<uint64_t()> count,
     std::chrono::seconds window) {
@@ -253,6 +275,7 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   }
   worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
   worker->setCongestionControllerFactory(ccFactory_);
+  worker->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
   if (rateLimit_) {
     worker->setRateLimiter(
         std::make_unique<SlidingWindowRateLimiter>(
