@@ -7,6 +7,7 @@
 
 #pragma once
 #include <folly/io/IOBuf.h>
+#include <folly/lang/Align.h>
 #include <quic/QuicConstants.h>
 
 namespace quic {
@@ -17,7 +18,7 @@ namespace quic {
  * to change it to have a uint8_t* under the hood. Once that's done, we can
  * remove the IOBuf-specific APIs, namely buf(), obtain(), and release().
  */
-class BufAccessor {
+class alignas(folly::hardware_destructive_interference_size) BufAccessor {
  public:
   explicit BufAccessor(BufPtr buf);
 

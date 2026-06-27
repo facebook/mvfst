@@ -51,6 +51,7 @@ mvfst_add_library(mvfst_common_buf_accessor
   EXPORTED_DEPS
     mvfst_constants
     Folly::folly_io_iobuf
+    Folly::folly_lang_align
 )
 
 mvfst_add_library(mvfst_common_buf_util
