@@ -13,3 +13,14 @@ mvfst_cpp_test(
         "//quic/tools/tperf:pacing_observer",
     ],
 )
+
+mvfst_cpp_test(
+    name = "TperfWriteStatsTest",
+    srcs = [
+        "TperfWriteStatsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/tools/tperf:tperf_server",
+    ],
+)

@@ -37,12 +37,16 @@ mvfst_cpp_library(
     deps = [
         ":pacing_observer",
         "//fizz/crypto:utils",
+        "//folly/io:iobuf",
         "//folly/stats:histogram",
         "//quic/common/test:test_utils",
+        "//quic/common/udpsocket:folly_async_udp_socket",
         "//quic/congestion_control:static_cwnd_congestion_controller",
         "//quic/logging/oops_logger:glog_oops_logger",
     ],
     exported_deps = [
+        "//folly/io/async:async_udp_socket",
+        "//quic/api:quic_batch_writer",
         "//quic/common:mvfst_logging",
         "//quic/logging:file_qlogger",
         "//quic/observer:socket_observer_types",

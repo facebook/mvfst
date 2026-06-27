@@ -6,16 +6,515 @@
  */
 
 #include <fizz/crypto/Utils.h>
+#include <folly/io/IOBuf.h>
+#include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/stats/Histogram.h>
+#include <quic/api/QuicBatchWriter.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/oops_logger/GlogOopsLogger.h>
 #include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfServer.h>
 
+#include <array>
+#include <cerrno>
+#include <chrono>
+#include <utility>
+#include <vector>
+
 namespace quic::tperf {
+
+namespace {
+
+// Snapshots the per-listener-fd MSG_ZEROCOPY kernel counters into
+// writeStats. Called from the inplace batch writer's write() path, which
+// runs on the same worker EventBase that owns `sock` — so this satisfies
+// folly's contract that ZeroCopyFdBookkeeping/getZeroCopy* getters are read
+// from the socket's own EventBase thread (the counters are plain uint64_t,
+// not atomics). With --num_server_worker=N, every worker overwrites the
+// same snapshot field on each ZC send; under default --num_server_worker=1
+// the snapshot is exact, otherwise it is best-effort observability (whichever
+// worker wrote last wins).
+void publishListenerZeroCopySnapshot(
+    folly::AsyncUDPSocket& sock,
+    const std::shared_ptr<TPerfWriteStats>& writeStats) {
+  if (!writeStats) {
+    return;
+  }
+  writeStats->recordListenerZeroCopySnapshot(
+      TPerfWriteStats::ListenerKernelSnapshot{
+          .completionsZc = sock.getZeroCopyCompletionsZc(),
+          .completionsCopied = sock.getZeroCopyCompletionsCopied(),
+          .sendsAckedZc = sock.getZeroCopySendsAckedZc(),
+          .sendsAckedMaybeCopied = sock.getZeroCopySendsAckedMaybeCopied(),
+          .zcEnabled = sock.getZeroCopy()});
+}
+
+// Records per-write latency by wrapping an inner batch writer. Used by the
+// override factory so generic write-latency counters land in TPerfWriteStats
+// regardless of which underlying writer mvfst picked.
+class TimingBatchWriter : public quic::BatchWriter {
+ public:
+  TimingBatchWriter(
+      BatchWriterPtr inner,
+      std::shared_ptr<TPerfWriteStats> writeStats)
+      : inner_(std::move(inner)), writeStats_(std::move(writeStats)) {}
+
+  [[nodiscard]] bool empty() const override {
+    return inner_->empty();
+  }
+
+  [[nodiscard]] size_t size() const override {
+    return inner_->size();
+  }
+
+  void reset() override {
+    inner_->reset();
+    bufferedPackets_ = 0;
+    bufferedBytes_ = 0;
+  }
+
+  bool needsFlush(size_t nextPacketSize) override {
+    return inner_->needsFlush(nextPacketSize);
+  }
+
+  void setTxTime(std::chrono::microseconds txtime) override {
+    inner_->setTxTime(txtime);
+  }
+
+  bool append(
+      BufPtr&& buf,
+      size_t bufSize,
+      const folly::SocketAddress& addr,
+      QuicAsyncUDPSocket* sock) override {
+    auto needsFlush = inner_->append(std::move(buf), bufSize, addr, sock);
+    bufferedPackets_++;
+    bufferedBytes_ += bufSize;
+    return needsFlush;
+  }
+
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override {
+    auto start = std::chrono::steady_clock::now();
+    auto ret = inner_->write(sock, address);
+    auto errnoCopy = ret < 0 ? errno : 0;
+    auto durationUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now() - start)
+                          .count();
+    writeStats_->recordWrite(
+        TPerfWriteStats::WriteSample{
+            .durationUs = static_cast<uint64_t>(durationUs),
+            .ret = ret,
+            .errnoValue = errnoCopy,
+            .bufferedPackets = bufferedPackets_,
+            .bufferedBytes = bufferedBytes_});
+    return ret;
+  }
+
+ private:
+  BatchWriterPtr inner_;
+  std::shared_ptr<TPerfWriteStats> writeStats_;
+  uint64_t bufferedPackets_{0};
+  uint64_t bufferedBytes_{0};
+};
+
+// Wraps `batchWriter` so per-write latency, byte, and errno counters land in
+// `writeStats`. The factory override always supplies a non-null `writeStats`;
+// callers that don't need timing should skip this wrapper.
+BatchWriterPtr wrapBatchWriterWithTiming(
+    BatchWriterPtr batchWriter,
+    const std::shared_ptr<TPerfWriteStats>& writeStats) {
+  MVCHECK(writeStats);
+  return BatchWriterPtr(
+      new TimingBatchWriter(std::move(batchWriter), writeStats));
+}
+
+// Thread-local pool of slab IOBufs reused across MSG_ZEROCOPY sends. mvfst
+// borrows a slab from this pool, encrypts directly into it, and hands
+// ownership to folly's writeChain. The pool implements
+// folly::AsyncWriter::ReleaseIOBufCallback so the per-fd
+// ZeroCopyFdBookkeeping (installed by QuicServerWorker::enableZeroCopy)
+// returns the slab via releaseIOBuf() when the kernel completion fires.
+class TperfInplaceZcSlabPool : public folly::AsyncWriter::ReleaseIOBufCallback {
+ public:
+  static constexpr size_t kDefaultMaxSlabs = 64;
+
+  TperfInplaceZcSlabPool() = default;
+  TperfInplaceZcSlabPool(const TperfInplaceZcSlabPool&) = delete;
+  TperfInplaceZcSlabPool& operator=(const TperfInplaceZcSlabPool&) = delete;
+  TperfInplaceZcSlabPool(TperfInplaceZcSlabPool&&) = delete;
+  TperfInplaceZcSlabPool& operator=(TperfInplaceZcSlabPool&&) = delete;
+
+  ~TperfInplaceZcSlabPool() override {
+    idle_.clear();
+  }
+
+  void setMaxSlabs(size_t maxSlabs) {
+    if (maxSlabs > 0) {
+      maxSlabs_ = maxSlabs;
+    }
+  }
+
+  BufPtr tryAcquireIdle(
+      size_t capacity,
+      const std::shared_ptr<TPerfWriteStats>& stats) {
+    if (slabCapacity_ == 0) {
+      slabCapacity_ = capacity;
+    }
+    if (!idle_.empty()) {
+      auto buf = std::move(idle_.back());
+      idle_.pop_back();
+      buf->clear();
+      if (stats) {
+        stats->recordUdpZerocopyInplacePoolAcquire(/*reused=*/true);
+      }
+      return buf;
+    }
+    if (totalAllocated_ < maxSlabs_) {
+      auto buf = folly::IOBuf::createCombined(slabCapacity_);
+      ++totalAllocated_;
+      if (stats) {
+        stats->recordUdpZerocopyInplacePoolAcquire(/*reused=*/false);
+      }
+      return buf;
+    }
+    return nullptr;
+  }
+
+  // Returns a slab to the idle pool. Decrements the outstanding-slab
+  // counter so that direct-return paths (writer destructor on a slab that
+  // never made it to the kernel) stay accounted for; the kernel-completion
+  // path (releaseIOBuf below) funnels through here too.
+  void returnIdle(BufPtr&& buf) {
+    if (!buf) {
+      return;
+    }
+    buf->clear();
+    if (stats_) {
+      stats_->recordUdpZerocopyInplacePoolRelease();
+    }
+    idle_.push_back(std::move(buf));
+  }
+
+  // Called when a slab was handed to folly's writeChain but the send
+  // failed before bookkeeping took ownership — folly's release callback
+  // contract only fires on successful MSG_ZEROCOPY sends, so the slab is
+  // gone (freed by folly's ioBufFreeFunc_ or by the unique_ptr destructor)
+  // and our ReleaseIOBufCallback will never see it. Decrement
+  // totalAllocated_ (so the pool can re-allocate up to the cap) and
+  // record the matching release on the outstanding-slabs counter so it
+  // doesn't drift upward over persistent ZC failures.
+  void notifyDroppedSlab(const std::shared_ptr<TPerfWriteStats>& stats) {
+    if (totalAllocated_ > 0) {
+      --totalAllocated_;
+    }
+    if (stats) {
+      stats->recordUdpZerocopyInplacePoolRelease();
+    }
+  }
+
+  // folly::AsyncWriter::ReleaseIOBufCallback override. Called by the
+  // ZeroCopyFdBookkeeping::onCompletion path when the kernel reports
+  // SO_EE_ORIGIN_ZEROCOPY for an id we registered via writeChain. Release
+  // accounting happens inside returnIdle so all return-to-idle paths
+  // increment the counter exactly once.
+  void releaseIOBuf(std::unique_ptr<folly::IOBuf> buf) noexcept override {
+    returnIdle(std::move(buf));
+  }
+
+  void setStats(std::shared_ptr<TPerfWriteStats> stats) {
+    stats_ = std::move(stats);
+  }
+
+ private:
+  std::vector<BufPtr> idle_;
+  size_t totalAllocated_{0};
+  size_t slabCapacity_{0};
+  size_t maxSlabs_{kDefaultMaxSlabs};
+  std::shared_ptr<TPerfWriteStats> stats_;
+};
+
+TperfInplaceZcSlabPool& threadLocalInplaceZcSlabPool() {
+  thread_local TperfInplaceZcSlabPool pool;
+  return pool;
+}
+
+// Per-fd singleton WriteCallback whose getReleaseIOBufCallback() returns
+// the thread-local slab pool. folly's writeChain reads this once per
+// successful MSG_ZEROCOPY send and stores the returned
+// ReleaseIOBufCallback* in the bookkeeping entry — so the pointer must
+// outlive every in-flight send. thread_local satisfies that since the
+// pool itself never gets destroyed for the worker thread.
+class TperfInplaceZcWriteCallback
+    : public folly::AsyncUDPSocket::WriteCallback {
+ public:
+  folly::AsyncWriter::ReleaseIOBufCallback* getReleaseIOBufCallback() noexcept
+      override {
+    return &threadLocalInplaceZcSlabPool();
+  }
+};
+
+TperfInplaceZcWriteCallback& threadLocalInplaceZcWriteCallback() {
+  thread_local TperfInplaceZcWriteCallback wcb;
+  return wcb;
+}
+
+// Inplace + MSG_ZEROCOPY batch writer. Hijacks conn.bufAccessor (requires
+// DataPathType::ContinuousMemory) to install a pool-borrowed slab for each
+// write event. mvfst encrypts directly into the slab; we then send via
+// writeChain with the per-write WriteCallback that hands the slab to the
+// per-fd ZeroCopyFdBookkeeping on success. The bookkeeping invokes our
+// release callback once the kernel completion arrives on the listener
+// fd's POLLERR path, returning the slab to the idle list.
+//
+// Lifetime: mvfst constructs a fresh writer every write event, so all
+// persistent slab state lives in the thread_local pool. This writer's
+// only per-instance state is `originalBuf_` (the buf displaced from the
+// accessor) — restored to the accessor in the destructor.
+class UdpGsoZerocopyInplaceBatchWriter : public quic::BatchWriter {
+ public:
+  UdpGsoZerocopyInplaceBatchWriter(const UdpGsoZerocopyInplaceBatchWriter&) =
+      delete;
+  UdpGsoZerocopyInplaceBatchWriter& operator=(
+      const UdpGsoZerocopyInplaceBatchWriter&) = delete;
+  UdpGsoZerocopyInplaceBatchWriter(UdpGsoZerocopyInplaceBatchWriter&&) = delete;
+  UdpGsoZerocopyInplaceBatchWriter& operator=(
+      UdpGsoZerocopyInplaceBatchWriter&&) = delete;
+
+  UdpGsoZerocopyInplaceBatchWriter(
+      QuicConnectionStateBase& conn,
+      size_t maxPackets,
+      TPerfUdpGsoZerocopyConfig config,
+      std::shared_ptr<TPerfWriteStats> writeStats)
+      : conn_(conn),
+        maxPackets_(maxPackets),
+        config_(config),
+        writeStats_(std::move(writeStats)),
+        pool_(threadLocalInplaceZcSlabPool()) {
+    pool_.setStats(writeStats_);
+    pool_.setMaxSlabs(static_cast<size_t>(config_.poolBuffers));
+    auto& accessor = *conn_.bufAccessor;
+    if (!accessor.ownsBuffer()) {
+      return;
+    }
+    slabCapacity_ = accessor.buf()->capacity();
+    auto slabBuf = pool_.tryAcquireIdle(slabCapacity_, writeStats_);
+    if (!slabBuf) {
+      return;
+    }
+    originalBuf_ = accessor.obtain();
+    accessor.release(std::move(slabBuf));
+    haveSlabInAccessor_ = true;
+  }
+
+  ~UdpGsoZerocopyInplaceBatchWriter() override {
+    auto& accessor = *conn_.bufAccessor;
+    if (haveSlabInAccessor_) {
+      // Slab still installed (never ZC-sent, or fell back to non-ZC on the
+      // last batch). Return it to the pool's idle list immediately.
+      pool_.returnIdle(accessor.obtain());
+      MVCHECK(originalBuf_);
+      accessor.release(std::move(originalBuf_));
+    } else if (originalBuf_) {
+      // We installed a slab, then ZC-sent it (now in the bookkeeping's
+      // pending set). Accessor is empty. Restore the original.
+      MVCHECK(!accessor.ownsBuffer());
+      accessor.release(std::move(originalBuf_));
+    }
+  }
+
+  void reset() override {
+    lastPacketEnd_ = nullptr;
+    prevSize_ = 0;
+    numPackets_ = 0;
+  }
+
+  bool needsFlush(size_t size) override {
+    return prevSize_ && size > prevSize_;
+  }
+
+  bool append(
+      BufPtr&& /*buf*/,
+      size_t size,
+      const folly::SocketAddress& /*addr*/,
+      QuicAsyncUDPSocket* /*sock*/) override {
+    MVCHECK(!needsFlush(size));
+    auto& buf = conn_.bufAccessor->buf();
+    if (!lastPacketEnd_) {
+      MVCHECK(prevSize_ == 0 && numPackets_ == 0);
+      prevSize_ = size;
+      lastPacketEnd_ = buf->tail();
+      numPackets_ = 1;
+      return false;
+    }
+    MVCHECK(prevSize_ && prevSize_ >= size);
+    ++numPackets_;
+    lastPacketEnd_ = buf->tail();
+    if (prevSize_ > size || numPackets_ == maxPackets_) {
+      return true;
+    }
+    return false;
+  }
+
+  ssize_t write(QuicAsyncUDPSocket& sock, const folly::SocketAddress& address)
+      override {
+    MVCHECK(lastPacketEnd_);
+    auto& accessor = *conn_.bufAccessor;
+    auto& accessorBuf = accessor.buf();
+    MVCHECK(!accessorBuf->isChained());
+
+    uint64_t diffToEnd = accessorBuf->tail() - lastPacketEnd_;
+    uint64_t diffToStart = lastPacketEnd_ - accessorBuf->data();
+    accessorBuf->trimEnd(diffToEnd);
+
+    bool inSlabMode = haveSlabInAccessor_;
+    uint64_t payloadLen = diffToStart;
+    // Only attempt ZC when the batch fits cleanly in the slab (no residue)
+    // and meets size/eligibility thresholds.
+    bool zcEligible = inSlabMode && diffToEnd == 0 && numPackets_ > 1 &&
+        config_.enabled && payloadLen >= config_.minBytes;
+
+    auto* follySock = dynamic_cast<FollyQuicAsyncUDPSocket*>(&sock);
+    if (zcEligible && follySock && !zcSetupAttempted_) {
+      zcSetupAttempted_ = true;
+      // Bookkeeping was installed by QuicServerWorker::enableZeroCopy and
+      // setZeroCopy(true) was called on the listener by
+      // QuicServer::enableZeroCopy.
+      zcConfigured_ = true;
+    }
+    bool sendZc = zcEligible && zcConfigured_ && follySock != nullptr;
+
+    int gsoVal = numPackets_ > 1 ? static_cast<int>(prevSize_) : 0;
+    ssize_t ret = 0;
+    int errnoCopy = 0;
+    bool zcFailed = false;
+
+    if (sendZc) {
+      // Pull the slab out of the accessor so we can pass ownership into
+      // writeChain — folly will hand it to the bookkeeping after a
+      // successful sendmsg, which holds it until the kernel completes the
+      // send. The accessor is left empty until we install another slab (or
+      // restore originalBuf_ in the destructor).
+      auto& udpSocket = follySock->getFollySocket();
+      auto slabBuf = accessor.obtain();
+      haveSlabInAccessor_ = false;
+      folly::AsyncUDPSocket::WriteOptions opts(gsoVal, true /*zerocopy*/);
+      opts.txTime = txTime_;
+      ret = udpSocket.writeChain(
+          &threadLocalInplaceZcWriteCallback(),
+          address,
+          std::move(slabBuf),
+          opts);
+      errnoCopy = ret < 0 ? errno : 0;
+      if (ret < 0) {
+        // writeChain failed — slabBuf was already moved out. Per folly
+        // contract (see AsyncUDPSocket::writeChain implementation), the
+        // per-write ReleaseIOBufCallback fires only when MSG_ZEROCOPY
+        // sendmsg returns >= 0; on any error return (including the
+        // ENOBUFS-fallback retry path) the buf is freed via folly's
+        // internal ioBufFreeFunc_ or dropped by the unique_ptr — the
+        // bookkeeping never registers it and our releaseIOBuf callback is
+        // never invoked. Decrement here so the outstanding-slabs counter
+        // and the pool's totalAllocated_ stay balanced; without this,
+        // persistent ZC failures drift the counter upward and permanently
+        // shrink the effective pool cap.
+        zcFailed = true;
+        pool_.notifyDroppedSlab(writeStats_);
+      } else {
+        // Successful ZC send: bookkeeping owns the buf. Publish the
+        // per-fd kernel MSG_ZEROCOPY counters into writeStats from this
+        // (worker) thread — same EventBase that owns `udpSocket`, so the
+        // non-atomic getZeroCopy* reads are race-free.
+        publishListenerZeroCopySnapshot(udpSocket, writeStats_);
+        // Try to install a fresh slab for the next batch in this write
+        // event.
+        auto next = pool_.tryAcquireIdle(slabCapacity_, writeStats_);
+        if (next) {
+          accessor.release(std::move(next));
+          haveSlabInAccessor_ = true;
+        } else {
+          // Pool exhausted. Restore originalBuf_ so the next batch can use
+          // it via the plain-GSO fallback (no ZC).
+          MVCHECK(originalBuf_);
+          accessor.release(std::move(originalBuf_));
+          // originalBuf_ is null now — destructor will detect that path.
+        }
+      }
+    } else {
+      // Plain GSO fallback (ineligible, setup failed, or residue present).
+      // Use writeGSO with iovec from the accessor buf; do not register with
+      // bookkeeping (no ZC requested) and leave the slab installed so the
+      // residue shift below works.
+      std::array<iovec, 1> vec{};
+      vec[0].iov_base = accessorBuf->writableData();
+      vec[0].iov_len = accessorBuf->length();
+      QuicAsyncUDPSocket::WriteOptions qOpts(gsoVal, false /*zerocopy*/);
+      qOpts.txTime = txTime_;
+      ret = sock.writeGSO(address, vec.data(), vec.size(), qOpts);
+      errnoCopy = ret < 0 ? errno : 0;
+      // GSOInplace residue shift: any bytes past lastPacketEnd_ are next
+      // batch's first packet; move them to the start of the slab.
+      if (diffToEnd) {
+        accessorBuf->trimStart(diffToStart);
+        accessorBuf->append(diffToEnd);
+        accessorBuf->retreat(diffToStart);
+      } else {
+        accessorBuf->clear();
+      }
+    }
+
+    if (writeStats_) {
+      bool zcSuccess = sendZc && ret >= 0;
+      bool fallbackSend = !sendZc;
+      writeStats_->recordUdpZerocopyInplaceWrite(
+          zcSuccess, fallbackSend, zcFailed);
+    }
+
+    reset();
+    errno = errnoCopy;
+    return ret;
+  }
+
+  [[nodiscard]] bool empty() const override {
+    return numPackets_ == 0;
+  }
+
+  [[nodiscard]] size_t size() const override {
+    if (empty()) {
+      return 0;
+    }
+    MVCHECK(lastPacketEnd_);
+    return lastPacketEnd_ - conn_.bufAccessor->data();
+  }
+
+  void setTxTime(std::chrono::microseconds txTime) override {
+    txTime_ = txTime;
+  }
+
+ private:
+  QuicConnectionStateBase& conn_;
+  size_t maxPackets_;
+  TPerfUdpGsoZerocopyConfig config_;
+  std::shared_ptr<TPerfWriteStats> writeStats_;
+  TperfInplaceZcSlabPool& pool_;
+
+  BufPtr originalBuf_;
+  size_t slabCapacity_{0};
+  bool haveSlabInAccessor_{false};
+  bool zcSetupAttempted_{false};
+  bool zcConfigured_{false};
+
+  const uint8_t* lastPacketEnd_{nullptr};
+  size_t prevSize_{0};
+  size_t numPackets_{0};
+  std::chrono::microseconds txTime_{std::chrono::microseconds(0)};
+};
+
+} // namespace
 
 class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
                             public quic::QuicSocket::ConnectionCallback,
@@ -405,8 +904,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         maxBytesPerStream_(maxBytesPerStream),
         burstDeadlineMs_(burstDeadlineMs),
         maxPacingRate_(maxPacingRate),
-        qloggerPath_(qloggerPath),
-        pacingObserver_(pacingObserver),
+        qloggerPath_(std::move(qloggerPath)),
+        pacingObserver_(std::move(pacingObserver)),
         doneCallback_(doneCallback) {}
 
   quic::QuicServerTransport::Ptr make(
@@ -508,12 +1007,14 @@ TPerfServer::TPerfServer(
     bool logAppRateLimited,
     bool logLoss,
     bool logRttSample,
+    TPerfUdpGsoZerocopyConfig udpGsoZerocopyConfig,
     std::string qloggerPath,
     const std::string& pacingObserver,
     DoneCallback* doneCallback,
     StaticCwndConfig staticCwndConfig)
     : host_(host),
       port_(port),
+      writeStats_(std::make_shared<TPerfWriteStats>()),
       acceptObserver_(
           std::make_unique<TPerfAcceptObserver>(
               logAppRateLimited,
@@ -530,7 +1031,8 @@ TPerfServer::TPerfServer(
       dscp_(dscp),
       numServerWorkers_(numServerWorkers),
       burstDeadlineMs_(burstDeadlineMs),
-      maxPacingRate_(maxPacingRate) {
+      maxPacingRate_(maxPacingRate),
+      udpGsoZerocopyConfig_(udpGsoZerocopyConfig) {
   fizz::Error err;
   FIZZ_THROW_ON_ERROR(fizz::CryptoUtils::init(err), err);
   eventBase_.setName("tperf_server");
@@ -582,6 +1084,27 @@ TPerfServer::TPerfServer(
   settings.readEcnOnIngress = readEcn_;
   settings.dscpValue = dscp_;
 
+  if (udpGsoZerocopyConfig_.enabled && udpGsoZerocopyConfig_.inplace) {
+    batchWriterFactoryOverride_ =
+        [udpGsoZerocopyConfig = udpGsoZerocopyConfig_,
+         writeStats = writeStats_](
+            const quic::QuicBatchingMode& /*batchingMode*/,
+            uint32_t batchSize,
+            DataPathType dataPathType,
+            QuicConnectionStateBase& conn,
+            bool gsoSupported) -> BatchWriterPtr {
+      if (udpGsoZerocopyConfig.enabled && udpGsoZerocopyConfig.inplace &&
+          gsoSupported && dataPathType == DataPathType::ContinuousMemory) {
+        return wrapBatchWriterWithTiming(
+            BatchWriterPtr(new UdpGsoZerocopyInplaceBatchWriter(
+                conn, batchSize, udpGsoZerocopyConfig, writeStats)),
+            writeStats);
+      }
+      // Fall through to the default factory.
+      return nullptr;
+    };
+  }
+
   server_ = QuicServer::createQuicServer(settings);
   server_->setQuicServerTransportFactory(
       std::make_unique<TPerfServerTransportFactory>(
@@ -590,7 +1113,7 @@ TPerfServer::TPerfServer(
           maxBytesPerStream,
           burstDeadlineMs_,
           maxPacingRate_,
-          qloggerPath,
+          std::move(qloggerPath),
           pacingObserver,
           doneCallback));
   auto serverCtx = quic::test::createServerCtx();
@@ -612,13 +1135,48 @@ void TPerfServer::start() {
   // Create a SocketAddress and the default or passed in host.
   quic::SocketAddress addr1(host_.c_str(), port_);
   addr1.setFromHostPort(host_, port_);
+  if (batchWriterFactoryOverride_) {
+    server_->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
+  }
   server_->start(addr1, numServerWorkers_);
+  if (udpGsoZerocopyConfig_.enabled && udpGsoZerocopyConfig_.inplace) {
+    auto result = server_->enableZeroCopy();
+    if (result.hasError()) {
+      throw std::runtime_error(
+          fmt::format(
+              "QuicServer::enableZeroCopy failed: {}", result.error().message));
+    }
+    MVLOG_INFO << "tperf server enabled MSG_ZEROCOPY for inplace data path";
+  }
   auto workerEvbs = server_->getWorkerEvbs();
   for (auto evb : workerEvbs) {
     server_->addAcceptObserver(evb, acceptObserver_.get());
   }
   MVLOG_INFO << "tperf server started at: " << addr1.describe();
+  scheduleWriteStatsLog();
   eventBase_.loopForever();
+}
+
+void TPerfServer::maybeLogWriteStats() {
+  if (!writeStats_) {
+    return;
+  }
+  // The listener-fd MSG_ZEROCOPY kernel counter snapshot (added in the
+  // prerequisite folly diff) is published by the inplace batch writer on
+  // each successful ZC send, from the worker thread that owns the listener
+  // socket — see publishListenerZeroCopySnapshot. The getZeroCopy* getters
+  // back onto plain uint64_t fields whose ZeroCopyFdBookkeeping contract
+  // requires single-EventBase access, so reading them from this (main)
+  // thread would be a data race; instead we just log whatever the worker
+  // already deposited under the writeStats mutex.
+  writeStats_->maybeLog();
+  scheduleWriteStatsLog();
+}
+
+void TPerfServer::scheduleWriteStatsLog() {
+  eventBase_.runAfterDelay(
+      [this]() { maybeLogWriteStats(); },
+      /*milliseconds=*/1000);
 }
 
 } // namespace quic::tperf

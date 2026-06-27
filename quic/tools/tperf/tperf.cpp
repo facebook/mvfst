@@ -133,6 +133,24 @@ DEFINE_string(
     pacer_interval_source,
     "std::nullopt",
     "If the StaticCwnd congestion controller is used with a pacer, this is the rtt that will be used to updated the pacer. (mrtt, lrtt, srtt, std::nullopt)");
+DEFINE_string(
+    tx_backend,
+    "udp",
+    "Server-side UDP TX backend: 'udp' (default) or 'udp_gso_zerocopy_inplace'. "
+    "The inplace MSG_ZEROCOPY backend requires --use_inplace_write and --gso; "
+    "mvfst encrypts directly into pool-borrowed slabs that the kernel zerocopies, "
+    "with per-fd completion bookkeeping returning slabs to the pool.");
+DEFINE_uint64(
+    udp_zerocopy_min_bytes,
+    1500,
+    "Minimum batch payload bytes before the inplace MSG_ZEROCOPY path is "
+    "attempted. Batches smaller than this fall back to plain GSO.");
+DEFINE_uint32(
+    udp_zerocopy_pool_buffers,
+    4096,
+    "Cap on the number of slab IOBufs the inplace MSG_ZEROCOPY pool will allocate. "
+    "When exhausted, the writer falls back to plain GSO until the kernel "
+    "completes outstanding sends and returns slabs to the idle list.");
 
 namespace quic::tperf {
 
@@ -193,6 +211,43 @@ int main(int argc, char* argv[]) {
       server.start();
       return 0;
     }
+    TPerfUdpGsoZerocopyConfig udpGsoZerocopyConfig;
+    if (FLAGS_tx_backend == "udp") {
+      // Default backend: no override, plain GSO writer.
+    } else if (FLAGS_tx_backend == "udp_gso_zerocopy_inplace") {
+      // The inplace MSG_ZEROCOPY writer hijacks conn.bufAccessor which only
+      // exists when mvfst's ContinuousMemory data path is enabled. That data
+      // path requires both --use_inplace_write and --gso (see TPerfServer
+      // constructor: settings.dataPathType = ContinuousMemory iff
+      // useInplaceWrite && gso). Refuse to start instead of silently falling
+      // back to the default writer and pretending --tx_backend was honored.
+      if (!FLAGS_use_inplace_write || !FLAGS_gso) {
+        MVLOG_ERROR
+            << "--tx_backend=udp_gso_zerocopy_inplace requires both "
+            << "--use_inplace_write=true and --gso=true (got use_inplace_write="
+            << FLAGS_use_inplace_write << ", gso=" << FLAGS_gso << ")";
+        return 1;
+      }
+      // --udp_zerocopy_pool_buffers=0 used to be silently ignored by the
+      // pool (setMaxSlabs(0) kept the default cap of 64), which contradicts
+      // the flag's user-facing meaning ("Cap on the number of slab IOBufs
+      // the inplace MSG_ZEROCOPY pool will allocate"). Reject it explicitly
+      // so the operator either picks a real cap or removes the flag.
+      if (FLAGS_udp_zerocopy_pool_buffers == 0) {
+        MVLOG_ERROR
+            << "--udp_zerocopy_pool_buffers=0 is not allowed; "
+            << "set it to a positive cap or omit the flag for the default.";
+        return 1;
+      }
+      udpGsoZerocopyConfig.enabled = true;
+      udpGsoZerocopyConfig.inplace = true;
+      udpGsoZerocopyConfig.minBytes = FLAGS_udp_zerocopy_min_bytes;
+      udpGsoZerocopyConfig.poolBuffers = FLAGS_udp_zerocopy_pool_buffers;
+    } else {
+      MVLOG_ERROR << "Unknown --tx_backend value: " << FLAGS_tx_backend
+                  << " (expected 'udp' or 'udp_gso_zerocopy_inplace')";
+      return 1;
+    }
     TPerfServer server(
         FLAGS_host,
         FLAGS_port,
@@ -222,6 +277,7 @@ int main(int argc, char* argv[]) {
         FLAGS_log_app_rate_limited,
         FLAGS_log_loss,
         FLAGS_log_rtt_sample,
+        udpGsoZerocopyConfig,
         FLAGS_server_qlogger_path,
         FLAGS_pacing_observer,
         nullptr, // DoneCallback
