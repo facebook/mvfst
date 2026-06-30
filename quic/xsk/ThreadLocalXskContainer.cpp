@@ -34,8 +34,9 @@ quic::Expected<void, std::runtime_error> ThreadLocalXskContainer::init(
         .numOwners = groupSize,
         .localMac = xskContainerConfig.localMac,
         .gatewayMac = xskContainerConfig.gatewayMac,
-        .zeroCopyEnabled = true,
-        .useNeedWakeup = true,
+        .zeroCopyEnabled = xskContainerConfig.zeroCopyEnabled,
+        .useNeedWakeup = xskContainerConfig.useNeedWakeup,
+        .useChecksumOffload = xskContainerConfig.useChecksumOffload,
         .sharedState = std::make_shared<SharedState>(groupSize),
         .xskPerThread = true};
 

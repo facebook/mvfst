@@ -25,8 +25,9 @@ quic::Expected<void, std::runtime_error> HashingXskContainer::init(
         .numOwners = numOwners,
         .localMac = xskContainerConfig.localMac,
         .gatewayMac = xskContainerConfig.gatewayMac,
-        .zeroCopyEnabled = true,
-        .useNeedWakeup = true,
+        .zeroCopyEnabled = xskContainerConfig.zeroCopyEnabled,
+        .useNeedWakeup = xskContainerConfig.useNeedWakeup,
+        .useChecksumOffload = xskContainerConfig.useChecksumOffload,
         .sharedState = std::make_shared<SharedState>(numOwners)};
     auto createResult = createXskSender(queueId, xskSenderConfig);
     if (createResult.hasError()) {

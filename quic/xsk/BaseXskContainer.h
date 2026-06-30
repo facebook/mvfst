@@ -23,6 +23,9 @@ struct XskContainerConfig {
   uint32_t frameSize;
   uint32_t batchSize;
   uint32_t numSockets;
+  bool useChecksumOffload{false};
+  bool useNeedWakeup{true};
+  bool zeroCopyEnabled{true};
 };
 
 class BaseXskContainer {
