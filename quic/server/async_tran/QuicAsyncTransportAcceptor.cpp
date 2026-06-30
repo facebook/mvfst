@@ -39,6 +39,11 @@ class ServerTransportConnectionSetupCallback
     delete this;
   }
 
+  void onWriteCipherAvailable() noexcept override {
+    // No-op: the async transport wrapper is not created until onTransportReady.
+    // Consumers using the async transport path do not need early-write access.
+  }
+
   void onTransportReady() noexcept override {
     // create wrapper to set as new ConnectionCallback
     auto asyncWrapper =

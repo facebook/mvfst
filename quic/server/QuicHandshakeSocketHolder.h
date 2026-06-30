@@ -23,6 +23,9 @@ class QuicHandshakeSocketHolder
     virtual void onConnectionSetupError(
         std::shared_ptr<quic::QuicSocket> quicSocket,
         quic::QuicError code) = 0;
+
+    virtual void onQuicWriteCipherAvailable(
+        std::shared_ptr<quic::QuicSocket> /*quicSocket*/) {}
   };
 
   static QuicServerTransport::Ptr makeServerTransport(
@@ -49,6 +52,12 @@ class QuicHandshakeSocketHolder
       callback_->onConnectionSetupError(std::move(quicSocket_), code);
     }
     delete this;
+  }
+
+  void onWriteCipherAvailable() noexcept override {
+    if (callback_) {
+      callback_->onQuicWriteCipherAvailable(quicSocket_);
+    }
   }
 
   void onReplaySafe() noexcept override {
