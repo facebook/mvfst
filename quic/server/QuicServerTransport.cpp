@@ -221,6 +221,7 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
   maybeNotifyHandshakeFinished();
   maybeNotifyConnectionIdRetired();
   maybeIssueConnectionIds();
+  maybeNotifyWriteCipherAvailable();
   maybeNotifyTransportReady();
   conn_->pathManager->maybeReapUnusedPaths();
   return {};
@@ -518,6 +519,7 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
       closeImpl(writeResult.error());
       return;
     }
+    maybeNotifyWriteCipherAvailable();
     maybeNotifyTransportReady();
   } catch (const QuicTransportException& ex) {
     MVVLOG(4) << "onCryptoEventAvailable() error " << ex.what() << " " << *this;
@@ -792,6 +794,14 @@ void QuicServerTransport::maybeIssueConnectionIds() {
           *newConnIdData->token);
       sendSimpleFrame(*conn_, std::move(frame));
     }
+  }
+}
+
+void QuicServerTransport::maybeNotifyWriteCipherAvailable() {
+  if (!writeCipherAvailableNotified_ && connSetupCallback_ &&
+      hasWriteCipher()) {
+    writeCipherAvailableNotified_ = true;
+    connSetupCallback_->onWriteCipherAvailable();
   }
 }
 

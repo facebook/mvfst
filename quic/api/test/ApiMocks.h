@@ -90,6 +90,7 @@ class MockConnectionSetupCallback : public QuicSocket::ConnectionSetupCallback {
   MOCK_METHOD((void), onConnectionSetupError, (QuicError), (noexcept));
   MOCK_METHOD((void), onReplaySafe, (), (noexcept));
   MOCK_METHOD((void), onTransportReady, (), (noexcept));
+  MOCK_METHOD((void), onWriteCipherAvailable, (), (noexcept));
   MOCK_METHOD((void), onFirstPeerPacketProcessed, (), (noexcept));
   MOCK_METHOD((void), onFullHandshakeDone, (), (noexcept));
   MOCK_METHOD(

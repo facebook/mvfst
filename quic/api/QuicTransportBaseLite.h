@@ -886,6 +886,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   bool useConnectionEndWithErrorCallback_{false};
 
   bool transportReadyNotified_{false};
+  bool writeCipherAvailableNotified_{false};
 
   struct ReadCallbackData {
     ReadCallback* readCb;

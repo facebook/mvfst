@@ -245,6 +245,7 @@ class QuicServerTransport
 
   void processPendingData(bool async);
   void maybeNotifyTransportReady();
+  void maybeNotifyWriteCipherAvailable();
   void maybeNotifyConnectionIdRetired();
   void maybeNotifyConnectionIdBound();
   [[nodiscard]] quic::Expected<void, QuicError> maybeWriteNewSessionTicket();
