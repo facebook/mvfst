@@ -71,6 +71,16 @@ class QuicSocketLite {
      */
     virtual void onPrimingDataAvailable(
         std::vector<quic::BufPtr>&& /* data */) noexcept {}
+
+    /**
+     * Server only.
+     * Called when the 1-RTT write cipher becomes available. On the server this
+     * can happen before the full handshake completes; for client-authenticated
+     * connections, the peer certificate may not have been validated yet. Use
+     * this only for data that is safe to send before transport-ready, such as
+     * HTTP/3 SETTINGS and control streams.
+     */
+    virtual void onWriteCipherAvailable() noexcept {}
   };
 
   /**
