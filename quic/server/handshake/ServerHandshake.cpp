@@ -210,6 +210,14 @@ ServerHandshake::Phase ServerHandshake::getPhase() const {
   return phase_;
 }
 
+bool ServerHandshake::hasReportedEarlyHandshakeSuccess() const {
+  return reportedEarlyHandshakeSuccess_;
+}
+
+bool ServerHandshake::hasReportedHandshakeSuccess() const {
+  return reportedHandshakeSuccess_;
+}
+
 Optional<ClientTransportParameters>
 ServerHandshake::getClientTransportParams() {
   return transportParams_->getClientTransportParams();
@@ -405,11 +413,13 @@ class ServerHandshake::ActionMoveVisitor {
   }
 
   void operator()(fizz::server::ReportEarlyHandshakeSuccess&) {
+    server_.reportedEarlyHandshakeSuccess_ = true;
     server_.phase_ = Phase::KeysDerived;
   }
 
   void operator()(fizz::server::ReportHandshakeSuccess&) {
     server_.handshakeDone_ = true;
+    server_.reportedHandshakeSuccess_ = true;
     auto originalPhase = server_.phase_;
     // Fizz only reports handshake success when the server receives the full
     // client finished. At this point we can write any post handshake data and

@@ -3809,24 +3809,32 @@ class QuicServerTransportHandshakeTest
   }
 
   void testSetupConnection() {
+    // Retiming defaults off; this test exercises the retimed behavior, so
+    // enable it explicitly.
+    server->getNonConstConn().transportSettings.retimeOnTransportReady = true;
     // If 0-rtt is accepted, one rtt write cipher will be available after CHLO
     // is processed
     if (GetParam().acceptZeroRtt) {
-      EXPECT_CALL(*quicStats_, onNewConnection());
+      InSequence callbacks;
       EXPECT_CALL(connSetupCallback, onWriteCipherAvailable());
       EXPECT_CALL(connSetupCallback, onTransportReady());
+      EXPECT_CALL(*quicStats_, onNewConnection());
       EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(0);
     }
     recvClientHello();
 
-    EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(1);
+    if (GetParam().acceptZeroRtt) {
+      EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(1);
+    }
 
     // If 0-rtt is disabled, one rtt write cipher will be available after CFIN
     // is processed
     if (!GetParam().acceptZeroRtt) {
-      EXPECT_CALL(*quicStats_, onNewConnection());
+      InSequence callbacks;
       EXPECT_CALL(connSetupCallback, onWriteCipherAvailable());
       EXPECT_CALL(connSetupCallback, onTransportReady());
+      EXPECT_CALL(*quicStats_, onNewConnection());
+      EXPECT_CALL(connSetupCallback, onFullHandshakeDone());
     }
     // onConnectionIdBound is always invoked after CFIN is processed
     EXPECT_CALL(routingCallback, onConnectionIdBound(_));
@@ -3852,6 +3860,47 @@ INSTANTIATE_TEST_SUITE_P(
         FizzHandshakeParam(true, false, true),
         FizzHandshakeParam(true, true, false),
         FizzHandshakeParam(true, true, true)));
+
+TEST_P(
+    QuicServerTransportHandshakeTest,
+    LegacyTransportReadyOrderingWhenRetimeDisabled) {
+  serverCtx->setSendNewSessionTicket(false);
+  expectedSourceToken_ = {clientAddr.getIPAddress()};
+  // Killswitch off: fall back to the legacy gate/ordering.
+  // onWriteCipherAvailable() belongs to the retimed flow only, so it must NOT
+  // be delivered when retiming is off.
+  server->getNonConstConn().transportSettings.retimeOnTransportReady = false;
+  EXPECT_CALL(connSetupCallback, onWriteCipherAvailable()).Times(0);
+
+  if (GetParam().acceptZeroRtt) {
+    // 0-RTT: the write cipher is available at CHLO, so onTransportReady fires
+    // then -- on raw write-cipher availability, as in the legacy flow.
+    InSequence callbacks;
+    EXPECT_CALL(connSetupCallback, onTransportReady());
+    EXPECT_CALL(*quicStats_, onNewConnection());
+    EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(0);
+  }
+  recvClientHello();
+
+  if (GetParam().acceptZeroRtt) {
+    EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(1);
+  }
+
+  if (!GetParam().acceptZeroRtt) {
+    // Non-0-RTT legacy: onTransportReady fires on raw write-cipher availability
+    // (after CFIN), and onFullHandshakeDone is delivered BEFORE
+    // onTransportReady
+    // -- the opposite of the retimed ordering.
+    InSequence callbacks;
+    EXPECT_CALL(connSetupCallback, onFullHandshakeDone());
+    EXPECT_CALL(connSetupCallback, onTransportReady());
+    EXPECT_CALL(*quicStats_, onNewConnection());
+  }
+  EXPECT_CALL(routingCallback, onConnectionIdBound(_));
+  expectWriteNewSessionTicket();
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
+  recvClientFinished();
+}
 
 TEST_P(
     QuicServerTransportHandshakeTest,

@@ -188,6 +188,10 @@ class ServerHandshake : public Handshake {
 
   virtual Phase getPhase() const;
 
+  virtual bool hasReportedEarlyHandshakeSuccess() const;
+
+  virtual bool hasReportedHandshakeSuccess() const;
+
   /**
    * Returns the negotiated transport parameters from the client.
    */
@@ -311,6 +315,8 @@ class ServerHandshake : public Handshake {
 
   bool inHandshakeStack_{false};
   bool handshakeDone_{false};
+  bool reportedEarlyHandshakeSuccess_{false};
+  bool reportedHandshakeSuccess_{false};
   bool handshakeEventAvailable_{false};
 
   std::shared_ptr<ServerTransportParametersExtension> transportParams_;

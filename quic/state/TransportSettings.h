@@ -371,6 +371,12 @@ struct TransportSettings {
   bool enableKeepalive{false};
   // Whether or not to enable WritableBytes limit (server only)
   bool enableWritableBytesLimit{false};
+  // (server only) When true, onTransportReady() is driven by the Fizz handshake
+  // report milestones (ReportEarlyHandshakeSuccess / ReportHandshakeSuccess)
+  // and is delivered before onFullHandshakeDone(). When false, it falls back to
+  // the legacy gate of raw 1-RTT write-cipher availability. Migration/rollout
+  // gate: off by default, turned on by the server layer during rollout.
+  bool retimeOnTransportReady{false};
   // experimental flag to close ingress SM when invoking stopSending
   bool dropIngressOnStopSending{false};
   bool advertisedReliableResetStreamSupport{false};

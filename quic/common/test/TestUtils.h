@@ -409,6 +409,7 @@ class FakeServerHandshake : public FizzServerHandshake {
 
     if (allowZeroRttKeys_) {
       validateAndUpdateSourceToken(conn_, sourceAddrs_);
+      reportedEarlyHandshakeSuccess_ = true;
       phase_ = Phase::KeysDerived;
       setEarlyKeys();
     }
@@ -419,6 +420,7 @@ class FakeServerHandshake : public FizzServerHandshake {
     // Do NOT invoke onCryptoEventAvailable callback
     // Fall through and let the ServerStateMachine to process the event
     setOneRttKeys();
+    reportedHandshakeSuccess_ = true;
     phase_ = Phase::Established;
     handshakeDone_ = true;
   }
@@ -593,6 +595,7 @@ class FakeServerHandshake : public FizzServerHandshake {
 
   void setHandshakeDone(bool done) {
     handshakeDone_ = done;
+    reportedHandshakeSuccess_ = done;
   }
 
   void allowZeroRttKeys() {

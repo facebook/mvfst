@@ -217,12 +217,32 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
   if (sessionTicketResult.hasError()) {
     return sessionTicketResult;
   }
+  const bool retimeOnTransportReady =
+      serverConn_->transportSettings.retimeOnTransportReady;
   maybeNotifyConnectionIdBound();
-  maybeNotifyHandshakeFinished();
+  if (!retimeOnTransportReady) {
+    // Legacy ordering: handshake-done before transport-ready.
+    maybeNotifyHandshakeFinished();
+  }
   maybeNotifyConnectionIdRetired();
   maybeIssueConnectionIds();
   maybeNotifyWriteCipherAvailable();
+  // onWriteCipherAvailable() can also synchronously close the connection once a
+  // consumer does write-dependent setup there (e.g. the H3 ALPN check); bail
+  // before transport-ready so it isn't delivered on a closed transport. This
+  // only happens in the retimed flow (onWriteCipherAvailable() is itself gated
+  // on retimeOnTransportReady), so scope the bail to it and leave the legacy
+  // flow unchanged.
+  if (retimeOnTransportReady && closeState_ == CloseState::CLOSED) {
+    return {};
+  }
   maybeNotifyTransportReady();
+  // Retimed ordering: transport-ready before handshake-done. onTransportReady()
+  // can synchronously close the connection (e.g. an H3 ALPN mismatch), so guard
+  // the deferred callback — it must not run on a closed transport.
+  if (retimeOnTransportReady && closeState_ != CloseState::CLOSED) {
+    maybeNotifyHandshakeFinished();
+  }
   conn_->pathManager->maybeReapUnusedPaths();
   return {};
 }
@@ -511,8 +531,13 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
       closeImpl(sessionTicketResult.error());
       return;
     }
+    const bool retimeOnTransportReady =
+        serverConn_->transportSettings.retimeOnTransportReady;
     maybeNotifyConnectionIdBound();
-    maybeNotifyHandshakeFinished();
+    if (!retimeOnTransportReady) {
+      // Legacy ordering: handshake-done before transport-ready.
+      maybeNotifyHandshakeFinished();
+    }
     maybeIssueConnectionIds();
     auto writeResult = writeSocketData();
     if (writeResult.hasError()) {
@@ -520,7 +545,23 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
       return;
     }
     maybeNotifyWriteCipherAvailable();
+    // onWriteCipherAvailable() can also synchronously close the connection once
+    // a consumer does write-dependent setup there (e.g. the H3 ALPN check);
+    // bail before transport-ready so it isn't delivered on a closed transport.
+    // This only happens in the retimed flow (onWriteCipherAvailable() is itself
+    // gated on retimeOnTransportReady), so scope the bail to it and leave the
+    // legacy flow unchanged.
+    if (retimeOnTransportReady && closeState_ == CloseState::CLOSED) {
+      return;
+    }
     maybeNotifyTransportReady();
+    // Retimed ordering: transport-ready before handshake-done.
+    // onTransportReady() can synchronously close the connection (e.g. an H3
+    // ALPN mismatch), so guard the deferred callback — it must not run on a
+    // closed transport.
+    if (retimeOnTransportReady && closeState_ != CloseState::CLOSED) {
+      maybeNotifyHandshakeFinished();
+    }
   } catch (const QuicTransportException& ex) {
     MVVLOG(4) << "onCryptoEventAvailable() error " << ex.what() << " " << *this;
     closeImpl(QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
@@ -798,7 +839,13 @@ void QuicServerTransport::maybeIssueConnectionIds() {
 }
 
 void QuicServerTransport::maybeNotifyWriteCipherAvailable() {
-  if (!writeCipherAvailableNotified_ && connSetupCallback_ &&
+  // The dual-phase callback flow (onWriteCipherAvailable() at write-cipher
+  // availability + onTransportReady() retimed to the handshake milestone) is
+  // enabled as a whole by retimeOnTransportReady. With retiming off we stay on
+  // the legacy single-callback flow where onTransportReady() itself fires at
+  // write-cipher availability, so onWriteCipherAvailable() is not delivered.
+  if (serverConn_->transportSettings.retimeOnTransportReady &&
+      !writeCipherAvailableNotified_ && connSetupCallback_ &&
       hasWriteCipher()) {
     writeCipherAvailableNotified_ = true;
     connSetupCallback_->onWriteCipherAvailable();
@@ -806,13 +853,27 @@ void QuicServerTransport::maybeNotifyWriteCipherAvailable() {
 }
 
 void QuicServerTransport::maybeNotifyTransportReady() {
-  if (!transportReadyNotified_ && connSetupCallback_ && hasWriteCipher()) {
-    transportReadyNotified_ = true;
-    connSetupCallback_->onTransportReady();
-
-    // This is a new connection. Update QUIC Stats
-    QUIC_STATS(conn_->statsCallback, onNewConnection);
+  // One-shot: return before computing readiness (incl. the handshake-layer
+  // checks below) once transport-ready has already fired, to avoid per-read
+  // overhead on the post-handshake hot path.
+  if (transportReadyNotified_ || !connSetupCallback_) {
+    return;
   }
+  // When retiming is enabled, drive onTransportReady() from the Fizz handshake
+  // report milestones; otherwise fall back to raw write-cipher availability.
+  const bool ready = serverConn_->transportSettings.retimeOnTransportReady
+      ? (serverConn_->serverHandshakeLayer
+             ->hasReportedEarlyHandshakeSuccess() ||
+         serverConn_->serverHandshakeLayer->hasReportedHandshakeSuccess())
+      : hasWriteCipher();
+  if (!ready) {
+    return;
+  }
+  transportReadyNotified_ = true;
+  connSetupCallback_->onTransportReady();
+
+  // This is a new connection. Update QUIC Stats
+  QUIC_STATS(conn_->statsCallback, onNewConnection);
 }
 
 void QuicServerTransport::setShouldRegisterKnobParamHandlerFn(
