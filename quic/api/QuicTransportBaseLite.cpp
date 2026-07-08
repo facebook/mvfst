@@ -2317,14 +2317,23 @@ void QuicTransportBaseLite::handleConnWritable() {
       connWriteCallback->onConnectionWriteReady(maxConnWrite);
     }
 
-    // If the connection flow control is unblocked, we might be unblocked
-    // on the streams now.
-    auto writeCallbackIt = pendingWriteCallbacks_.begin();
+    // If the connection flow control is unblocked, we might be unblocked on
+    // the streams now. Snapshot the ids first: onStreamWriteReady() may
+    // re-enter notifyPendingWriteOnStream() and insert into
+    // pendingWriteCallbacks_, rehashing the map and invalidating any iterator
+    // held across the callback.
+    std::vector<StreamId> pendingWriteStreamIds;
+    pendingWriteStreamIds.reserve(pendingWriteCallbacks_.size());
+    for (const auto& pendingWriteCallback : pendingWriteCallbacks_) {
+      pendingWriteStreamIds.push_back(pendingWriteCallback.first);
+    }
 
-    while (writeCallbackIt != pendingWriteCallbacks_.end()) {
-      auto streamId = writeCallbackIt->first;
+    for (auto streamId : pendingWriteStreamIds) {
+      auto writeCallbackIt = pendingWriteCallbacks_.find(streamId);
+      if (writeCallbackIt == pendingWriteCallbacks_.end()) {
+        continue;
+      }
       auto wcb = writeCallbackIt->second;
-      ++writeCallbackIt;
       auto stream = MVCHECK_NOTNULL(
           conn_->streamManager->getStream(streamId).value_or(nullptr));
       if (!stream->writable()) {

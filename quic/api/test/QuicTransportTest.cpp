@@ -4381,6 +4381,71 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnAsync) {
       SocketAddress("::1", 10000));
 }
 
+TEST_F(QuicTransportTest, HandleConnWritableReentrantStreamWriteRegistration) {
+  auto& conn = transport_->getConnectionState();
+
+  // Two streams whose write callbacks will be pending purely on connection
+  // flow control.
+  auto streamId1 = transport_->createBidirectionalStream().value();
+  auto streamId2 = transport_->createBidirectionalStream().value();
+
+  // Exhaust connection flow control so the write callbacks stay pending until
+  // the peer grants more connection flow control.
+  auto blockerId = transport_->createBidirectionalStream().value();
+  auto blocker = conn.streamManager->getStream(blockerId).value();
+  ASSERT_FALSE(updateFlowControlOnWriteToStream(
+                   *blocker, conn.flowControlState.peerAdvertisedMaxOffset)
+                   .hasError());
+
+  // The first callback re-registers these mid-iteration, growing (and
+  // rehashing) pendingWriteCallbacks_ from inside handleConnWritable().
+  std::vector<StreamId> reentrantStreamIds;
+  reentrantStreamIds.reserve(32);
+  for (int i = 0; i < 32; ++i) {
+    reentrantStreamIds.push_back(
+        transport_->createBidirectionalStream().value());
+  }
+
+  NiceMock<MockWriteCallback> reentrantCb;
+  NiceMock<MockWriteCallback> writeCallback;
+  bool reregistered = false;
+  ON_CALL(writeCallback, onStreamWriteReady(_, _))
+      .WillByDefault([&](StreamId, uint64_t) {
+        if (!reregistered) {
+          reregistered = true;
+          for (auto id : reentrantStreamIds) {
+            transport_->notifyPendingWriteOnStream(id, &reentrantCb);
+          }
+        }
+      });
+
+  ASSERT_FALSE(transport_->notifyPendingWriteOnStream(streamId1, &writeCallback)
+                   .hasError());
+  ASSERT_FALSE(transport_->notifyPendingWriteOnStream(streamId2, &writeCallback)
+                   .hasError());
+  evb_.loop();
+
+  // Both original callbacks must fire even though the first one rehashes the
+  // map from inside handleConnWritable().
+  EXPECT_CALL(writeCallback, onStreamWriteReady(streamId1, _)).Times(1);
+  EXPECT_CALL(writeCallback, onStreamWriteReady(streamId2, _)).Times(1);
+
+  PacketNum num = 10;
+  handleConnWindowUpdate(
+      conn,
+      MaxDataFrame(conn.flowControlState.peerAdvertisedMaxOffset + 100000),
+      num);
+  dispatchNetworkData(
+      *transport_,
+      SocketAddress("::", 10001),
+      NetworkData(ReceivedUdpPacket(IOBuf::copyBuffer("fake data"))),
+      SocketAddress("::1", 10000));
+
+  // Drain the re-registered async ops while the mock callbacks are still in
+  // scope so none dangle into transport teardown.
+  evb_.loop();
+}
+
 TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
   TransportSettings transportSettings;
   transportSettings.totalBufferSpaceAvailable = 100;
