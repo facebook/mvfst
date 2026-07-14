@@ -14,6 +14,17 @@ fb_native.constraint_value(
     visibility = ["PUBLIC"],
 )
 
+fb_native.constraint_setting(
+    name = "force_alt_crypto",
+    visibility = ["PUBLIC"],
+)
+
+fb_native.constraint_value(
+    name = "force_alt_crypto-enabled",
+    constraint_setting = ":force_alt_crypto",
+    visibility = ["PUBLIC"],
+)
+
 # Deps for the `config` target's exported_deps, split by which mvfst-config
 # header the `headers` select picks. Keep these on the same select axes as
 # `headers` so ARVR Android can keep the server address aliases.
