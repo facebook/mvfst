@@ -82,22 +82,43 @@ mvfst_cpp_library(
     ],
 )
 
+_TPERF_DEPS = [
+    ":tperf_client",
+    ":tperf_server",
+    ":tperf_tcp",
+    "//folly/init:init",
+    "//folly/portability:gflags",
+    "//quic/common:mvfst_logging",
+] + select({
+    "DEFAULT": ["//folly:memcpy-use"],
+    "ovr_config//os:windows": [],
+})
+
 mvfst_cpp_binary(
     name = "tperf",
     srcs = [
         "tperf.cpp",
     ],
-    deps = [
-        ":tperf_client",
-        ":tperf_server",
-        ":tperf_tcp",
-        "//folly/init:init",
-        "//folly/portability:gflags",
-        "//quic/common:mvfst_logging",
-    ] + select({
-        "DEFAULT": ["//folly:memcpy-use"],
-        "ovr_config//os:windows": [],
-    }),
+    deps = _TPERF_DEPS,
+)
+
+# Same tperf binary, built with the xsec_crypto AEAD backend instead of
+# fizz/OpenSSL, matching prod revproxy (encrypt via xsec, decrypt via OpenSSL).
+# The constraints are applied as cfg modifiers (like revproxy's proxygend) so
+# they compose with the selected platform/build mode rather than pinning one.
+# use_alt_crypto -> QUIC_DEFAULT_AEAD = XSecCryptoAead; force_alt_crypto -> the
+# bridge always uses xsec (bypasses the JK). No flag; :tperf is the OpenSSL
+# baseline. (xsec is linux-only; on other platforms this builds like :tperf.)
+mvfst_cpp_binary(
+    name = "tperf-xsec",
+    srcs = [
+        "tperf.cpp",
+    ],
+    modifiers = [
+        "fbcode//quic:use_alt_crypto-enabled",
+        "fbcode//quic:force_alt_crypto-enabled",
+    ],
+    deps = _TPERF_DEPS,
 )
 
 mvfst_cpp_library(
