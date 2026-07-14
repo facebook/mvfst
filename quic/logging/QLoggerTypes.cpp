@@ -138,7 +138,9 @@ folly::dynamic KnobFrameLog::toDynamic() const {
   d["frame_type"] = toQlogString(FrameType::KNOB);
   d["knob_space"] = knobSpace;
   d["knob_id"] = knobId;
-  d["knob_blob_len"] = knobBlobLen;
+  folly::dynamic raw = folly::dynamic::object();
+  raw["payload_length"] = knobBlobLen;
+  d["raw"] = std::move(raw);
   return d;
 }
 
@@ -447,18 +449,19 @@ folly::dynamic QLogRetryEvent::toDynamic() const {
   folly::dynamic data = folly::dynamic::object();
   folly::dynamic header = folly::dynamic::object();
 
-  // Add packet size to header per test expectations
-  if (packetSize > 0) {
-    header["packet_size"] = packetSize;
-  }
+  header["packet_type"] = packetType;
 
   data["header"] = std::move(header);
 
-  // packet_type is at data level, not in header
-  data["packet_type"] = packetType;
-
-  if (tokenSize > 0) {
-    data["token_size"] = tokenSize;
+  if (packetSize > 0 || tokenSize > 0) {
+    folly::dynamic raw = folly::dynamic::object();
+    if (packetSize > 0) {
+      raw["length"] = packetSize;
+    }
+    if (tokenSize > 0) {
+      raw["payload_length"] = tokenSize;
+    }
+    data["raw"] = std::move(raw);
   }
 
   event["data"] = std::move(data);
@@ -802,7 +805,11 @@ folly::dynamic QLogPacketDropEvent::toDynamic() const {
   event["name"] = toQlogEventName(eventType);
 
   folly::dynamic data = folly::dynamic::object();
-  data["packet_size"] = packetSize;
+  if (packetSize > 0) {
+    folly::dynamic raw = folly::dynamic::object();
+    raw["length"] = packetSize;
+    data["raw"] = std::move(raw);
+  }
   data["drop_reason"] = dropReason;
 
   event["data"] = std::move(data);
@@ -824,7 +831,11 @@ folly::dynamic QLogDatagramReceivedEvent::toDynamic() const {
   event["name"] = toQlogEventName(eventType);
 
   folly::dynamic data = folly::dynamic::object();
-  data["data_len"] = dataLen;
+  if (dataLen > 0) {
+    folly::dynamic raw = folly::dynamic::object();
+    raw["length"] = dataLen;
+    data["raw"] = std::move(raw);
+  }
 
   event["data"] = std::move(data);
   return event;
@@ -925,7 +936,11 @@ folly::dynamic QLogPacketBufferedEvent::toDynamic() const {
 
   folly::dynamic data = folly::dynamic::object();
   data["protection_type"] = toString(protectionType);
-  data["packet_size"] = packetSize;
+  if (packetSize > 0) {
+    folly::dynamic raw = folly::dynamic::object();
+    raw["length"] = packetSize;
+    data["raw"] = std::move(raw);
+  }
 
   event["data"] = std::move(data);
   return event;

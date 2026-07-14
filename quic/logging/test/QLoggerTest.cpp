@@ -85,6 +85,32 @@ TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   EXPECT_EQ(gotObject.versions, packet.versions);
 }
 
+TEST_F(QLoggerTest, RetryPacketFollyDynamic) {
+  QLogRetryEvent event;
+  event.refTime = 0us;
+  event.eventType = QLogEventType::PacketReceived;
+  event.packetType = toQlogString(LongHeader::Types::Retry).str();
+  event.packetSize = 42;
+  event.tokenSize = 7;
+
+  folly::dynamic expected = folly::parseJson(
+      R"({
+        "time": 0,
+        "name": "quic:packet_received",
+        "data": {
+          "header": {
+            "packet_type": "RETRY"
+          },
+          "raw": {
+            "length": 42,
+            "payload_length": 7
+          }
+        }
+      })");
+
+  EXPECT_EQ(expected, event.toDynamic());
+}
+
 TEST_F(QLoggerTest, ConnectionCloseEvent) {
   FileQLogger q(VantagePoint::Client);
   auto error = toString(LocalErrorCode::CONNECTION_RESET);
@@ -219,6 +245,22 @@ TEST_F(QLoggerTest, DatagramReceivedEvent) {
   auto gotEvent = dynamic_cast<QLogDatagramReceivedEvent*>(p.get());
 
   EXPECT_EQ(gotEvent->dataLen, 100);
+}
+
+TEST_F(QLoggerTest, KnobFrameFollyDynamic) {
+  KnobFrameLog frame(1, 2, 3);
+
+  folly::dynamic expected = folly::parseJson(
+      R"({
+        "frame_type": "knob",
+        "knob_space": 1,
+        "knob_id": 2,
+        "raw": {
+          "payload_length": 3
+        }
+      })");
+
+  EXPECT_EQ(expected, frame.toDynamic());
 }
 
 TEST_F(QLoggerTest, LossAlarmEvent) {
@@ -1232,7 +1274,9 @@ TEST_F(QLoggerTest, PacketDropFollyDynamic) {
          "name": "quic:packet_dropped",
          "data": {
          "drop_reason": "max buffered",
-         "packet_size": 100
+         "raw": {
+           "length": 100
+         }
         }
       }
  ])");
@@ -1252,7 +1296,9 @@ TEST_F(QLoggerTest, DatagramReceivedFollyDynamic) {
          "time": 0,
          "name": "quic:datagram_received",
          "data": {
-         "data_len": 8
+         "raw": {
+           "length": 8
+         }
        }
       }
  ])");
@@ -1338,7 +1384,9 @@ TEST_F(QLoggerTest, PacketBufferedFollyDynamic) {
          "name": "quic:packet_buffered",
          "data": {
        "protection_type": "Handshake",
-       "packet_size": 100
+       "raw": {
+         "length": 100
+       }
      }
     }
 ])");
