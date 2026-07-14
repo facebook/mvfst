@@ -228,13 +228,15 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
 
 /*
  * This function will fill the parameter ack frame with ack blocks from the
- * parameter ackBlocks until it runs out of space (bytesLimit). The largest
- * ack block should have been inserted by the caller.
+ * parameter ackBlocks until it runs out of space (bytesLimit) or hits
+ * maxAdditionalAckBlocks. The largest ack block should have been inserted by
+ * the caller.
  */
 [[nodiscard]] static quic::Expected<size_t, QuicError> fillFrameWithAckBlocks(
     const AckBlocks& ackBlocks,
     WriteAckFrame& ackFrame,
-    uint64_t bytesLimit) {
+    uint64_t bytesLimit,
+    uint64_t maxAdditionalAckBlocks) {
   PacketNum currentSeqNum = ackBlocks.crbegin()->start;
 
   // starts off with 0 which is what we assumed the initial ack block to be for
@@ -245,6 +247,9 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
   // Skip the largest, as it has already been emplaced.
   for (auto blockItr = ackBlocks.crbegin() + 1; blockItr != ackBlocks.crend();
        ++blockItr) {
+    if (numAdditionalAckBlocks >= maxAdditionalAckBlocks) {
+      break;
+    }
     const auto& currBlock = *blockItr;
     // These must be true because of the properties of the interval set.
     MVCHECK_GE(currentSeqNum, currBlock.end + 2);
@@ -571,8 +576,11 @@ maybeWriteAckBaseFields(
   spaceLeft -= headerSize;
 
   ackFrame.ackBlocks.push_back(ackState.acks.back());
-  auto numAdditionalAckBlocksResult =
-      fillFrameWithAckBlocks(ackState.acks, ackFrame, spaceLeft);
+  auto numAdditionalAckBlocksResult = fillFrameWithAckBlocks(
+      ackState.acks,
+      ackFrame,
+      spaceLeft,
+      ackFrameMetaData.maxAdditionalAckBlocks);
   if (numAdditionalAckBlocksResult.hasError()) {
     return quic::make_unexpected(numAdditionalAckBlocksResult.error());
   }
