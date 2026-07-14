@@ -503,15 +503,16 @@ folly::dynamic FileQLogger::toDynamicBase() const {
   auto vpInfo = createVantagePoint(vantagePoint, "");
   trace["vantage_point"] = vpInfo.toDynamic();
 
-  trace["event_schemas"] =
-      folly::dynamic::array(kQLogEventSchemaURI, kQLogMvfstEventSchemaURI);
+  auto eventSchemas = folly::dynamic::array(kQLogEventSchemaURI);
+  if (protocolType == kHTTP3ProtocolType) {
+    eventSchemas.push_back(kQLogHTTP3EventSchemaURI);
+  }
+  eventSchemas.push_back(kQLogMvfstEventSchemaURI);
+  trace["event_schemas"] = std::move(eventSchemas);
 
   folly::dynamic commonFieldsDyn = folly::dynamic::object();
   commonFieldsDyn["odcid"] = dcid.has_value() ? dcid.value().hex() : "";
 
-  if (!protocolType.empty()) {
-    commonFieldsDyn["protocol_type"] = protocolType;
-  }
   folly::dynamic refTime = folly::dynamic::object();
   refTime["clock_type"] = kQLogClockTypeMonotonic;
   refTime["epoch"] = "unknown";

@@ -63,9 +63,6 @@ struct CommonFieldsInfo {
   // Reference time information
   ReferenceTime referenceTime;
 
-  // Protocol type (e.g., "QUIC_HTTP3")
-  std::string protocolType;
-
   // Optional group_id for event grouping
   std::string groupId;
 

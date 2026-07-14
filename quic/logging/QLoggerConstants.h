@@ -71,6 +71,7 @@ constexpr auto kQLogVersion = "0.4";
 constexpr auto kQLogFileSchemaURI = "urn:ietf:params:qlog:file:contained";
 constexpr auto kQLogSerializationFormat = "application/qlog+json";
 constexpr auto kQLogEventSchemaURI = "urn:ietf:params:qlog:events:quic";
+constexpr auto kQLogHTTP3EventSchemaURI = "urn:ietf:params:qlog:events:http3";
 constexpr auto kQLogMvfstEventSchemaURI = "urn:ietf:params:qlog:events:mvfst";
 
 constexpr auto kQLogTitle = "mvfst qlog";

@@ -319,7 +319,6 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
        "description": "Generated qlog from connection",
        "common_fields": {
          "odcid": "",
-         "protocol_type": "QUIC_HTTP3",
          "reference_time": {
           "clock_type": "monotonic",
           "epoch": "unknown"
@@ -329,6 +328,7 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
        },
        "event_schemas": [
          "urn:ietf:params:qlog:events:quic",
+         "urn:ietf:params:qlog:events:http3",
          "urn:ietf:params:qlog:events:mvfst"
        ],
        "vantage_point": {
@@ -546,7 +546,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
      {
        "common_fields": {
          "odcid": "",
-         "protocol_type": "QUIC_HTTP3",
          "reference_time": {
           "clock_type": "monotonic",
           "epoch": "unknown"
@@ -557,6 +556,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
        "description": "Generated qlog from connection",
        "event_schemas": [
          "urn:ietf:params:qlog:events:quic",
+         "urn:ietf:params:qlog:events:http3",
          "urn:ietf:params:qlog:events:mvfst"
        ],
        "events": [
@@ -1545,7 +1545,6 @@ TEST_F(QLoggerTest, PrettyStream) {
      {
        "common_fields": {
          "odcid": "0101",
-         "protocol_type": "QUIC_HTTP3",
          "reference_time": {
           "clock_type": "monotonic",
           "epoch": "unknown"
@@ -1556,6 +1555,7 @@ TEST_F(QLoggerTest, PrettyStream) {
        "description": "Generated qlog from connection",
        "event_schemas": [
          "urn:ietf:params:qlog:events:quic",
+         "urn:ietf:params:qlog:events:http3",
          "urn:ietf:params:qlog:events:mvfst"
        ],
        "events": [
@@ -1650,7 +1650,6 @@ const std::string expectedJsonStr1 =
        "description": "Generated qlog from connection",
        "common_fields": {
          "odcid": "0202",
-         "protocol_type": "QUIC_HTTP3",
          "reference_time": {
           "clock_type": "monotonic",
           "epoch": "unknown"
@@ -1660,6 +1659,7 @@ const std::string expectedJsonStr1 =
        },
        "event_schemas": [
          "urn:ietf:params:qlog:events:quic",
+         "urn:ietf:params:qlog:events:http3",
          "urn:ietf:params:qlog:events:mvfst"
        ],
        "vantage_point": {
@@ -1884,7 +1884,6 @@ TEST_F(QLoggerTest, PrettyDatagram) {
      {
        "common_fields": {
          "odcid": "0101",
-         "protocol_type": "QUIC_HTTP3",
          "reference_time": {
           "clock_type": "monotonic",
           "epoch": "unknown"
@@ -1895,6 +1894,7 @@ TEST_F(QLoggerTest, PrettyDatagram) {
        "description": "Generated qlog from connection",
        "event_schemas": [
          "urn:ietf:params:qlog:events:quic",
+         "urn:ietf:params:qlog:events:http3",
          "urn:ietf:params:qlog:events:mvfst"
        ],
        "events": [
@@ -1990,7 +1990,6 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
      {
        "common_fields": {
          "odcid": "0101",
-         "protocol_type": "QUIC_HTTP3",
          "reference_time": {
           "clock_type": "monotonic",
           "epoch": "unknown"
@@ -2001,6 +2000,7 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
        "description": "Generated qlog from connection",
        "event_schemas": [
          "urn:ietf:params:qlog:events:quic",
+         "urn:ietf:params:qlog:events:http3",
          "urn:ietf:params:qlog:events:mvfst"
        ],
        "events": [

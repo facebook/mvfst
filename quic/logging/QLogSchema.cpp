@@ -48,10 +48,6 @@ folly::dynamic CommonFieldsInfo::toDynamic() const {
     obj["reference_time"] = referenceTime.toDynamic();
   }
 
-  if (!protocolType.empty()) {
-    obj["protocol_type"] = protocolType;
-  }
-
   if (!groupId.empty()) {
     obj["group_id"] = groupId;
   }
