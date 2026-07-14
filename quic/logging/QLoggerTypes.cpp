@@ -14,6 +14,27 @@
 
 namespace quic {
 
+namespace {
+
+double microsecondsToMilliseconds(std::chrono::microseconds duration) {
+  return duration.count() / 1000.0;
+}
+
+double microsecondsToMilliseconds(uint64_t microseconds) {
+  return static_cast<double>(microseconds) / 1000.0;
+}
+
+folly::dynamic microsecondDeltasToMilliseconds(
+    const std::vector<uint64_t>& deltas) {
+  folly::dynamic out = folly::dynamic::array();
+  for (auto delta : deltas) {
+    out.push_back(microsecondsToMilliseconds(delta));
+  }
+  return out;
+}
+
+} // namespace
+
 folly::dynamic PaddingFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::PADDING);
@@ -126,7 +147,7 @@ folly::dynamic AckFrequencyFrameLog::toDynamic() const {
   d["frame_type"] = toQlogString(FrameType::ACK_FREQUENCY);
   d["sequence_number"] = sequenceNumber;
   d["packet_tolerance"] = packetTolerance;
-  d["update_max_ack_delay"] = updateMaxAckDelay;
+  d["update_max_ack_delay"] = microsecondsToMilliseconds(updateMaxAckDelay);
   d["reorder_threshold"] = reorderThreshold;
   return d;
 }
@@ -233,7 +254,7 @@ folly::dynamic legacyTimestampRangesToDynamic(
     folly::dynamic obj = folly::dynamic::object();
     obj["gap"] = r.gap;
     obj["timestamp_delta_count"] = r.timestamp_delta_count;
-    obj["deltas"] = folly::dynamic::array(r.deltas.begin(), r.deltas.end());
+    obj["deltas"] = microsecondDeltasToMilliseconds(r.deltas);
     out.push_back(std::move(obj));
   }
   return out;
@@ -248,7 +269,7 @@ folly::dynamic draft02TimestampRangesToDynamic(
     folly::dynamic obj = folly::dynamic::object();
     obj["delta_largest_acknowledged"] = r.deltaLargestAcknowledged;
     obj["timestamp_delta_count"] = r.timestamp_delta_count;
-    obj["deltas"] = folly::dynamic::array(r.deltas.begin(), r.deltas.end());
+    obj["deltas"] = microsecondDeltasToMilliseconds(r.deltas);
     out.push_back(std::move(obj));
   }
   return out;
@@ -286,7 +307,7 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
       frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     if (maybeLatestRecvdPacketTime.has_value()) {
       d["latest_recvd_packet_time"] =
-          maybeLatestRecvdPacketTime.value().count();
+          microsecondsToMilliseconds(maybeLatestRecvdPacketTime.value());
     }
     if (maybeLatestRecvdPacketNum.has_value()) {
       d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
@@ -297,7 +318,7 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
     d["draft02_timestamp_ranges"] =
         draft02TimestampRangesToDynamic(draft02RecvdPacketsTimestampRanges);
   }
-  d["ack_delay"] = ackDelay.count();
+  d["ack_delay"] = microsecondsToMilliseconds(ackDelay);
 
   return d;
 }
@@ -320,7 +341,7 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
       frameType == FrameType::ACK_RECEIVE_TIMESTAMPS) {
     if (maybeLatestRecvdPacketTime.has_value()) {
       d["latest_recvd_packet_time"] =
-          maybeLatestRecvdPacketTime.value().count();
+          microsecondsToMilliseconds(maybeLatestRecvdPacketTime.value());
     }
     if (maybeLatestRecvdPacketNum.has_value()) {
       d["latest_recvd_packet_num"] = maybeLatestRecvdPacketNum.value();
@@ -331,7 +352,7 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
     d["draft02_timestamp_ranges"] =
         draft02TimestampRangesToDynamic(draft02RecvdPacketsTimestampRanges);
   }
-  d["ack_delay"] = ackDelay.count();
+  d["ack_delay"] = microsecondsToMilliseconds(ackDelay);
   return d;
 }
 
@@ -683,7 +704,7 @@ folly::dynamic QLogBandwidthEstUpdateEvent::toDynamic() const {
 
   folly::dynamic data = folly::dynamic::object();
   data["bandwidth_bytes"] = bytes;
-  data["bandwidth_interval"] = interval.count();
+  data["bandwidth_interval"] = microsecondsToMilliseconds(interval);
 
   event["data"] = std::move(data);
   return event;
@@ -706,7 +727,7 @@ folly::dynamic QLogPacingMetricUpdateEvent::toDynamic() const {
 
   folly::dynamic data = folly::dynamic::object();
   data["pacing_burst_size"] = pacingBurstSize;
-  data["pacing_interval"] = pacingInterval.count();
+  data["pacing_interval"] = microsecondsToMilliseconds(pacingInterval);
 
   event["data"] = std::move(data);
   return event;
@@ -969,16 +990,16 @@ folly::dynamic QLogMetricUpdateEvent::toDynamic() const {
 
   folly::dynamic data = folly::dynamic::object();
 
-  data["latest_rtt"] = static_cast<float>(latestRtt.count()) / 1000.0f;
-  data["min_rtt"] = static_cast<float>(mrtt.count()) / 1000.0f;
-  data["smoothed_rtt"] = static_cast<float>(srtt.count()) / 1000.0f;
+  data["latest_rtt"] = microsecondsToMilliseconds(latestRtt);
+  data["min_rtt"] = microsecondsToMilliseconds(mrtt);
+  data["smoothed_rtt"] = microsecondsToMilliseconds(srtt);
 
   if (ackDelay.count() > 0) {
-    data["ack_delay"] = static_cast<float>(ackDelay.count()) / 1000.0f;
+    data["ack_delay"] = microsecondsToMilliseconds(ackDelay);
   }
 
   if (rttVar.has_value()) {
-    data["rtt_variance"] = static_cast<float>(rttVar->count()) / 1000.0f;
+    data["rtt_variance"] = microsecondsToMilliseconds(*rttVar);
   }
 
   if (congestionWindow.has_value()) {
@@ -1180,9 +1201,11 @@ folly::dynamic QLogNetworkPathModelUpdateEvent::toDynamic() const {
   data["inflight_hi"] = inflightHi_;
   data["inflight_lo"] = inflightLo_;
   data["bandwidth_hi_bytes"] = bandwidthHiBytes_;
-  data["bandwidth_hi_interval"] = bandwidthHiInterval_.count();
+  data["bandwidth_hi_interval"] =
+      microsecondsToMilliseconds(bandwidthHiInterval_);
   data["bandwidth_lo_bytes"] = bandwidthLoBytes_;
-  data["bandwidth_lo_interval"] = bandwidthLoInterval_.count();
+  data["bandwidth_lo_interval"] =
+      microsecondsToMilliseconds(bandwidthLoInterval_);
 
   event["data"] = std::move(data);
   return event;

@@ -78,7 +78,6 @@ constexpr auto kQLogDescription = "Converted from file";
 constexpr auto kQLogTraceTitle = "mvfst qlog from single connection";
 constexpr auto kQLogTraceDescription = "Generated qlog from connection";
 
-constexpr auto kQLogTimeUnits = "microseconds";
 constexpr auto kQLogTimeFormatRelativeToEpoch = "relative_to_epoch";
 constexpr auto kQLogTimeFormatRelativeToPrevious = "relative_to_previous_event";
 constexpr auto kQLogClockTypeSystem = "system";

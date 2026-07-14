@@ -542,7 +542,7 @@ folly::dynamic FileQLogger::generateSummary(
   // if there is <= 1 event, max_duration is 0
   // otherwise, it is the (time of the last event - time of the  first event)
   summaryObj["max_duration"] =
-      (numEvents <= 1) ? 0 : (endTime - startTime).count();
+      (numEvents <= 1) ? 0.0 : (endTime - startTime).count() / 1000.0;
   summaryObj["total_event_count"] = numEvents;
   return summaryObj;
 }

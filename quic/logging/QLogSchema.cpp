@@ -44,10 +44,6 @@ folly::dynamic CommonFieldsInfo::toDynamic() const {
     obj["time_format"] = timeFormat;
   }
 
-  if (!timeUnits.empty()) {
-    obj["time_units"] = timeUnits;
-  }
-
   if (!referenceTime.clockType.empty()) {
     obj["reference_time"] = referenceTime.toDynamic();
   }

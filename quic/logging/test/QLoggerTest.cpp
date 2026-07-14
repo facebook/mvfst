@@ -336,7 +336,7 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
        },
        "events": [
          {
-           "time": 31,
+           "time": 0.031,
            "name": "quic:packet_received",
            "data": {
              "frames": [
@@ -373,7 +373,8 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
 
   q.logs[0]->refTime = 31us;
   folly::dynamic gotDynamic = q.toDynamic();
-  gotDynamic["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  gotDynamic["traces"][0]["events"][0]["time"] =
+      0.031; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
 }
 
@@ -467,7 +468,7 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
          "data": {
              "frames": [
                {
-                 "ack_delay": 111,
+                 "ack_delay": 0.111,
                  "acked_ranges": [
                   [
                     900,
@@ -581,7 +582,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
          "data": {
              "frames": [
                {
-                 "ack_delay": 111,
+                 "ack_delay": 0.111,
                  "acked_ranges": [
                    [
                      900,
@@ -677,7 +678,7 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
          "data": {
                "frames": [
                  {
-                   "ack_delay": 111,
+                   "ack_delay": 0.111,
                    "acked_ranges": [
                      [
                        300,
@@ -737,7 +738,7 @@ TEST_F(QLoggerTest, AddingAckReceiveTimestampFrame) {
          "data": {
                "frames": [
                  {
-                   "ack_delay": 111,
+                   "ack_delay": 0.111,
                    "acked_ranges": [
                      [
                        300,
@@ -750,18 +751,18 @@ TEST_F(QLoggerTest, AddingAckReceiveTimestampFrame) {
                    ],
                    "frame_type": "ack_receive_timestamps",
                    "latest_recvd_packet_num": 400,
-                   "latest_recvd_packet_time": 100000,
+                   "latest_recvd_packet_time": 100.0,
                    "timestamp_ranges": [
                     {
                       "deltas": [
-                        1, 1, 1, 1, 1
+                        0.001, 0.001, 0.001, 0.001, 0.001
                       ],
                       "gap": 0,
                       "timestamp_delta_count": 5
                     },
                     {
                       "deltas": [
-                        1, 1, 1 ,1, 1
+                        0.001, 0.001, 0.001, 0.001, 0.001
                       ],
                       "gap": 100,
                       "timestamp_delta_count": 5
@@ -827,7 +828,7 @@ TEST_F(QLoggerTest, AddingDraft02AckReceiveTimestampsFrame) {
          "data": {
                "frames": [
                  {
-                   "ack_delay": 222,
+                   "ack_delay": 0.222,
                    "acked_ranges": [
                      [
                        300,
@@ -840,12 +841,12 @@ TEST_F(QLoggerTest, AddingDraft02AckReceiveTimestampsFrame) {
                    "ecn_ce": 3,
                    "draft02_timestamp_ranges": [
                     {
-                      "deltas": [500, 10, 5],
+                      "deltas": [0.5, 0.01, 0.005],
                       "delta_largest_acknowledged": 0,
                       "timestamp_delta_count": 3
                     },
                     {
-                      "deltas": [20],
+                      "deltas": [0.02],
                       "delta_largest_acknowledged": 50,
                       "timestamp_delta_count": 1
                     }
@@ -902,12 +903,12 @@ TEST_F(QLoggerTest, AddingDraft02AckReceiveTimestampsFrameNoEcn) {
          "data": {
                "frames": [
                  {
-                   "ack_delay": 222,
+                   "ack_delay": 0.222,
                    "acked_ranges": [[300, 400]],
                    "frame_type": "ack_receive_timestamps_draft_02",
                    "draft02_timestamp_ranges": [
                     {
-                      "deltas": [500, 10, 5],
+                      "deltas": [0.5, 0.01, 0.005],
                       "delta_largest_acknowledged": 0,
                       "timestamp_delta_count": 3
                     }
@@ -958,12 +959,12 @@ TEST_F(QLoggerTest, ReadDraft02AckReceiveTimestampsFrame) {
          "data": {
                "frames": [
                  {
-                   "ack_delay": 222,
+                   "ack_delay": 0.222,
                    "acked_ranges": [[300, 400]],
                    "frame_type": "ack_receive_timestamps_draft_02",
                    "draft02_timestamp_ranges": [
                     {
-                      "deltas": [500, 10, 5],
+                      "deltas": [0.5, 0.01, 0.005],
                       "delta_largest_acknowledged": 0,
                       "timestamp_delta_count": 3
                     }
@@ -1014,7 +1015,7 @@ TEST_F(QLoggerTest, ReadDraft02AckReceiveTimestampsEcnFrame) {
          "data": {
                "frames": [
                  {
-                   "ack_delay": 222,
+                   "ack_delay": 0.222,
                    "acked_ranges": [[300, 400]],
                    "frame_type": "ack_receive_timestamps_draft_02_ecn",
                    "ecn_ect0": 4,
@@ -1022,7 +1023,7 @@ TEST_F(QLoggerTest, ReadDraft02AckReceiveTimestampsEcnFrame) {
                    "ecn_ce": 6,
                    "draft02_timestamp_ranges": [
                     {
-                      "deltas": [500],
+                      "deltas": [0.5],
                       "delta_largest_acknowledged": 10,
                       "timestamp_delta_count": 1
                     }
@@ -1189,7 +1190,7 @@ TEST_F(QLoggerTest, PacingMetricUpdateFollyDynamic) {
          "name": "mvfst:pacing_metric_update",
          "data": {
          "pacing_burst_size": 20,
-         "pacing_interval": 30
+         "pacing_interval": 0.03
         }
       }
  ])");
@@ -1559,7 +1560,7 @@ TEST_F(QLoggerTest, PrettyStream) {
        ],
        "events": [
          {
-         "time": 31,
+         "time": 0.031,
          "name": "quic:packet_received",
          "data": {
              "frames": [
@@ -1631,7 +1632,7 @@ TEST_F(QLoggerTest, PrettyStream) {
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   folly::dynamic parsed = folly::parseJson(str);
 
-  parsed["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  parsed["traces"][0]["events"][0]["time"] = 0.031; // hardcode reference time
   parsed["traces"][0]["common_fields"]["odcid"] = "0101";
 
   EXPECT_EQ(expected, parsed);
@@ -1666,7 +1667,7 @@ const std::string expectedJsonStr1 =
        },
        "events": [
          {
-           "time": 31,
+           "time": 0.031,
            "name": "quic:packet_received",
            "data": {
              "frames": [
@@ -1737,7 +1738,7 @@ TEST_F(QLoggerTest, NonPrettyStream) {
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   folly::dynamic parsed = folly::parseJson(str);
 
-  parsed["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  parsed["traces"][0]["events"][0]["time"] = 0.031; // hardcode reference time
   parsed["traces"][0]["common_fields"]["odcid"] = "0202";
 
   EXPECT_EQ(expected["traces"], parsed["traces"]);
@@ -1785,7 +1786,7 @@ TEST_F(QLoggerTest, CompressedStream) {
           ->uncompress(compressedData);
   folly::dynamic parsed = folly::parseJson(str);
 
-  parsed["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  parsed["traces"][0]["events"][0]["time"] = 0.031; // hardcode reference time
   parsed["traces"][0]["common_fields"]["odcid"] = "0202";
 
   EXPECT_EQ(expected["traces"], parsed["traces"]);
@@ -1830,7 +1831,7 @@ TEST_F(QLoggerTest, CompressedNonStream) {
           ->uncompress(compressedData);
   folly::dynamic parsed = folly::parseJson(str);
 
-  parsed["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  parsed["traces"][0]["events"][0]["time"] = 0.031; // hardcode reference time
   parsed["traces"][0]["common_fields"]["odcid"] = "0202";
 
   EXPECT_EQ(expected["traces"], parsed["traces"]);
@@ -1898,7 +1899,7 @@ TEST_F(QLoggerTest, PrettyDatagram) {
        ],
        "events": [
          {
-         "time": 31,
+         "time": 0.031,
          "name": "quic:packet_received",
          "data": {
              "frames": [
@@ -1972,7 +1973,7 @@ TEST_F(QLoggerTest, PrettyDatagram) {
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   folly::dynamic parsed = folly::parseJson(str);
 
-  parsed["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  parsed["traces"][0]["events"][0]["time"] = 0.031; // hardcode reference time
   parsed["traces"][0]["common_fields"]["odcid"] = "0101";
 
   EXPECT_EQ(expected, parsed);
@@ -2004,7 +2005,7 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
        ],
        "events": [
          {
-         "time": 31,
+         "time": 0.031,
          "name": "quic:packet_received",
          "data": {
              "frames": [
@@ -2015,7 +2016,7 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
                  "stream_id": "10"
                },
                {
-                   "ack_delay": 111,
+                   "ack_delay": 0.111,
                    "acked_ranges": [
                      [
                        300,
@@ -2028,18 +2029,18 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
                    ],
                    "frame_type": "ack_receive_timestamps",
                    "latest_recvd_packet_num": 400,
-                   "latest_recvd_packet_time": 100000,
+                   "latest_recvd_packet_time": 100.0,
                    "timestamp_ranges": [
                     {
                       "deltas": [
-                        1, 1, 1, 1, 1
+                        0.001, 0.001, 0.001, 0.001, 0.001
                       ],
                       "gap": 0,
                       "timestamp_delta_count": 5
                     },
                     {
                       "deltas": [
-                        1, 1, 1 ,1, 1
+                        0.001, 0.001, 0.001, 0.001, 0.001
                       ],
                       "gap": 100,
                       "timestamp_delta_count": 5
@@ -2124,7 +2125,7 @@ TEST_F(QLoggerTest, ReadAckReceiveTimestampsFrame) {
       (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
   folly::dynamic parsed = folly::parseJson(str);
 
-  parsed["traces"][0]["events"][0]["time"] = 31; // hardcode reference time
+  parsed["traces"][0]["events"][0]["time"] = 0.031; // hardcode reference time
   parsed["traces"][0]["common_fields"]["odcid"] = "0101";
 
   EXPECT_EQ(expected, parsed);

@@ -60,9 +60,6 @@ struct CommonFieldsInfo {
   // Time format: "relative_to_epoch" or "relative_to_previous_event"
   std::string timeFormat;
 
-  // Time units (typically "us" for microseconds)
-  std::string timeUnits;
-
   // Reference time information
   ReferenceTime referenceTime;
 
