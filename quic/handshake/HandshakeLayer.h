@@ -62,6 +62,7 @@ class Handshake {
     std::string namedGroup;
     std::string pskType;
     std::string echStatus;
+    uint16_t version{0};
   };
 
   [[nodiscard]] virtual TLSSummary getTLSSummary() const = 0;

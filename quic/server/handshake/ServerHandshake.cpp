@@ -394,6 +394,9 @@ Handshake::TLSSummary ServerHandshake::getTLSSummary() const {
   if (state_.echState().has_value()) {
     summary.echStatus = fizz::server::toString(state_.echStatus());
   }
+  if (auto version = state_.version()) {
+    summary.version = static_cast<uint16_t>(*version);
+  }
   return summary;
 }
 

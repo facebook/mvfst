@@ -70,6 +70,7 @@ class MockQuicSocket : public QuicSocket {
       (StreamId),
       (const));
   MOCK_METHOD(QuicSocket::TransportInfo, getTransportInfo, (), (const));
+  MOCK_METHOD(Optional<Handshake::TLSSummary>, getTLSSummary, (), (const));
   MOCK_METHOD(
       (quic::Expected<QuicSocket::StreamTransportInfo, LocalErrorCode>),
       getStreamTransportInfo,
