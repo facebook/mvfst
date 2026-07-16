@@ -11,6 +11,7 @@
 
 #include <fizz/protocol/Protocol.h>
 #include <fizz/server/ReplayCache.h>
+#include <algorithm>
 #include <chrono>
 
 namespace quic {
@@ -72,6 +73,17 @@ FizzServerQuicHandshakeContext::getPrimingContext() const {
         context_->getAcceptEarlyData(fizz::ProtocolVersion::tls_1_3),
         tolerance,
         replayCache);
+
+    // Priming connections exist only to transfer resumption state, so accept
+    // pure PSK (psk_ke) resumption even when the base context restricts modes
+    // to psk_dhe_ke. Append rather than overwrite to preserve the base's mode
+    // preference order (e.g. keep preferring ECDHE-PSK when offered).
+    auto pskModes = context_->getSupportedPskModes();
+    if (std::ranges::find(pskModes, fizz::PskKeyExchangeMode::psk_ke) ==
+        pskModes.end()) {
+      pskModes.push_back(fizz::PskKeyExchangeMode::psk_ke);
+      primingContext->setSupportedPskModes(std::move(pskModes));
+    }
 
     primingContext_ = std::move(primingContext);
   }
