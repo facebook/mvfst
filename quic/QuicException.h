@@ -15,7 +15,6 @@
 #include <stdexcept>
 #include <string>
 
-#include <quic/QuicConstants.h>
 #include <quic/common/Variant.h>
 
 namespace quic {
