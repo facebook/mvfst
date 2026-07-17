@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load("@fbsource//tools/target_determinator/macros:ci.bzl", "ci")
 
 oncall("traffic_protocols")
@@ -80,7 +81,13 @@ mvfst_cpp_library(
     headers = [
         "LibevQuicAsyncUDPSocket.h",
     ],
-    labels = ci.labels(ci.remove(ci.windows())),
+    # Do not cover windows. Cover mac-arm64 only on fbsource.
+    labels = ci.labels(
+        ci.remove(ci.windows()),
+        ci.mac(ci.aarch64(ci.mode("fbsource//arvr/mode/mac-arm/dev"))),
+    )
+    if get_fbsource_cell() != "fbcode"
+    else ci.labels(ci.remove(ci.windows())),
     deps = [
         "//quic/common:string_utils",
     ],
