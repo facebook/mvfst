@@ -84,6 +84,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     MVVLOG(2) << prefix_ << __func__ << " version: " << quic::toString(version);
   }
 
+  void onNewConnectionAttemptRejected() override {
+    MVVLOG(2) << prefix_ << __func__;
+  }
+
   void onConnectionRateLimited() override {
     MVVLOG(2) << prefix_ << __func__;
   }

@@ -3224,11 +3224,17 @@ TEST_F(QuicServerTest, NetworkTestNoVersionNegotiation) {
 TEST_F(QuicServerTest, TestRejectNewConnections) {
   // test that Version Negotiation fails if the server is rejecting all
   // new connections
-  quic::SocketAddress addr("::1", 0);
-  server_->start(addr, 2);
-  server_->rejectNewConnections([]() { return true; });
-  server_->waitUntilInitialized();
-  auto serverAddr = server_->getAddress();
+  folly::Promise<quic::SocketAddress> clientAddressPromise;
+  auto clientAddressFuture = clientAddressPromise.getFuture();
+  server_->rejectNewConnections(
+      [&clientAddressPromise](const quic::SocketAddress& client) {
+        clientAddressPromise.setValue(client);
+        return true;
+      });
+
+  auto* stats = new NiceMock<MockQuicStats>();
+  EXPECT_CALL(*stats, onNewConnectionAttemptRejected()).Times(1);
+  auto serverAddr = initializeServer({evbThread_.getEventBase()}, stats);
 
   quic::SocketAddress addr2("::1", 0);
 
@@ -3252,6 +3258,8 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   reader->getSocket().write(serverAddr, data->clone());
 
   auto serverData = reader->readOne().get(200ms);
+  EXPECT_EQ(
+      std::move(clientAddressFuture).get(200ms), reader->getSocket().address());
 
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
 

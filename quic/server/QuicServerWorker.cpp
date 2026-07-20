@@ -303,7 +303,8 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
   }
   isInitial =
       isInitial && invariant.version != QuicVersion::VERSION_NEGOTIATION;
-  if (rejectNewConnections_() && isInitial) {
+  if (isInitial && rejectNewConnections_(client)) {
+    QUIC_STATS(statsCallback_, onNewConnectionAttemptRejected);
     VersionNegotiationPacketBuilder builder(
         invariant.dstConnId,
         invariant.srcConnId,
@@ -1402,7 +1403,7 @@ void QuicServerWorker::setFizzContext(
 }
 
 void QuicServerWorker::rejectNewConnections(
-    std::function<bool()> rejectNewConnections) {
+    std::function<bool(const quic::SocketAddress&)> rejectNewConnections) {
   rejectNewConnections_ = std::move(rejectNewConnections);
 }
 

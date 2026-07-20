@@ -255,7 +255,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   /**
    * If true, start to reject any new connection during handshake
    */
-  void rejectNewConnections(std::function<bool()> rejectNewConnections);
+  void rejectNewConnections(
+      std::function<bool(const quic::SocketAddress&)> rejectNewConnections);
 
   /**
    * Set callback to determine if MVFST_PRIMING protocol version is enabled
@@ -648,7 +649,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // supports GRO. otherwise 1
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   Optional<BufPtr> healthCheckToken_;
-  std::function<bool()> rejectNewConnections_{[]() { return false; }};
+  std::function<bool(const quic::SocketAddress&)> rejectNewConnections_{
+      [](const quic::SocketAddress&) { return false; }};
   std::function<bool()> isPrimingEnabled_{[]() { return false; }};
   std::function<bool(uint16_t)> isBlockListedSrcPort_{
       [](uint16_t) { return false; }};

@@ -89,6 +89,8 @@ class QuicTransportStatsCallback {
 
   virtual void onClientInitialReceived(QuicVersion version) = 0;
 
+  virtual void onNewConnectionAttemptRejected() = 0;
+
   virtual void onConnectionRateLimited() = 0;
 
   virtual void onConnectionWritableBytesLimited() = 0;

@@ -223,7 +223,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * function is stored and evaluated on each new connection before being
    * accepted.
    */
-  void rejectNewConnections(std::function<bool()> rejectFn);
+  void rejectNewConnections(
+      std::function<bool(const quic::SocketAddress&)> rejectFn);
 
   /**
    * Set callback to determine if MVFST_PRIMING version handling is
@@ -508,7 +509,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   ProcessId processId_{ProcessId::ZERO};
   uint32_t hostId_{0};
   ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
-  std::function<bool()> rejectNewConnections_{[]() { return false; }};
+  std::function<bool(const quic::SocketAddress&)> rejectNewConnections_{
+      [](const quic::SocketAddress&) { return false; }};
   std::function<bool()> isPrimingEnabled_{[]() { return false; }};
   std::function<bool(uint16_t)> isBlockListedSrcPort_{
       [](uint16_t) { return false; }};

@@ -63,7 +63,8 @@ void QuicAsyncTransportServer::createAcceptors(
 }
 
 void QuicAsyncTransportServer::shutdown() {
-  quicServer_->rejectNewConnections([]() { return true; });
+  quicServer_->rejectNewConnections(
+      [](const quic::SocketAddress&) { return true; });
   quicServer_->shutdown();
   quicServer_.reset();
 }

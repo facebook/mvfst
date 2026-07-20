@@ -712,7 +712,8 @@ const TransportSettings& QuicServer::getTransportSettings() const noexcept {
   return transportSettings_;
 }
 
-void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {
+void QuicServer::rejectNewConnections(
+    std::function<bool(const quic::SocketAddress&)> rejectFn) {
   rejectNewConnections_ = rejectFn;
   runOnAllWorkers([rejectFn](auto worker) mutable {
     worker->rejectNewConnections(rejectFn);
