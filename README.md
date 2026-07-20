@@ -52,6 +52,22 @@ The settings for mvfst's cmake build are held in its getdeps manifest `build/fbc
 
 #### Dependencies
 
+#### Windows
+
+The Windows build requires Python 3, Git, and the Visual Studio 2022 C++
+Build Tools workload with a Windows SDK installed. After cloning the
+repository, configure Git from the repository directory so dependency patch
+files and long paths are handled consistently:
+
+    git config core.longpaths true
+    git config core.autocrlf false
+
+The recommended Windows build uses `getdeps.py` directly. An absolute install
+prefix avoids resolving `_build` relative to the dependency scratch directory:
+
+    $installPrefix = Join-Path (Get-Location) "_build"
+    python .\build\fbcode_builder\getdeps.py build --build-type RelWithDebInfo --src-dir=. mvfst "--install-prefix=$installPrefix"
+
 If on Linux or MacOS (with homebrew installed) you can install system dependencies to save building them:
 
     # Clone the repo
