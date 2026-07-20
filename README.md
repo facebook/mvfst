@@ -185,6 +185,14 @@ and to run a client:
 ```
 ./echo -mode=client -host=<host> -port=<port>
 ```
+
+On Windows, run the executable from PowerShell with the same options:
+
+```powershell
+.\echo.exe -mode=server -host=127.0.0.1 -port=4433
+.\echo.exe -mode=client -host=127.0.0.1 -port=4433
+```
+
 For more options, see
 ```
 ./echo --help
