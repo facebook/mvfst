@@ -11,8 +11,6 @@
 #include <quic/common/ContiguousCursor.h>
 #include <quic/common/StringUtils.h>
 
-#include <folly/portability/GTest.h>
-
 namespace quic::test {
 
 TEST(ConnectionIdTest, TestConnidLen) {
