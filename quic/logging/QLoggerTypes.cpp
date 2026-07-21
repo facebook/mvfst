@@ -821,7 +821,9 @@ folly::dynamic QLogPacketDropEvent::toDynamic() const {
     raw["length"] = packetSize;
     data["raw"] = std::move(raw);
   }
-  data["drop_reason"] = dropReason;
+  folly::dynamic details = folly::dynamic::object();
+  details["drop_reason"] = dropReason;
+  data["details"] = std::move(details);
 
   event["data"] = std::move(data);
   return event;

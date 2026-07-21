@@ -1273,7 +1273,9 @@ TEST_F(QLoggerTest, PacketDropFollyDynamic) {
          "time": 0,
          "name": "quic:packet_dropped",
          "data": {
-         "drop_reason": "max buffered",
+         "details": {
+           "drop_reason": "max buffered"
+         },
          "raw": {
            "length": 100
          }
