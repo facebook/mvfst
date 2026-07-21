@@ -7,7 +7,9 @@
 
 #include <quic/logging/QLoggerTypes.h>
 
+#include <folly/lang/Bits.h>
 #include <quic/QuicException.h>
+#include <quic/common/StringUtils.h>
 #include <quic/logging/QLoggerConstants.h>
 
 #include <utility>
@@ -31,6 +33,17 @@ folly::dynamic microsecondDeltasToMilliseconds(
     out.push_back(microsecondsToMilliseconds(delta));
   }
   return out;
+}
+
+std::string toHexString(const uint8_t* data, size_t size) {
+  return hexlify(std::string(reinterpret_cast<const char*>(data), size));
+}
+
+std::string pathDataToHexString(uint64_t pathData) {
+  const auto bigEndianPathData = folly::Endian::big(pathData);
+  return toHexString(
+      reinterpret_cast<const uint8_t*>(&bigEndianPathData),
+      sizeof(bigEndianPathData));
 }
 
 } // namespace
@@ -213,14 +226,14 @@ folly::dynamic StopSendingFrameLog::toDynamic() const {
 folly::dynamic PathChallengeFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::PATH_CHALLENGE);
-  d["path_data"] = pathData;
+  d["data"] = pathDataToHexString(pathData);
   return d;
 }
 
 folly::dynamic PathResponseFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::PATH_RESPONSE);
-  d["path_data"] = pathData;
+  d["data"] = pathDataToHexString(pathData);
   return d;
 }
 
@@ -228,13 +241,7 @@ folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::NEW_CONNECTION_ID);
   d["sequence"] = sequence;
-
-  folly::dynamic dToken = folly::dynamic::array();
-  for (const auto& a : token) {
-    dToken.push_back(a);
-  }
-
-  d["token"] = dToken;
+  d["token"] = toHexString(token.data(), token.size());
   return d;
 }
 

@@ -1540,6 +1540,42 @@ TEST_F(QLoggerTest, PaddingFramesFollyDynamic) {
   EXPECT_EQ(expected, gotEvents);
 }
 
+TEST_F(QLoggerTest, PathFramesSerializeDataAsHex) {
+  const uint64_t pathData = 0x000102030a0bfeff;
+
+  const auto expectedChallenge = folly::parseJson(
+      R"({"frame_type":"path_challenge","data":"000102030a0bfeff"})");
+  const auto expectedResponse = folly::parseJson(
+      R"({"frame_type":"path_response","data":"000102030a0bfeff"})");
+
+  EXPECT_EQ(expectedChallenge, PathChallengeFrameLog(pathData).toDynamic());
+  EXPECT_EQ(expectedResponse, PathResponseFrameLog(pathData).toDynamic());
+}
+
+TEST_F(QLoggerTest, NewConnectionIdSerializesResetTokenAsHex) {
+  const StatelessResetToken token{
+      0x00,
+      0x01,
+      0x0a,
+      0x0f,
+      0x10,
+      0x1f,
+      0x20,
+      0x7f,
+      0x80,
+      0x9a,
+      0xa0,
+      0xcd,
+      0xde,
+      0xef,
+      0xfe,
+      0xff};
+  const auto expected = folly::parseJson(
+      R"({"frame_type":"new_connection_id","sequence":7,"token":"00010a0f101f207f809aa0cddeeffeff"})");
+
+  EXPECT_EQ(expected, NewConnectionIdFrameLog(7, token).toDynamic());
+}
+
 TEST_F(QLoggerTest, ConnectionMigration) {
   folly::dynamic expected = folly::parseJson(
       R"([
