@@ -13,6 +13,7 @@
 #include <quic/priority/PriorityQueue.h>
 #include <chrono>
 #include <cstdint>
+#include <limits>
 
 namespace quic {
 
@@ -426,6 +427,15 @@ struct TransportSettings {
   // are enabled or not and should not a part of
   //  maybeAckReceiveTimestampsConfigSentToPeer optional.
   uint64_t maxReceiveTimestampsPerAckStored{kMaxReceivedPktsTimestampsStored};
+
+  // Maximum number of additional ack blocks (beyond the required first
+  // block) included in each ACK frame sent to the peer. Bounds ACK frame
+  // size when ack ranges accumulate faster than they are coalesced, e.g.
+  // datagram-heavy workloads on lossy networks where gaps are never
+  // retransmitted. The most recent (largest packet number) blocks are kept.
+  // Unlimited by default; only the space remaining in the packet bounds the
+  // block count.
+  uint64_t maxAdditionalAckBlocksPerFrame{std::numeric_limits<uint64_t>::max()};
 
   // When true, advertise the draft-ietf-quic-receive-ts-02 transport
   // parameters (TP 0x4ac07, 0x4ac26) whenever

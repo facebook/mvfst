@@ -21,6 +21,7 @@
 #include <quic/common/Variant.h>
 #include <quic/folly_utils/Utils.h>
 #include <quic/mvfst-config.h>
+#include <limits>
 
 /**
  * This details the types of objects that can be serialized or deserialized
@@ -306,6 +307,11 @@ struct WriteAckFrameMetaData {
 
   // Receive timestamps basis
   TimePoint connTime;
+
+  // Maximum number of additional ack blocks (beyond the required first
+  // block) to write into the frame. Defaults to unlimited, in which case
+  // only the space remaining in the packet bounds the block count.
+  uint64_t maxAdditionalAckBlocks{std::numeric_limits<uint64_t>::max()};
 };
 
 struct WriteAckFrameResult {

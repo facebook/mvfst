@@ -1838,6 +1838,64 @@ TEST_P(QuicWriteCodecTest, WriteSomeAckBlocks) {
   }
 }
 
+TEST_F(QuicWriteCodecTest, WriteAckFrameWithMaxAdditionalAckBlocks) {
+  // Plenty of space in the packet, but the number of additional ack blocks
+  // is capped by maxAdditionalAckBlocks; the most recent blocks are kept.
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  AckBlocks ackBlocks;
+  PacketNum currentEnd = 1000;
+  auto blockLength = 5;
+  auto gap = 10;
+  for (int i = 0; i < 30; i++) {
+    ackBlocks.insert({currentEnd - blockLength + 1, currentEnd});
+    currentEnd -= blockLength + gap;
+  }
+
+  TimePoint connTime = Clock::now();
+  WriteAckFrameState ackState =
+      createTestWriteAckState(FrameType::ACK, connTime, ackBlocks);
+  WriteAckFrameMetaData ackFrameMetaData = {
+      .ackState = ackState,
+      .ackDelay = 111us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+      .maxAdditionalAckBlocks = 3,
+  };
+
+  auto ackFrameWriteResultExpected =
+      writeAckFrame(ackFrameMetaData, pktBuilder, FrameType::ACK);
+  ASSERT_FALSE(ackFrameWriteResultExpected.hasError());
+  ASSERT_TRUE(ackFrameWriteResultExpected.value().has_value());
+  auto& ackFrameWriteResult = ackFrameWriteResultExpected.value().value();
+  // First ack block plus 3 additional ones.
+  EXPECT_EQ(ackFrameWriteResult.ackBlocksWritten, 4);
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 4);
+
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame decodedFrame = parseQuicFrame(queue);
+  auto& decodedAckFrame = *decodedFrame.asReadAckFrame();
+  EXPECT_EQ(decodedAckFrame.largestAcked, 1000);
+  ASSERT_EQ(decodedAckFrame.ackBlocks.size(), 4);
+  // Decoded blocks are ordered largest to smallest packet number; the 4
+  // blocks covering the most recent packets survive the cap.
+  EXPECT_EQ(decodedAckFrame.ackBlocks[0].startPacket, 996);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[0].endPacket, 1000);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[1].startPacket, 981);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[1].endPacket, 985);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[2].startPacket, 966);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[2].endPacket, 970);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[3].startPacket, 951);
+  EXPECT_EQ(decodedAckFrame.ackBlocks[3].endPacket, 955);
+}
+
 TEST_P(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 6;
