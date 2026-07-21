@@ -1569,7 +1569,7 @@ TEST_F(QLoggerTest, PathValidation) {
          "name": "quic:path_validated",
          "data": {
         "success": false,
-        "vantagePoint": "server"
+        "vantage_point": "server"
       }
     }
 ])");

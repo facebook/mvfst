@@ -1127,9 +1127,9 @@ folly::dynamic QLogPathValidationEvent::toDynamic() const {
   folly::dynamic data = folly::dynamic::object();
   data["success"] = success_;
   if (vantagePoint_ == VantagePoint::Client) {
-    data["vantagePoint"] = "client";
+    data["vantage_point"] = "client";
   } else {
-    data["vantagePoint"] = "server";
+    data["vantage_point"] = "server";
   }
 
   event["data"] = std::move(data);
