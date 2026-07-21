@@ -170,6 +170,7 @@ mvfst_cpp_library(
         "//quic/common/udpsocket:quic_async_udp_socket",
         "//quic/handshake:handshake",
         "//quic/handshake:transport_parameters",
+        "//quic/observer:socket_observer_container",
         "//quic/state:quic_state_machine",
     ],
 )

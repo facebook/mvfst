@@ -62,7 +62,9 @@ mvfst_cpp_library(
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
         "//quic/common:expected",
+        "//quic/common:mvfst_check",
         "//quic/common/udpsocket:quic_async_udp_socket",
+        "//quic/observer:socket_observer_macros",
         "//quic/state:quic_connection_stats",
     ],
 )

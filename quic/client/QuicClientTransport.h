@@ -135,6 +135,12 @@ class QuicClientTransport : public QuicTransportBase,
     return wrappedObserverContainer_.getPtr();
   }
 
+  // Full transport eagerly owns its container; override prevents the Lite
+  // base's lazy path from creating a second one when addObserver is called.
+  SocketObserverContainer* ensureSocketObserverContainer() override {
+    return wrappedObserverContainer_.getPtr();
+  }
+
   [[nodiscard]] quic::Expected<void, QuicError> readWithRecvmmsgWrapper(
       QuicAsyncUDPSocket& sock,
       uint64_t readBufferSize,

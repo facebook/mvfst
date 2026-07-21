@@ -106,6 +106,7 @@ mvfst_add_library(mvfst_api_transport_lite
     mvfst_exception
     mvfst_handshake
     mvfst_handshake_transport_parameters
+    mvfst_observer_socket_observer_container
     mvfst_state_quic_state_machine
     fizz::fizz
     Folly::folly_io_async_delayed_destruction

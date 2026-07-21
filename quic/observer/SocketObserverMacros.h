@@ -10,6 +10,12 @@
 #include <quic/observer/SocketObserverContainer.h>
 #include <quic/observer/SocketObserverInterface.h>
 
+// Enables observer-only members in the real build (see
+// QuicClientTransportLite). Preprocessor sentinel (used in #if), so it must
+// stay a macro.
+// NOLINTNEXTLINE(modernize-macro-to-enum)
+#define QUIC_SOCKET_OBSERVERS_ENABLED 1
+
 namespace quic {
 
 // Guard macro for observer events with specific event type filtering.

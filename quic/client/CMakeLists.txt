@@ -49,7 +49,9 @@ mvfst_add_library(mvfst_client_client_lite
     mvfst_common_buf_accessor
     mvfst_common_buf_util
     mvfst_common_expected
+    mvfst_common_mvfst_check
     mvfst_common_udpsocket_quic_async_udp_socket
+    mvfst_observer_socket_observer_macros
     mvfst_state_quic_connection_stats
     Folly::folly_io_socket_option_map
     Folly::folly_net_net_ops

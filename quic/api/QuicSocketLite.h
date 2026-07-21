@@ -17,6 +17,7 @@
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/handshake/TransportParameters.h>
+#include <quic/observer/SocketObserverContainer.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -822,6 +823,104 @@ class QuicSocketLite {
     return std::nullopt;
   }
 
+  using Observer = SocketObserverContainer::Observer;
+  using ManagedObserver = SocketObserverContainer::ManagedObserver;
+
+  /**
+   * Adds an observer. Lazily creates the observer container on first add.
+   *
+   * If the observer is already added, this is a no-op.
+   *
+   * @param observer     Observer to add.
+   * @return             Whether the observer was added (fails if no list).
+   */
+  bool addObserver(Observer* observer) {
+    if (auto* list = ensureSocketObserverContainer()) {
+      list->addObserver(observer);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Adds an observer. Lazily creates the observer container on first add.
+   *
+   * If the observer is already added, this is a no-op.
+   *
+   * @param observer     Observer to add.
+   * @return             Whether the observer was added (fails if no list).
+   */
+  bool addObserver(std::shared_ptr<Observer> observer) {
+    if (auto* list = ensureSocketObserverContainer()) {
+      list->addObserver(std::move(observer));
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Removes an observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether the observer was found and removed.
+   */
+  bool removeObserver(Observer* observer) {
+    if (auto* list = getSocketObserverContainer()) {
+      return list->removeObserver(observer);
+    }
+    return false;
+  }
+
+  /**
+   * Removes an observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether the observer was found and removed.
+   */
+  bool removeObserver(std::shared_ptr<Observer> observer) {
+    if (auto* list = getSocketObserverContainer()) {
+      return list->removeObserver(std::move(observer));
+    }
+    return false;
+  }
+
+  /**
+   * Get number of observers.
+   *
+   * @return             Number of observers.
+   */
+  [[nodiscard]] size_t numObservers() const {
+    if (auto* list = getSocketObserverContainer()) {
+      return list->numObservers();
+    }
+    return 0;
+  }
+
+  /**
+   * Returns list of attached observers.
+   *
+   * @return             List of observers.
+   */
+  std::vector<Observer*> getObservers() {
+    if (auto* list = getSocketObserverContainer()) {
+      return list->getObservers();
+    }
+    return {};
+  }
+
+  /**
+   * Returns list of attached observers that are of type T.
+   *
+   * @return             Attached observers of type T.
+   */
+  template <typename T = Observer>
+  std::vector<T*> findObservers() {
+    if (auto* list = getSocketObserverContainer()) {
+      return list->findObservers<T>();
+    }
+    return {};
+  }
+
   virtual ~QuicSocketLite() = default;
 
  protected:
@@ -841,6 +940,18 @@ class QuicSocketLite {
   [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
       const {
     return nullptr;
+  }
+
+  /**
+   * Returns the container, creating it on first use if the implementation
+   * supports lazy creation. Default forwards to getSocketObserverContainer().
+   *
+   * Implementations that lazily own a container should override this and
+   * return non-null on first call (creating the container) so addObserver
+   * can succeed without requiring eager construction.
+   */
+  virtual SocketObserverContainer* ensureSocketObserverContainer() {
+    return getSocketObserverContainer();
   }
 };
 

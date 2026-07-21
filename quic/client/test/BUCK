@@ -74,6 +74,7 @@ mvfst_cpp_test(
         "QuicClientTransportTest.cpp",
     ],
     deps = [
+        "//quic/api/test:api_mocks",
         "//quic/client:client",
         "//quic/client/test:mocks",
         "//quic/common/events/test:QuicEventBaseMock",
@@ -88,6 +89,7 @@ mvfst_cpp_test(
         "QuicClientTransportLiteTest.cpp",
     ],
     deps = [
+        "//quic/api/test:api_mocks",
         "//quic/api/test:mocks",
         "//quic/client:client",
         "//quic/client/test:mocks",

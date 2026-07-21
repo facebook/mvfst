@@ -15,7 +15,9 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/Expected.h>
+#include <quic/common/MvfstCheck.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
+#include <quic/observer/SocketObserverMacros.h> // QUIC_SOCKET_OBSERVERS_ENABLED
 #include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
@@ -258,8 +260,27 @@ class QuicClientTransportLite
  protected:
   // From QuicSocket
   SocketObserverContainer* getSocketObserverContainer() const override {
+#if QUIC_SOCKET_OBSERVERS_ENABLED
+    return observerContainer_ ? observerContainer_->getPtr() : nullptr;
+#else
     return nullptr;
+#endif
   }
+
+#if QUIC_SOCKET_OBSERVERS_ENABLED
+  // Lazy: create the container (and publish a weak_ptr into conn_) on first
+  // addObserver. undoAllClientStateForRetry preserves observerContainer.
+  // Must be called on the same event base thread as the transport.
+  SocketObserverContainer* ensureSocketObserverContainer() override {
+    MVDCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
+    if (!observerContainer_) {
+      observerContainer_ =
+          std::make_unique<WrappedSocketObserverContainer>(this);
+      conn_->observerContainer = observerContainer_->getWeakPtr();
+    }
+    return observerContainer_->getPtr();
+  }
+#endif
 
   // From QuicAsyncUDPSocket::ReadCallback
   void getReadBuffer(void** buf, size_t* len) noexcept override;
@@ -413,5 +434,11 @@ class QuicClientTransportLite
 
   // Track pending SCONE rate signal for conditional usage per spec
   Optional<QuicConnectionStateBase::SconeRateSignal> pendingSconeRateSignal_;
+
+#if QUIC_SOCKET_OBSERVERS_ENABLED
+  // MUST be the last member: destroyed first so observers can inspect
+  // transport state during teardown.
+  std::unique_ptr<WrappedSocketObserverContainer> observerContainer_;
+#endif
 };
 } // namespace quic

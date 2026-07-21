@@ -293,6 +293,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
     auto released = static_cast<QuicClientConnectionState*>(conn_.release());
     std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
+    // observerContainer is preserved by undoAllClientStateForRetry; no
+    // re-point.
     auto tempConn = undoAllClientStateForRetry(std::move(uniqueClient));
 
     clientConn_ = tempConn.get();

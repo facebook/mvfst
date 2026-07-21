@@ -6,6 +6,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <quic/api/test/ApiMocks.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/client/test/Mocks.h>
 #include <quic/common/events/test/QuicEventBaseMock.h>
@@ -251,6 +252,17 @@ TEST_F(
   ASSERT_TRUE(result.hasError());
   EXPECT_EQ(result.error().code, TransportErrorCode::INTERNAL_ERROR);
   EXPECT_EQ(result.error().message, "local address unavailable");
+}
+
+TEST_F(QuicClientTransportTest, NoDoubleObserverContainer) {
+  // Full transport owns the sole container; the Lite base must not create one.
+  EXPECT_EQ(quicClient_->numObservers(), 0);
+  MockObserver obs;
+  EXPECT_TRUE(quicClient_->addObserver(&obs));
+  EXPECT_EQ(quicClient_->numObservers(), 1);
+  EXPECT_FALSE(quicClient_->getClientConn()->observerContainer.expired());
+  EXPECT_TRUE(quicClient_->removeObserver(&obs));
+  EXPECT_EQ(quicClient_->numObservers(), 0);
 }
 
 } // namespace quic::test
