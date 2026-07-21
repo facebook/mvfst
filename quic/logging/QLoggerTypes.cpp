@@ -66,10 +66,11 @@ folly::dynamic RstStreamFrameLog::toDynamic() const {
   d["frame_type"] = toQlogString(
       reliableOffset ? FrameType::RST_STREAM_AT : FrameType::RST_STREAM);
   d["stream_id"] = streamId;
+  d["error"] = "unknown";
   d["error_code"] = errorCode;
-  d["offset"] = offset;
+  d["final_size"] = offset;
   if (reliableOffset) {
-    d["reliable_offset"] = reliableOffset.value();
+    d["reliable_size"] = reliableOffset.value();
   }
   return d;
 }
@@ -111,7 +112,7 @@ folly::dynamic MaxStreamDataFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::MAX_STREAM_DATA);
   d["stream_id"] = streamId;
-  d["maximum_data"] = maximumData;
+  d["maximum"] = maximumData;
   return d;
 }
 
@@ -119,8 +120,9 @@ folly::dynamic MaxStreamsFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   FrameType type = isForBidirectional ? FrameType::MAX_STREAMS_BIDI
                                       : FrameType::MAX_STREAMS_UNI;
-  d["frame_type"] = toString(type);
-  d["max_streams"] = maxStreams;
+  d["frame_type"] = toQlogString(type);
+  d["stream_type"] = isForBidirectional ? "bidirectional" : "unidirectional";
+  d["maximum"] = maxStreams;
   return d;
 }
 
@@ -128,8 +130,9 @@ folly::dynamic StreamsBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   FrameType type = isForBidirectional ? FrameType::STREAMS_BLOCKED_BIDI
                                       : FrameType::STREAMS_BLOCKED_UNI;
-  d["frame_type"] = toString(type);
-  d["stream_limit"] = streamLimit;
+  d["frame_type"] = toQlogString(type);
+  d["stream_type"] = isForBidirectional ? "bidirectional" : "unidirectional";
+  d["limit"] = streamLimit;
   return d;
 }
 
@@ -142,7 +145,7 @@ folly::dynamic PingFrameLog::toDynamic() const {
 folly::dynamic DataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::DATA_BLOCKED);
-  d["data_limit"] = dataLimit;
+  d["limit"] = dataLimit;
   return d;
 }
 
@@ -177,7 +180,7 @@ folly::dynamic StreamDataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::STREAM_DATA_BLOCKED);
   d["stream_id"] = streamId;
-  d["data_limit"] = dataLimit;
+  d["limit"] = dataLimit;
   return d;
 }
 
@@ -219,6 +222,7 @@ folly::dynamic StopSendingFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::STOP_SENDING);
   d["stream_id"] = streamId;
+  d["error"] = "unknown";
   d["error_code"] = errorCode;
   return d;
 }
@@ -240,7 +244,7 @@ folly::dynamic PathResponseFrameLog::toDynamic() const {
 folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::NEW_CONNECTION_ID);
-  d["sequence"] = sequence;
+  d["sequence_number"] = sequence;
   d["token"] = toHexString(token.data(), token.size());
   return d;
 }
@@ -248,7 +252,7 @@ folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
 folly::dynamic RetireConnectionIdFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::RETIRE_CONNECTION_ID);
-  d["sequence"] = sequence;
+  d["sequence_number"] = sequence;
   return d;
 }
 

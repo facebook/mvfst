@@ -29,9 +29,9 @@ folly::StringPiece toQlogString(FrameType frame) {
     case FrameType::ACK_ECN:
       return "ack_ecn";
     case FrameType::RST_STREAM:
-      return "rst_stream";
+      return "reset_stream";
     case FrameType::RST_STREAM_AT:
-      return "rst_stream_at";
+      return "reset_stream_at";
     case FrameType::STOP_SENDING:
       return "stop_sending";
     case FrameType::CRYPTO_FRAME:

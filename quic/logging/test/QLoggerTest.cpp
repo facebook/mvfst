@@ -1552,6 +1552,54 @@ TEST_F(QLoggerTest, PathFramesSerializeDataAsHex) {
   EXPECT_EQ(expectedResponse, PathResponseFrameLog(pathData).toDynamic());
 }
 
+TEST_F(QLoggerTest, ResetAndStopSendingFramesUseQlogFieldNames) {
+  const auto expectedResetStream = folly::parseJson(
+      R"({"frame_type":"reset_stream","stream_id":3,"error":"unknown","error_code":42,"final_size":100})");
+  const auto expectedResetStreamAt = folly::parseJson(
+      R"({"frame_type":"reset_stream_at","stream_id":3,"error":"unknown","error_code":42,"final_size":100,"reliable_size":80})");
+  const auto expectedStopSending = folly::parseJson(
+      R"({"frame_type":"stop_sending","stream_id":3,"error":"unknown","error_code":42})");
+
+  EXPECT_EQ(expectedResetStream, RstStreamFrameLog(3, 42, 100).toDynamic());
+  EXPECT_EQ(
+      expectedResetStreamAt, RstStreamFrameLog(3, 42, 100, 80).toDynamic());
+  EXPECT_EQ(expectedStopSending, StopSendingFrameLog(3, 42).toDynamic());
+}
+
+TEST_F(QLoggerTest, FlowControlFramesUseQlogFieldNames) {
+  const auto expectedMaxStreamData = folly::parseJson(
+      R"({"frame_type":"max_stream_data","stream_id":3,"maximum":100})");
+  const auto expectedMaxStreamsBidirectional = folly::parseJson(
+      R"({"frame_type":"max_streams","stream_type":"bidirectional","maximum":10})");
+  const auto expectedMaxStreamsUnidirectional = folly::parseJson(
+      R"({"frame_type":"max_streams","stream_type":"unidirectional","maximum":10})");
+  const auto expectedDataBlocked =
+      folly::parseJson(R"({"frame_type":"data_blocked","limit":100})");
+  const auto expectedStreamDataBlocked = folly::parseJson(
+      R"({"frame_type":"stream_data_blocked","stream_id":3,"limit":100})");
+  const auto expectedStreamsBlockedBidirectional = folly::parseJson(
+      R"({"frame_type":"streams_blocked","stream_type":"bidirectional","limit":10})");
+  const auto expectedStreamsBlockedUnidirectional = folly::parseJson(
+      R"({"frame_type":"streams_blocked","stream_type":"unidirectional","limit":10})");
+
+  EXPECT_EQ(expectedMaxStreamData, MaxStreamDataFrameLog(3, 100).toDynamic());
+  EXPECT_EQ(
+      expectedMaxStreamsBidirectional,
+      MaxStreamsFrameLog(10, true).toDynamic());
+  EXPECT_EQ(
+      expectedMaxStreamsUnidirectional,
+      MaxStreamsFrameLog(10, false).toDynamic());
+  EXPECT_EQ(expectedDataBlocked, DataBlockedFrameLog(100).toDynamic());
+  EXPECT_EQ(
+      expectedStreamDataBlocked, StreamDataBlockedFrameLog(3, 100).toDynamic());
+  EXPECT_EQ(
+      expectedStreamsBlockedBidirectional,
+      StreamsBlockedFrameLog(10, true).toDynamic());
+  EXPECT_EQ(
+      expectedStreamsBlockedUnidirectional,
+      StreamsBlockedFrameLog(10, false).toDynamic());
+}
+
 TEST_F(QLoggerTest, NewConnectionIdSerializesResetTokenAsHex) {
   const StatelessResetToken token{
       0x00,
@@ -1571,9 +1619,16 @@ TEST_F(QLoggerTest, NewConnectionIdSerializesResetTokenAsHex) {
       0xfe,
       0xff};
   const auto expected = folly::parseJson(
-      R"({"frame_type":"new_connection_id","sequence":7,"token":"00010a0f101f207f809aa0cddeeffeff"})");
+      R"({"frame_type":"new_connection_id","sequence_number":7,"token":"00010a0f101f207f809aa0cddeeffeff"})");
 
   EXPECT_EQ(expected, NewConnectionIdFrameLog(7, token).toDynamic());
+}
+
+TEST_F(QLoggerTest, RetireConnectionIdUsesQlogSequenceNumberField) {
+  const auto expected = folly::parseJson(
+      R"({"frame_type":"retire_connection_id","sequence_number":7})");
+
+  EXPECT_EQ(expected, RetireConnectionIdFrameLog(7).toDynamic());
 }
 
 TEST_F(QLoggerTest, ConnectionMigration) {
