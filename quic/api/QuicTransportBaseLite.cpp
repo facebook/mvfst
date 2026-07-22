@@ -1424,6 +1424,11 @@ void QuicTransportBaseLite::checkForClosedStream() {
     if (connCallback_) {
       connCallback_->onStreamPreReaped(*itr);
     }
+    // onStreamPreReaped may synchronously close() the transport, which frees
+    // readCallbacks_ and tears down stream state; bail before reusing readCbIt.
+    if (closeState_ == CloseState::CLOSED) {
+      return;
+    }
     auto result = conn_->streamManager->removeClosedStream(*itr);
     if (!result.has_value()) {
       exceptionCloseWhat_ = result.error().message;
