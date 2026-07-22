@@ -5016,4 +5016,31 @@ TEST_F(QuicTransportImplTestBase, StopSendingCallback) {
   transport->invokeProcessCallbacksAfterNetworkData();
 }
 
+TEST_F(QuicTransportImplTestBase, StopSendingCallbackReentrantRegistration) {
+  auto id = transport->createBidirectionalStream().value();
+
+  std::vector<StreamId> reentrantIds;
+  reentrantIds.reserve(64);
+  for (int i = 0; i < 64; ++i) {
+    reentrantIds.push_back(transport->createBidirectionalStream().value());
+  }
+
+  NiceMock<MockStopSendingCallback> reentrantCb;
+  NiceMock<MockStopSendingCallback> ssCb;
+  ON_CALL(ssCb, onStopSending(id, 0))
+      .WillByDefault([&](StreamId, ApplicationErrorCode) {
+        for (auto rid : reentrantIds) {
+          ASSERT_FALSE(
+              transport->setStopSendingCallback(rid, &reentrantCb).hasError());
+        }
+      });
+
+  EXPECT_FALSE(transport->setStopSendingCallback(id, &ssCb).hasError());
+
+  EXPECT_CALL(ssCb, onStopSending(id, 0)).Times(1);
+  transport->getConnectionState().streamManager->addStopSending(
+      id, /*error=*/0);
+  transport->invokeProcessCallbacksAfterNetworkData();
+}
+
 } // namespace quic::test

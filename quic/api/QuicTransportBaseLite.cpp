@@ -2302,8 +2302,12 @@ void QuicTransportBaseLite::handleStreamStopSendingCallbacks() {
     }
     auto it = stopSendingCallbacks_.find(id);
     if (it != stopSendingCallbacks_.end()) {
-      it->second->onStopSending(id, ec);
+      // onStopSending() may re-enter setStopSendingCallback() and insert into
+      // stopSendingCallbacks_, rehashing the map and invalidating it. Erase
+      // before invoking the callback so it is never reused across it.
+      auto cb = it->second;
       stopSendingCallbacks_.erase(it);
+      cb->onStopSending(id, ec);
       if (closeState_ != CloseState::OPEN) {
         return;
       }
