@@ -68,10 +68,16 @@ class QuicSocketLite {
     /**
      * Client only.
      * Called when the transport is in priming mode and 0-RTT packets are
-     * available
+     * available.
+     *
+     * @param data the 0-RTT priming packets.
+     * @param truncated true if the request did not fully fit within the initial
+     *   congestion/flow-control window. Priming never receives ACKs to open the
+     *   window, so a truncated flight cannot be completed.
      */
     virtual void onPrimingDataAvailable(
-        std::vector<quic::BufPtr>&& /* data */) noexcept {}
+        std::vector<quic::BufPtr>&& /* data */,
+        bool /* truncated */) noexcept {}
 
     /**
      * Server only.

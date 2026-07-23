@@ -96,7 +96,7 @@ class MockConnectionSetupCallback : public QuicSocket::ConnectionSetupCallback {
   MOCK_METHOD(
       (void),
       onPrimingDataAvailable,
-      (std::vector<quic::BufPtr>&&),
+      (std::vector<quic::BufPtr>&&, bool),
       (noexcept));
 };
 

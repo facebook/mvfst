@@ -119,7 +119,9 @@ TEST_F(QuicClientTransportLiteTest, TestPriming) {
   ASSERT_FALSE(
       quicClient_->writeChain(streamId, folly::IOBuf::copyBuffer("test"), false)
           .hasError());
-  EXPECT_CALL(mockConnectionSetupCallback_, onPrimingDataAvailable(_));
+  EXPECT_CALL(
+      mockConnectionSetupCallback_,
+      onPrimingDataAvailable(_, false /* truncated */));
   evb_.loopOnce(EVLOOP_NONBLOCK);
 }
 

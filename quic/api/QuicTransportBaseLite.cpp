@@ -1538,7 +1538,17 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
     }
     if (conn_->transportSettings.isPriming && conn_->primingData.size() > 0) {
       auto primingData = std::move(conn_->primingData);
-      connSetupCallback_->onPrimingDataAvailable(std::move(primingData));
+      // Priming sends a single flight and never receives ACKs to open the
+      // window. Unsent request stream or crypto data, or a stream blocked by
+      // flow control, indicates that the priming request did not fit in the
+      // first flight.
+      const auto pendingWriteReason = hasNonAckDataToWrite(*conn_);
+      const bool truncated =
+          pendingWriteReason == WriteDataReason::CRYPTO_STREAM ||
+          pendingWriteReason == WriteDataReason::STREAM ||
+          pendingWriteReason == WriteDataReason::BLOCKED;
+      connSetupCallback_->onPrimingDataAvailable(
+          std::move(primingData), truncated);
     }
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
