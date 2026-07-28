@@ -1,7 +1,6 @@
 load("@fbcode_macros//build_defs:cpp_benchmark.bzl", "cpp_benchmark")
 load("@fbcode_macros//build_defs:cpp_binary.bzl", "cpp_binary")
 load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
-load("@fbsource//tools/build_defs:buckconfig.bzl", "read_bool")
 load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 load(
     "@fbsource//tools/build_defs:default_platform_defs.bzl",
@@ -19,6 +18,7 @@ load("@fbsource//tools/build_defs:fb_xplat_cxx_test.bzl", "fb_xplat_cxx_test")
 load("@fbsource//tools/build_defs/dirsync:fb_dirsync_cpp_library.bzl", "fb_dirsync_cpp_library")
 load("@fbsource//tools/build_defs/xplat:deps_map_utils.bzl", "deps_map_utils")
 load("@fbsource//xplat/pfh/Infra_Networking_Core:DEFS.bzl", "Infra_Networking_Core")
+load("@prelude//utils:buckconfig.bzl", "read_bool")
 
 CXXFLAGS = [
     "-frtti",
