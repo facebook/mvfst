@@ -1029,6 +1029,8 @@ quic::Expected<void, QuicError> updateConnection(
         }
         break;
       }
+      case QuicWriteFrame::Type::TimestampFrame:
+        break;
       case QuicWriteFrame::Type::PaddingFrame: {
         // do not mark padding as retransmittable. There are several reasons
         // for this:

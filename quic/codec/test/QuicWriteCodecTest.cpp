@@ -43,14 +43,12 @@ QuicFrame parseQuicFrame(
         .maxReceiveTimestampsPerAck = 5, .receiveTimestampsExponent = 3};
   }
 
-  auto result = quic::parseFrame(
-      queue,
-      buildTestShortHeader(),
-      CodecParameters(
-          kDefaultAckDelayExponent,
-          QuicVersion::MVFST,
-          receiveTimeStampsConfig,
-          extendedAckSupport));
+  CodecParameters codecParams(
+      kDefaultAckDelayExponent,
+      QuicVersion::MVFST,
+      receiveTimeStampsConfig,
+      extendedAckSupport);
+  auto result = quic::parseFrame(queue, buildTestShortHeader(), codecParams);
 
   if (!result.has_value()) {
     throw QuicTransportException(
@@ -3948,6 +3946,40 @@ TEST_F(QuicWriteCodecTest, WriteDraft02AckFirstDeltaClampedWhenBeforeConnTime) {
   const auto& range = decoded.draft02RecvdPacketsTimestampRanges[0];
   ASSERT_EQ(range.deltas.size(), 1);
   EXPECT_EQ(range.deltas[0], 0);
+}
+
+TEST_F(QuicWriteCodecTest, WriteTimestampFrame) {
+  MockQuicPacketBuilder pktBuilder;
+  pktBuilder.remaining_ = 1300;
+  setupCommonExpects(pktBuilder);
+
+  TimestampFrame frame(1234);
+
+  auto bytesWritten = writeFrame(QuicWriteFrame(frame), pktBuilder);
+  ASSERT_FALSE(bytesWritten.hasError());
+  EXPECT_EQ(bytesWritten.value(), 4);
+
+  auto outputBuf = pktBuilder.data_->clone();
+  EXPECT_EQ(outputBuf->computeChainDataLength(), 4);
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  ASSERT_EQ(regularPacket.frames.size(), 1);
+  auto resultFrame = regularPacket.frames[0].asTimestampFrame();
+  ASSERT_TRUE(resultFrame);
+  EXPECT_EQ(resultFrame->timestamp, frame.timestamp);
+
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  auto parsedFrameExpected = quic::parseFrame(
+      queue,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  ASSERT_TRUE(parsedFrameExpected.has_value());
+  auto decodedFrame = parsedFrameExpected->asTimestampFrame();
+  ASSERT_TRUE(decodedFrame);
+  EXPECT_EQ(decodedFrame->timestamp, frame.timestamp);
 }
 
 INSTANTIATE_TEST_SUITE_P(

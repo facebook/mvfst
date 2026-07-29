@@ -104,6 +104,7 @@ mvfst_cpp_test(
     srcs = [
         "DecodeTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
         "//folly:random",
         "//folly/container:array",

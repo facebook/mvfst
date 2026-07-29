@@ -9,10 +9,14 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/codec/QuicReadCodec.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <cstdint>
+#include <memory>
+#include <string>
 
 using namespace ::testing;
 
@@ -39,6 +43,259 @@ class TransportParametersTest : public Test {
     return params;
   }
 };
+
+namespace {
+
+constexpr int64_t kAbsentTimestampParameter = -1;
+
+struct ClientTimestampPeer {
+  using Connection = QuicClientConnectionState;
+
+  static std::unique_ptr<Connection> makeConnection() {
+    return std::make_unique<Connection>(
+        FizzClientQuicHandshakeContext::Builder().build());
+  }
+
+  static auto process(
+      Connection& conn,
+      std::vector<TransportParameter> parameters) {
+    return processServerInitialParams(
+        conn, ServerTransportParameters{std::move(parameters)}, 0);
+  }
+
+  static constexpr const char* name() {
+    return "Client";
+  }
+
+  static constexpr QuicNodeType nodeType() {
+    return QuicNodeType::Client;
+  }
+};
+
+struct ServerTimestampPeer {
+  using Connection = QuicServerConnectionState;
+
+  static std::unique_ptr<Connection> makeConnection() {
+    return std::make_unique<Connection>(
+        FizzServerQuicHandshakeContext::Builder().build());
+  }
+
+  static auto process(
+      Connection& conn,
+      std::vector<TransportParameter> parameters) {
+    return processClientInitialParams(
+        conn, ClientTransportParameters{std::move(parameters)});
+  }
+
+  static constexpr const char* name() {
+    return "Server";
+  }
+
+  static constexpr QuicNodeType nodeType() {
+    return QuicNodeType::Server;
+  }
+};
+
+template <typename Peer, int64_t Support, int64_t Exponent>
+struct TimestampPeerParametersCase {
+  using PeerType = Peer;
+  static constexpr int64_t support = Support;
+  static constexpr int64_t exponent = Exponent;
+};
+
+using TimestampPeerParametersCases = Types<
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        kAbsentTimestampParameter,
+        kAbsentTimestampParameter>,
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        0,
+        kAbsentTimestampParameter>,
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        1,
+        kAbsentTimestampParameter>,
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        kAbsentTimestampParameter,
+        0>,
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        kAbsentTimestampParameter,
+        4>,
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        1,
+        kMaxTimestampFrameTimestampExponent>,
+    TimestampPeerParametersCase<
+        ClientTimestampPeer,
+        1,
+        kMaxTimestampFrameTimestampExponent + 1>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        kAbsentTimestampParameter,
+        kAbsentTimestampParameter>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        0,
+        kAbsentTimestampParameter>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        1,
+        kAbsentTimestampParameter>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        kAbsentTimestampParameter,
+        0>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        kAbsentTimestampParameter,
+        4>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        1,
+        kMaxTimestampFrameTimestampExponent>,
+    TimestampPeerParametersCase<
+        ServerTimestampPeer,
+        1,
+        kMaxTimestampFrameTimestampExponent + 1>>;
+
+class TimestampPeerParametersCaseNames {
+ public:
+  template <typename T>
+  static std::string GetName(int) {
+    std::string name = T::PeerType::name();
+    if constexpr (T::support == kAbsentTimestampParameter) {
+      name += "SupportAbsent";
+    } else {
+      name += T::support == 0 ? "SupportOff" : "SupportOn";
+    }
+    if constexpr (T::exponent == kAbsentTimestampParameter) {
+      name += "ExponentAbsent";
+    } else if constexpr (T::exponent > kMaxTimestampFrameTimestampExponent) {
+      name += "ExponentTooLarge";
+    } else {
+      name += "Exponent" + std::to_string(T::exponent);
+    }
+    return name;
+  }
+};
+
+struct TimestampLocalParametersCase {
+  const char* name;
+  bool advertise;
+  uint64_t exponent;
+  bool expectParameters;
+  uint64_t expectedExponent;
+};
+
+} // namespace
+
+template <typename T>
+class TimestampPeerParametersTest : public Test {};
+
+TYPED_TEST_SUITE(
+    TimestampPeerParametersTest,
+    TimestampPeerParametersCases,
+    TimestampPeerParametersCaseNames);
+
+TYPED_TEST(
+    TimestampPeerParametersTest,
+    AppliesSupportAndExponentPolicySymmetrically) {
+  using Peer = typename TypeParam::PeerType;
+  auto conn = Peer::makeConnection();
+  conn->readCodec = std::make_unique<QuicReadCodec>(Peer::nodeType());
+  std::vector<TransportParameter> parameters;
+  if constexpr (TypeParam::support != kAbsentTimestampParameter) {
+    auto encoded = encodeIntegerParameter(
+        TransportParameterId::timestamp_frame_supported, TypeParam::support);
+    ASSERT_TRUE(encoded.has_value());
+    parameters.push_back(std::move(encoded.value()));
+  }
+  if constexpr (TypeParam::exponent != kAbsentTimestampParameter) {
+    auto encoded = encodeIntegerParameter(
+        TransportParameterId::timestamp_frame_timestamp_exponent,
+        TypeParam::exponent);
+    ASSERT_TRUE(encoded.has_value());
+    parameters.push_back(std::move(encoded.value()));
+  }
+
+  auto result = Peer::process(*conn, std::move(parameters));
+  constexpr bool kExpectError =
+      TypeParam::exponent != kAbsentTimestampParameter &&
+      TypeParam::exponent >
+          static_cast<int64_t>(kMaxTimestampFrameTimestampExponent);
+  EXPECT_EQ(result.hasError(), kExpectError);
+  if constexpr (kExpectError) {
+    ASSERT_TRUE(result.hasError());
+    EXPECT_EQ(
+        *result.error().code.asTransportErrorCode(),
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    return;
+  }
+
+  EXPECT_EQ(conn->peerTimestampFrameState.canReceive, TypeParam::support == 1);
+  constexpr auto kExpectedExponent =
+      TypeParam::exponent == kAbsentTimestampParameter
+      ? kDefaultTimestampFrameTimestampExponent
+      : TypeParam::exponent;
+  EXPECT_EQ(conn->peerTimestampFrameState.sendExponent, kExpectedExponent);
+  EXPECT_EQ(
+      conn->readCodec->getCodecParameters().peerTimestampFrameTimestampExponent,
+      kExpectedExponent);
+}
+
+class TimestampLocalParametersTest
+    : public TransportParametersTest,
+      public WithParamInterface<TimestampLocalParametersCase> {};
+
+TEST_P(TimestampLocalParametersTest, EmitsOnlyAdvertisedBoundedParameters) {
+  const auto& testCase = GetParam();
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.advertisedTimestampFrameSupport = testCase.advertise;
+  conn.transportSettings.timestampFrameTimestampExponent = testCase.exponent;
+
+  const auto parameters = getSupportedExtTransportParams(conn);
+  auto support = getIntegerParameter(
+      TransportParameterId::timestamp_frame_supported, parameters);
+  auto exponent = getIntegerParameter(
+      TransportParameterId::timestamp_frame_timestamp_exponent, parameters);
+  ASSERT_FALSE(support.hasError());
+  ASSERT_FALSE(exponent.hasError());
+  const auto& maybeSupport = support.value();
+  const auto& maybeExponent = exponent.value();
+  EXPECT_EQ(maybeSupport.has_value(), testCase.expectParameters);
+  EXPECT_EQ(maybeExponent.has_value(), testCase.expectParameters);
+  if (testCase.expectParameters) {
+    EXPECT_EQ(*maybeSupport, 1);
+    EXPECT_EQ(*maybeExponent, testCase.expectedExponent);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    TimestampPolicy,
+    TimestampLocalParametersTest,
+    Values(
+        TimestampLocalParametersCase{"NotAdvertised", false, 4, false, 0},
+        TimestampLocalParametersCase{"ExponentZero", true, 0, true, 0},
+        TimestampLocalParametersCase{"ExponentFour", true, 4, true, 4},
+        TimestampLocalParametersCase{
+            "ExponentMaximum",
+            true,
+            kMaxTimestampFrameTimestampExponent,
+            true,
+            kMaxTimestampFrameTimestampExponent},
+        TimestampLocalParametersCase{
+            "ExponentClamped",
+            true,
+            kMaxTimestampFrameTimestampExponent + 1,
+            true,
+            kMaxTimestampFrameTimestampExponent}),
+    [](const TestParamInfo<TimestampLocalParametersCase>& info) {
+      return info.param.name;
+    });
 
 // Test client-side direct encap parameter generation
 TEST_F(TransportParametersTest, ClientDirectEncapEnabled) {

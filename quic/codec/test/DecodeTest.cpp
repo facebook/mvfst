@@ -15,6 +15,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/test/TestUtils.h>
 #include <ctime>
+#include <string>
 
 using namespace testing;
 
@@ -998,6 +999,54 @@ TEST_F(DecodeTest, PaddingFrameNoBytesTest) {
 
   ContiguousReadCursor cursor(buf->data(), buf->length());
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
+}
+
+class TimestampFrameDecodeTest : public DecodeTest,
+                                 public WithParamInterface<uint8_t> {};
+
+TEST_P(TimestampFrameDecodeTest, AppliesNegotiatedExponent) {
+  auto buf = folly::IOBuf::create(0);
+  BufAppender appender(buf.get(), 10);
+  QuicInteger timestamp(1234);
+  timestamp.encode([&](auto val) { appender.writeBE(val); });
+  buf->coalesce();
+
+  ContiguousReadCursor cursor(buf->data(), buf->length());
+  CodecParameters codecParams(kDefaultAckDelayExponent, QuicVersion::MVFST);
+  codecParams.peerTimestampFrameTimestampExponent = GetParam();
+  auto result = decodeTimestampFrame(cursor, codecParams);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->timestamp, uint64_t{1234} << GetParam());
+  EXPECT_EQ(cursor.remaining(), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    TimestampExponent,
+    TimestampFrameDecodeTest,
+    Values(0, 2, kMaxTimestampFrameTimestampExponent),
+    [](const TestParamInfo<uint8_t>& info) {
+      return "Exponent" + std::to_string(info.param);
+    });
+
+TEST_F(DecodeTest, TimestampFrameParseSuccess) {
+  auto buf = folly::IOBuf::create(0);
+  BufAppender appender(buf.get(), 10);
+  QuicInteger frameType(static_cast<uint64_t>(FrameType::TIMESTAMP));
+  QuicInteger timestamp(5678);
+  frameType.encode([&](auto val) { appender.writeBE(val); });
+  timestamp.encode([&](auto val) { appender.writeBE(val); });
+  buf->coalesce();
+
+  BufQueue queue(std::move(buf));
+  auto result = parseFrame(
+      queue,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  ASSERT_TRUE(result.has_value());
+  auto frame = result->asTimestampFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(frame->timestamp, 5678);
+  EXPECT_EQ(queue.chainLength(), 0);
 }
 
 TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {

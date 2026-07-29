@@ -71,7 +71,7 @@ quic::Expected<Optional<PacketNum>, QuicError> AckScheduler::writeNextAcks(
       ackState_, /* ackState*/
       ackDelay, /* ackDelay */
       static_cast<uint8_t>(ackDelayExponentToUse), /* ackDelayExponent */
-      conn_.connectionTime, /* connect timestamp */
+      conn_.connectionTime, /* timestamp epoch */
   };
 
   auto ackWriteResult =

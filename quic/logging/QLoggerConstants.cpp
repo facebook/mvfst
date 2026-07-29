@@ -95,6 +95,8 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "ack_receive_timestamps_draft_02";
     case FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN:
       return "ack_receive_timestamps_draft_02_ecn";
+    case FrameType::TIMESTAMP:
+      return "timestamp";
   }
   folly::assume_unreachable();
 }

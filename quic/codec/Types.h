@@ -136,6 +136,16 @@ struct ImmediateAckFrame {
   }
 };
 
+struct TimestampFrame {
+  explicit TimestampFrame(uint64_t timestampIn = 0) : timestamp(timestampIn) {}
+
+  bool operator==(const TimestampFrame& rhs) const {
+    return timestamp == rhs.timestamp;
+  }
+
+  uint64_t timestamp;
+};
+
 /**
  * AckBlock represents a series of continuous packet sequences from
  * [startPacket, endPacket]
@@ -898,6 +908,7 @@ DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
   F(PingFrame, __VA_ARGS__)              \
   F(NoopFrame, __VA_ARGS__)              \
   F(DatagramFrame, __VA_ARGS__)          \
+  F(TimestampFrame, __VA_ARGS__)         \
   F(ImmediateAckFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
@@ -918,6 +929,7 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
   F(PingFrame, __VA_ARGS__)              \
   F(NoopFrame, __VA_ARGS__)              \
   F(DatagramFrame, __VA_ARGS__)          \
+  F(TimestampFrame, __VA_ARGS__)         \
   F(ImmediateAckFrame, __VA_ARGS__)
 
 // Types of frames which are written.

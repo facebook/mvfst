@@ -13,6 +13,7 @@
 #include <quic/QuicException.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/logging/oops_logger/OopsLogger.h>
+#include <algorithm>
 #include <chrono>
 
 namespace {
@@ -154,29 +155,40 @@ quic::Expected<ImmediateAckFrame, QuicError> decodeImmediateAckFrame(
 
 quic::Expected<uint64_t, QuicError> convertEncodedDurationToMicroseconds(
     uint8_t exponentToUse,
-    uint64_t delay) noexcept {
-  // ackDelayExponentToUse is guaranteed to be less than the size of uint64_t
-  uint64_t delayOverflowMask = 0xFFFFFFFFFFFFFFFF;
+    uint64_t encodedDuration) noexcept {
+  uint64_t durationOverflowMask = 0xFFFFFFFFFFFFFFFF;
 
-  constexpr uint8_t delayValWidth = sizeof(delay) * 8;
-  if (exponentToUse == 0 || exponentToUse >= delayValWidth) {
-    return delay;
+  constexpr uint8_t durationValueWidth = sizeof(encodedDuration) * 8;
+  if (exponentToUse == 0 || exponentToUse >= durationValueWidth) {
+    return encodedDuration;
   }
-  uint8_t leftShift = (delayValWidth - exponentToUse);
-  delayOverflowMask = delayOverflowMask << leftShift;
-  if ((delay & delayOverflowMask) != 0) {
+  uint8_t leftShift = (durationValueWidth - exponentToUse);
+  durationOverflowMask = durationOverflowMask << leftShift;
+  if ((encodedDuration & durationOverflowMask) != 0) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        "Decoded delay overflows"));
+        "Decoded duration overflows"));
   }
-  uint64_t adjustedDelay = delay << exponentToUse;
-  if (adjustedDelay >
+  uint64_t adjustedDuration = encodedDuration << exponentToUse;
+  if (adjustedDuration >
       static_cast<uint64_t>(
           std::numeric_limits<std::chrono::microseconds::rep>::max())) {
-    return quic::make_unexpected(
-        QuicError(quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad delay"));
+    return quic::make_unexpected(QuicError(
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad duration"));
   }
-  return adjustedDelay;
+  return adjustedDuration;
+}
+
+quic::Expected<TimestampFrame, QuicError> decodeTimestampFrame(
+    ContiguousReadCursor& cursor,
+    const CodecParameters& params) {
+  QUIC_TRY_DECODE_INT(timestamp, cursor, "timestamp");
+  auto scaled = convertEncodedDurationToMicroseconds(
+      params.peerTimestampFrameTimestampExponent, timestamp);
+  if (scaled.hasError()) {
+    return quic::make_unexpected(scaled.error());
+  }
+  return TimestampFrame(*scaled);
 }
 
 quic::Expected<ReadAckFrame, QuicError> decodeAckFrame(
@@ -1084,6 +1096,9 @@ quic::Expected<QuicFrame, QuicError> parseFrame(
     case FrameType::IMMEDIATE_ACK:
       return decodeFrameAndTrimBufQueue(
           queue, contiguousCursor, decodeImmediateAckFrame);
+    case FrameType::TIMESTAMP:
+      return decodeFrameAndTrimBufQueue(
+          queue, contiguousCursor, decodeTimestampFrame, params);
     case FrameType::ACK_RECEIVE_TIMESTAMPS: {
       auto ackWithReceiveTiemstampsRes = decodeAckFrameWithReceivedTimestamps(
           contiguousCursor, header, params, FrameType::ACK_RECEIVE_TIMESTAMPS);

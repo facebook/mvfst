@@ -115,7 +115,7 @@ class QuicServerTransportAllowMigrationTest
         *server->getConn().serverConnectionId,
         clientNextAppDataPacketNum++);
     RegularQuicPacketBuilder builder(
-        server->getConn().udpSendPacketLen,
+        static_cast<uint32_t>(server->getConn().udpSendPacketLen),
         std::move(header),
         0 /* largestAcked */);
     CHECK(!builder.encodePacketHeader().hasError());
@@ -145,6 +145,22 @@ class QuicServerTransportAllowMigrationTest
     auto packet = std::move(builder).buildPacket();
     return packet;
   }
+
+  quic::PacketBuilderInterface::Packet makePacketWithTimestampFrame() {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++);
+    RegularQuicPacketBuilder builder(
+        static_cast<uint32_t>(server->getConn().udpSendPacketLen),
+        std::move(header),
+        0 /* largestAcked */);
+    CHECK(!builder.encodePacketHeader().hasError());
+    CHECK(builder.canBuildPacket());
+
+    CHECK(!writeFrame(TimestampFrame(1234), builder).hasError());
+    return std::move(builder).buildPacket();
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -156,6 +172,21 @@ INSTANTIATE_TEST_SUITE_P(
         MigrationParam{4},
         MigrationParam{9},
         MigrationParam{50}));
+
+TEST_P(QuicServerTransportAllowMigrationTest, TimestampFrameIsNotPathProbing) {
+  auto& conn = server->getConn();
+  const auto initialPathId = conn.currentPathId;
+  quic::SocketAddress newPeer("100.101.102.103", 23456);
+
+  EXPECT_CALL(*quicStats_, onConnectionMigration).Times(1);
+  EXPECT_CALL(*quicStats_, onPathAdded).Times(1);
+
+  auto packetData = packetToBuf(makePacketWithTimestampFrame());
+  deliverData(std::move(packetData), false, &newPeer);
+
+  EXPECT_NE(conn.currentPathId, initialPathId);
+  EXPECT_EQ(conn.peerAddress, newPeer);
+}
 
 TEST_P(
     QuicServerTransportAllowMigrationTest,

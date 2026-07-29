@@ -1768,6 +1768,30 @@ quic::Expected<size_t, QuicError> writeFrame(
       }
       return size_t(0);
     }
+    case QuicWriteFrame::Type::TimestampFrame: {
+      TimestampFrame& timestampFrame = *frame.asTimestampFrame();
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::TIMESTAMP));
+      QuicInteger intTimestamp(timestampFrame.timestamp);
+
+      auto intFrameTypeSize = intFrameType.getSize();
+      if (intFrameTypeSize.hasError()) {
+        return quic::make_unexpected(intFrameTypeSize.error());
+      }
+      auto intTimestampSize = intTimestamp.getSize();
+      if (intTimestampSize.hasError()) {
+        return quic::make_unexpected(intTimestampSize.error());
+      }
+
+      const auto timestampFrameLen =
+          intFrameTypeSize.value() + intTimestampSize.value();
+      if (packetSpaceCheck(spaceLeft, timestampFrameLen)) {
+        builder.write(intFrameType);
+        builder.write(intTimestamp);
+        builder.appendFrame(std::move(timestampFrame));
+        return timestampFrameLen;
+      }
+      return size_t(0);
+    }
     case QuicWriteFrame::Type::ImmediateAckFrame: {
       const ImmediateAckFrame& immediateAckFrame = *frame.asImmediateAckFrame();
       QuicInteger intFrameType(static_cast<uint64_t>(FrameType::IMMEDIATE_ACK));

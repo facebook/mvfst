@@ -63,11 +63,14 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->initialWriteCipher = std::move(conn->initialWriteCipher);
   newConn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   newConn->readCodec->setClientConnectionId(*conn->clientConnectionId);
-  newConn->readCodec->setCodecParameters(CodecParameters(
+  CodecParameters codecParams(
       conn->peerAckDelayExponent,
       conn->originalVersion.value(),
       conn->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
-      conn->transportSettings.advertisedExtendedAckFeatures));
+      conn->transportSettings.advertisedExtendedAckFeatures);
+  codecParams.peerTimestampFrameTimestampExponent =
+      conn->peerTimestampFrameState.sendExponent;
+  newConn->readCodec->setCodecParameters(std::move(codecParams));
   newConn->earlyDataAppParamsHandler = conn->earlyDataAppParamsHandler;
   newConn->happyEyeballsState = std::move(conn->happyEyeballsState);
   newConn->flowControlState = std::move(conn->flowControlState);
@@ -299,6 +302,22 @@ quic::Expected<void, QuicError> processServerInitialParams(
   }
   auto extendedAckFeatures = extendedAckFeaturesResult.value();
 
+  auto timestampFrameSupportedResult = getIntegerParameter(
+      TransportParameterId::timestamp_frame_supported, serverParams.parameters);
+  if (timestampFrameSupportedResult.hasError()) {
+    return quic::make_unexpected(timestampFrameSupportedResult.error());
+  }
+  auto timestampFrameSupported = timestampFrameSupportedResult.value();
+
+  auto timestampFrameTimestampExponentResult = getIntegerParameter(
+      TransportParameterId::timestamp_frame_timestamp_exponent,
+      serverParams.parameters);
+  if (timestampFrameTimestampExponentResult.hasError()) {
+    return quic::make_unexpected(timestampFrameTimestampExponentResult.error());
+  }
+  auto timestampFrameTimestampExponent =
+      timestampFrameTimestampExponentResult.value();
+
   auto reliableResetTpIter = findParameter(
       serverParams.parameters,
       static_cast<TransportParameterId>(
@@ -492,6 +511,26 @@ quic::Expected<void, QuicError> processServerInitialParams(
   }
 
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
+  conn.peerTimestampFrameState.canReceive =
+      timestampFrameSupported.value_or(0) > 0;
+  if (timestampFrameTimestampExponent &&
+      *timestampFrameTimestampExponent > kMaxTimestampFrameTimestampExponent) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        fmt::format(
+            "timestamp_frame_timestamp_exponent above max: {} > {}",
+            *timestampFrameTimestampExponent,
+            kMaxTimestampFrameTimestampExponent)));
+  }
+  conn.peerTimestampFrameState.sendExponent =
+      static_cast<uint8_t>(timestampFrameTimestampExponent.value_or(
+          kDefaultTimestampFrameTimestampExponent));
+  if (conn.readCodec) {
+    auto codecParams = conn.readCodec->getCodecParameters();
+    codecParams.peerTimestampFrameTimestampExponent =
+        conn.peerTimestampFrameState.sendExponent;
+    conn.readCodec->setCodecParameters(std::move(codecParams));
+  }
   conn.peerAdvertisedExtendedAckFeatures = extendedAckFeatures.value_or(0);
 
   return {};

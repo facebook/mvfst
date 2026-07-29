@@ -3253,11 +3253,14 @@ void QuicTransportBaseLite::setTransportSettings(
   if (conn_->readCodec) {
     // Update the codec parameters. In case of the client, the codec was
     // initialized in the constructor and did not have the transport settings.
-    conn_->readCodec->setCodecParameters(CodecParameters(
+    CodecParameters codecParams(
         conn_->peerAckDelayExponent,
         conn_->originalVersion.value(),
         conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer,
-        conn_->transportSettings.advertisedExtendedAckFeatures));
+        conn_->transportSettings.advertisedExtendedAckFeatures);
+    codecParams.peerTimestampFrameTimestampExponent =
+        conn_->peerTimestampFrameState.sendExponent;
+    conn_->readCodec->setCodecParameters(std::move(codecParams));
   }
 }
 

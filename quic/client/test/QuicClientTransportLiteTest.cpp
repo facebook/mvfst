@@ -125,6 +125,21 @@ TEST_F(QuicClientTransportLiteTest, TestPriming) {
   evb_.loopOnce(EVLOOP_NONBLOCK);
 }
 
+TEST_F(
+    QuicClientTransportLiteTest,
+    SetTransportSettingsPreservesPeerTimestampFrameExponent) {
+  constexpr uint8_t kPeerTimestampExponent = 7;
+  auto* conn = quicClient_->getConn();
+  ASSERT_TRUE(conn->readCodec);
+  conn->peerTimestampFrameState.sendExponent = kPeerTimestampExponent;
+
+  quicClient_->setTransportSettings(quicClient_->getTransportSettings());
+
+  EXPECT_EQ(
+      conn->readCodec->getCodecParameters().peerTimestampFrameTimestampExponent,
+      kPeerTimestampExponent);
+}
+
 TEST_F(QuicClientTransportLiteTest, TestMaybeIssueConnectionIdsZeroLengthCid) {
   // Test: No action when clientConnectionId size is 0
   auto conn = quicClient_->getConn();

@@ -577,6 +577,35 @@ TEST_F(QuicPacketRebuilderTest, PurePingWillRebuild) {
   EXPECT_EQ(1, conn.outstandings.numClonedPackets());
 }
 
+TEST_F(QuicPacketRebuilderTest, TimestampFrameIsDroppedDuringRebuild) {
+  ShortHeader originalHeader(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
+  RegularQuicPacketBuilder originalBuilder(
+      kDefaultUDPSendPacketLen, std::move(originalHeader), 0);
+  ASSERT_FALSE(originalBuilder.encodePacketHeader().hasError());
+  ASSERT_FALSE(writeFrame(PingFrame(), originalBuilder).hasError());
+  ASSERT_FALSE(writeFrame(TimestampFrame(1234), originalBuilder).hasError());
+  auto originalPacket = std::move(originalBuilder).buildPacket();
+  auto outstandingPacket =
+      makeDummyOutstandingPacket(originalPacket.packet, 50);
+
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  ShortHeader rebuiltHeader(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), 1);
+  RegularQuicPacketBuilder rebuiltBuilder(
+      kDefaultUDPSendPacketLen, std::move(rebuiltHeader), 0);
+  ASSERT_FALSE(rebuiltBuilder.encodePacketHeader().hasError());
+  PacketRebuilder rebuilder(rebuiltBuilder, conn);
+
+  auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
+  ASSERT_FALSE(rebuildResult.hasError());
+  ASSERT_TRUE(rebuildResult.value().has_value());
+  auto rebuiltPacket = std::move(rebuiltBuilder).buildPacket();
+  ASSERT_EQ(rebuiltPacket.packet.frames.size(), 1);
+  EXPECT_NE(rebuiltPacket.packet.frames.front().asPingFrame(), nullptr);
+}
+
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

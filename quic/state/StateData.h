@@ -317,6 +317,15 @@ struct ReadDatagram {
   BufQueue buf_;
 };
 
+struct PeerTimestampFrameState {
+  // The peer advertised that it can receive TIMESTAMP frames, so this endpoint
+  // may write them.
+  bool canReceive{false};
+  // The exponent the peer applies to TIMESTAMP frames it sends. This is
+  // independent of canReceive because an endpoint may be configured send-only.
+  uint8_t sendExponent{kDefaultTimestampFrameTimestampExponent};
+};
+
 struct QuicConnectionStateBase : public folly::DelayedDestruction {
   ~QuicConnectionStateBase() override = default;
 
@@ -742,6 +751,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   bool peerAdvertisedReliableStreamResetSupport{false};
 
   bool peerAdvertisedKnobFrameSupport{false};
+
+  PeerTimestampFrameState peerTimestampFrameState;
 
   ExtendedAckFeatureMaskType peerAdvertisedExtendedAckFeatures{0};
 

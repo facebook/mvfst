@@ -249,11 +249,25 @@ class QuicTransportFunctionsTest : public Test {
   const PathInfo* currentPathInfo_{};
 };
 
-TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
+enum class LossAlarmFrameType : uint8_t { Ping, Timestamp };
+
+class QuicTransportFunctionsLossAlarmTest
+    : public QuicTransportFunctionsTest,
+      public WithParamInterface<LossAlarmFrameType> {};
+
+TEST_P(
+    QuicTransportFunctionsLossAlarmTest,
+    RetransmittableFrameControlsOutstandingAndAlarm) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  packet.packet.frames.push_back(PingFrame());
+  const bool retransmittable = GetParam() == LossAlarmFrameType::Ping;
+  if (retransmittable) {
+    packet.packet.frames.push_back(PingFrame());
+  } else {
+    packet.packet.frames.push_back(TimestampFrame(1234));
+  }
   EXPECT_EQ(0, conn->outstandings.packets.size());
+
   auto result = updateConnection(
       *conn,
       *currentPathInfo_,
@@ -262,10 +276,16 @@ TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPListAndLossAlarm) {
       Clock::now(),
       50,
       0);
+
   ASSERT_FALSE(result.hasError());
-  EXPECT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
+  EXPECT_EQ(retransmittable ? 1 : 0, conn->outstandings.packets.size());
+  EXPECT_EQ(retransmittable, conn->pendingEvents.setLossDetectionAlarm);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    PingAndTimestamp,
+    QuicTransportFunctionsLossAlarmTest,
+    Values(LossAlarmFrameType::Ping, LossAlarmFrameType::Timestamp));
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto conn = createConn();

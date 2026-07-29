@@ -2206,6 +2206,12 @@ class QuicUnencryptedServerTransportTest : public QuicServerTransportTest {
   void setupConnection() override {}
 };
 
+enum class UnprotectedFrameCase : uint8_t { FlowControl, Timestamp };
+
+class QuicUnencryptedServerTransportFrameTest
+    : public QuicUnencryptedServerTransportTest,
+      public WithParamInterface<UnprotectedFrameCase> {};
+
 TEST_F(QuicUnencryptedServerTransportTest, FirstPacketProcessedCallback) {
   getFakeHandshakeLayer()->allowZeroRttKeys();
   EXPECT_CALL(connSetupCallback, onFirstPeerPacketProcessed()).Times(1);
@@ -2575,6 +2581,51 @@ TEST_F(
       kDefaultUDPSendPacketLen, std::move(header), /*largestAckedPacketNum=*/0);
   ASSERT_FALSE(
       writeSimpleFrame(PathResponseFrame(0xaabbccddeeff), builder).hasError());
+
+  // add some data
+  auto data = IOBuf::copyBuffer("hello!");
+  auto res = *writeStreamFrameHeader(
+      builder,
+      /*id=*/4,
+      /*offset=*/0,
+      data->computeChainDataLength(),
+      data->computeChainDataLength(),
+      /*fin=*/true,
+      /*skipLenHint=*/std::nullopt);
+  ASSERT_TRUE(res.has_value());
+  auto dataLen = *res;
+  writeStreamFrameData(
+      builder,
+      data->clone(),
+      std::min(static_cast<size_t>(dataLen), data->computeChainDataLength()));
+
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  builder.accountForCipherOverhead(0);
+
+  auto packet = std::move(builder).buildPacket();
+  EXPECT_THROW(deliverData(packetToBuf(packet), true), std::runtime_error);
+  EXPECT_TRUE(server->getConn().localConnectionError);
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
+    ReceiveTimestampFrameInZeroRttPacket) {
+  server->getNonConstConn().transportSettings.disableMigration = false;
+  server->getNonConstConn().transportSettings.advertisedTimestampFrameSupport =
+      true;
+  fakeHandshake->allowZeroRttKeys();
+  recvClientHello();
+
+  // create 0-rtt packet with some stream data and a timestamp frame
+  LongHeader header(
+      LongHeader::Types::ZeroRtt,
+      *clientConnectionId,
+      *initialDestinationConnectionId,
+      clientNextAppDataPacketNum++,
+      server->getConn().supportedVersions[0]);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), /*largestAckedPacketNum=*/0);
+  ASSERT_FALSE(writeFrame(TimestampFrame(1234), builder).hasError());
 
   // add some data
   auto data = IOBuf::copyBuffer("hello!");
@@ -3322,22 +3373,37 @@ BufPtr getHandshakePacketWithFrame(
       clientPacketNum);
 }
 
-TEST_F(QuicUnencryptedServerTransportTest, TestNotAllowedInUnencryptedPacket) {
+TEST_P(QuicUnencryptedServerTransportFrameTest, RejectsFrameInHandshakePacket) {
   // This should trigger derivation of keys.
   recvClientHello();
 
-  StreamId streamId = 4;
-  auto data = IOBuf::copyBuffer("data");
+  QuicWriteFrame frame = GetParam() == UnprotectedFrameCase::FlowControl
+      ? QuicWriteFrame(MaxStreamDataFrame(4, 100))
+      : QuicWriteFrame(TimestampFrame(1234));
+  auto handshakeCipher = test::createNoOpAead();
+  auto handshakeHeaderCipher = test::createNoOpHeaderCipher().value();
 
   EXPECT_THROW(
       deliverData(getHandshakePacketWithFrame(
-          MaxStreamDataFrame(streamId, 100),
+          std::move(frame),
           *clientConnectionId,
-          *getInitialCipher(),
-          *getInitialHeaderCipher())),
+          *handshakeCipher,
+          *handshakeHeaderCipher)),
       std::runtime_error);
-  EXPECT_TRUE(server->error());
+  ASSERT_TRUE(server->getConn().localConnectionError.has_value());
+  EXPECT_EQ(
+      server->getConn().localConnectionError->code,
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION));
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    UnprotectedFramePolicy,
+    QuicUnencryptedServerTransportFrameTest,
+    Values(UnprotectedFrameCase::FlowControl, UnprotectedFrameCase::Timestamp),
+    [](const TestParamInfo<UnprotectedFrameCase>& info) {
+      return info.param == UnprotectedFrameCase::FlowControl ? "FlowControl"
+                                                             : "Timestamp";
+    });
 
 TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
   folly::EventBase testLooper;

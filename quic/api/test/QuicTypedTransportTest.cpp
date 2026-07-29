@@ -151,6 +151,26 @@ TYPED_TEST_SUITE(
     ::TransportTypes,
     ::TransportTypeNames);
 
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    TimestampFrameAcceptedWithoutLocalAdvertisement) {
+  auto& ackState = this->getNonConstConn().ackStates.appDataAckState;
+  ackState.numRxPacketsRecvd = 0;
+  ackState.numNonRxPacketsRecvd = 0;
+  ackState.needsToSendAckImmediately = false;
+  this->getNonConstConn().pendingEvents.scheduleAckTimeout = false;
+
+  this->deliverPacket(
+      this->buildPeerPacketWithTimestampFrame(1234), Clock::now(), 0, false);
+
+  EXPECT_FALSE(this->getConn().localConnectionError.has_value());
+  EXPECT_EQ(ackState.numRxPacketsRecvd, 0);
+  EXPECT_EQ(ackState.numNonRxPacketsRecvd, 1);
+  EXPECT_FALSE(ackState.needsToSendAckImmediately);
+  EXPECT_FALSE(this->getConn().pendingEvents.scheduleAckTimeout);
+  this->destroyTransport();
+}
+
 /**
  * Verify that RTT signals are properly passed through to TransportInfo.
  *

@@ -217,6 +217,12 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
             std::make_unique<quic::DatagramFrameLog>(frame.length));
         break;
       }
+      case QuicFrame::Type::TimestampFrame: {
+        const auto& frame = *quicFrame.asTimestampFrame();
+        event->frames.push_back(
+            std::make_unique<quic::TimestampFrameLog>(frame.timestamp));
+        break;
+      }
       case QuicFrame::Type::ImmediateAckFrame: {
         event->frames.push_back(std::make_unique<quic::ImmediateAckFrameLog>());
         break;
@@ -341,6 +347,12 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
       }
       case QuicWriteFrame::Type::DatagramFrame: {
         // TODO
+        break;
+      }
+      case QuicWriteFrame::Type::TimestampFrame: {
+        const auto& frame = *quicFrame.asTimestampFrame();
+        event->frames.push_back(
+            std::make_unique<quic::TimestampFrameLog>(frame.timestamp));
         break;
       }
       case QuicWriteFrame::Type::ImmediateAckFrame: {

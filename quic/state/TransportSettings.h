@@ -381,6 +381,12 @@ struct TransportSettings {
   bool dropIngressOnStopSending{false};
   bool advertisedReliableResetStreamSupport{false};
   bool advertisedKnobFrameSupport{false};
+  // Advertise that this endpoint accepts TIMESTAMP frames from the peer.
+  bool advertisedTimestampFrameSupport{false};
+  // Local TIMESTAMP values are encoded as microseconds >> exponent; one
+  // encoded tick therefore represents 2^exponent microseconds.
+  uint64_t timestampFrameTimestampExponent{
+      kDefaultTimestampFrameTimestampExponent};
   Optional<uint16_t> quicExperimentId;
 
   // Extended ACK support to advertise to the peer. This is what we expect to

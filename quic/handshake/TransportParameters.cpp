@@ -105,7 +105,7 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
   const auto& ts = conn.transportSettings;
 
   std::vector<TransportParameter> customTps;
-  customTps.reserve(7);
+  customTps.reserve(9);
 
   if (ts.datagramConfig.enabled) {
     auto result = encodeIntegerParameter(
@@ -192,6 +192,22 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
         TpId::extended_ack_features, ts.advertisedExtendedAckFeatures);
     if (extendedAckResult.has_value()) {
       customTps.push_back(extendedAckResult.value());
+    }
+  }
+
+  if (ts.advertisedTimestampFrameSupport) {
+    auto timestampFrameResult =
+        encodeIntegerParameter(TpId::timestamp_frame_supported, 1);
+    if (timestampFrameResult.has_value()) {
+      customTps.push_back(timestampFrameResult.value());
+    }
+    auto exponentResult = encodeIntegerParameter(
+        TpId::timestamp_frame_timestamp_exponent,
+        std::min(
+            ts.timestampFrameTimestampExponent,
+            kMaxTimestampFrameTimestampExponent));
+    if (exponentResult.has_value()) {
+      customTps.push_back(exponentResult.value());
     }
   }
 

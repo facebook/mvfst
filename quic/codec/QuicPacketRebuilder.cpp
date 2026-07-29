@@ -270,7 +270,9 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         break;
       }
       case QuicWriteFrame::Type::DatagramFrame:
-        // Do not clone Datagram frames.
+      case QuicWriteFrame::Type::TimestampFrame:
+        // Datagram data is unreliable, and TIMESTAMP reflects send time.
+        // Neither frame is meaningful to clone.
         writeSuccess = true;
         break;
       default: {

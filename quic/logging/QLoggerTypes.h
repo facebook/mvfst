@@ -192,6 +192,16 @@ class ImmediateAckFrameLog : public QLogFrame {
   [[nodiscard]] folly::dynamic toDynamic() const override;
 };
 
+class TimestampFrameLog : public QLogFrame {
+ public:
+  uint64_t timestamp;
+
+  explicit TimestampFrameLog(uint64_t timestampIn) : timestamp(timestampIn) {}
+
+  ~TimestampFrameLog() override = default;
+  [[nodiscard]] folly::dynamic toDynamic() const override;
+};
+
 class StreamDataBlockedFrameLog : public QLogFrame {
  public:
   StreamId streamId;

@@ -840,6 +840,13 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         }
         break;
       }
+      case QuicFrame::Type::TimestampFrame:
+        if (pnSpace != PacketNumberSpace::AppData) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::PROTOCOL_VIOLATION,
+              "Received TIMESTAMP frame outside 1-RTT"));
+        }
+        break;
       case QuicFrame::Type::DatagramFrame: {
         DatagramFrame& frame = *quicFrame.asDatagramFrame();
         MVVLOG(10) << "Client received datagram data: " << "len="

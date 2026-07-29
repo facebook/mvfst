@@ -27,6 +27,8 @@ struct CodecParameters {
   Optional<AckReceiveTimestampsConfig> maybeAckReceiveTimestampsConfig =
       std::nullopt;
   ExtendedAckFeatureMaskType extendedAckFeatures{0};
+  uint8_t peerTimestampFrameTimestampExponent{
+      kDefaultTimestampFrameTimestampExponent};
 
   CodecParameters() = default;
 
@@ -124,6 +126,10 @@ decodeAckFrequencyFrame(ContiguousReadCursor& cursor);
 
 [[nodiscard]] quic::Expected<ImmediateAckFrame, QuicError>
 decodeImmediateAckFrame(ContiguousReadCursor& cursor);
+
+[[nodiscard]] quic::Expected<TimestampFrame, QuicError> decodeTimestampFrame(
+    ContiguousReadCursor& cursor,
+    const CodecParameters& params);
 
 [[nodiscard]] quic::Expected<DataBlockedFrame, QuicError>
 decodeDataBlockedFrame(ContiguousReadCursor& cursor);
@@ -284,5 +290,5 @@ parseShortHeaderInvariants(
 [[nodiscard]] quic::Expected<uint64_t, QuicError>
 convertEncodedDurationToMicroseconds(
     uint8_t exponentToUse,
-    uint64_t delay) noexcept;
+    uint64_t encodedDuration) noexcept;
 } // namespace quic

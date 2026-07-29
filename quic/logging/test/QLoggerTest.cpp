@@ -72,6 +72,42 @@ TEST_F(QLoggerTest, TestRegularPacket) {
   EXPECT_EQ(gotEvent->eventType, QLogEventType::PacketReceived);
 }
 
+TEST_F(QLoggerTest, TestTimestampFramePacket) {
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  regularQuicPacket.frames.emplace_back(TimestampFrame(1234));
+
+  FileQLogger q(VantagePoint::Client);
+  q.addPacket(regularQuicPacket, 10);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogPacketEvent*>(p.get());
+  auto* gotObject = dynamic_cast<TimestampFrameLog*>(gotEvent->frames[0].get());
+  ASSERT_NE(gotObject, nullptr);
+
+  EXPECT_EQ(gotObject->timestamp, 1234);
+  EXPECT_EQ(gotEvent->eventType, QLogEventType::PacketReceived);
+}
+
+TEST_F(QLoggerTest, TestTimestampFrameWritePacket) {
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicWritePacket regularQuicPacket(std::move(headerIn));
+  regularQuicPacket.frames.emplace_back(TimestampFrame(1234));
+
+  FileQLogger q(VantagePoint::Client);
+  q.addPacket(regularQuicPacket, 10);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogPacketEvent*>(p.get());
+  auto* gotObject = dynamic_cast<TimestampFrameLog*>(gotEvent->frames[0].get());
+  ASSERT_NE(gotObject, nullptr);
+
+  EXPECT_EQ(gotObject->timestamp, 1234);
+  EXPECT_EQ(gotEvent->eventType, QLogEventType::PacketSent);
+}
+
 TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   bool isPacketRecvd = false;
   FileQLogger q(VantagePoint::Client);

@@ -300,6 +300,28 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Build a packet with a TimestampFrame from peer.
+   */
+  quic::BufPtr buildPeerPacketWithTimestampFrame(uint64_t timestamp) {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        getDstConnectionId(),
+        peerPacketNumStore.nextAppDataPacketNum++);
+    RegularQuicPacketBuilder builder(
+        static_cast<uint32_t>(getConn().udpSendPacketLen),
+        std::move(header),
+        0 /* largestAcked */);
+    CHECK(!builder.encodePacketHeader().hasError());
+    CHECK(builder.canBuildPacket());
+
+    CHECK(!writeFrame(TimestampFrame(timestamp), builder).hasError());
+
+    auto buf = quic::test::packetToBuf(std::move(builder).buildPacket());
+    buf->coalesce();
+    return buf;
+  }
+
+  /**
    * Build a packet with a RstStreamFrame from peer.
    */
   quic::BufPtr buildPeerPacketWithRstStreamFrame(

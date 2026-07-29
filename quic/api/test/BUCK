@@ -109,6 +109,7 @@ mvfst_cpp_test(
     srcs = [
         "QuicTransportFunctionsTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
         ":mocks",
         "//folly:range",

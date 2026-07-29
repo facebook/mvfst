@@ -294,6 +294,7 @@ enum class FrameType : uint64_t {
   ACK_FREQUENCY = 0xAF,
   ACK_RECEIVE_TIMESTAMPS = 0xB0,
   ACK_EXTENDED = 0xB1,
+  TIMESTAMP = 0xB2,
   // draft-ietf-quic-receive-ts-02 frame types.
   ACK_RECEIVE_TIMESTAMPS_DRAFT_02 = 0x03178307,
   ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN = 0x03178308,
@@ -645,6 +646,11 @@ constexpr uint32_t kDefaultMaxBufferedPackets = 20;
 // Default exponent to use while computing ack delay.
 constexpr uint64_t kDefaultAckDelayExponent = 3;
 constexpr uint64_t kMaxAckDelayExponent = 20;
+constexpr uint64_t kDefaultTimestampFrameTimestampExponent = 0;
+// TIMESTAMP values are microseconds >> exponent on write and restored as
+// encoded * 2^exponent microseconds on read. Cap the private extension at the
+// same coarse 2^20 microsecond resolution accepted for ACK delay.
+constexpr uint64_t kMaxTimestampFrameTimestampExponent = 20;
 
 // Default connection id size of the connection id we will send.
 constexpr size_t kDefaultConnectionIdSize = 8;
