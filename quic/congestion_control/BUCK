@@ -310,20 +310,39 @@ mvfst_cpp_library(
     ],
 )
 
+# Mobile builds default to the nullptr pacer stub (PacerFactoryMobile.cpp) to save
+# binary size. Apps that opt into QUIC pacing set the mobilenetwork "mvfst-pacer-enabled"
+# constraint on their platform, which links the real PacerFactory.cpp + TokenlessPacer.
+# Nested (not flat) select: OS is the outer key, the pacer opt-in is nested inside the
+# mobile arms so the two constraint_settings don't produce an ambiguous flat select.
+_MVFST_PACER_ENABLED = "fbsource//xplat/mobilenetwork/constraints:mvfst-pacer[enabled]"
+
 mvfst_cpp_library(
     name = "pacer_factory",
     srcs = select({
         "DEFAULT": ["PacerFactory.cpp"],
-        "ovr_config//os/constraints:android": ["PacerFactoryMobile.cpp"],
-        "ovr_config//os/constraints:iphoneos": ["PacerFactoryMobile.cpp"],
+        "ovr_config//os/constraints:android": select({
+            "DEFAULT": ["PacerFactoryMobile.cpp"],
+            _MVFST_PACER_ENABLED: ["PacerFactory.cpp"],
+        }),
+        "ovr_config//os/constraints:iphoneos": select({
+            "DEFAULT": ["PacerFactoryMobile.cpp"],
+            _MVFST_PACER_ENABLED: ["PacerFactory.cpp"],
+        }),
     }),
     headers = [
         "PacerFactory.h",
     ],
     deps = select({
         "DEFAULT": [":pacer"],
-        "ovr_config//os/constraints:android": [],
-        "ovr_config//os/constraints:iphoneos": [],
+        "ovr_config//os/constraints:android": select({
+            "DEFAULT": [],
+            _MVFST_PACER_ENABLED: [":pacer"],
+        }),
+        "ovr_config//os/constraints:iphoneos": select({
+            "DEFAULT": [],
+            _MVFST_PACER_ENABLED: [":pacer"],
+        }),
     }),
 )
 
