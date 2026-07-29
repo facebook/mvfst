@@ -38,6 +38,10 @@ class LibevQuicEventBase
 
     virtual std::optional<pthread_t> getEventLoopThread() = 0;
 
+    virtual void runInEventBaseThread(std::function<void()> /*fn*/) noexcept {
+      MVCHECK(false, "runInEventBaseThread not supported by this EvLoopWeak");
+    }
+
     virtual ~EvLoopWeak() = default;
   };
 
@@ -75,8 +79,8 @@ class LibevQuicEventBase
     return false;
   }
 
-  void runInEventBaseThread(std::function<void()> /*fn*/) noexcept override {
-    MVCHECK(false, __func__ << " not supported in LibevQuicEventBase");
+  void runInEventBaseThread(std::function<void()> fn) noexcept override {
+    loopWeak_->runInEventBaseThread(std::move(fn));
   }
 
   void runInEventBaseThreadAndWait(
