@@ -48,5 +48,6 @@ mvfst_cpp_test(
         "//folly/portability:gtest",
         "//quic/common:string_utils",
         "//quic/fizz/handshake:fizz_handshake",
+        "//quic/fizz/handshake:fizz_packet_number_cipher",
     ],
 )

@@ -19,25 +19,45 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "fizz_packet_number_cipher",
+    srcs = select({
+        "DEFAULT": ["FizzOpenSSLPacketNumberCipher.cpp"],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
+    }),
+    headers = [
+        "FizzPacketNumberCipher.h",
+    ] + select({
+        "DEFAULT": ["FizzOpenSSLPacketNumberCipher.h"],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
+    }),
+    preprocessor_flags = select({
+        "DEFAULT": [],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["-DMVFST_MBED"],  # @fb-only
+    }),
+    deps = [
+        "//quic/common:mvfst_logging",
+    ],
+    exported_deps = [
+        "//quic/codec:packet_number_cipher",
+    ] + select({
+        "DEFAULT": ["//folly/ssl:openssl_ptr_types"],
+        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
+    }),
+)
+
+mvfst_cpp_library(
     name = "fizz_handshake",
     srcs = [
         "FizzCryptoFactory.cpp",
         "FizzRetryIntegrityTagGenerator.cpp",
         "QuicFizzFactory.cpp",
-    ] + select({
-        "DEFAULT": ["FizzOpenSSLPacketNumberCipher.cpp"],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
-    }),
+    ],
     headers = [
         "FizzCryptoFactory.h",
-        "FizzPacketNumberCipher.h",
         "FizzRetryIntegrityTagGenerator.h",
         "FizzTransportParameters.h",
         "QuicFizzFactory.h",
-    ] + select({
-        "DEFAULT": ["FizzOpenSSLPacketNumberCipher.h"],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
-    }),
+    ],
     preprocessor_flags = select({
         "DEFAULT": [],
         "fbsource//xplat/fizz/constraints:mnscrypto-only": ["-DMVFST_MBED"],  # @fb-only
@@ -48,23 +68,25 @@ mvfst_cpp_library(
         "//fizz/crypto:utils",
         "//fizz/crypto/aead:aead",
         "//quic/common:optional",
-    ],
+    ] + select({
+        "DEFAULT": [":fizz_packet_number_cipher"],
+        "ovr_config//runtime/constraints:fbcode": select({
+            "DEFAULT": [":fizz_packet_number_cipher"],  # @fb-only
+            "fbcode//quic:use_alt_crypto-enabled": ["fbcode//quic/facebook/handshake:xsec_ecb_packet_number_cipher"],  # @fb-only
+            "ovr_config//build_mode:arvr_mode[enabled]": [":fizz_packet_number_cipher"],  # @fb-only
+            "ovr_config//runtime/constraints:android-host-test": [":fizz_packet_number_cipher"],  # @fb-only
+        }),  # @fb-only
+    }),
     exported_deps = [
         "//fizz/protocol:default_factory",
         "//fizz/record:record",
-        "//quic/codec:packet_number_cipher",
         "//quic/common:buf_util",
         "//quic/common:mvfst_logging",
         "//quic/folly_utils:folly_utils",
         "//quic/handshake:handshake",
         "//quic/handshake:retry_integrity_tag_generator",
         "//quic/handshake:transport_parameters",
-    ]
-    + select({
-        "DEFAULT": ["//folly/ssl:openssl_ptr_types"],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
-    })
-    + select({
+    ] + select({
         "DEFAULT": [],
         "ovr_config//runtime/constraints:fbcode": select({
             "DEFAULT": [],  # @fb-only

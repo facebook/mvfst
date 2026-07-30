@@ -22,6 +22,11 @@ namespace quic {
 #define QUIC_DEFAULT_AEAD_HEADER <quic/fizz/handshake/FizzBridge.h>
 #define QUIC_DEFAULT_AEAD ::quic::FizzAead
 
+#define QUIC_DEFAULT_PACKET_NUM_HEADER \
+<quic/fizz/handshake/FizzPacketNumberCipher.h>
+#define QUIC_DEFAULT_AES128_PACKET_NUM_CIPHER ::quic::Aes128PacketNumberCipher
+#define QUIC_DEFAULT_AES256_PACKET_NUM_CIPHER ::quic::Aes256PacketNumberCipher
+
 template <class... Args>
 struct UnorderedMap : folly::F14FastMap<Args...> {};
 
