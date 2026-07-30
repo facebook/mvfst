@@ -157,7 +157,8 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
             .resetFrames()
             .streamFrames()
             .pingFrames()
-            .immediateAckFrames();
+            .immediateAckFrames()
+            .timestampFrames();
     if (!exceptCryptoStream) {
       probeSchedulerBuilder.cryptoFrames();
     }
@@ -200,6 +201,7 @@ quic::Expected<WriteQuicDataResult, QuicError> writeQuicDataToSocketImpl(
           .pingFrames()
           .datagramFrames()
           .immediateAckFrames()
+          .timestampFrames()
           .ackFrames();
   if (!exceptCryptoStream) {
     schedulerBuilder.cryptoFrames();

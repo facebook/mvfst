@@ -166,6 +166,7 @@ mvfst_cpp_test(
     srcs = [
         "QuicPacketRebuilderTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
         ":mocks",
         "//folly/portability:gtest",

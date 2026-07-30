@@ -70,6 +70,13 @@ quic_add_test(TARGET QuicPacingFunctionsTest
   mvfst_state_pacing_functions
 )
 
+quic_add_test(TARGET TimestampFrameFunctionsTest
+  SOURCES
+  TimestampFrameFunctionsTest.cpp
+  DEPENDS
+  mvfst_state_timestamp_frame_functions
+)
+
 quic_add_test(TARGET QuicTransportSettingsFunctionsTest
   SOURCES
   TransportSettingsFunctionsTest.cpp

@@ -204,6 +204,16 @@ mvfst_add_library(mvfst_state_simple_frame_functions
     mvfst_state_quic_state_machine
 )
 
+mvfst_add_library(mvfst_state_timestamp_frame_functions
+  SRCS
+    TimestampFrameFunctions.cpp
+  DEPS
+    mvfst_constants
+  EXPORTED_DEPS
+    mvfst_codec_types
+    mvfst_state_quic_state_machine
+)
+
 mvfst_add_library(mvfst_state_quic_connection_stats
   EXPORTED_DEPS
     mvfst_config

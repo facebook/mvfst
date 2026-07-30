@@ -108,6 +108,7 @@ mvfst_add_library(mvfst_codec_pktrebuilder
   EXPORTED_DEPS
     mvfst_codec_pktbuilder
     mvfst_state_quic_state_machine
+    mvfst_state_timestamp_frame_functions
 )
 
 mvfst_add_library(mvfst_codec_header_codec

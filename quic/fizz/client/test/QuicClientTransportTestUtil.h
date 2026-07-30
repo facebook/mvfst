@@ -100,6 +100,10 @@ class TestingQuicClientTransport : public QuicClientTransport {
     return idleTimeout_;
   }
 
+  auto& writeLooper() {
+    return writeLooper_;
+  }
+
   auto& lossTimeout() {
     return lossTimeout_;
   }

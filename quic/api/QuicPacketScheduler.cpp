@@ -12,6 +12,8 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/state/ConnectionOopsFields.h>
+#include <quic/state/SimpleFrameFunctions.h>
+#include <quic/state/TimestampFrameFunctions.h>
 #include <cstdint>
 
 namespace {
@@ -195,6 +197,11 @@ FrameScheduler::Builder& FrameScheduler::Builder::immediateAckFrames() {
   return *this;
 }
 
+FrameScheduler::Builder& FrameScheduler::Builder::timestampFrames() {
+  timestampFrameScheduler_ = true;
+  return *this;
+}
+
 FrameScheduler::Builder& FrameScheduler::Builder::pathValidationFrames(
     PathIdType pathId) {
   schedulePathValidationFramesForPathId_ = pathId;
@@ -235,6 +242,9 @@ FrameScheduler FrameScheduler::Builder::build() && {
   if (immediateAckFrameScheduler_) {
     scheduler.immediateAckFrameScheduler_.emplace(
         ImmediateAckFrameScheduler(conn_));
+  }
+  if (timestampFrameScheduler_) {
+    scheduler.timestampFrameScheduler_.emplace(conn_);
   }
   if (schedulePathValidationFramesForPathId_.has_value()) {
     scheduler.pathValidationFrameScheduler_.emplace(
@@ -279,7 +289,13 @@ FrameScheduler::scheduleFramesForPacket(
       : 0;
   // We cannot return early if the writablyBytes drops to 0 here, since pure
   // acks can skip writableBytes entirely.
-  PacketBuilderWrapper wrapper(builder, writableBytes);
+  TimestampFramePacketObserver timestampPacketObserver;
+  const bool trackTimestampFrames = timestampFrameScheduler_ && shortHeader &&
+      shouldWriteOneRttTimestampFrame(conn_, false);
+  PacketFrameTrackingBuilderHolder<TimestampFramePacketObserver>
+      selectedBuilder(builder, timestampPacketObserver, trackTimestampFrames);
+  auto& packetBuilder = selectedBuilder.builder();
+  PacketBuilderWrapper wrapper(packetBuilder, writableBytes);
   bool cryptoDataWritten = false;
   bool rstWritten = false;
   if (cryptoStreamScheduler_ && cryptoStreamScheduler_->hasData()) {
@@ -311,7 +327,7 @@ FrameScheduler::scheduleFramesForPacket(
       // bytes, this will be a pure ack packet and it will skip congestion
       // controller. Otherwise, we will give other schedulers an opportunity to
       // write up to writable bytes.
-      auto writeAcksRes = ackScheduler_->writeNextAcks(builder);
+      auto writeAcksRes = ackScheduler_->writeNextAcks(packetBuilder);
       if (!writeAcksRes.has_value()) {
         return quic::make_unexpected(writeAcksRes.error());
       }
@@ -357,29 +373,104 @@ FrameScheduler::scheduleFramesForPacket(
   if (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame()) {
     pingFrameScheduler_->writePing(wrapper);
   }
-  if (streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()) {
-    auto result = streamFrameScheduler_->writeStreams(wrapper);
-    if (!result.has_value()) {
-      return quic::make_unexpected(result.error());
-    }
+
+  const auto hasStandaloneDatagramData = [&] {
+    return datagramFrameScheduler_ &&
+        !conn_.transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
+        datagramFrameScheduler_->hasPendingDatagramFrames();
+  };
+  const bool hasBulkData =
+      (streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()) ||
+      hasStandaloneDatagramData();
+  const bool hasPendingSelectedData =
+      conn_.transportSettings.oneRttTimestampFramePacketSelection ==
+          TimestampFramePacketSelection::StreamPackets
+      ? streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()
+      : hasBulkData;
+  Optional<TimestampFrame> timestampFrame;
+  if (trackTimestampFrames) {
+    timestampFrame = timestampFrameScheduler_->maybeGenerateTimestampFrame(
+        timestampPacketObserver, hasPendingSelectedData);
   }
-  // When scheduleDatagramsWithStreams is enabled, datagrams are handled by
-  // streamFrameScheduler above.
-  if (datagramFrameScheduler_ &&
-      !conn_.transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
-      datagramFrameScheduler_->hasPendingDatagramFrames()) {
-    auto datagramRes = datagramFrameScheduler_->writeDatagramFrames(wrapper);
-    if (!datagramRes.has_value()) {
-      return quic::make_unexpected(datagramRes.error());
+
+  PacketBuilderInterface* bulkBuilder = &wrapper;
+  Optional<PacketBuilderWrapper> prioritizedWrapper;
+  const auto timestampPacketSelection =
+      conn_.transportSettings.oneRttTimestampFramePacketSelection;
+  const bool hadSelectedFrameBeforeBulk =
+      timestampPacketObserver.matchesPacketSelection(timestampPacketSelection);
+  if (timestampFrame &&
+      conn_.transportSettings.oneRttTimestampFrameWriteMode ==
+          TimestampFrameWriteMode::Prioritized) {
+    auto timestampSize = getTimestampFrameEncodedSize(*timestampFrame);
+    if (timestampSize.hasError()) {
+      return quic::make_unexpected(timestampSize.error());
+    }
+    const auto remaining = wrapper.remainingSpaceInPkt();
+    if (remaining >= timestampSize.value()) {
+      prioritizedWrapper.emplace(wrapper, remaining - timestampSize.value());
+      bulkBuilder = &*prioritizedWrapper;
     }
   }
 
-  if (builder.hasFramesPending()) {
+  auto writeBulkFrames =
+      [&](PacketBuilderInterface& target) -> quic::Expected<void, QuicError> {
+    if (streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()) {
+      auto result = streamFrameScheduler_->writeStreams(target);
+      if (!result.has_value()) {
+        return quic::make_unexpected(result.error());
+      }
+    }
+    // When scheduleDatagramsWithStreams is enabled, datagrams are handled by
+    // streamFrameScheduler above.
+    if (hasStandaloneDatagramData()) {
+      auto datagramRes = datagramFrameScheduler_->writeDatagramFrames(target);
+      if (!datagramRes.has_value()) {
+        return quic::make_unexpected(datagramRes.error());
+      }
+    }
+    return {};
+  };
+
+  auto bulkResult = writeBulkFrames(*bulkBuilder);
+  if (bulkResult.hasError()) {
+    return quic::make_unexpected(bulkResult.error());
+  }
+  if (prioritizedWrapper && !hadSelectedFrameBeforeBulk &&
+      !timestampPacketObserver.matchesPacketSelection(
+          timestampPacketSelection)) {
+    // Bulk schedulers consume only successful writes, so retrying targets
+    // only data that did not fit under the unused timestamp reservation.
+    bulkResult = writeBulkFrames(wrapper);
+    if (bulkResult.hasError()) {
+      return quic::make_unexpected(bulkResult.error());
+    }
+  }
+
+  if (timestampFrame &&
+      timestampPacketObserver.matchesPacketSelection(
+          timestampPacketSelection)) {
+    // TIMESTAMP does not make an ACK-only packet ACK-eliciting, so it can use
+    // the same congestion-control bypass as its ACK frame.
+    PacketBuilderInterface& timestampBuilder =
+        timestampPacketObserver.hasAckElicitingFrame() ? wrapper
+                                                       : packetBuilder;
+    auto timestampRes = timestampFrameScheduler_->writeTimestampFrame(
+        *timestampFrame, timestampBuilder);
+    if (!timestampRes.has_value()) {
+      return quic::make_unexpected(timestampRes.error());
+    }
+    // The unreserved bulk retry may consume the timestamp budget. Keep its
+    // carrier packet because TIMESTAMP is best-effort.
+    static_cast<void>(timestampRes.value());
+  }
+
+  if (packetBuilder.hasFramesPending()) {
     if (initialPacket || hasPathProbingFrame) {
       // This is the initial packet or a it has a path probing frame, we need to
       // fill er up.
-      while (builder.remainingSpaceInPkt() > 0) {
-        auto writeRes = writeFrame(PaddingFrame(), builder);
+      while (packetBuilder.remainingSpaceInPkt() > 0) {
+        auto writeRes = writeFrame(PaddingFrame(), packetBuilder);
         if (!writeRes.has_value()) {
           return quic::make_unexpected(writeRes.error());
         }
@@ -390,7 +481,7 @@ FrameScheduler::scheduleFramesForPacket(
       if (paddingModulo > 0) {
         size_t paddingIncrement = wrapper.remainingSpaceInPkt() % paddingModulo;
         for (size_t i = 0; i < paddingIncrement; i++) {
-          auto writeRes = writeFrame(PaddingFrame(), builder);
+          auto writeRes = writeFrame(PaddingFrame(), packetBuilder);
           if (!writeRes.has_value()) {
             return quic::make_unexpected(writeRes.error());
           }
@@ -401,7 +492,7 @@ FrameScheduler::scheduleFramesForPacket(
   }
 
   return SchedulingResult(
-      std::nullopt, std::move(builder).buildPacket(), shortHeaderPadding);
+      std::nullopt, std::move(packetBuilder).buildPacket(), shortHeaderPadding);
 }
 
 bool FrameScheduler::hasData() const {
@@ -1041,6 +1132,29 @@ bool ImmediateAckFrameScheduler::writeImmediateAckFrame(
   // We shouldn't ever error on an IMMEDIATE_ACK.
   MVCHECK(result.has_value());
   return result.value() != 0;
+}
+
+Optional<TimestampFrame> TimestampFrameScheduler::maybeGenerateTimestampFrame(
+    const TimestampFramePacketObserver& packetObserver,
+    bool hasPendingEligibleData) const {
+  if ((!packetObserver.matchesPacketSelection(
+           conn_.transportSettings.oneRttTimestampFramePacketSelection) &&
+       !hasPendingEligibleData) ||
+      !shouldWriteOneRttTimestampFrame(
+          conn_, packetObserver.hasAckReceiveTimestamps())) {
+    return std::nullopt;
+  }
+  return generateOneRttTimestampFrame(conn_);
+}
+
+quic::Expected<bool, QuicError> TimestampFrameScheduler::writeTimestampFrame(
+    TimestampFrame frame,
+    PacketBuilderInterface& builder) const {
+  auto writeResult = writeFrame(frame, builder);
+  if (writeResult.hasError()) {
+    return quic::make_unexpected(writeResult.error());
+  }
+  return writeResult.value() != 0;
 }
 
 CloningScheduler::CloningScheduler(

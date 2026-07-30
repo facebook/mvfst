@@ -119,6 +119,18 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "TimestampFrameFunctionsTest",
+    srcs = [
+        "TimestampFrameFunctionsTest.cpp",
+    ],
+    supports_static_listing = False,
+    deps = [
+        "//quic:constants",
+        "//quic/state:timestamp_frame_functions",
+    ],
+)
+
+mvfst_cpp_test(
     name = "TransportSettingsFunctionsTest",
     srcs = [
         "TransportSettingsFunctionsTest.cpp",

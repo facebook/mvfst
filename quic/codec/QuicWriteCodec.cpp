@@ -1456,6 +1456,20 @@ quic::Expected<size_t, QuicError> writeSimpleFrame(
   folly::assume_unreachable();
 }
 
+quic::Expected<size_t, QuicError> getTimestampFrameEncodedSize(
+    const TimestampFrame& frame) {
+  auto frameTypeSize =
+      QuicInteger(static_cast<uint64_t>(FrameType::TIMESTAMP)).getSize();
+  if (frameTypeSize.hasError()) {
+    return quic::make_unexpected(frameTypeSize.error());
+  }
+  auto timestampSize = QuicInteger(frame.timestamp).getSize();
+  if (timestampSize.hasError()) {
+    return quic::make_unexpected(timestampSize.error());
+  }
+  return frameTypeSize.value() + timestampSize.value();
+}
+
 quic::Expected<size_t, QuicError> writeFrame(
     QuicWriteFrame&& frame,
     PacketBuilderInterface& builder) {
@@ -1772,18 +1786,12 @@ quic::Expected<size_t, QuicError> writeFrame(
       TimestampFrame& timestampFrame = *frame.asTimestampFrame();
       QuicInteger intFrameType(static_cast<uint64_t>(FrameType::TIMESTAMP));
       QuicInteger intTimestamp(timestampFrame.timestamp);
-
-      auto intFrameTypeSize = intFrameType.getSize();
-      if (intFrameTypeSize.hasError()) {
-        return quic::make_unexpected(intFrameTypeSize.error());
+      auto timestampFrameLenResult =
+          getTimestampFrameEncodedSize(timestampFrame);
+      if (timestampFrameLenResult.hasError()) {
+        return quic::make_unexpected(timestampFrameLenResult.error());
       }
-      auto intTimestampSize = intTimestamp.getSize();
-      if (intTimestampSize.hasError()) {
-        return quic::make_unexpected(intTimestampSize.error());
-      }
-
-      const auto timestampFrameLen =
-          intFrameTypeSize.value() + intTimestampSize.value();
+      const auto timestampFrameLen = timestampFrameLenResult.value();
       if (packetSpaceCheck(spaceLeft, timestampFrameLen)) {
         builder.write(intFrameType);
         builder.write(intTimestamp);

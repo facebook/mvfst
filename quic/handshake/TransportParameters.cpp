@@ -201,6 +201,10 @@ std::vector<TransportParameter> getSupportedExtTransportParams(
     if (timestampFrameResult.has_value()) {
       customTps.push_back(timestampFrameResult.value());
     }
+  }
+
+  if (ts.advertisedTimestampFrameSupport ||
+      ts.oneRttTimestampFrameWriteMode != TimestampFrameWriteMode::Disabled) {
     auto exponentResult = encodeIntegerParameter(
         TpId::timestamp_frame_timestamp_exponent,
         std::min(

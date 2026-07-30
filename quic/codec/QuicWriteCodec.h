@@ -38,6 +38,9 @@ namespace quic {
     QuicWriteFrame&& frame,
     PacketBuilderInterface& builder);
 
+[[nodiscard]] quic::Expected<size_t, QuicError> getTimestampFrameEncodedSize(
+    const TimestampFrame& frame);
+
 /**
  * Write a complete stream frame header into builder
  * This writes the stream frame header into the parameter builder and returns

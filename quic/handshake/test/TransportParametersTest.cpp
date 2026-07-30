@@ -185,8 +185,10 @@ class TimestampPeerParametersCaseNames {
 struct TimestampLocalParametersCase {
   const char* name;
   bool advertise;
+  TimestampFrameWriteMode writeMode;
   uint64_t exponent;
-  bool expectParameters;
+  bool expectSupport;
+  bool expectExponent;
   uint64_t expectedExponent;
 };
 
@@ -255,6 +257,7 @@ TEST_P(TimestampLocalParametersTest, EmitsOnlyAdvertisedBoundedParameters) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   conn.transportSettings.advertisedTimestampFrameSupport = testCase.advertise;
+  conn.transportSettings.oneRttTimestampFrameWriteMode = testCase.writeMode;
   conn.transportSettings.timestampFrameTimestampExponent = testCase.exponent;
 
   const auto parameters = getSupportedExtTransportParams(conn);
@@ -266,10 +269,12 @@ TEST_P(TimestampLocalParametersTest, EmitsOnlyAdvertisedBoundedParameters) {
   ASSERT_FALSE(exponent.hasError());
   const auto& maybeSupport = support.value();
   const auto& maybeExponent = exponent.value();
-  EXPECT_EQ(maybeSupport.has_value(), testCase.expectParameters);
-  EXPECT_EQ(maybeExponent.has_value(), testCase.expectParameters);
-  if (testCase.expectParameters) {
+  EXPECT_EQ(maybeSupport.has_value(), testCase.expectSupport);
+  EXPECT_EQ(maybeExponent.has_value(), testCase.expectExponent);
+  if (testCase.expectSupport) {
     EXPECT_EQ(*maybeSupport, 1);
+  }
+  if (testCase.expectExponent) {
     EXPECT_EQ(*maybeExponent, testCase.expectedExponent);
   }
 }
@@ -278,19 +283,60 @@ INSTANTIATE_TEST_SUITE_P(
     TimestampPolicy,
     TimestampLocalParametersTest,
     Values(
-        TimestampLocalParametersCase{"NotAdvertised", false, 4, false, 0},
-        TimestampLocalParametersCase{"ExponentZero", true, 0, true, 0},
-        TimestampLocalParametersCase{"ExponentFour", true, 4, true, 4},
         TimestampLocalParametersCase{
-            "ExponentMaximum",
+            "Disabled",
+            false,
+            TimestampFrameWriteMode::Disabled,
+            4,
+            false,
+            false,
+            0},
+        TimestampLocalParametersCase{
+            "AdvertisedExponentZero",
             true,
+            TimestampFrameWriteMode::Disabled,
+            0,
+            true,
+            true,
+            0},
+        TimestampLocalParametersCase{
+            "AdvertisedExponentFour",
+            true,
+            TimestampFrameWriteMode::Disabled,
+            4,
+            true,
+            true,
+            4},
+        TimestampLocalParametersCase{
+            "AdvertisedExponentMaximum",
+            true,
+            TimestampFrameWriteMode::Disabled,
             kMaxTimestampFrameTimestampExponent,
+            true,
             true,
             kMaxTimestampFrameTimestampExponent},
         TimestampLocalParametersCase{
-            "ExponentClamped",
+            "AdvertisedExponentClamped",
             true,
+            TimestampFrameWriteMode::Disabled,
             kMaxTimestampFrameTimestampExponent + 1,
+            true,
+            true,
+            kMaxTimestampFrameTimestampExponent},
+        TimestampLocalParametersCase{
+            "OpportunisticWriteOnly",
+            false,
+            TimestampFrameWriteMode::Opportunistic,
+            4,
+            false,
+            true,
+            4},
+        TimestampLocalParametersCase{
+            "PrioritizedWriteOnly",
+            false,
+            TimestampFrameWriteMode::Prioritized,
+            kMaxTimestampFrameTimestampExponent + 1,
+            false,
             true,
             kMaxTimestampFrameTimestampExponent}),
     [](const TestParamInfo<TimestampLocalParametersCase>& info) {

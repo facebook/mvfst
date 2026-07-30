@@ -21,6 +21,8 @@
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/MockQuicStats.h>
+#include <chrono>
+#include <optional>
 
 using namespace quic;
 using namespace testing;
@@ -192,6 +194,50 @@ void verifyStreamFrames(
         builder.frames_.begin() + expectedFrames.size());
   }
 }
+
+size_t countTimestampFrames(const RegularQuicWritePacket::Vec& frames) {
+  size_t count = 0;
+  for (const auto& frame : frames) {
+    if (frame.asTimestampFrame()) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+void addAckReceiveTimestampState(
+    QuicConnectionStateBase& conn,
+    AckReceiveTimestampsVersion version =
+        AckReceiveTimestampsVersion::LegacyMvfst) {
+  auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
+  ackState.acks.insert(10);
+  WriteAckFrameState::ReceivedPacket rpi;
+  rpi.pktNum = 10;
+  rpi.timings.receiveTimePoint = Clock::now();
+  auto receiveTime = rpi.timings.receiveTimePoint;
+  ackState.recvdPacketInfos.emplace_back(std::move(rpi));
+  ackState.largestRecvdPacketNum = 10;
+  ackState.largestRecvdPacketTime = receiveTime;
+  conn.transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+  conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = version,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
+  if (version == AckReceiveTimestampsVersion::DraftIetf02) {
+    conn.transportSettings.enableIetfAckReceiveTimestamps = true;
+    updateNegotiatedAckFeatures(conn);
+  } else {
+    conn.negotiatedAckReceiveTimestampSupport = true;
+  }
+}
+
+void addPlainAckState(QuicConnectionStateBase& conn) {
+  auto& ackState = getAckState(conn, PacketNumberSpace::AppData);
+  ackState.acks.insert(10);
+  ackState.largestRecvdPacketNum = 10;
+  ackState.largestRecvdPacketTime = Clock::now();
+}
 } // namespace
 
 namespace quic::test {
@@ -245,6 +291,51 @@ class QuicPacketSchedulerTest : public QuicPacketSchedulerTestBase,
     conn.datagramState.maxWriteBufferSize = 100;
   }
 };
+
+enum class TimestampAckKind : uint8_t {
+  Plain,
+  LegacyReceiveTimestamps,
+  Draft02ReceiveTimestamps,
+  ExtendedReceiveTimestamps,
+};
+
+struct TimestampAckPolicyCase {
+  const char* name;
+  TimestampAckKind ackKind;
+  bool suppressForAckReceiveTimestamps;
+  bool expectedTimestamp;
+  FrameType expectedAckType;
+};
+
+class TimestampAckPolicyTest
+    : public QuicPacketSchedulerTestBase,
+      public testing::TestWithParam<TimestampAckPolicyCase> {};
+
+enum class TimestampAckOnlyFrame : uint8_t { Ack, ImmediateAck };
+
+struct TimestampAckOnlyPolicyCase {
+  const char* name;
+  TimestampAckOnlyFrame frame;
+  TimestampFrameWriteMode mode;
+  std::optional<TimestampFramePacketSelection> packetSelection;
+  bool expectedTimestamp;
+};
+
+class TimestampAckOnlyPolicyTest
+    : public QuicPacketSchedulerTestBase,
+      public testing::TestWithParam<TimestampAckOnlyPolicyCase> {};
+
+struct TimestampCapacityPolicyCase {
+  const char* name;
+  TimestampFrameWriteMode mode;
+  bool fillPacket;
+  bool validClock;
+  bool expectedTimestamp;
+};
+
+class TimestampCapacityPolicyTest
+    : public QuicPacketSchedulerTestBase,
+      public testing::TestWithParam<TimestampCapacityPolicyCase> {};
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   QuicClientConnectionState conn(
@@ -1417,6 +1508,390 @@ TEST_P(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
 
   conn.ackStates.handshakeAckState->largestAckScheduled = std::nullopt;
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
+}
+
+TEST_P(TimestampAckPolicyTest, SuppressesOnlyAcksThatCarryTimestamps) {
+  const auto& testCase = GetParam();
+  auto connPtr = createConn(10, 100000, 100000);
+  ASSERT_NE(connPtr, nullptr);
+  if (connPtr == nullptr) {
+    return;
+  }
+  auto& conn = *connPtr;
+  conn.transportSettings.oneRttTimestampFrameWriteMode =
+      TimestampFrameWriteMode::Opportunistic;
+  conn.transportSettings
+      .suppressOneRttTimestampFrameWhenAckReceiveTimestampsWritten =
+      testCase.suppressForAckReceiveTimestamps;
+  conn.peerTimestampFrameState.canReceive = true;
+  conn.connectionTime = Clock::now() - std::chrono::milliseconds(5);
+
+  switch (testCase.ackKind) {
+    case TimestampAckKind::Plain:
+      addPlainAckState(conn);
+      break;
+    case TimestampAckKind::LegacyReceiveTimestamps:
+      addAckReceiveTimestampState(conn);
+      break;
+    case TimestampAckKind::Draft02ReceiveTimestamps:
+      addAckReceiveTimestampState(
+          conn, AckReceiveTimestampsVersion::DraftIetf02);
+      break;
+    case TimestampAckKind::ExtendedReceiveTimestamps:
+      addAckReceiveTimestampState(conn);
+      conn.negotiatedExtendedAckFeatures =
+          static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
+      break;
+  }
+
+  auto stream = createStream(conn);
+  writeDataToStream(conn, stream, "some data");
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "timestampAckPolicy")
+                                     .ackFrames()
+                                     .streamFrames()
+                                     .timestampFrames())
+                                 .build();
+  const auto writableBytes = static_cast<uint32_t>(conn.udpSendPacketLen);
+  RegularQuicPacketBuilder builder(
+      writableBytes,
+      ShortHeader(
+          ProtectionType::KeyPhaseOne,
+          conn.clientConnectionId.value_or(getTestConnectionId()),
+          getNextPacketNum(conn, PacketNumberSpace::AppData)),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result =
+      scheduler.scheduleFramesForPacket(std::move(builder), writableBytes);
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  EXPECT_EQ(
+      countTimestampFrames(result->packet->packet.frames),
+      testCase.expectedTimestamp ? 1 : 0);
+  const auto* ackFrame = result->packet->packet.frames[0].asWriteAckFrame();
+  ASSERT_NE(ackFrame, nullptr);
+  if (ackFrame == nullptr) {
+    return;
+  }
+  EXPECT_EQ(ackFrame->frameType, testCase.expectedAckType);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AckEncodingPolicy,
+    TimestampAckPolicyTest,
+    testing::Values(
+        TimestampAckPolicyCase{
+            "PlainAckSuppressionOn",
+            TimestampAckKind::Plain,
+            true,
+            true,
+            FrameType::ACK},
+        TimestampAckPolicyCase{
+            "LegacySuppressionOn",
+            TimestampAckKind::LegacyReceiveTimestamps,
+            true,
+            false,
+            FrameType::ACK_RECEIVE_TIMESTAMPS},
+        TimestampAckPolicyCase{
+            "LegacySuppressionOff",
+            TimestampAckKind::LegacyReceiveTimestamps,
+            false,
+            true,
+            FrameType::ACK_RECEIVE_TIMESTAMPS},
+        TimestampAckPolicyCase{
+            "Draft02SuppressionOn",
+            TimestampAckKind::Draft02ReceiveTimestamps,
+            true,
+            false,
+            FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02},
+        TimestampAckPolicyCase{
+            "Draft02SuppressionOff",
+            TimestampAckKind::Draft02ReceiveTimestamps,
+            false,
+            true,
+            FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02},
+        TimestampAckPolicyCase{
+            "ExtendedSuppressionOn",
+            TimestampAckKind::ExtendedReceiveTimestamps,
+            true,
+            false,
+            FrameType::ACK_EXTENDED},
+        TimestampAckPolicyCase{
+            "ExtendedSuppressionOff",
+            TimestampAckKind::ExtendedReceiveTimestamps,
+            false,
+            true,
+            FrameType::ACK_EXTENDED}),
+    [](const testing::TestParamInfo<TimestampAckPolicyCase>& info) {
+      return info.param.name;
+    });
+
+TEST_P(TimestampAckOnlyPolicyTest, AppliesSelectionToAckOnlyPackets) {
+  const auto& testCase = GetParam();
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.oneRttTimestampFrameWriteMode = testCase.mode;
+  if (testCase.packetSelection) {
+    conn.transportSettings.oneRttTimestampFramePacketSelection =
+        *testCase.packetSelection;
+  }
+  conn.peerTimestampFrameState.canReceive = true;
+  conn.connectionTime = Clock::now() - std::chrono::milliseconds(5);
+
+  FrameScheduler scheduler = [&] {
+    if (testCase.frame == TimestampAckOnlyFrame::Ack) {
+      conn.ackStates.appDataAckState.largestRecvdPacketTime = Clock::now();
+      conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+      conn.ackStates.appDataAckState.acks.insert(10);
+      return std::move(
+                 FrameScheduler::Builder(
+                     conn,
+                     EncryptionLevel::AppData,
+                     PacketNumberSpace::AppData,
+                     "timestampAckOnlyPolicy")
+                     .ackFrames()
+                     .timestampFrames())
+          .build();
+    }
+    conn.pendingEvents.requestImmediateAck = true;
+    return std::move(
+               FrameScheduler::Builder(
+                   conn,
+                   EncryptionLevel::AppData,
+                   PacketNumberSpace::AppData,
+                   "timestampImmediateAckPolicy")
+                   .immediateAckFrames()
+                   .timestampFrames())
+        .build();
+  }();
+  const auto writableBytes = static_cast<uint32_t>(conn.udpSendPacketLen);
+  RegularQuicPacketBuilder builder(
+      writableBytes,
+      ShortHeader(
+          ProtectionType::KeyPhaseOne,
+          conn.clientConnectionId.value_or(getTestConnectionId()),
+          getNextPacketNum(conn, PacketNumberSpace::AppData)),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder),
+      testCase.frame == TimestampAckOnlyFrame::Ack ? 0 : writableBytes);
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  EXPECT_EQ(
+      countTimestampFrames(result->packet->packet.frames),
+      testCase.expectedTimestamp ? 1 : 0);
+  EXPECT_EQ(
+      std::count_if(
+          result->packet->packet.frames.begin(),
+          result->packet->packet.frames.end(),
+          [&](const QuicWriteFrame& frame) {
+            return testCase.frame == TimestampAckOnlyFrame::Ack
+                ? frame.asWriteAckFrame() != nullptr
+                : frame.asImmediateAckFrame() != nullptr;
+          }),
+      1);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AckOnlySelectionPolicy,
+    TimestampAckOnlyPolicyTest,
+    testing::Values(
+        TimestampAckOnlyPolicyCase{
+            "AckDefaultAllEligibleOpportunistic",
+            TimestampAckOnlyFrame::Ack,
+            TimestampFrameWriteMode::Opportunistic,
+            std::nullopt,
+            true},
+        TimestampAckOnlyPolicyCase{
+            "AckAckEliciting",
+            TimestampAckOnlyFrame::Ack,
+            TimestampFrameWriteMode::Prioritized,
+            TimestampFramePacketSelection::AckElicitingPackets,
+            false},
+        TimestampAckOnlyPolicyCase{
+            "AckStream",
+            TimestampAckOnlyFrame::Ack,
+            TimestampFrameWriteMode::Prioritized,
+            TimestampFramePacketSelection::StreamPackets,
+            false},
+        TimestampAckOnlyPolicyCase{
+            "ImmediateAckAllEligible",
+            TimestampAckOnlyFrame::ImmediateAck,
+            TimestampFrameWriteMode::Prioritized,
+            TimestampFramePacketSelection::AllEligiblePackets,
+            true},
+        TimestampAckOnlyPolicyCase{
+            "ImmediateAckAckEliciting",
+            TimestampAckOnlyFrame::ImmediateAck,
+            TimestampFrameWriteMode::Prioritized,
+            TimestampFramePacketSelection::AckElicitingPackets,
+            true},
+        TimestampAckOnlyPolicyCase{
+            "ImmediateAckStream",
+            TimestampAckOnlyFrame::ImmediateAck,
+            TimestampFrameWriteMode::Prioritized,
+            TimestampFramePacketSelection::StreamPackets,
+            false}),
+    [](const testing::TestParamInfo<TimestampAckOnlyPolicyCase>& info) {
+      return info.param.name;
+    });
+
+TEST_P(TimestampCapacityPolicyTest, AppliesWriteModeWhenCarrierFillsPacket) {
+  const auto& testCase = GetParam();
+  auto connPtr = createConn(10, 100000, 100000);
+  ASSERT_NE(connPtr, nullptr);
+  if (connPtr == nullptr) {
+    return;
+  }
+  auto& conn = *connPtr;
+  conn.transportSettings.oneRttTimestampFrameWriteMode = testCase.mode;
+  conn.peerTimestampFrameState.canReceive = true;
+  conn.connectionTime = testCase.validClock
+      ? Clock::now() - std::chrono::milliseconds(5)
+      : Clock::now() + std::chrono::seconds(1);
+
+  auto stream = createStream(conn);
+  if (testCase.fillPacket) {
+    writeDataToStream(
+        conn, stream, buildRandomInputData(conn.udpSendPacketLen * 2));
+  } else {
+    writeDataToStream(conn, stream, "some data");
+  }
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "timestampCapacityPolicy")
+                                     .streamFrames()
+                                     .timestampFrames())
+                                 .build();
+  const auto writableBytes = static_cast<uint32_t>(conn.udpSendPacketLen);
+  RegularQuicPacketBuilder builder(
+      writableBytes,
+      ShortHeader(
+          ProtectionType::KeyPhaseOne,
+          conn.clientConnectionId.value_or(getTestConnectionId()),
+          getNextPacketNum(conn, PacketNumberSpace::AppData)),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result =
+      scheduler.scheduleFramesForPacket(std::move(builder), writableBytes);
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  EXPECT_TRUE(
+      std::any_of(
+          result->packet->packet.frames.begin(),
+          result->packet->packet.frames.end(),
+          [](const auto& frame) {
+            return frame.asWriteStreamFrame() != nullptr;
+          }));
+  EXPECT_EQ(
+      countTimestampFrames(result->packet->packet.frames),
+      testCase.expectedTimestamp ? 1 : 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    WriteModeAndSpacePolicy,
+    TimestampCapacityPolicyTest,
+    testing::Values(
+        TimestampCapacityPolicyCase{
+            "DisabledWithSpace",
+            TimestampFrameWriteMode::Disabled,
+            false,
+            true,
+            false},
+        TimestampCapacityPolicyCase{
+            "OpportunisticWithSpace",
+            TimestampFrameWriteMode::Opportunistic,
+            false,
+            true,
+            true},
+        TimestampCapacityPolicyCase{
+            "OpportunisticPacketFull",
+            TimestampFrameWriteMode::Opportunistic,
+            true,
+            true,
+            false},
+        TimestampCapacityPolicyCase{
+            "PrioritizedWithSpace",
+            TimestampFrameWriteMode::Prioritized,
+            false,
+            true,
+            true},
+        TimestampCapacityPolicyCase{
+            "PrioritizedPacketFull",
+            TimestampFrameWriteMode::Prioritized,
+            true,
+            true,
+            true},
+        TimestampCapacityPolicyCase{
+            "PrioritizedInvalidClock",
+            TimestampFrameWriteMode::Prioritized,
+            false,
+            false,
+            false}),
+    [](const testing::TestParamInfo<TimestampCapacityPolicyCase>& info) {
+      return info.param.name;
+    });
+
+TEST_P(
+    QuicPacketSchedulerTest,
+    PrioritizedTimestampReservationDoesNotSuppressOnlyFittingDatagram) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.oneRttTimestampFrameWriteMode =
+      TimestampFrameWriteMode::Prioritized;
+  conn.peerTimestampFrameState.canReceive = true;
+  conn.datagramState.maxWriteFrameSize = std::numeric_limits<uint16_t>::max();
+
+  constexpr uint64_t kDatagramPayloadSize = 1;
+  conn.datagramState.flowManager.addDatagram(
+      folly::IOBuf::copyBuffer("d"), kDefaultDatagramFlowId);
+
+  FrameScheduler scheduler = std::move(
+                                 FrameScheduler::Builder(
+                                     conn,
+                                     EncryptionLevel::AppData,
+                                     PacketNumberSpace::AppData,
+                                     "tinyDatagramTimestampScheduler")
+                                     .datagramFrames()
+                                     .timestampFrames())
+                                 .build();
+
+  const auto connId = getTestConnectionId();
+  const auto packetNum = getNextPacketNum(conn, PacketNumberSpace::AppData);
+  const auto largestAcked =
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0);
+  const auto packetNumberEncoding = encodePacketNumber(packetNum, largestAcked);
+  const auto datagramFrameSize = kDatagramFrameTypeSize +
+      getQuicIntegerSize(kDatagramPayloadSize).value() + kDatagramPayloadSize;
+  const auto writableBytes = static_cast<uint32_t>(
+      1 + connId.size() + packetNumberEncoding.length + datagramFrameSize);
+
+  ShortHeader header(ProtectionType::KeyPhaseOne, connId, packetNum);
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      largestAcked);
+  auto result =
+      scheduler.scheduleFramesForPacket(std::move(builder), writableBytes);
+
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result->packet.has_value());
+  EXPECT_EQ(countTimestampFrames(result->packet->packet.frames), 0);
+  ASSERT_EQ(result->packet->packet.frames.size(), 1);
+  EXPECT_NE(result->packet->packet.frames[0].asDatagramFrame(), nullptr);
+  EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 0);
 }
 
 TEST_P(QuicPacketSchedulerTest, LargestAckToSend) {

@@ -163,6 +163,7 @@ mvfst_add_library(mvfst_api_transport_helpers
     mvfst_state_state_functions
     mvfst_state_stats_callback
     mvfst_state_stream_functions
+    mvfst_state_timestamp_frame_functions
     Folly::folly_lang_assume
 )
 

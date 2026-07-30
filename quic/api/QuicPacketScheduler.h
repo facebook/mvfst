@@ -17,6 +17,7 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/TimestampFrameFunctions.h>
 
 #include <folly/lang/Assume.h>
 
@@ -268,6 +269,23 @@ class ImmediateAckFrameScheduler {
   const QuicConnectionStateBase& conn_;
 };
 
+class TimestampFrameScheduler {
+ public:
+  explicit TimestampFrameScheduler(const QuicConnectionStateBase& conn)
+      : conn_(conn) {}
+
+  [[nodiscard]] Optional<TimestampFrame> maybeGenerateTimestampFrame(
+      const TimestampFramePacketObserver& packetObserver,
+      bool hasPendingEligibleData) const;
+
+  [[nodiscard]] quic::Expected<bool, QuicError> writeTimestampFrame(
+      TimestampFrame frame,
+      PacketBuilderInterface& builder) const;
+
+ private:
+  const QuicConnectionStateBase& conn_;
+};
+
 class FrameScheduler : public QuicPacketScheduler {
  public:
   ~FrameScheduler() override = default;
@@ -289,6 +307,7 @@ class FrameScheduler : public QuicPacketScheduler {
     Builder& pingFrames();
     Builder& datagramFrames();
     Builder& immediateAckFrames();
+    Builder& timestampFrames();
     Builder& pathValidationFrames(PathIdType pathId);
 
     FrameScheduler build() &&;
@@ -310,6 +329,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool pingFrameScheduler_{false};
     bool datagramFrameScheduler_{false};
     bool immediateAckFrameScheduler_{false};
+    bool timestampFrameScheduler_{false};
     Optional<PathIdType> schedulePathValidationFramesForPathId_;
   };
 
@@ -342,6 +362,7 @@ class FrameScheduler : public QuicPacketScheduler {
   Optional<PingFrameScheduler> pingFrameScheduler_;
   Optional<DatagramFrameScheduler> datagramFrameScheduler_;
   Optional<ImmediateAckFrameScheduler> immediateAckFrameScheduler_;
+  Optional<TimestampFrameScheduler> timestampFrameScheduler_;
   Optional<PathValidationFrameScheduler> pathValidationFrameScheduler_;
   folly::StringPiece name_;
   QuicConnectionStateBase& conn_;

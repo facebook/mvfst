@@ -327,6 +327,23 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "timestamp_frame_functions",
+    srcs = [
+        "TimestampFrameFunctions.cpp",
+    ],
+    headers = [
+        "TimestampFrameFunctions.h",
+    ],
+    deps = [
+        "//quic:constants",
+    ],
+    exported_deps = [
+        ":quic_state_machine",
+        "//quic/codec:types",
+    ],
+)
+
+mvfst_cpp_library(
     name = "quic_connection_stats",
     srcs = [],
     headers = [

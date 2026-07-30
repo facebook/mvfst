@@ -9,6 +9,7 @@
 
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/state/StateData.h>
+#include <quic/state/TimestampFrameFunctions.h>
 
 namespace quic {
 
@@ -26,6 +27,12 @@ class PacketRebuilder {
   PacketRebuilder(
       PacketBuilderInterface& regularBuilder,
       QuicConnectionStateBase& conn);
+
+  PacketRebuilder(const PacketRebuilder&) = delete;
+  PacketRebuilder& operator=(const PacketRebuilder&) = delete;
+  PacketRebuilder(PacketRebuilder&&) = delete;
+  PacketRebuilder& operator=(PacketRebuilder&&) = delete;
+  ~PacketRebuilder() = default;
 
   [[nodiscard]] quic::Expected<Optional<ClonedPacketIdentifier>, QuicError>
   rebuildFromPacket(OutstandingPacketWrapper& packet);
@@ -57,7 +64,8 @@ class PacketRebuilder {
       const QuicStreamState* stream);
 
  private:
-  PacketBuilderInterface& builder_;
   QuicConnectionStateBase& conn_;
+  TimestampFramePacketObserver timestampPacketObserver_;
+  PacketFrameTrackingBuilderHolder<TimestampFramePacketObserver> builder_;
 };
 } // namespace quic

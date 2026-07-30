@@ -241,6 +241,7 @@ mvfst_cpp_library(
         "//quic/state:state_functions",
         "//quic/state:stats_callback",
         "//quic/state:stream_functions",
+        "//quic/state:timestamp_frame_functions",
     ],
 )
 

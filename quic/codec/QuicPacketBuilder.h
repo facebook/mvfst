@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <functional>
+#include <variant>
+
 #include <folly/Portability.h>
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/QuicInteger.h>
@@ -579,6 +582,88 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
  private:
   PacketBuilderInterface& builder;
   uint32_t diff;
+};
+
+/** Notifies a caller-provided observer when frames are appended. */
+template <typename FrameObserver>
+class PacketFrameTrackingBuilder final : public PacketBuilderWrapper {
+ public:
+  PacketFrameTrackingBuilder(
+      PacketBuilderInterface& builder,
+      FrameObserver& frameObserver)
+      : PacketBuilderWrapper(builder, builder.remainingSpaceInPkt()),
+        frameObserver_(frameObserver) {}
+
+  void appendFrame(QuicWriteFrame frame) override {
+    frameObserver_(frame);
+    PacketBuilderWrapper::appendFrame(std::move(frame));
+  }
+
+  void appendPaddingFrame() override {
+    frameObserver_(QuicWriteFrame(PaddingFrame()));
+    PacketBuilderWrapper::appendPaddingFrame();
+  }
+
+ private:
+  FrameObserver& frameObserver_;
+};
+
+/** Selects either the original builder or a frame-tracking wrapper. */
+template <typename FrameObserver>
+class PacketFrameTrackingBuilderHolder final {
+ public:
+  using OriginalBuilder = std::reference_wrapper<PacketBuilderInterface>;
+  using TrackingBuilder = PacketFrameTrackingBuilder<FrameObserver>;
+  using Builder = std::variant<OriginalBuilder, TrackingBuilder>;
+
+  PacketFrameTrackingBuilderHolder(
+      PacketBuilderInterface& builder,
+      FrameObserver& frameObserver,
+      bool trackFrames)
+      : builder_(
+            trackFrames
+                ? Builder(
+                      std::in_place_type<TrackingBuilder>,
+                      builder,
+                      frameObserver)
+                : Builder(std::in_place_type<OriginalBuilder>, builder)) {}
+
+  PacketFrameTrackingBuilderHolder(const PacketFrameTrackingBuilderHolder&) =
+      delete;
+  PacketFrameTrackingBuilderHolder& operator=(
+      const PacketFrameTrackingBuilderHolder&) = delete;
+  PacketFrameTrackingBuilderHolder(PacketFrameTrackingBuilderHolder&&) = delete;
+  PacketFrameTrackingBuilderHolder& operator=(
+      PacketFrameTrackingBuilderHolder&&) = delete;
+
+  ~PacketFrameTrackingBuilderHolder() = default;
+
+  [[nodiscard]] PacketBuilderInterface& builder() noexcept {
+    if (auto* originalBuilder = std::get_if<OriginalBuilder>(&builder_)) {
+      return originalBuilder->get();
+    }
+    if (auto* trackingBuilder = std::get_if<TrackingBuilder>(&builder_)) {
+      return *trackingBuilder;
+    }
+    folly::assume_unreachable();
+  }
+
+  [[nodiscard]] const PacketBuilderInterface& builder() const noexcept {
+    if (const auto* originalBuilder = std::get_if<OriginalBuilder>(&builder_)) {
+      return originalBuilder->get();
+    }
+    if (const auto* trackingBuilder = std::get_if<TrackingBuilder>(&builder_)) {
+      return *trackingBuilder;
+    }
+    folly::assume_unreachable();
+  }
+
+  [[nodiscard]] bool isTracking() const noexcept {
+    return std::holds_alternative<TrackingBuilder>(builder_);
+  }
+
+ private:
+  Builder builder_;
 };
 
 /**

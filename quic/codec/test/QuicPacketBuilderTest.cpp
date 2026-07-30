@@ -447,6 +447,63 @@ TEST_F(QuicPacketBuilderTest, PacketBuilderWrapper) {
   EXPECT_EQ(0, wrapper.remainingSpaceInPkt());
 }
 
+class PacketFrameTrackingBuilderHolderTest : public TestWithParam<bool> {};
+
+TEST_P(
+    PacketFrameTrackingBuilderHolderTest,
+    SelectsSingleBuilderRouteAndForwardsBuild) {
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen,
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 1),
+      0);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  std::vector<QuicWriteFrame::Type> observedTypes;
+  auto observer = [&](const QuicWriteFrame& frame) {
+    observedTypes.push_back(frame.type());
+  };
+  PacketFrameTrackingBuilderHolder<decltype(observer)> holder(
+      builder, observer, GetParam());
+  auto& selectedBuilder = holder.builder();
+
+  EXPECT_EQ(holder.isTracking(), GetParam());
+  EXPECT_EQ(&selectedBuilder == &builder, !GetParam());
+  ASSERT_FALSE(writeFrame(PingFrame(), selectedBuilder).hasError());
+  ASSERT_FALSE(writeFrame(TimestampFrame(1), selectedBuilder).hasError());
+  ASSERT_FALSE(writeFrame(PaddingFrame(), selectedBuilder).hasError());
+  ASSERT_FALSE(writeFrame(PaddingFrame(), selectedBuilder).hasError());
+
+  if (GetParam()) {
+    EXPECT_THAT(
+        observedTypes,
+        ElementsAre(
+            QuicWriteFrame::Type::PingFrame,
+            QuicWriteFrame::Type::TimestampFrame,
+            QuicWriteFrame::Type::PaddingFrame,
+            QuicWriteFrame::Type::PaddingFrame));
+  } else {
+    EXPECT_TRUE(observedTypes.empty());
+  }
+
+  auto packet = std::move(selectedBuilder).buildPacket();
+  ASSERT_EQ(packet.packet.frames.size(), 3);
+  EXPECT_NE(packet.packet.frames[0].asPingFrame(), nullptr);
+  EXPECT_NE(packet.packet.frames[1].asTimestampFrame(), nullptr);
+  const auto* paddingFrame = packet.packet.frames[2].asPaddingFrame();
+  ASSERT_NE(paddingFrame, nullptr);
+  if (paddingFrame == nullptr) {
+    return;
+  }
+  EXPECT_EQ(paddingFrame->numFrames, 2);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    TrackingPolicy,
+    PacketFrameTrackingBuilderHolderTest,
+    Values(false, true),
+    [](const TestParamInfo<bool>& info) {
+      return info.param ? "Tracking" : "Original";
+    });
+
 TEST_P(QuicPacketBuilderTest, LongHeaderBytesCounting) {
   ConnectionId clientCid = getTestConnectionId(0);
   ConnectionId serverCid = getTestConnectionId(1);

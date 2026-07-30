@@ -166,6 +166,24 @@ struct PeerReceiveTimestampsConfig {
   uint64_t exponent{0};
 };
 
+enum class TimestampFrameWriteMode : uint8_t {
+  Disabled,
+  // Writes only from capacity left after ordinary scheduling or rebuilding.
+  Opportunistic,
+  // During ordinary scheduling, reserves TIMESTAMP space before stream/datagram
+  // output, then releases that reservation rather than prevent the packet from
+  // acquiring a qualifying carrier. It never displaces earlier ACK/control
+  // frames or PacketRebuilder clone contents; rebuilt packets append TIMESTAMP
+  // only if capacity remains.
+  Prioritized,
+};
+
+enum class TimestampFramePacketSelection : uint8_t {
+  AllEligiblePackets,
+  AckElicitingPackets,
+  StreamPackets,
+};
+
 // JSON-serialized transport knobs
 struct SerializedKnob {
   uint64_t space;
@@ -383,6 +401,17 @@ struct TransportSettings {
   bool advertisedKnobFrameSupport{false};
   // Advertise that this endpoint accepts TIMESTAMP frames from the peer.
   bool advertisedTimestampFrameSupport{false};
+  // Controls ordinary TIMESTAMP writes on selected non-empty 1-RTT packets;
+  // see TimestampFrameWriteMode for the priority boundary.
+  TimestampFrameWriteMode oneRttTimestampFrameWriteMode{
+      TimestampFrameWriteMode::Disabled};
+  // Select every eligible non-empty packet, every packet carrying an
+  // ack-eliciting frame, or only packets that actually carry stream data.
+  TimestampFramePacketSelection oneRttTimestampFramePacketSelection{
+      TimestampFramePacketSelection::AllEligiblePackets};
+  // Avoid redundant timing metadata when an ACK in the same packet already
+  // carries receive timestamps.
+  bool suppressOneRttTimestampFrameWhenAckReceiveTimestampsWritten{true};
   // Local TIMESTAMP values are encoded as microseconds >> exponent; one
   // encoded tick therefore represents 2^exponent microseconds.
   uint64_t timestampFrameTimestampExponent{
