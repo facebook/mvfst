@@ -15,6 +15,17 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "quic_executor",
+    headers = [
+        "QuicExecutor.h",
+    ],
+    exported_deps = [
+        ":eventbase",
+        "//folly:executor",
+    ],
+)
+
+mvfst_cpp_library(
     name = "quic_timer",
     srcs = [],
     headers = [
@@ -38,6 +49,21 @@ mvfst_cpp_library(
         ":eventbase",
         "//folly/io/async:async_base",
         "//folly/io/async:async_base_fwd",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_folly_executor_impl",
+    srcs = [
+        "QuicFollyExecutorImpl.cpp",
+    ],
+    headers = [
+        "QuicFollyExecutorImpl.h",
+    ],
+    exported_deps = [
+        ":folly_eventbase",
+        ":quic_executor",
+        "//folly/io/async:async_base",
     ],
 )
 
@@ -71,6 +97,25 @@ mvfst_cpp_library(
         "//folly:glog",
         "//folly:intrusive_list",
         "//quic/common:mvfst_logging",
+    ],
+    exported_external_deps = [
+        "libev",
+    ],
+)
+
+mvfst_cpp_library(
+    name = "quic_libev_executor_impl",
+    srcs = [
+        "QuicLibevExecutorImpl.cpp",
+    ],
+    headers = [
+        "QuicLibevExecutorImpl.h",
+    ],
+    labels = ci.labels(ci.remove(ci.windows())),
+    exported_deps = [
+        ":libev_eventbase",
+        ":quic_executor",
+        "//folly:intrusive_list",
     ],
     exported_external_deps = [
         "libev",

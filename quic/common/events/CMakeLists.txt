@@ -11,6 +11,12 @@ mvfst_add_library(mvfst_common_events_eventbase
     Folly::folly_glog
 )
 
+mvfst_add_library(mvfst_common_events_quic_executor
+  EXPORTED_DEPS
+    mvfst_common_events_eventbase
+    Folly::folly_executor
+)
+
 mvfst_add_library(mvfst_common_events_quic_timer
   EXPORTED_DEPS
     mvfst_common_events_eventbase
@@ -24,6 +30,15 @@ mvfst_add_library(mvfst_common_events_folly_eventbase
     mvfst_common_events_eventbase
     Folly::folly_io_async_async_base
     Folly::folly_io_async_async_base_fwd
+)
+
+mvfst_add_library(mvfst_common_events_quic_folly_executor_impl
+  SRCS
+    QuicFollyExecutorImpl.cpp
+  EXPORTED_DEPS
+    mvfst_common_events_folly_eventbase
+    mvfst_common_events_quic_executor
+    Folly::folly_io_async_async_base
 )
 
 mvfst_add_library(mvfst_common_events_highres_quic_timer
