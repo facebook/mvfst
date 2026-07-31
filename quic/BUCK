@@ -1,27 +1,32 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
 load("@fbsource//tools/build_defs:fb_native_wrapper.bzl", "fb_native")
+load("@prelude//configurations:constraint_alias.bzl", "constraint_with_aliases")
 
 oncall("traffic_protocols")
 
-fb_native.constraint_setting(
+constraint_with_aliases(
     name = "use_alt_crypto",
+    aliases = {
+        "use_alt_crypto-enabled": "enabled",
+    },
+    default = "unspecified",
+    values = [
+        "enabled",
+        "unspecified",
+    ],
     visibility = ["PUBLIC"],
 )
 
-fb_native.constraint_value(
-    name = "use_alt_crypto-enabled",
-    constraint_setting = ":use_alt_crypto",
-    visibility = ["PUBLIC"],
-)
-
-fb_native.constraint_setting(
+constraint_with_aliases(
     name = "force_alt_crypto",
-    visibility = ["PUBLIC"],
-)
-
-fb_native.constraint_value(
-    name = "force_alt_crypto-enabled",
-    constraint_setting = ":force_alt_crypto",
+    aliases = {
+        "force_alt_crypto-enabled": "enabled",
+    },
+    default = "unspecified",
+    values = [
+        "enabled",
+        "unspecified",
+    ],
     visibility = ["PUBLIC"],
 )
 
