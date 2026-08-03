@@ -14,7 +14,6 @@
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
 #include <quic/common/IntervalSet.h>
-#include <quic/mvfst-config.h>
 #include <quic/priority/PriorityQueue.h>
 
 namespace quic {
