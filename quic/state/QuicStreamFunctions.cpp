@@ -93,7 +93,8 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,
-    FunctionRef<void(uint64_t, uint64_t)> connFlowControlVisitor) {
+    FunctionRef<quic::Expected<void, QuicError>(uint64_t, uint64_t)>
+        connFlowControlVisitor) {
   auto& readBuffer = stream.readBuffer;
   auto it = readBuffer.begin();
 
@@ -119,7 +120,6 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
           QuicErrorCode(TransportErrorCode::FINAL_SIZE_ERROR),
           std::string("EOF in middle of stream")));
     }
-    stream.finalReadOffset = bufferEofOffset;
   } else if (stream.finalReadOffset) {
     // We did not receive a segment with an EOF set.
     if (buffer.offset + buffer.data.chainLength() > *stream.finalReadOffset) {
@@ -129,8 +129,16 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
     }
   }
   // Update the flow control information before changing max offset observed on
-  // the stream.
-  connFlowControlVisitor(stream.maxOffsetObserved, bufferEndOffset);
+  // the stream. This runs after the consistency checks but before any stream
+  // mutation, so a violation leaves the stream state untouched.
+  auto flowControlResult =
+      connFlowControlVisitor(stream.maxOffsetObserved, bufferEndOffset);
+  if (!flowControlResult.has_value()) {
+    return quic::make_unexpected(flowControlResult.error());
+  }
+  if (bufferEofOffset) {
+    stream.finalReadOffset = bufferEofOffset;
+  }
   stream.maxOffsetObserved =
       std::max(stream.maxOffsetObserved, bufferEndOffset);
 
@@ -319,7 +327,10 @@ quic::Expected<void, QuicError> appendDataToReadBuffer(
         "crypto read buffer limit exceeded"));
   }
   return appendDataToReadBufferCommon(
-      stream, std::move(buffer), 0, [](uint64_t, uint64_t) {});
+      stream,
+      std::move(buffer),
+      0,
+      [](uint64_t, uint64_t) -> quic::Expected<void, QuicError> { return {}; });
 }
 
 std::pair<BufPtr, bool> readDataInOrderFromReadBuffer(

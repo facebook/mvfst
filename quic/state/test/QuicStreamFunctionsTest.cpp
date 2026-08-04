@@ -2542,4 +2542,51 @@ TEST_F(QuicStreamFunctionsTestBase, CryptoStreamBufferLimitExceeded) {
       QuicErrorCode(TransportErrorCode::CRYPTO_BUFFER_EXCEEDED));
 }
 
+TEST_F(QuicStreamFunctionsTestBase, AppendBeyondStreamFlowControlRejected) {
+  // Regression for T279928027: a STREAM fragment whose end offset exceeds the
+  // advertised stream flow-control window must abort the append with
+  // FLOW_CONTROL_ERROR and buffer nothing.
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+  stream->flowControlState.advertisedMaxOffset = 100;
+
+  // In-window data is accepted and buffered.
+  auto inWindow = IOBuf::create(100);
+  inWindow->append(100);
+  ASSERT_FALSE(
+      appendDataToReadBuffer(*stream, StreamBuffer(std::move(inWindow), 0))
+          .hasError());
+  EXPECT_EQ(stream->readBuffer.size(), 1);
+
+  // A 1-byte fragment one past the advertised window is rejected, and nothing
+  // is buffered for it.
+  auto beyond = IOBuf::create(1);
+  beyond->append(1);
+  auto res =
+      appendDataToReadBuffer(*stream, StreamBuffer(std::move(beyond), 100));
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(
+      res.error().code, QuicErrorCode(TransportErrorCode::FLOW_CONTROL_ERROR));
+  EXPECT_EQ(stream->readBuffer.size(), 1);
+}
+
+TEST_F(
+    QuicStreamFunctionsTestBase,
+    FlowControlViolationWithFinLeavesStreamClean) {
+  // A frame that carries a FIN and violates flow control must not leave
+  // finalReadOffset behind from the EOF bookkeeping.
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+  stream->flowControlState.advertisedMaxOffset = 100;
+
+  auto beyond = IOBuf::create(10);
+  beyond->append(10);
+  auto res = appendDataToReadBuffer(
+      *stream, StreamBuffer(std::move(beyond), 200, /*eofIn=*/true));
+  ASSERT_TRUE(res.hasError());
+  EXPECT_EQ(
+      res.error().code, QuicErrorCode(TransportErrorCode::FLOW_CONTROL_ERROR));
+  EXPECT_FALSE(stream->finalReadOffset.has_value());
+  EXPECT_EQ(stream->maxOffsetObserved, 0);
+  EXPECT_TRUE(stream->readBuffer.empty());
+}
+
 } // namespace quic::test

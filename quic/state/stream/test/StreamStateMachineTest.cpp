@@ -96,6 +96,26 @@ TEST_F(QuicOpenStateTest, ReadInvalidData) {
   EXPECT_NE(result.error().code.asTransportErrorCode(), nullptr);
 }
 
+TEST_F(QuicOpenStateTest, ReadStreamDataBeyondFlowControlRejected) {
+  // Regression for T279928027: receiveReadStreamFrameSMHandler must surface a
+  // FLOW_CONTROL_ERROR when a fragment's end offset exceeds the advertised
+  // stream window, rather than silently buffering it.
+  auto conn = createConn();
+  StreamId id = 0x00;
+  QuicStreamState stream(id, *conn);
+  stream.flowControlState.advertisedMaxOffset = 100;
+
+  ReadStreamFrame frame(id, /*offsetIn=*/100, /*finIn=*/false);
+  frame.data = IOBuf::copyBuffer("x");
+  auto result = receiveReadStreamFrameSMHandler(stream, std::move(frame));
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::FLOW_CONTROL_ERROR);
+  EXPECT_TRUE(stream.readBuffer.empty());
+}
+
 TEST_F(QuicOpenStateTest, InvalidEvent) {
   auto conn = createConn();
   StreamId id = 5;

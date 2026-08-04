@@ -135,7 +135,8 @@ uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream);
     QuicStreamLike& stream,
     StreamBuffer buffer,
     uint32_t coalescingSize,
-    FunctionRef<void(uint64_t, uint64_t)> connFlowControlVisitor);
+    FunctionRef<quic::Expected<void, QuicError>(uint64_t, uint64_t)>
+        connFlowControlVisitor);
 
 /**
  * Common function to read data from the read buffer in order. Returns a pair of
