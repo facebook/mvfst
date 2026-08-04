@@ -29,6 +29,7 @@ target_compile_options(
 target_link_libraries(
   echo PUBLIC
   mvfst_test_utils
+  mvfst_client_client
   ${GFLAGS_LIBRARIES}
   ${LIBGMOCK_LIBRARIES}
 )
