@@ -14,7 +14,11 @@ QuicLibevExecutorImpl::QuicLibevExecutorImpl(
     : LibevQuicEventBase(std::move(loop)) {}
 
 void QuicLibevExecutorImpl::add(folly::Func func) {
-  runInLoop(std::move(func).asStdFunction(), /*thisIteration=*/false);
+  if (isInEventBaseThread()) {
+    runInLoop(std::move(func).asStdFunction(), /*thisIteration=*/false);
+  } else {
+    runInEventBaseThread(std::move(func).asStdFunction());
+  }
 }
 
 void QuicLibevExecutorImpl::scheduleTimeout(
