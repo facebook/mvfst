@@ -424,8 +424,13 @@ CodecResult QuicReadCodec::parsePacket(
   if (queue.empty()) {
     return CodecResult(Nothing());
   }
-  MVCHECK(!queue.front()->isChained());
-  ContiguousReadCursor cursor(queue.front()->data(), queue.front()->length());
+  MVCHECK(
+      queue.front(),
+      "Non-empty BufQueue has no front buffer, chainLength="
+          << queue.chainLength());
+  auto* front = queue.front();
+  MVCHECK(!front->isChained());
+  ContiguousReadCursor cursor(front->data(), front->length());
   uint8_t initialByte = 0;
   if (!cursor.tryReadBE(initialByte)) {
     return CodecResult(Nothing());
