@@ -6,6 +6,7 @@
  */
 
 #include <fizz/crypto/Utils.h>
+#include <fizz/record/Types.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/stats/Histogram.h>
@@ -543,7 +544,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     buf_ = folly::IOBuf::createCombined(blockSize_);
   }
 
-  void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
+  void setQuicSocket(std::shared_ptr<quic::QuicServerTransport> socket) {
     sock_ = socket;
   }
 
@@ -803,7 +804,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
   void callbackCanceled() noexcept override {}
 
  private:
-  std::shared_ptr<quic::QuicSocket> sock_;
+  std::shared_ptr<quic::QuicServerTransport> sock_;
   std::shared_ptr<FollyQuicEventBase> evb_;
   FollyQuicAsyncUDPSocket udpSock_;
   uint64_t blockSize_;

@@ -37,6 +37,7 @@ mvfst_cpp_library(
     deps = [
         ":pacing_observer",
         "//fizz/crypto:utils",
+        "//fizz/record:record",
         "//folly/io:iobuf",
         "//folly/stats:histogram",
         "//quic/common/test:test_utils",
@@ -119,6 +120,21 @@ mvfst_cpp_binary(
         "fbcode//quic:force_alt_crypto-enabled",
     ],
     deps = _TPERF_DEPS,
+)
+
+mvfst_cpp_binary(
+    name = "tperf-xsec-zen4",
+    srcs = [
+        "tperf.cpp",
+    ],
+    modifiers = [
+        "fbcode//quic:use_alt_crypto-enabled",
+        "fbcode//quic:force_alt_crypto-enabled",
+    ],
+    deps = _TPERF_DEPS
+    + [
+        "//xsec_crypto/cpp20/haberdashery/aead/extensions:aes128gcm_zen4_benchmark_extension",
+    ],
 )
 
 mvfst_cpp_library(
