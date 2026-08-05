@@ -22,17 +22,17 @@ mvfst_cpp_library(
     name = "fizz_packet_number_cipher",
     srcs = select({
         "DEFAULT": ["FizzOpenSSLPacketNumberCipher.cpp"],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
+        "fbsource//xplat/fizz/constraints:profile[mnscrypto-only]": [],  # @fb-only
     }),
     headers = [
         "FizzPacketNumberCipher.h",
     ] + select({
         "DEFAULT": ["FizzOpenSSLPacketNumberCipher.h"],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": [],  # @fb-only
+        "fbsource//xplat/fizz/constraints:profile[mnscrypto-only]": [],  # @fb-only
     }),
     preprocessor_flags = select({
         "DEFAULT": [],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["-DMVFST_MBED"],  # @fb-only
+        "fbsource//xplat/fizz/constraints:profile[mnscrypto-only]": ["-DMVFST_MBED"],  # @fb-only
     }),
     deps = [
         "//quic/common:mvfst_logging",
@@ -41,7 +41,7 @@ mvfst_cpp_library(
         "//quic/codec:packet_number_cipher",
     ] + select({
         "DEFAULT": ["//folly/ssl:openssl_ptr_types"],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
+        "fbsource//xplat/fizz/constraints:profile[mnscrypto-only]": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
     }),
 )
 
@@ -60,7 +60,7 @@ mvfst_cpp_library(
     ],
     preprocessor_flags = select({
         "DEFAULT": [],
-        "fbsource//xplat/fizz/constraints:mnscrypto-only": ["-DMVFST_MBED"],  # @fb-only
+        "fbsource//xplat/fizz/constraints:profile[mnscrypto-only]": ["-DMVFST_MBED"],  # @fb-only
     }),
     deps = [
         ":fizz_bridge",  # @manual included via QUIC_DEFAULT_AEAD_HEADER macro
