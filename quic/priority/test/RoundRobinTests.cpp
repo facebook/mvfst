@@ -25,6 +25,78 @@ class RoundRobinTest : public ::testing::Test {
   RoundRobin rr_;
 };
 
+TEST_F(RoundRobinTest, AdvanceAfterNext) {
+  rr_.advanceAfterBytes(3); // force 100% coverage in next call
+  rr_.advanceAfterNext(3);
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+}
+
+TEST_F(RoundRobinTest, AdvanceAfterBytes) {
+  rr_.advanceAfterBytes(10);
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(10), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+}
+
+TEST_F(RoundRobinTest, EraseHeadResetsCurrent) {
+  rr_.advanceAfterBytes(10);
+  auto id1 = Identifier::fromStreamID(1);
+  EXPECT_EQ(rr_.getNext(9), id1); // 9 of 10 bytes spent on id1
+  EXPECT_TRUE(rr_.erase(id1));
+  // The turn died with id1, so id2 gets a full quantum.
+  auto id2 = Identifier::fromStreamID(2);
+  EXPECT_EQ(rr_.getNext(9), id2);
+  EXPECT_EQ(rr_.getNext(std::nullopt), id2);
+}
+
+TEST_F(RoundRobinTest, MoveEmptyThenInsert) {
+  // An empty RoundRobin has nextIt_ on end(), the one iterator a list move
+  // invalidates. Inserting afterwards must still work.
+  RoundRobin empty_rr;
+  ASSERT_TRUE(empty_rr.empty());
+  RoundRobin moved(std::move(empty_rr));
+  EXPECT_TRUE(moved.empty());
+  moved.insert(Identifier::fromStreamID(7));
+  EXPECT_FALSE(moved.empty());
+  EXPECT_EQ(moved.getNext(std::nullopt), Identifier::fromStreamID(7));
+}
+
+TEST_F(RoundRobinTest, MoveKeepsRotationPosition) {
+  // Take one turn, then move; the rotation must resume where it left off.
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  RoundRobin moved(std::move(rr_));
+  EXPECT_EQ(moved.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(moved.getNext(std::nullopt), Identifier::fromStreamID(3));
+  EXPECT_EQ(moved.getNext(std::nullopt), Identifier::fromStreamID(1));
+}
+
+TEST_F(RoundRobinTest, MoveAssignEmptyOverFull) {
+  RoundRobin empty_rr;
+  rr_ = std::move(empty_rr);
+  EXPECT_TRUE(rr_.empty());
+  rr_.insert(Identifier::fromStreamID(9));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(9));
+}
+
+TEST_F(RoundRobinTest, MoveKeepsByteDeficit) {
+  rr_.advanceAfterBytes(10);
+  EXPECT_EQ(rr_.getNext(5), Identifier::fromStreamID(1));
+  RoundRobin moved(std::move(rr_));
+  // 5 bytes already spent, so 5 more ends the turn.
+  EXPECT_EQ(moved.getNext(5), Identifier::fromStreamID(1));
+  EXPECT_EQ(moved.getNext(std::nullopt), Identifier::fromStreamID(2));
+}
+
 TEST_F(RoundRobinTest, Empty) {
   RoundRobin empty_rr;
   EXPECT_TRUE(empty_rr.empty());

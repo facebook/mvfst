@@ -18,6 +18,47 @@ static constexpr size_t kDestroyIndexThreshold = 10;
 
 namespace quic {
 
+RoundRobin::RoundRobin(RoundRobin&& other) noexcept {
+  *this = std::move(other);
+}
+
+RoundRobin& RoundRobin::operator=(RoundRobin&& other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+  // Sample this before the move: afterwards other.list_ is empty and the
+  // comparison would answer for the wrong container.
+  const bool onEnd = other.nextIt_ == other.list_.end();
+  list_ = std::move(other.list_);
+  indexMap_ = std::move(other.indexMap_);
+  advanceType_ = other.advanceType_;
+  useIndexMap_ = other.useIndexMap_;
+  advanceAfter_ = other.advanceAfter_;
+  current_ = other.current_;
+  // Iterators to elements survived the move and now name nodes in list_.
+  nextIt_ = onEnd ? list_.end() : other.nextIt_;
+  other.nextIt_ = other.list_.end();
+  other.current_ = 0;
+  other.useIndexMap_ = false;
+  return *this;
+}
+
+void RoundRobin::advanceAfterNext(size_t n) {
+  if (advanceType_ == AdvanceType::Bytes) {
+    current_ = 0;
+  }
+  advanceType_ = AdvanceType::Nexts;
+  advanceAfter_ = n;
+}
+
+void RoundRobin::advanceAfterBytes(uint64_t bytes) {
+  if (advanceType_ == AdvanceType::Nexts) {
+    current_ = 0;
+  }
+  advanceType_ = AdvanceType::Bytes;
+  advanceAfter_ = bytes;
+}
+
 bool RoundRobin::empty() const {
   return list_.empty();
 }
@@ -99,7 +140,12 @@ quic::PriorityQueue::Identifier RoundRobin::getNext(
   return *nextIt_;
 }
 
-void RoundRobin::consume(const quic::Optional<uint64_t>& /* bytes */) {
+void RoundRobin::consume(const quic::Optional<uint64_t>& bytes) {
+  if (advanceType_ == AdvanceType::Bytes) {
+    current_ += bytes.value_or(0);
+  } else {
+    current_++;
+  }
   maybeAdvance();
 }
 
@@ -110,6 +156,7 @@ void RoundRobin::clear() {
     useIndexMap_ = false;
   }
   nextIt_ = list_.end();
+  current_ = 0;
 }
 
 void RoundRobin::erase(ListType::iterator eraseIt) {
@@ -118,6 +165,8 @@ void RoundRobin::erase(ListType::iterator eraseIt) {
     if (nextIt_ == list_.end()) {
       nextIt_ = list_.begin();
     }
+    // The turn belonged to the erased element, so the next one starts fresh.
+    current_ = 0;
   } else {
     list_.erase(eraseIt);
   }
@@ -134,9 +183,12 @@ void RoundRobin::maybeAdvance() {
       "quic_round_robin_priority_queue",
       "invariant_violation: priority queue advanced while empty");
   MVCHECK(!list_.empty());
-  ++nextIt_;
-  if (nextIt_ == list_.end()) {
-    nextIt_ = list_.begin();
+  if (current_ >= advanceAfter_) {
+    ++nextIt_;
+    current_ = 0;
+    if (nextIt_ == list_.end()) {
+      nextIt_ = list_.begin();
+    }
   }
 }
 

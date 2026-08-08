@@ -17,6 +17,24 @@ namespace quic {
 
 class RoundRobin {
  public:
+  RoundRobin() = default;
+  ~RoundRobin() = default;
+
+  // Moving a std::list invalidates only its past-the-end iterator, so nextIt_
+  // has to be re-seated rather than copied whenever it is not on an element -
+  // which is always the case for an empty RoundRobin.  Copying would leave
+  // nextIt_ pointing into the source list, so it is disallowed.
+  RoundRobin(RoundRobin&& other) noexcept;
+  RoundRobin& operator=(RoundRobin&& other) noexcept;
+  RoundRobin(const RoundRobin&) = delete;
+  RoundRobin& operator=(const RoundRobin&) = delete;
+
+  // A turn ends after n calls to consume(), or after that many bytes have been
+  // reported to it.  Bytes are the fairer measure when elements differ in how
+  // much they write per turn.
+  void advanceAfterNext(size_t n);
+  void advanceAfterBytes(uint64_t bytes);
+
   [[nodiscard]] bool empty() const;
   void insert(quic::PriorityQueue::Identifier value);
   bool erase(quic::PriorityQueue::Identifier value);
@@ -40,7 +58,11 @@ class RoundRobin {
       ListType::iterator,
       PriorityQueue::Identifier::hash>
       indexMap_;
+  enum class AdvanceType : uint8_t { Nexts, Bytes };
+  AdvanceType advanceType_{AdvanceType::Nexts};
   bool useIndexMap_{false};
+  uint64_t advanceAfter_{1};
+  uint64_t current_{0};
 };
 
 } // namespace quic
