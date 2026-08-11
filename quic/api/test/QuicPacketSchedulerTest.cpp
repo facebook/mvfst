@@ -2702,6 +2702,67 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
   ASSERT_EQ(frames.size(), 1);
 }
 
+TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerDrainsNonDefaultFlow) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+  conn.transportSettings.datagramConfig.framePerPacket = false;
+  DatagramFrameScheduler scheduler(conn);
+  // Nothing on the default flow; both datagrams live on a named flow.
+  constexpr uint32_t kNamedFlowId = 7;
+  std::string s1(conn.udpSendPacketLen / 3, '*');
+  BufQueue buf1;
+  buf1.append(folly::IOBuf::copyBuffer(s1));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf1), kNamedFlowId);
+  std::string s2(conn.udpSendPacketLen / 3, '%');
+  BufQueue buf2;
+  buf2.append(folly::IOBuf::copyBuffer(s2));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf2), kNamedFlowId);
+  NiceMock<MockQuicPacketBuilder> builder;
+  EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder.frames_.push_back(f);
+  }));
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(2);
+  auto& frames = builder.frames_;
+  ASSERT_FALSE(scheduler.writeDatagramFrames(builder).hasError());
+  EXPECT_EQ(frames.size(), 2);
+  EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 0);
+}
+
+TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerDrainsAllFlows) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+  conn.transportSettings.datagramConfig.framePerPacket = false;
+  DatagramFrameScheduler scheduler(conn);
+  // One datagram on the default flow and one on each of two named flows.
+  for (uint32_t flowId : {kDefaultDatagramFlowId, 7u, 9u}) {
+    std::string s(conn.udpSendPacketLen / 8, '*');
+    BufQueue buf;
+    buf.append(folly::IOBuf::copyBuffer(s));
+    (void)conn.datagramState.flowManager.addDatagram(std::move(buf), flowId);
+  }
+  NiceMock<MockQuicPacketBuilder> builder;
+  EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder.frames_.push_back(f);
+  }));
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(3);
+  auto& frames = builder.frames_;
+  ASSERT_FALSE(scheduler.writeDatagramFrames(builder).hasError());
+  EXPECT_EQ(frames.size(), 3);
+  EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 0);
+}
+
 TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

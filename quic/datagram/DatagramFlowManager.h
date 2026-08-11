@@ -145,6 +145,14 @@ class DatagramFlowManager {
   [[nodiscard]] bool hasDatagramsForFlow(uint32_t flowId) const;
 
   /**
+   * Id of an arbitrary flow holding at least one datagram, or nullopt if
+   * every flow is empty. Flows are unordered, so repeated calls may return
+   * different ids; callers that need priority ordering must schedule via the
+   * PriorityQueue instead.
+   */
+  [[nodiscard]] std::optional<uint32_t> firstNonEmptyFlowId() const;
+
+  /**
    * Close a datagram flow and drop any queued datagrams.
    * Returns error if flow doesn't exist.
    */

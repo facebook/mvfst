@@ -971,15 +971,29 @@ quic::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     PacketBuilderInterface& builder) {
   bool sent = false;
 
-  // Write datagrams from default flow when not using PriorityQueue scheduling
-  size_t maxIters = conn_.datagramState.flowManager.getDatagramCount();
+  // Drain every flow when not using PriorityQueue scheduling. This is the only
+  // writer on this path, so datagrams queued on a non-default flow would
+  // otherwise never be sent. Flow order is unspecified here; callers that need
+  // priority ordering must enable PriorityQueue scheduling.
+  auto& flowManager = conn_.datagramState.flowManager;
+  // Every iteration either writes or expires at least one datagram, so the
+  // total datagram count bounds the loop.
+  size_t maxIters = flowManager.getDatagramCount();
   for (size_t i = 0; i < maxIters; ++i) {
-    auto writeResult =
-        writeDatagramFrame(conn_, kDefaultDatagramFlowId, builder);
+    auto flowId = flowManager.firstNonEmptyFlowId();
+    if (!flowId) {
+      break;
+    }
+    auto writeResult = writeDatagramFrame(conn_, *flowId, builder);
     if (!writeResult.has_value()) {
       return quic::make_unexpected(writeResult.error());
     }
     if (writeResult->datagramLen == 0) {
+      if (writeResult->flowEmpty) {
+        // Everything queued on this flow expired; move on to the next flow.
+        continue;
+      }
+      // Front datagram doesn't fit in the remaining space.
       break;
     }
     sent = true;

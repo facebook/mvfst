@@ -107,6 +107,15 @@ bool DatagramFlowManager::hasDatagramsForFlow(uint32_t flowId) const {
   return it != writeBuffer_.end() && !it->second.empty();
 }
 
+std::optional<uint32_t> DatagramFlowManager::firstNonEmptyFlowId() const {
+  for (const auto& [flowId, flow] : writeBuffer_) {
+    if (!flow.empty()) {
+      return flowId;
+    }
+  }
+  return std::nullopt;
+}
+
 quic::Expected<void, LocalErrorCode> DatagramFlowManager::closeFlow(
     uint32_t flowId) {
   auto it = writeBuffer_.find(flowId);
