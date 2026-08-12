@@ -74,6 +74,7 @@ void Cubic::handoff(
     uint64_t newCwnd,
     uint64_t newSsthresh,
     TimePoint lastReductionTime) noexcept {
+  invalidateSpuriousLossUndo();
   cwndBytes_ = newCwnd;
   ssthresh_ = newSsthresh;
   if (cwndBytes_ >= ssthresh_) {
@@ -143,11 +144,20 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
     return;
   }
   onRemoveBytesFromInflight(loss.lostBytes);
+  const bool startsNewRecovery = *loss.largestLostSentTime >=
+      recoveryState_.endOfRecovery.value_or(*loss.largestLostSentTime);
+  if (!conn_.transportSettings.ccaConfig.enableSpuriousLossRecovery ||
+      loss.persistentCongestion) {
+    invalidateSpuriousLossUndo();
+  } else if (startsNewRecovery) {
+    armSpuriousLossUndo(loss);
+  } else {
+    extendSpuriousLossUndo(loss);
+  }
   // If the loss occurred past the endOfRecovery then we need to move the
   // endOfRecovery back and invoke the state machine, otherwise ignore the loss
   // as it was already accounted for in a recovery period.
-  if (*loss.largestLostSentTime >=
-      recoveryState_.endOfRecovery.value_or(*loss.largestLostSentTime)) {
+  if (startsNewRecovery) {
     recoveryState_.endOfRecovery = Clock::now();
     cubicReduction(loss.lossTime);
     if (state_ == CubicStates::Hystart || state_ == CubicStates::Steady) {
@@ -195,6 +205,119 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
   }
 }
 
+void Cubic::resolveSpuriousLossUndo(
+    const AckEvent* FOLLY_NULLABLE ackEvent,
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (!conn_.transportSettings.ccaConfig.enableSpuriousLossRecovery) {
+    invalidateSpuriousLossUndo();
+    return;
+  }
+  auto& undoState = recoveryState_.spuriousLossUndo;
+  if (!undoState) {
+    return;
+  }
+
+  const uint64_t numPacketsSpuriouslyAcked =
+      ackEvent ? ackEvent->numPacketsSpuriouslyAcked : 0;
+  const uint64_t numNewLostPackets = lossEvent ? lossEvent->lostPackets : 0;
+  const auto declaredLostCount = conn_.outstandings.declaredLostCount;
+  if (numPacketsSpuriouslyAcked > undoState->pendingLostPackets ||
+      numNewLostPackets > declaredLostCount) {
+    invalidateSpuriousLossUndo();
+    return;
+  }
+
+  // Ack handling has already removed spurious ACKs from declaredLostCount,
+  // while loss detection has already added this event's new losses.
+  const auto remainingLostPackets =
+      undoState->pendingLostPackets - numPacketsSpuriouslyAcked;
+  const auto previouslyDeclaredLostPackets =
+      declaredLostCount - numNewLostPackets;
+  if (remainingLostPackets != previouslyDeclaredLostPackets) {
+    invalidateSpuriousLossUndo();
+    return;
+  }
+
+  undoState->pendingLostPackets = remainingLostPackets;
+  if (undoState->pendingLostPackets == 0) {
+    undoSpuriousLoss();
+  }
+}
+
+void Cubic::armSpuriousLossUndo(const LossEvent& loss) {
+  invalidateSpuriousLossUndo();
+  // Older retained losses make aggregate episode accounting ambiguous.
+  if (conn_.outstandings.declaredLostCount != loss.lostPackets) {
+    return;
+  }
+  recoveryState_.spuriousLossUndo = RecoveryState::PreviousSnapshot{
+      .priorCwndBytes = cwndBytes_,
+      .priorSsthresh = ssthresh_,
+      .priorState = state_,
+      .priorEndOfRecovery = recoveryState_.endOfRecovery,
+      .pendingLostPackets = loss.lostPackets,
+  };
+}
+
+void Cubic::extendSpuriousLossUndo(const LossEvent& loss) {
+  auto& undoState = recoveryState_.spuriousLossUndo;
+  if (!undoState) {
+    return;
+  }
+  undoState->pendingLostPackets += loss.lostPackets;
+  if (undoState->pendingLostPackets != conn_.outstandings.declaredLostCount) {
+    invalidateSpuriousLossUndo();
+  }
+}
+
+void Cubic::undoSpuriousLoss() {
+  MVCHECK(recoveryState_.spuriousLossUndo.has_value());
+  auto undoState = *recoveryState_.spuriousLossUndo;
+  recoveryState_.spuriousLossUndo.reset();
+  const auto stateBeforeUndo = state_;
+  cwndBytes_ = std::max(cwndBytes_, undoState.priorCwndBytes);
+  ssthresh_ = std::max(ssthresh_, undoState.priorSsthresh);
+  recoveryState_.endOfRecovery = undoState.priorEndOfRecovery;
+  if (state_ == CubicStates::FastRecovery) {
+    state_ = undoState.priorState;
+  }
+  if (steadyState_.tcpFriendly) {
+    steadyState_.estRenoCwnd = std::max(steadyState_.estRenoCwnd, cwndBytes_);
+  }
+
+  if (conn_.pacer) {
+    conn_.pacer->refreshPacingRate(
+        static_cast<uint64_t>(static_cast<float>(cwndBytes_) * pacingGain()),
+        conn_.lossState.srtt);
+  }
+  QLOG(
+      conn_,
+      addMetricUpdate,
+      conn_.lossState.lrtt,
+      conn_.lossState.mrtt,
+      conn_.lossState.srtt,
+      conn_.lossState.maybeLrttAckDelay.value_or(0us),
+      conn_.lossState.rttvar,
+      cwndBytes_,
+      conn_.lossState.inflightBytes,
+      ssthresh_ == std::numeric_limits<uint64_t>::max()
+          ? std::nullopt
+          : Optional<uint64_t>(ssthresh_),
+      std::nullopt,
+      std::nullopt,
+      conn_.lossState.ptoCount);
+  QLOG(
+      conn_,
+      addCongestionStateUpdate,
+      cubicStateToString(stateBeforeUndo).str(),
+      cubicStateToString(state_).str(),
+      kCubicSpuriousLossRecovery);
+}
+
+void Cubic::invalidateSpuriousLossUndo() noexcept {
+  recoveryState_.spuriousLossUndo.reset();
+}
+
 void Cubic::onRemoveBytesFromInflight(uint64_t /* bytes */) {
   QLOG(
       conn_,
@@ -221,6 +344,7 @@ void Cubic::onRemoveBytesFromInflight(uint64_t /* bytes */) {
 }
 
 void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
+  invalidateSpuriousLossUndo();
   QLOG(conn_, addAppIdleUpdate, kAppIdle, idle);
   bool currentAppIdle = isAppIdle();
   if (!currentAppIdle && idle) {
@@ -393,6 +517,7 @@ void Cubic::onPacketAckOrLoss(
   // largestLostPacketNum isn't a std::nullopt. But we should probably also
   // check against it here anyway just in case the loss code is changed in the
   // future.
+  resolveSpuriousLossUndo(ackEvent, lossEvent);
   if (lossEvent) {
     onPacketLoss(*lossEvent);
     if (conn_.pacer) {
@@ -887,6 +1012,7 @@ void Cubic::onEcnCongestionEvent(const AckEvent& ack) {
       conn_.ecnL4sTracker->getL4sWeight() >
           conn_.transportSettings.ccaConfig.l4sCETarget) {
     if (ack.largestNewlyAckedPacketSentTime > l4sCwndReducedTimestamp_) {
+      invalidateSpuriousLossUndo();
       MVCHECK(conn_.ecnL4sTracker);
       auto distanceToTarget = conn_.ecnL4sTracker->getNormalizedL4sWeight() -
           conn_.transportSettings.ccaConfig.l4sCETarget;

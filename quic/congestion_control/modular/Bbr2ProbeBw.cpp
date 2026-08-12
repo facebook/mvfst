@@ -47,6 +47,9 @@ void Bbr2ProbeBw::onPacketSent(const OutstandingPacketWrapper& packet) {
 void Bbr2ProbeBw::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (ackEvent && !ackEvent->largestNewlyAckedPacket && !lossEvent) {
+    return;
+  }
   if (lossEvent && lossEvent->lostPackets > 0) {
     if (conn_.transportSettings.ccaConfig.enableRecoveryInProbeStates) {
       auto ackedBytes = ackEvent ? ackEvent->ackedBytes : 0;

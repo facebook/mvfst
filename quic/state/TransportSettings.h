@@ -52,6 +52,11 @@ struct CongestionControlConfig {
   // limited.
   bool leaveHeadroomForCwndLimited{false};
 
+  // Used by: Cubic
+  // Allow a congestion controller to undo its congestion response when every
+  // packet in a loss episode is explicitly acknowledged as spurious.
+  bool enableSpuriousLossRecovery{false};
+
   // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
   //  The first controls how many ack eliciting packets have to be received
   //  to trigger an ACK.

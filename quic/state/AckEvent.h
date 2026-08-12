@@ -291,6 +291,11 @@ struct AckEvent {
   // Information about each packet ACKed during this event
   std::vector<AckPacket> ackedPackets;
 
+  // Packets explicitly acknowledged after having previously been declared
+  // lost. They are excluded from ackedPackets and ackedBytes because their
+  // inflight and frame state was handled at loss time.
+  uint64_t numPacketsSpuriouslyAcked{0};
+
   struct BuilderFields {
     Optional<TimePoint> maybeAckTime;
     Optional<TimePoint> maybeAdjustedAckTime;

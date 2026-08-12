@@ -125,6 +125,14 @@ class Cubic : public CongestionController {
   void onPacketLossInRecovery(const LossEvent& loss);
   void onPersistentCongestion();
 
+  void resolveSpuriousLossUndo(
+      const AckEvent* FOLLY_NULLABLE ackEvent,
+      const LossEvent* FOLLY_NULLABLE lossEvent);
+  void armSpuriousLossUndo(const LossEvent& loss);
+  void extendSpuriousLossUndo(const LossEvent& loss);
+  void undoSpuriousLoss();
+  void invalidateSpuriousLossUndo() noexcept;
+
   void onEcnCongestionEvent(const AckEvent& ack);
 
   [[nodiscard]] float pacingGain() const noexcept;
@@ -189,8 +197,17 @@ class Cubic : public CongestionController {
   };
 
   struct RecoveryState {
+    struct PreviousSnapshot {
+      uint64_t priorCwndBytes;
+      uint64_t priorSsthresh;
+      CubicStates priorState;
+      Optional<TimePoint> priorEndOfRecovery;
+      uint64_t pendingLostPackets;
+    };
+
     // The time point after which Quic will no longer be in current recovery
     Optional<TimePoint> endOfRecovery;
+    Optional<PreviousSnapshot> spuriousLossUndo;
   };
 
   // if quiescenceStart_ has a value, then the connection is app limited

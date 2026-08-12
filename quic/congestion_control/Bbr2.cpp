@@ -102,6 +102,9 @@ void Bbr2CongestionController::onPacketSent(
 void Bbr2CongestionController::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (ackEvent && !ackEvent->largestNewlyAckedPacket && !lossEvent) {
+    return;
+  }
   SCOPE_EXIT {
     QLOG(
         conn_,

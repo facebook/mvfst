@@ -68,8 +68,11 @@ void updateCongestionControllerForAck(
     QuicConnectionStateBase& conn,
     AckEvent& ack,
     Optional<LossEvent>& lossEvent) {
-  if (conn.congestionController &&
-      (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
+  const bool hasAckOrLoss =
+      ack.largestNewlyAckedPacket.has_value() || lossEvent.has_value();
+  const bool hasCongestionControllerEvent =
+      hasAckOrLoss || ack.numPacketsSpuriouslyAcked > 0;
+  if (conn.congestionController && hasCongestionControllerEvent) {
     if (lossEvent) {
       PROTO_OOPS_LOG_BUILDER_IF(
           conn.nodeType == QuicNodeType::Server &&
@@ -103,10 +106,12 @@ void updateCongestionControllerForAck(
     }
     conn.congestionController->onPacketAckOrLoss(
         &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
-    for (auto& packetProcessor : conn.packetProcessors) {
-      packetProcessor->onPacketAck(&ack);
-      packetProcessor->onPacketAckOrLoss(
-          &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
+    if (hasAckOrLoss) {
+      for (auto& packetProcessor : conn.packetProcessors) {
+        packetProcessor->onPacketAck(&ack);
+        packetProcessor->onPacketAckOrLoss(
+            &ack, lossEvent.has_value() ? &lossEvent.value() : nullptr);
+      }
     }
 
     ack.ccState = conn.congestionController->getState();
@@ -269,6 +274,9 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         return quic::make_unexpected(QuicError(
             TransportErrorCode::INTERNAL_ERROR,
             "Failed to modify state for spurious loss"));
+      }
+      if (!ack.implicit) {
+        ++ack.numPacketsSpuriouslyAcked;
       }
       QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
       if (spuriousLossEvent) {

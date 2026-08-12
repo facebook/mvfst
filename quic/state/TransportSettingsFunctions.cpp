@@ -68,7 +68,7 @@ quic::CongestionControlConfig parseCongestionControlConfig(
   quic::CongestionControlConfig ccaConfig;
 
   // Parse known boolean fields
-  const std::array<std::pair<std::string_view, bool&>, 17> boolFields = {{
+  const std::array<std::pair<std::string_view, bool&>, 18> boolFields = {{
       {"conservativeRecovery", ccaConfig.conservativeRecovery},
       {"largeProbeRttCwnd", ccaConfig.largeProbeRttCwnd},
       {"enableAckAggregationInStartup",
@@ -78,6 +78,7 @@ quic::CongestionControlConfig parseCongestionControlConfig(
       {"additiveIncreaseAfterHystart", ccaConfig.additiveIncreaseAfterHystart},
       {"onlyGrowCwndWhenLimited", ccaConfig.onlyGrowCwndWhenLimited},
       {"leaveHeadroomForCwndLimited", ccaConfig.leaveHeadroomForCwndLimited},
+      {"enableSpuriousLossRecovery", ccaConfig.enableSpuriousLossRecovery},
       {"ignoreInflightHi", ccaConfig.ignoreInflightLongTerm},
       {"ignoreLoss", ccaConfig.ignoreShortTerm},
       {"enableRecoveryInStartup", ccaConfig.enableRecoveryInStartup},

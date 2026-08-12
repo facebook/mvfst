@@ -20,6 +20,7 @@ constexpr auto kPersistentCongestion = "persistent congestion";
 constexpr auto kRemoveInflight = "remove bytes in flight";
 constexpr auto kCubicSkipLoss = "cubic skip loss";
 constexpr auto kCubicLoss = "cubic loss";
+constexpr auto kCubicSpuriousLossRecovery = "cubic spurious loss recovery";
 constexpr auto kCubicSteadyCwnd = "cubic steady cwnd";
 constexpr auto kCubicSkipAck = "cubic skip ack";
 constexpr auto kCubicInit = "cubic init";

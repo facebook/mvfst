@@ -14,7 +14,218 @@ using namespace testing;
 
 namespace quic::test {
 
+namespace {
+
+AckEvent makeSpuriousAck(uint64_t numPackets) {
+  const auto ackTime = Clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(0)
+                 .build();
+  ack.numPacketsSpuriouslyAcked = numPackets;
+  return ack;
+}
+
+void processCubicEvent(
+    QuicConnectionStateBase& conn,
+    Cubic& cubic,
+    Optional<AckEvent> ack,
+    Optional<LossEvent> loss) {
+  const auto numPacketsSpuriouslyAcked =
+      ack ? ack->numPacketsSpuriouslyAcked : 0;
+  ASSERT_LE(numPacketsSpuriouslyAcked, conn.outstandings.declaredLostCount);
+  conn.outstandings.declaredLostCount -= numPacketsSpuriouslyAcked;
+  if (loss) {
+    conn.outstandings.declaredLostCount += loss->lostPackets;
+  }
+  quic::test::onPacketAckOrLossWrapper(
+      &conn, &cubic, std::move(ack), std::move(loss));
+}
+
+} // namespace
+
 class CubicRecoveryTest : public Test {};
+
+TEST_F(CubicRecoveryTest, SpuriousLossRecoveryDisabledByDefault) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  Cubic cubic(conn);
+  const auto sentTime = Clock::now() - 1s;
+  auto packet = makeTestingWritePacket(0, 1000, 1000, sentTime);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet);
+  LossEvent loss;
+  loss.addLostPacket(packet);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(loss));
+  const auto cwndAfterLoss = cubic.getCongestionWindow();
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+
+  EXPECT_EQ(cwndAfterLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
+}
+
+TEST_F(CubicRecoveryTest, RecoversAfterEntireLossEpisodeIsSpurious) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  const auto cwndBeforeLoss = cubic.getCongestionWindow();
+  const auto sentTime = Clock::now() - 1s;
+  auto packet0 = makeTestingWritePacket(0, 1000, 1000, sentTime);
+  auto packet1 = makeTestingWritePacket(1, 1000, 2000, sentTime);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet0);
+  quic::test::onPacketsSentWrapper(&conn, &cubic, packet1);
+  LossEvent loss;
+  loss.addLostPacket(packet0);
+  loss.addLostPacket(packet1);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(loss));
+  const auto cwndAfterLoss = cubic.getCongestionWindow();
+  EXPECT_LT(cwndAfterLoss, cwndBeforeLoss);
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+  EXPECT_EQ(cwndAfterLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+  EXPECT_EQ(cwndBeforeLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::Hystart, cubic.state());
+  CongestionControllerStats stats{};
+  cubic.getStats(stats);
+  EXPECT_EQ(Cubic::INIT_SSTHRESH, stats.cubicStats.ssthresh);
+}
+
+TEST_F(CubicRecoveryTest, LossesInRecoveryMustAlsoBeSpurious) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  const auto cwndBeforeLoss = cubic.getCongestionWindow();
+  const auto sentTime = Clock::now() - 1s;
+  auto packet0 = makeTestingWritePacket(0, 1000, 1000, sentTime);
+  auto packet1 = makeTestingWritePacket(1, 1000, 2000, sentTime);
+  LossEvent firstLoss;
+  firstLoss.addLostPacket(packet0);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(firstLoss));
+  const auto cwndAfterLoss = cubic.getCongestionWindow();
+
+  LossEvent lossInRecovery;
+  lossInRecovery.addLostPacket(packet1);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(lossInRecovery));
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+  EXPECT_EQ(cwndAfterLoss, cubic.getCongestionWindow());
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+  EXPECT_EQ(cwndBeforeLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::Hystart, cubic.state());
+}
+
+TEST_F(CubicRecoveryTest, RetainedLossFromOlderEpisodePreventsUndo) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  conn.outstandings.declaredLostCount = 1;
+  auto packet = makeTestingWritePacket(0, 1000, 1000, Clock::now() - 1s);
+  LossEvent loss;
+  loss.addLostPacket(packet);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(loss));
+  const auto cwndAfterLoss = cubic.getCongestionWindow();
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(2), std::nullopt);
+
+  EXPECT_EQ(cwndAfterLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
+}
+
+TEST_F(CubicRecoveryTest, SpuriousLossIsProcessedBeforeNewLoss) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  const auto cwndBeforeLoss = cubic.getCongestionWindow();
+  auto packet0 = makeTestingWritePacket(0, 1000, 1000, Clock::now() - 1s);
+  LossEvent firstLoss;
+  firstLoss.addLostPacket(packet0);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(firstLoss));
+  const auto cwndAfterOneReduction = cubic.getCongestionWindow();
+
+  auto packet1 = makeTestingWritePacket(1, 1000, 2000, Clock::now() + 1s);
+  LossEvent newLoss;
+  newLoss.addLostPacket(packet1);
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::move(newLoss));
+
+  EXPECT_EQ(cwndAfterOneReduction, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+  EXPECT_EQ(cwndBeforeLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::Hystart, cubic.state());
+}
+
+TEST_F(CubicRecoveryTest, RecoversAfterFastRecoveryEnds) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  const auto cwndBeforeLoss = cubic.getCongestionWindow();
+  auto lostPacket = makeTestingWritePacket(0, 1000, 1000, Clock::now() - 1s);
+  LossEvent loss;
+  loss.addLostPacket(lostPacket);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(loss));
+
+  auto ackedPacket = makeTestingWritePacket(1, 1000, 2000, Clock::now());
+  processCubicEvent(
+      conn,
+      cubic,
+      makeAck(1, 1000, Clock::now() + 1ms, ackedPacket.metadata.time),
+      std::nullopt);
+  ASSERT_EQ(CubicStates::Steady, cubic.state());
+  const auto cwndAfterRecovery = cubic.getCongestionWindow();
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+
+  EXPECT_EQ(
+      std::max(cwndBeforeLoss, cwndAfterRecovery), cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::Steady, cubic.state());
+}
+
+TEST_F(CubicRecoveryTest, CountMismatchInvalidatesUndo) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  const auto sentTime = Clock::now() - 1s;
+  auto packet0 = makeTestingWritePacket(0, 1000, 1000, sentTime);
+  auto packet1 = makeTestingWritePacket(1, 1000, 2000, sentTime);
+  LossEvent loss;
+  loss.addLostPacket(packet0);
+  loss.addLostPacket(packet1);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(loss));
+  const auto cwndAfterLoss = cubic.getCongestionWindow();
+
+  --conn.outstandings.declaredLostCount;
+  processCubicEvent(conn, cubic, makeSpuriousAck(1), std::nullopt);
+
+  EXPECT_EQ(cwndAfterLoss, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
+}
+
+TEST_F(CubicRecoveryTest, PersistentCongestionInvalidatesRecovery) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
+  Cubic cubic(conn);
+  auto packet0 = makeTestingWritePacket(0, 1000, 1000, Clock::now() - 1s);
+  LossEvent firstLoss;
+  firstLoss.addLostPacket(packet0);
+  processCubicEvent(conn, cubic, std::nullopt, std::move(firstLoss));
+
+  auto packet1 = makeTestingWritePacket(1, 1000, 2000, Clock::now() + 1s);
+  LossEvent persistentLoss;
+  persistentLoss.addLostPacket(packet1);
+  persistentLoss.persistentCongestion = true;
+  processCubicEvent(conn, cubic, std::nullopt, std::move(persistentLoss));
+  const auto cwndAfterPersistentCongestion = cubic.getCongestionWindow();
+  ASSERT_EQ(CubicStates::Hystart, cubic.state());
+
+  processCubicEvent(conn, cubic, makeSpuriousAck(2), std::nullopt);
+  EXPECT_EQ(cwndAfterPersistentCongestion, cubic.getCongestionWindow());
+  EXPECT_EQ(CubicStates::Hystart, cubic.state());
+}
 
 TEST_F(CubicRecoveryTest, LossBurst) {
   QuicConnectionStateBase conn(QuicNodeType::Client);

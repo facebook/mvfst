@@ -68,6 +68,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"probeRttDisabledIfAppLimited\": 2, "
       "\"drainToTarget\": \"1\", "
       "\"leaveHeadroomForCwndLimited\": \"1\", "
+      "\"enableSpuriousLossRecovery\": true, "
       "\"ackFrequencyConfig\": {"
       "\"ackElicitingThreshold\": 99, "
       "\"reorderingThreshold\": \"88\", "
@@ -95,6 +96,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.additiveIncreaseAfterHystart, true);
   EXPECT_EQ(config.onlyGrowCwndWhenLimited, true);
   EXPECT_EQ(config.leaveHeadroomForCwndLimited, true);
+  EXPECT_EQ(config.enableSpuriousLossRecovery, true);
   EXPECT_EQ(config.ignoreInflightLongTerm, true);
   EXPECT_EQ(config.ignoreShortTerm, true);
   EXPECT_EQ(config.exitStartupOnLoss, false);
@@ -128,6 +130,7 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.enableAckAggregationInStartup, false);
   EXPECT_EQ(config.probeRttDisabledIfAppLimited, false);
   EXPECT_EQ(config.drainToTarget, false);
+  EXPECT_EQ(config.enableSpuriousLossRecovery, false);
   EXPECT_EQ(config.ignoreInflightLongTerm, false);
   EXPECT_EQ(config.ignoreShortTerm, false);
   EXPECT_EQ(config.exitStartupOnLoss, true);

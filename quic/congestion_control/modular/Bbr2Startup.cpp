@@ -43,6 +43,9 @@ Bbr2Startup::Bbr2Startup(QuicConnectionStateBase& conn)
 void Bbr2Startup::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (ackEvent && !ackEvent->largestNewlyAckedPacket && !lossEvent) {
+    return;
+  }
   if (lossEvent && lossEvent->lostPackets > 0) {
     auto ackedBytes = ackEvent ? ackEvent->ackedBytes : 0;
     if (conn_.transportSettings.ccaConfig.enableRecoveryInStartup) {

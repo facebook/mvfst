@@ -145,6 +145,112 @@ auto getNumAckReceiveTimestamps(const AckEvent& ackEvent) {
   return numTimestamps;
 }
 
+TEST_P(AckHandlersTest, SpuriousOnlyAckNotifiesCongestionController) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto* rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto* rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
+
+  constexpr PacketNum kPacketNum = 7;
+  auto packet = createNewPacket(kPacketNum, GetParam().pnSpace);
+  conn.outstandings.packets.emplace_back(
+      std::move(packet),
+      Clock::now() - 1ms,
+      0,
+      1,
+      0,
+      1,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  conn.outstandings.packets.back().declaredLost = true;
+  conn.outstandings.declaredLostCount = 1;
+  getAckState(conn, GetParam().pnSpace).nextPacketNum = kPacketNum + 1;
+
+  EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, IsNull()))
+      .WillOnce([expectedPacketNumberSpace = GetParam().pnSpace](
+                    const AckEvent* ack, const LossEvent*) {
+        ASSERT_NE(nullptr, ack);
+        EXPECT_FALSE(ack->largestNewlyAckedPacket.has_value());
+        EXPECT_EQ(expectedPacketNumberSpace, ack->packetNumberSpace);
+        EXPECT_EQ(1, ack->numPacketsSpuriouslyAcked);
+      });
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(0);
+  EXPECT_CALL(*rawPacketProcessor, onPacketAckOrLoss(_, _)).Times(0);
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = kPacketNum;
+  ackFrame.ackBlocks.emplace_back(kPacketNum, kPacketNum);
+  auto result = processAckFrame(
+      conn,
+      GetParam().pnSpace,
+      ackFrame,
+      [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+      [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      Clock::now());
+
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(1, result.value().numPacketsSpuriouslyAcked);
+  EXPECT_EQ(0, conn.outstandings.declaredLostCount);
+}
+
+TEST_P(AckHandlersTest, ImplicitAckIsNotSpuriousLossProof) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto* rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+
+  constexpr PacketNum kPacketNum = 7;
+  auto packet = createNewPacket(kPacketNum, GetParam().pnSpace);
+  conn.outstandings.packets.emplace_back(
+      std::move(packet),
+      Clock::now() - 1ms,
+      0,
+      1,
+      0,
+      1,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  conn.outstandings.packets.back().declaredLost = true;
+  conn.outstandings.declaredLostCount = 1;
+  getAckState(conn, GetParam().pnSpace).nextPacketNum = kPacketNum + 1;
+
+  EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = kPacketNum;
+  ackFrame.ackBlocks.emplace_back(kPacketNum, kPacketNum);
+  ackFrame.implicit = true;
+  auto result = processAckFrame(
+      conn,
+      GetParam().pnSpace,
+      ackFrame,
+      [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+      [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      Clock::now());
+
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(0, result.value().numPacketsSpuriouslyAcked);
+  EXPECT_EQ(0, conn.outstandings.declaredLostCount);
+}
+
 // Build a timestamp map of received packets with relative timestamps using a
 // given timestamp range for later matching.
 uint64_t buildExpectedReceiveTimestamps(
