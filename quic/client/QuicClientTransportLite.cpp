@@ -2132,10 +2132,12 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
 
   QUIC_STATS(conn_->statsCallback, onConnectionMigration);
 
-  // If there's already a previous path from an earlier migration, remove it
-  // now. We only keep track of one old path at a time.
+  // Path validation can synchronously migrate from the read loop, which still
+  // uses the previous path's socket until it unwinds.
   if (previousPathId_.has_value()) {
-    (void)conn_->pathManager->removePath(*previousPathId_);
+    runOnEvbAsyncOp(
+        {.type = AsyncOpType::RemoveNonCurrentPathClient,
+         .pathId = *previousPathId_});
   }
   previousPathId_ = oldPathId;
 

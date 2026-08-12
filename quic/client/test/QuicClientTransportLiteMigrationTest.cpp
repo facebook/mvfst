@@ -261,6 +261,43 @@ TEST_F(
 
 TEST_F(
     QuicClientTransportLiteMigrationTest,
+    PreviousPathRemovalIsDeferredAcrossValidationCallback) {
+  auto initialPathId = quicClient_->getConn()->currentPathId;
+
+  quic::SocketAddress firstAddr("::", 12345);
+  auto firstSocket = createProbeSocketMock(firstAddr);
+  TestPathValidationCallback firstCallback(quicClient_.get(), true);
+  auto firstResult =
+      quicClient_->startPathProbe(std::move(firstSocket), &firstCallback);
+  ASSERT_TRUE(firstResult.has_value()) << firstResult.error();
+  auto firstPathId = firstResult.value();
+  validatePath(firstPathId);
+  ASSERT_EQ(quicClient_->getConn()->currentPathId, firstPathId);
+
+  quic::SocketAddress secondAddr("::", 12346);
+  auto secondSocket = createProbeSocketMock(secondAddr);
+  auto* secondSocketPtr = secondSocket.get();
+  TestPathValidationCallback secondCallback(quicClient_.get(), true);
+  auto secondResult =
+      quicClient_->startPathProbe(std::move(secondSocket), &secondCallback);
+  ASSERT_TRUE(secondResult.has_value()) << secondResult.error();
+  auto secondPathId = secondResult.value();
+  validatePath(secondPathId);
+  ASSERT_EQ(quicClient_->getConn()->currentPathId, secondPathId);
+  sockPtr_ = secondSocketPtr;
+
+  EXPECT_NE(
+      quicClient_->getConn()->pathManager->getPath(initialPathId), nullptr);
+  qEvb_->loopOnce();
+  EXPECT_EQ(
+      quicClient_->getConn()->pathManager->getPath(initialPathId), nullptr);
+  EXPECT_NE(quicClient_->getConn()->pathManager->getPath(firstPathId), nullptr);
+  EXPECT_NE(
+      quicClient_->getConn()->pathManager->getPath(secondPathId), nullptr);
+}
+
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
     MigrateConnectionSwitchesCurrentPath) {
   quic::SocketAddress localAddr("::", 22334);
   auto probeSock = createProbeSocketMock(localAddr);
