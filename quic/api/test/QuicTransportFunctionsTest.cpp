@@ -4371,7 +4371,7 @@ TEST_F(QuicTransportFunctionsTest, HasDatagramsToWrite) {
   EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
   BufQueue buf;
   buf.append(folly::IOBuf::copyBuffer("I'm an unreliable Datagram"));
-  conn->datagramState.flowManager.addDatagram(
+  (void)conn->datagramState.flowManager.addDatagram(
       std::move(buf), kDefaultDatagramFlowId);
   EXPECT_EQ(WriteDataReason::DATAGRAM, hasNonAckDataToWrite(*conn));
 }

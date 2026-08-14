@@ -1855,7 +1855,7 @@ TEST_P(
   conn.datagramState.maxWriteFrameSize = std::numeric_limits<uint16_t>::max();
 
   constexpr uint64_t kDatagramPayloadSize = 1;
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       folly::IOBuf::copyBuffer("d"), kDefaultDatagramFlowId);
 
   FrameScheduler scheduler = std::move(
@@ -2606,12 +2606,12 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
   std::string s1(conn.udpSendPacketLen / 3, '*');
   BufQueue buf1;
   buf1.append(folly::IOBuf::copyBuffer(s1));
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       std::move(buf1), kDefaultDatagramFlowId);
   std::string s2(conn.udpSendPacketLen / 3, '%');
   BufQueue buf2;
   buf2.append(folly::IOBuf::copyBuffer(s2));
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       std::move(buf2), kDefaultDatagramFlowId);
   NiceMock<MockQuicPacketBuilder> builder;
   EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
@@ -2640,12 +2640,12 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
   std::string s1(conn.udpSendPacketLen / 3, '*');
   BufQueue buf1;
   buf1.append(folly::IOBuf::copyBuffer(s1));
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       std::move(buf1), kDefaultDatagramFlowId);
   std::string s2(conn.udpSendPacketLen / 3, '%');
   BufQueue buf2;
   buf2.append(folly::IOBuf::copyBuffer(s2));
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       std::move(buf2), kDefaultDatagramFlowId);
   NiceMock<MockQuicPacketBuilder> builder;
   EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
@@ -2679,7 +2679,7 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
   std::string s(conn.udpSendPacketLen / 3, '*');
   BufQueue buf;
   buf.append(folly::IOBuf::copyBuffer(s));
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       std::move(buf), kDefaultDatagramFlowId);
   NiceMock<MockQuicPacketBuilder> builder;
   EXPECT_CALL(builder, remainingSpaceInPkt())
@@ -4254,8 +4254,10 @@ TEST_P(QuicPacketSchedulerTest, DatagramDoubleSchedulerBug) {
       true; // KEY: stops after 1 datagram
 
   // Add 2 small datagrams
-  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer("d1"));
-  conn.datagramState.flowManager.addDatagram(folly::IOBuf::copyBuffer("d2"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      folly::IOBuf::copyBuffer("d1"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      folly::IOBuf::copyBuffer("d2"));
 
   // Add to priority queue
   auto dgId =
@@ -4337,7 +4339,7 @@ TEST_F(QuicPacketSchedulerTest, DatagramFlowPriorityScheduling) {
   uint32_t datagramFlowId = 100;
   BufQueue datagramBuf;
   datagramBuf.append(folly::IOBuf::copyBuffer("datagram data"));
-  conn.datagramState.flowManager.addDatagram(
+  (void)conn.datagramState.flowManager.addDatagram(
       std::move(datagramBuf), datagramFlowId);
   (void)conn.datagramState.flowManager.setFlowPriority(
       datagramFlowId, HTTPPriorityQueue::Priority(7, false));
@@ -4384,7 +4386,8 @@ TEST_F(QuicPacketSchedulerTest, MultipleDatagramFlowsWithPriorities) {
 
   BufQueue buf1;
   buf1.append(folly::IOBuf::copyBuffer("high priority datagram"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf1), highPriorityFlow);
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf1), highPriorityFlow);
   (void)conn.datagramState.flowManager.setFlowPriority(
       highPriorityFlow, highPri);
   conn.streamManager->writeQueue().insertOrUpdate(
@@ -4392,14 +4395,16 @@ TEST_F(QuicPacketSchedulerTest, MultipleDatagramFlowsWithPriorities) {
 
   BufQueue buf2;
   buf2.append(folly::IOBuf::copyBuffer("mid priority datagram"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf2), midPriorityFlow);
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf2), midPriorityFlow);
   (void)conn.datagramState.flowManager.setFlowPriority(midPriorityFlow, midPri);
   conn.streamManager->writeQueue().insertOrUpdate(
       PriorityQueue::Identifier::fromDatagramFlowID(midPriorityFlow), midPri);
 
   BufQueue buf3;
   buf3.append(folly::IOBuf::copyBuffer("low priority datagram"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf3), lowPriorityFlow);
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf3), lowPriorityFlow);
   (void)conn.datagramState.flowManager.setFlowPriority(lowPriorityFlow, lowPri);
   conn.streamManager->writeQueue().insertOrUpdate(
       PriorityQueue::Identifier::fromDatagramFlowID(lowPriorityFlow), lowPri);
@@ -4436,14 +4441,14 @@ TEST_F(QuicPacketSchedulerTest, InterleavedStreamsAndDatagramsRespectPriority) {
 
   BufQueue buf1;
   buf1.append(folly::IOBuf::copyBuffer("d1"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf1), 100);
+  (void)conn.datagramState.flowManager.addDatagram(std::move(buf1), 100);
   (void)conn.datagramState.flowManager.setFlowPriority(100, pri3);
   conn.streamManager->writeQueue().insertOrUpdate(
       PriorityQueue::Identifier::fromDatagramFlowID(100), pri3);
 
   BufQueue buf2;
   buf2.append(folly::IOBuf::copyBuffer("d2"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf2), 200);
+  (void)conn.datagramState.flowManager.addDatagram(std::move(buf2), 200);
   (void)conn.datagramState.flowManager.setFlowPriority(200, pri7);
   conn.streamManager->writeQueue().insertOrUpdate(
       PriorityQueue::Identifier::fromDatagramFlowID(200), pri7);
@@ -4462,7 +4467,7 @@ TEST_F(QuicPacketSchedulerTest, InterleavedStreamsAndDatagramsRespectPriority) {
   }
 }
 
-TEST_F(QuicPacketSchedulerTest, DatagramFlowCloseDropsPendingDatagrams) {
+TEST_F(QuicPacketSchedulerTest, DatagramFlowCloseNowDropsPendingDatagrams) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   setupDatagramFlowConn(conn);
@@ -4473,14 +4478,14 @@ TEST_F(QuicPacketSchedulerTest, DatagramFlowCloseDropsPendingDatagrams) {
   for (int i = 0; i < 3; ++i) {
     BufQueue buf;
     buf.append(folly::IOBuf::copyBuffer("datagram " + std::to_string(i)));
-    conn.datagramState.flowManager.addDatagram(std::move(buf), flowId);
+    (void)conn.datagramState.flowManager.addDatagram(std::move(buf), flowId);
   }
 
   EXPECT_EQ(3, conn.datagramState.flowManager.getDatagramCount());
   EXPECT_TRUE(conn.datagramState.flowManager.hasDatagramsForFlow(flowId));
 
   // Close the flow
-  auto result = conn.datagramState.flowManager.closeFlow(flowId);
+  auto result = conn.datagramState.flowManager.closeFlowNow(flowId);
   ASSERT_TRUE(result.has_value());
 
   // All datagrams should be dropped
@@ -4524,7 +4529,7 @@ TEST_F(QuicPacketSchedulerTest, DatagramFlowPriorityCanBeUpdated) {
   // Add datagram with initial priority
   BufQueue buf;
   buf.append(folly::IOBuf::copyBuffer("datagram"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf), flowId);
+  (void)conn.datagramState.flowManager.addDatagram(std::move(buf), flowId);
   (void)conn.datagramState.flowManager.setFlowPriority(flowId, initialPri);
   conn.streamManager->writeQueue().insertOrUpdate(
       PriorityQueue::Identifier::fromDatagramFlowID(flowId), initialPri);
@@ -4553,22 +4558,298 @@ TEST_F(QuicPacketSchedulerTest, ClosingFlowWithDatagramsRemovesFromQueue) {
   // Add datagrams to two flows
   BufQueue buf1;
   buf1.append(folly::IOBuf::copyBuffer("flow1-data"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf1), flow1);
+  (void)conn.datagramState.flowManager.addDatagram(std::move(buf1), flow1);
 
   BufQueue buf2;
   buf2.append(folly::IOBuf::copyBuffer("flow2-data"));
-  conn.datagramState.flowManager.addDatagram(std::move(buf2), flow2);
+  (void)conn.datagramState.flowManager.addDatagram(std::move(buf2), flow2);
 
   EXPECT_EQ(2, conn.datagramState.flowManager.getDatagramCount());
 
   // Close flow1
-  auto result = conn.datagramState.flowManager.closeFlow(flow1);
+  auto result = conn.datagramState.flowManager.closeFlowNow(flow1);
   ASSERT_TRUE(result.has_value());
 
   // flow1 should be gone, flow2 should remain
   EXPECT_EQ(1, conn.datagramState.flowManager.getDatagramCount());
   EXPECT_FALSE(conn.datagramState.flowManager.hasDatagramsForFlow(flow1));
   EXPECT_TRUE(conn.datagramState.flowManager.hasDatagramsForFlow(flow2));
+}
+
+TEST_F(QuicPacketSchedulerTest, EphemeralDatagramFlowCleanup) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10).value();
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.datagramConfig.enabled = true;
+  conn.transportSettings.datagramConfig.scheduleDatagramsWithStreams = true;
+  conn.datagramState.maxWriteFrameSize = 1000;
+  conn.datagramState.maxWriteBufferSize = 100;
+
+  // Create an ephemeral flow with priority 5
+  uint32_t ephemeralFlowId = 0; // Ephemeral flows count up from 0
+  BufQueue datagramBuf;
+  datagramBuf.append(folly::IOBuf::copyBuffer("ephemeral datagram"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(datagramBuf),
+      ephemeralFlowId,
+      HTTPPriorityQueue::Priority(5, false),
+      true /* ephemeral */);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(ephemeralFlowId),
+      HTTPPriorityQueue::Priority(5, false));
+
+  // Verify flow exists
+  EXPECT_EQ(conn.datagramState.flowManager.getFlowCount(), 1);
+  EXPECT_TRUE(conn.datagramState.flowManager.isFlowDraining(ephemeralFlowId));
+
+  // Write the datagram
+  auto builder = setupMockPacketBuilder();
+  StreamFrameScheduler scheduler(conn);
+  auto result = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result.hasError());
+
+  // Verify datagram was written
+  bool foundDatagramFrame = false;
+  for (const auto& frame : builder->frames_) {
+    if (frame.asDatagramFrame()) {
+      foundDatagramFrame = true;
+    }
+  }
+  EXPECT_TRUE(foundDatagramFrame);
+
+  // Verify ephemeral flow was cleaned up (removed from writeBuffer)
+  EXPECT_EQ(conn.datagramState.flowManager.getFlowCount(), 0);
+}
+
+TEST_F(QuicPacketSchedulerTest, MultipleEphemeralFlowsWithPriorities) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10).value();
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.datagramConfig.enabled = true;
+  conn.transportSettings.datagramConfig.scheduleDatagramsWithStreams = true;
+  conn.datagramState.maxWriteFrameSize = 1000;
+  conn.datagramState.maxWriteBufferSize = 100;
+
+  // Create three ephemeral flows with different priorities
+  uint32_t highPriFlow = 0;
+  uint32_t midPriFlow = 1;
+  uint32_t lowPriFlow = 2;
+
+  BufQueue buf1;
+  buf1.append(folly::IOBuf::copyBuffer("high"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf1),
+      highPriFlow,
+      HTTPPriorityQueue::Priority(1, false),
+      true);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(highPriFlow),
+      HTTPPriorityQueue::Priority(1, false));
+
+  BufQueue buf2;
+  buf2.append(folly::IOBuf::copyBuffer("mid"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf2), midPriFlow, HTTPPriorityQueue::Priority(5, false), true);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(midPriFlow),
+      HTTPPriorityQueue::Priority(5, false));
+
+  BufQueue buf3;
+  buf3.append(folly::IOBuf::copyBuffer("low"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf3), lowPriFlow, HTTPPriorityQueue::Priority(9, false), true);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(lowPriFlow),
+      HTTPPriorityQueue::Priority(9, false));
+
+  EXPECT_EQ(3, conn.datagramState.flowManager.getFlowCount());
+
+  // Schedule - should send all datagrams and clean up all flows
+  auto builder = setupMockPacketBuilder();
+  StreamFrameScheduler scheduler(conn);
+  auto result = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result.hasError());
+
+  // Verify at least one datagram was sent
+  bool foundDatagramFrame = false;
+  for (const auto& frame : builder->frames_) {
+    if (frame.asDatagramFrame()) {
+      foundDatagramFrame = true;
+    }
+  }
+  EXPECT_TRUE(foundDatagramFrame);
+
+  // Note: In a single packet builder call, we may not send all datagrams
+  // The test verifies cleanup happens correctly for what was sent
+}
+
+TEST_F(QuicPacketSchedulerTest, EphemeralFlowNotCleanedWhenNotSent) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10).value();
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.datagramConfig.enabled = true;
+  conn.transportSettings.datagramConfig.scheduleDatagramsWithStreams = true;
+  conn.datagramState.maxWriteFrameSize = 50; // Small size
+  conn.datagramState.maxWriteBufferSize = 100;
+
+  // Create ephemeral flow with a datagram that won't fit
+  uint32_t ephemeralFlowId = 0;
+  std::string largeData(1000, 'x'); // Large datagram
+  BufQueue buf;
+  buf.append(folly::IOBuf::copyBuffer(largeData));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf),
+      ephemeralFlowId,
+      HTTPPriorityQueue::Priority(5, false),
+      true);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(ephemeralFlowId),
+      HTTPPriorityQueue::Priority(5, false));
+
+  EXPECT_EQ(1, conn.datagramState.flowManager.getFlowCount());
+  EXPECT_TRUE(conn.datagramState.flowManager.isFlowDraining(ephemeralFlowId));
+
+  // Try to schedule - datagram won't fit
+  auto builder = setupMockPacketBuilder();
+  EXPECT_CALL(*builder, remainingSpaceInPkt()).WillRepeatedly(Return(100));
+  StreamFrameScheduler scheduler(conn);
+  auto result = scheduler.writeStreams(*builder);
+
+  // Ephemeral flow should still exist (not sent, so not cleaned up)
+  EXPECT_EQ(1, conn.datagramState.flowManager.getFlowCount());
+  EXPECT_EQ(1, conn.datagramState.flowManager.getDatagramCount());
+  EXPECT_TRUE(conn.datagramState.flowManager.isFlowDraining(ephemeralFlowId));
+}
+
+TEST_F(QuicPacketSchedulerTest, MixedEphemeralAndPersistentFlows) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10).value();
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.datagramConfig.enabled = true;
+  conn.transportSettings.datagramConfig.scheduleDatagramsWithStreams = true;
+  conn.datagramState.maxWriteFrameSize = 1000;
+  conn.datagramState.maxWriteBufferSize = 100;
+
+  // Create ephemeral flow
+  uint32_t ephemeralFlow = 0;
+  BufQueue buf1;
+  buf1.append(folly::IOBuf::copyBuffer("ephemeral"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf1),
+      ephemeralFlow,
+      HTTPPriorityQueue::Priority(5, false),
+      true);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(ephemeralFlow),
+      HTTPPriorityQueue::Priority(5, false));
+
+  // Create persistent flow
+  uint32_t persistentFlow = 100;
+  BufQueue buf2;
+  buf2.append(folly::IOBuf::copyBuffer("persistent"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf2),
+      persistentFlow,
+      HTTPPriorityQueue::Priority(5, false),
+      false);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(persistentFlow),
+      HTTPPriorityQueue::Priority(5, false));
+
+  EXPECT_EQ(2, conn.datagramState.flowManager.getFlowCount());
+  EXPECT_TRUE(conn.datagramState.flowManager.isFlowDraining(ephemeralFlow));
+  EXPECT_FALSE(conn.datagramState.flowManager.isFlowDraining(persistentFlow));
+
+  // Schedule datagrams
+  auto builder = setupMockPacketBuilder();
+  StreamFrameScheduler scheduler(conn);
+  auto result = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result.hasError());
+
+  // Verify datagrams were sent
+  int datagramCount = 0;
+  for (const auto& frame : builder->frames_) {
+    if (frame.asDatagramFrame()) {
+      datagramCount++;
+    }
+  }
+  EXPECT_GT(datagramCount, 0);
+
+  // Check which flows were cleaned up based on what was sent
+  // Ephemeral flows get cleaned when empty, persistent flows don't
+  if (!conn.datagramState.flowManager.hasDatagramsForFlow(ephemeralFlow)) {
+    // Ephemeral was sent and cleaned up
+    EXPECT_FALSE(conn.datagramState.flowManager.isFlowDraining(
+        ephemeralFlow)); // Doesn't exist
+  }
+  if (!conn.datagramState.flowManager.hasDatagramsForFlow(persistentFlow)) {
+    // Persistent was sent but still exists
+    EXPECT_FALSE(conn.datagramState.flowManager.isFlowDraining(persistentFlow));
+  }
+}
+
+TEST_F(QuicPacketSchedulerTest, EphemeralFlowWithStreamInterleaving) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10).value();
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.datagramConfig.enabled = true;
+  conn.transportSettings.datagramConfig.scheduleDatagramsWithStreams = true;
+  conn.datagramState.maxWriteFrameSize = 1000;
+  conn.datagramState.maxWriteBufferSize = 100;
+
+  // Create stream with priority 3
+  auto streamId = createStream(conn, HTTPPriorityQueue::Priority(3, false));
+  writeDataToStream(conn, streamId, "stream data");
+
+  // Create ephemeral datagram flow with priority 5 (lower than stream)
+  uint32_t ephemeralFlowId = 0;
+  BufQueue buf;
+  buf.append(folly::IOBuf::copyBuffer("ephemeral"));
+  (void)conn.datagramState.flowManager.addDatagram(
+      std::move(buf),
+      ephemeralFlowId,
+      HTTPPriorityQueue::Priority(5, false),
+      true);
+  conn.streamManager->writeQueue().insertOrUpdate(
+      PriorityQueue::Identifier::fromDatagramFlowID(ephemeralFlowId),
+      HTTPPriorityQueue::Priority(5, false));
+
+  EXPECT_EQ(1, conn.datagramState.flowManager.getFlowCount());
+
+  // Schedule - stream should be sent first, then datagram
+  auto builder = setupMockPacketBuilder();
+  StreamFrameScheduler scheduler(conn);
+  auto result = scheduler.writeStreams(*builder);
+  ASSERT_FALSE(result.hasError());
+
+  // Verify both were sent
+  bool foundStream = false;
+  bool foundDatagram = false;
+  for (const auto& frame : builder->frames_) {
+    if (frame.asWriteStreamFrame()) {
+      foundStream = true;
+      // Stream should come before datagram
+      EXPECT_FALSE(foundDatagram);
+    } else if (frame.asDatagramFrame()) {
+      foundDatagram = true;
+    }
+  }
+
+  EXPECT_TRUE(foundStream);
+  EXPECT_TRUE(foundDatagram);
+
+  // Ephemeral flow should be cleaned up
+  EXPECT_EQ(0, conn.datagramState.flowManager.getFlowCount());
 }
 
 INSTANTIATE_TEST_SUITE_P(

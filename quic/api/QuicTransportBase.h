@@ -169,6 +169,10 @@ class QuicTransportBase : public QuicSocket,
    */
   quic::Expected<void, LocalErrorCode> writeDatagram(BufPtr buf) override;
 
+  quic::Expected<void, LocalErrorCode> writeDatagram(
+      PriorityQueue::Priority priority,
+      BufPtr buf) override;
+
   quic::Expected<uint32_t, LocalErrorCode> createDatagramFlowId() override;
 
   quic::Expected<void, LocalErrorCode> writeDatagram(
@@ -180,6 +184,9 @@ class QuicTransportBase : public QuicSocket,
       PriorityQueue::Priority priority) override;
 
   quic::Expected<void, LocalErrorCode> closeDatagramFlow(
+      uint32_t flowId) override;
+
+  quic::Expected<void, LocalErrorCode> closeDatagramFlowNow(
       uint32_t flowId) override;
 
   /**
@@ -300,7 +307,11 @@ class QuicTransportBase : public QuicSocket,
    */
   quic::Expected<void, LocalErrorCode> writeDatagramInternal(
       BufPtr buf,
-      uint32_t flowId);
+      uint32_t flowId,
+      std::optional<PriorityQueue::Priority> priority,
+      bool ephemeralFlow);
+
+  void maybeEraseDatagramFlowFromWriteQueue(uint32_t flowId);
 };
 
 } // namespace quic

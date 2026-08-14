@@ -47,10 +47,27 @@ void DatagramFlowManager::DatagramFlowQueue::pop() {
   }
 }
 
-PriorityQueue::Priority DatagramFlowManager::addDatagram(
+quic::Expected<PriorityQueue::Priority, LocalErrorCode>
+DatagramFlowManager::addDatagram(
     BufQueue buf,
-    uint32_t flowId) {
+    uint32_t flowId,
+    std::optional<PriorityQueue::Priority> priority,
+    bool draining) {
+  auto it = writeBuffer_.find(flowId);
+
+  // Rejected whether or not the scheduler has finished draining, so the
+  // caller gets the same answer either way.
+  if (it != writeBuffer_.end() && it->second.draining) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+
   auto& flow = writeBuffer_[flowId];
+  if (draining) {
+    flow.draining = true;
+  }
+  if (priority) {
+    flow.priority = *priority;
+  }
   flow.push(std::move(buf));
   ++datagramCount_;
   return flow.priority;
@@ -91,15 +108,31 @@ DatagramFlowManager::DatagramPopResult DatagramFlowManager::popDatagramIfFits(
   it->second.pop();
   --datagramCount_;
   bool flowEmpty = it->second.empty();
+  if (flowEmpty && it->second.draining) {
+    writeBuffer_.erase(it);
+  }
   return {std::move(result), flowEmpty, datagramLen};
 }
 
-void DatagramFlowManager::popDatagram() {
+std::optional<uint32_t> DatagramFlowManager::popDatagram() {
   CHECK(!writeBuffer_.empty()) << "popDatagram called with empty writeBuffer";
 
-  auto it = writeBuffer_.begin();
-  it->second.pop();
-  --datagramCount_;
+  for (auto it = writeBuffer_.begin(); it != writeBuffer_.end(); ++it) {
+    // A flow can be queued with nothing in it -- created, or drained and not
+    // draining -- and popping it would undercount.
+    if (it->second.empty()) {
+      continue;
+    }
+    it->second.pop();
+    --datagramCount_;
+    if (it->second.empty() && it->second.draining) {
+      auto retiredFlowId = it->first;
+      writeBuffer_.erase(it);
+      return retiredFlowId;
+    }
+    return std::nullopt;
+  }
+  return std::nullopt;
 }
 
 bool DatagramFlowManager::hasDatagramsForFlow(uint32_t flowId) const {
@@ -117,6 +150,22 @@ std::optional<uint32_t> DatagramFlowManager::firstNonEmptyFlowId() const {
 }
 
 quic::Expected<void, LocalErrorCode> DatagramFlowManager::closeFlow(
+    uint32_t flowId) {
+  auto it = writeBuffer_.find(flowId);
+  if (it == writeBuffer_.end()) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+
+  if (it->second.empty()) {
+    writeBuffer_.erase(it);
+    return {};
+  }
+
+  it->second.draining = true;
+  return {};
+}
+
+quic::Expected<void, LocalErrorCode> DatagramFlowManager::closeFlowNow(
     uint32_t flowId) {
   auto it = writeBuffer_.find(flowId);
   if (it == writeBuffer_.end()) {

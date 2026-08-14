@@ -34,6 +34,9 @@ class DatagramFlowManager {
     BufQueue single;
     std::unique_ptr<CircularDeque<BufQueue>> multi;
     PriorityQueue::Priority priority{kDefaultDatagramPriority};
+    // Closing: rejects further writes and is erased once its last datagram is
+    // popped. Set by closeFlow(), and at creation for ephemeral flows.
+    bool draining{false};
 
     DatagramFlowQueue() = default;
     ~DatagramFlowQueue() = default;
@@ -108,13 +111,29 @@ class DatagramFlowManager {
     return writeBuffer_.find(flowId) != writeBuffer_.end();
   }
 
+  [[nodiscard]] size_t getFlowCount() const {
+    return writeBuffer_.size();
+  }
+
+  [[nodiscard]] bool isFlowDraining(uint32_t flowId) const {
+    auto it = writeBuffer_.find(flowId);
+    return it != writeBuffer_.end() && it->second.draining;
+  }
+
   /**
    * Add a datagram to a flow's write buffer.
-   * Returns the flow's priority.
+   * Does a single map lookup and handles priority setting if provided.
+   * Returns the flow's priority (either newly set or existing).
+   * Pass draining for an ephemeral flow: one that takes this datagram and is
+   * erased once it is written.
+   * Returns error if the flow is already draining - a closed flow id is
+   * finished, and the caller must allocate a new one.
    */
-  PriorityQueue::Priority addDatagram(
+  quic::Expected<PriorityQueue::Priority, LocalErrorCode> addDatagram(
       BufQueue buf,
-      uint32_t flowId = kDefaultDatagramFlowId);
+      uint32_t flowId = kDefaultDatagramFlowId,
+      std::optional<PriorityQueue::Priority> priority = std::nullopt,
+      bool draining = false);
 
   /**
    * Set priority for an existing flow.
@@ -133,11 +152,12 @@ class DatagramFlowManager {
   DatagramPopResult popDatagramIfFits(uint32_t flowId, uint64_t availableSpace);
 
   /**
-   * Pop a datagram from any non-empty flow.
-   * Removes flow from map if it becomes empty (single datagram case).
-   * Multi-datagram flows stay in the map.
+   * Drop a datagram from the first non-empty flow. Returns the id of the flow
+   * this retired - a draining flow whose last datagram it was - so the caller
+   * can drop whatever scheduling state it holds for that flow. Returns nullopt
+   * if the flow is still around.
    */
-  void popDatagram();
+  std::optional<uint32_t> popDatagram();
 
   /**
    * Check if a flow exists and is not empty.
@@ -153,10 +173,24 @@ class DatagramFlowManager {
   [[nodiscard]] std::optional<uint32_t> firstNonEmptyFlowId() const;
 
   /**
-   * Close a datagram flow and drop any queued datagrams.
-   * Returns error if flow doesn't exist.
+   * Close a datagram flow, draining whatever is already queued on it. A flow
+   * with nothing queued is erased immediately; otherwise it is marked
+   * draining and erased once the scheduler pops its last datagram. A draining
+   * flow rejects addDatagram(), but an erased one reads as an unused id and
+   * addDatagram() would quietly reopen it, so discard a closed id rather than
+   * relying on this to reject writes.
+   * Use hasFlow() to tell whether the flow is already gone.
+   * Returns error if the flow doesn't exist.
    */
   quic::Expected<void, LocalErrorCode> closeFlow(uint32_t flowId);
+
+  /**
+   * Close a datagram flow immediately, discarding anything still queued on
+   * it. Prefer closeFlow() unless the queued datagrams are known to be
+   * worthless - this drops data the peer will never see.
+   * Returns error if the flow doesn't exist.
+   */
+  quic::Expected<void, LocalErrorCode> closeFlowNow(uint32_t flowId);
 
  private:
   // Buffers Outgoing Datagrams per-flow

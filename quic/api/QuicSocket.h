@@ -386,6 +386,15 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual WriteResult writeDatagram(BufPtr buf) = 0;
 
   /**
+   * Writes a Datagram frame with a specific priority. Creates an ephemeral
+   * flow for this datagram that is automatically cleaned up when the datagram
+   * is sent.
+   */
+  virtual WriteResult writeDatagram(
+      PriorityQueue::Priority priority,
+      BufPtr buf) = 0;
+
+  /**
    * Creates a new datagram flow ID that can be used to send datagrams
    * with a specific priority.
    */
@@ -407,9 +416,26 @@ class QuicSocket : virtual public QuicSocketLite {
       PriorityQueue::Priority priority) = 0;
 
   /**
-   * Closes a datagram flow. Any queued datagrams in the flow will be dropped.
+   * Closes a datagram flow, draining whatever is already queued on it. A flow
+   * with nothing queued closes immediately; otherwise it closes once the
+   * queued datagrams have been written.
+   * The flow id is finished either way - further writeDatagram() calls on it
+   * fail, whether or not it has finished draining - so discard the id and
+   * call createDatagramFlowId() again if you need another flow.
+   * Only flows from createDatagramFlowId() can be closed; the default flow
+   * backing writeDatagram(BufPtr) has no id to discard, so closing it returns
+   * INVALID_OPERATION.
    */
   virtual quic::Expected<void, LocalErrorCode> closeDatagramFlow(
+      uint32_t flowId) = 0;
+
+  /**
+   * Closes a datagram flow immediately, dropping any datagrams still queued on
+   * it. Prefer closeDatagramFlow() unless the queued datagrams are known to be
+   * worthless - this discards data the peer will never see.
+   * As with closeDatagramFlow(), the default flow cannot be closed.
+   */
+  virtual quic::Expected<void, LocalErrorCode> closeDatagramFlowNow(
       uint32_t flowId) = 0;
 
   /**

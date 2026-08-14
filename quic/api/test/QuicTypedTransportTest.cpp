@@ -6827,10 +6827,6 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportAfterStartTestDatagram,
     SetPriorityBeforeFirstWrite) {
-  if (!TypeParam::scheduleDatagramsWithStreams) {
-    GTEST_SKIP();
-  }
-
   // Create a datagram flow
   auto maybeFlowId = this->getTransport()->createDatagramFlowId();
   ASSERT_TRUE(maybeFlowId.has_value());
@@ -6851,15 +6847,154 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportAfterStartTestDatagram,
     WriteToUncreatedFlowReturnsError) {
-  if (!TypeParam::scheduleDatagramsWithStreams) {
-    GTEST_SKIP();
-  }
-
   // Write to a flowId that was never created
   auto result = this->getTransport()->writeDatagram(
       12345, folly::IOBuf::copyBuffer("payload"));
   ASSERT_TRUE(result.hasError());
   EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, result.error());
+
+  this->destroyTransport();
+}
+
+/**
+ * The default flow backs writeDatagram(BufPtr) and has no id for the caller to
+ * discard, so closing it is refused. Erasing it would only invite the next
+ * default-flow write to reopen it.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    CloseDefaultDatagramFlowReturnsError) {
+  ASSERT_TRUE(this->getTransport()
+                  ->writeDatagram(folly::IOBuf::copyBuffer("Default"))
+                  .has_value());
+
+  auto closeResult =
+      this->getTransport()->closeDatagramFlow(kDefaultDatagramFlowId);
+  ASSERT_TRUE(closeResult.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, closeResult.error());
+
+  auto closeNowResult =
+      this->getTransport()->closeDatagramFlowNow(kDefaultDatagramFlowId);
+  ASSERT_TRUE(closeNowResult.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, closeNowResult.error());
+
+  // The default flow is untouched, so the queued datagram still goes out.
+  EXPECT_EQ(
+      1, this->getNonConstConn().datagramState.flowManager.getDatagramCount());
+
+  this->destroyTransport();
+}
+
+/**
+ * With sendDropOldDataFirst, a write into a full buffer drops the oldest
+ * queued datagram. When that datagram is the only one on an ephemeral flow,
+ * the flow manager retires the flow -- so the flow id must come out of the
+ * write queue too. Left behind, the scheduler picks it up and pops from a flow
+ * that no longer exists.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    DropOldestRetiresEphemeralFlowFromWriteQueue) {
+  if (!TypeParam::scheduleDatagramsWithStreams) {
+    GTEST_SKIP();
+  }
+
+  auto& conn = this->getNonConstConn();
+  conn.transportSettings.datagramConfig.sendDropOldDataFirst = true;
+  conn.datagramState.maxWriteBufferSize = 1;
+
+  // Ephemeral flow, urgency 1: one datagram, and the flow goes away with it.
+  ASSERT_TRUE(this->getTransport()
+                  ->writeDatagram(
+                      HTTPPriorityQueue::Priority(1, false),
+                      folly::IOBuf::copyBuffer("Ephemeral"))
+                  .has_value());
+  ASSERT_EQ(1, conn.datagramState.flowManager.getFlowCount());
+
+  // The buffer is full, so this write drops the ephemeral datagram, which
+  // empties and retires the ephemeral flow.
+  ASSERT_TRUE(this->getTransport()
+                  ->writeDatagram(folly::IOBuf::copyBuffer("Default"))
+                  .has_value());
+  ASSERT_TRUE(
+      this->getTransport()
+          ->setDatagramFlowPriority(
+              kDefaultDatagramFlowId, HTTPPriorityQueue::Priority(3, false))
+          .has_value());
+
+  ASSERT_EQ(1, conn.datagramState.flowManager.getDatagramCount());
+  ASSERT_TRUE(conn.datagramState.flowManager.hasDatagramsForFlow(
+      kDefaultDatagramFlowId));
+  // The ephemeral flow is gone; only the default flow is left.
+  EXPECT_EQ(1, conn.datagramState.flowManager.getFlowCount());
+
+  // The default flow is the only writable one, so it has to be what the
+  // scheduler sees next. The retired ephemeral flow outranks it (urgency 1 vs
+  // 3), so a leftover queue entry surfaces here.
+  const auto nextId = conn.streamManager->writeQueue().peekNextScheduledID();
+  ASSERT_TRUE(nextId.isDatagramFlowID());
+  EXPECT_EQ(kDefaultDatagramFlowId, nextId.asDatagramFlowID())
+      << "write queue still schedules the retired ephemeral flow";
+
+  // A stale entry makes this pop from a flow that is not in the write buffer.
+  this->loopForWrites();
+
+  EXPECT_EQ(0, conn.datagramState.flowManager.getDatagramCount());
+  EXPECT_TRUE(conn.streamManager->writeQueue().empty());
+
+  this->destroyTransport();
+}
+
+/**
+ * A gracefully closed flow stays in the write buffer while it drains, so a
+ * write to it has to be refused up front. Left to addDatagram, a full buffer
+ * would first drop another flow's datagram to make room for a write that then
+ * fails anyway.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    WriteToDrainingFlowDropsNothing) {
+  auto& conn = this->getNonConstConn();
+  conn.transportSettings.datagramConfig.sendDropOldDataFirst = true;
+  conn.datagramState.maxWriteBufferSize = 2;
+
+  auto flowId = this->getTransport()->createDatagramFlowId();
+  ASSERT_TRUE(flowId.has_value());
+  ASSERT_TRUE(this->getTransport()
+                  ->writeDatagram(*flowId, folly::IOBuf::copyBuffer("Draining"))
+                  .has_value());
+  ASSERT_TRUE(this->getTransport()
+                  ->writeDatagram(folly::IOBuf::copyBuffer("Default"))
+                  .has_value());
+  ASSERT_TRUE(this->getTransport()->closeDatagramFlow(*flowId).has_value());
+  ASSERT_EQ(2, conn.datagramState.flowManager.getDatagramCount());
+
+  auto result = this->getTransport()->writeDatagram(
+      *flowId, folly::IOBuf::copyBuffer("Rejected"));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, result.error());
+  // Both queued datagrams survive the rejected write.
+  EXPECT_EQ(2, conn.datagramState.flowManager.getDatagramCount());
+
+  this->destroyTransport();
+}
+
+/**
+ * A zero-sized write buffer is full with nothing in it, so the drop-oldest
+ * path has no victim to find.
+ */
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestDatagram,
+    WriteWithZeroSizedBufferFails) {
+  auto& conn = this->getNonConstConn();
+  conn.transportSettings.datagramConfig.sendDropOldDataFirst = true;
+  conn.datagramState.maxWriteBufferSize = 0;
+
+  auto result =
+      this->getTransport()->writeDatagram(folly::IOBuf::copyBuffer("Nowhere"));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_WRITE_DATA, result.error());
+  EXPECT_EQ(0, conn.datagramState.flowManager.getDatagramCount());
 
   this->destroyTransport();
 }

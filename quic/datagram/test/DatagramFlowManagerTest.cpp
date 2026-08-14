@@ -45,7 +45,7 @@ TEST_F(DatagramFlowManagerTest, AddAndPopSingleDatagram) {
   EXPECT_FALSE(manager_->hasDatagramsToSend());
   EXPECT_EQ(0, manager_->getDatagramCount());
 
-  manager_->addDatagram(makeBuf("hello"), 1);
+  (void)manager_->addDatagram(makeBuf("hello"), 1);
 
   EXPECT_TRUE(manager_->hasDatagramsToSend());
   EXPECT_EQ(1, manager_->getDatagramCount());
@@ -62,9 +62,9 @@ TEST_F(DatagramFlowManagerTest, AddAndPopSingleDatagram) {
 }
 
 TEST_F(DatagramFlowManagerTest, MultipleDatagramsOnSingleFlow) {
-  manager_->addDatagram(makeBuf("first"), 1);
-  manager_->addDatagram(makeBuf("second"), 1);
-  manager_->addDatagram(makeBuf("third"), 1);
+  (void)manager_->addDatagram(makeBuf("first"), 1);
+  (void)manager_->addDatagram(makeBuf("second"), 1);
+  (void)manager_->addDatagram(makeBuf("third"), 1);
 
   EXPECT_EQ(3, manager_->getDatagramCount());
   EXPECT_TRUE(manager_->hasDatagramsForFlow(1));
@@ -93,11 +93,11 @@ TEST_F(DatagramFlowManagerTest, MultipleFlowsWithDifferentPriorities) {
   HTTPPriorityQueue::Priority midPri(5, false);
   HTTPPriorityQueue::Priority lowPri(9, false);
 
-  manager_->addDatagram(makeBuf("high priority"), 100);
+  (void)manager_->addDatagram(makeBuf("high priority"), 100);
   (void)manager_->setFlowPriority(100, highPri);
-  manager_->addDatagram(makeBuf("mid priority"), 200);
+  (void)manager_->addDatagram(makeBuf("mid priority"), 200);
   (void)manager_->setFlowPriority(200, midPri);
-  manager_->addDatagram(makeBuf("low priority"), 300);
+  (void)manager_->addDatagram(makeBuf("low priority"), 300);
   (void)manager_->setFlowPriority(300, lowPri);
 
   EXPECT_EQ(3, manager_->getDatagramCount());
@@ -125,7 +125,7 @@ TEST_F(DatagramFlowManagerTest, SetFlowPriority) {
   HTTPPriorityQueue::Priority newPri(3, false);
 
   // Add datagram with initial priority
-  manager_->addDatagram(makeBuf("data"), 1);
+  (void)manager_->addDatagram(makeBuf("data"), 1);
   (void)manager_->setFlowPriority(1, initialPri);
 
   // Change priority
@@ -149,7 +149,7 @@ TEST_F(DatagramFlowManagerTest, SetFlowPriorityReturnsEmptyStatus) {
   HTTPPriorityQueue::Priority pri(5, false);
 
   // Add and pop datagram to create empty flow
-  manager_->addDatagram(makeBuf("data"), 1);
+  (void)manager_->addDatagram(makeBuf("data"), 1);
   manager_->popDatagram();
 
   // Flow still exists in map but is empty
@@ -160,7 +160,7 @@ TEST_F(DatagramFlowManagerTest, SetFlowPriorityReturnsEmptyStatus) {
 }
 
 TEST_F(DatagramFlowManagerTest, PopDatagramIfFitsWithInsufficientSpace) {
-  manager_->addDatagram(makeBuf("this is a long datagram"), 1);
+  (void)manager_->addDatagram(makeBuf("this is a long datagram"), 1);
 
   // Try to pop with insufficient space
   auto result = manager_->popDatagramIfFits(1, 10);
@@ -184,7 +184,7 @@ TEST_F(DatagramFlowManagerTest, PopDatagramIfFitsWithOverhead) {
     return datagramLen / 10; // 10% overhead
   });
 
-  manager_->addDatagram(makeBuf("0123456789"), 1); // 10 bytes
+  (void)manager_->addDatagram(makeBuf("0123456789"), 1); // 10 bytes
 
   // With 10% overhead, need 11 bytes total
   auto result1 = manager_->popDatagramIfFits(1, 10);
@@ -197,7 +197,7 @@ TEST_F(DatagramFlowManagerTest, PopDatagramIfFitsWithOverhead) {
 
 TEST_F(DatagramFlowManagerTest, CloseEmptyFlow) {
   // Create a flow and make it empty
-  manager_->addDatagram(makeBuf("data"), 1);
+  (void)manager_->addDatagram(makeBuf("data"), 1);
   manager_->popDatagram();
 
   EXPECT_EQ(0, manager_->getDatagramCount());
@@ -212,15 +212,15 @@ TEST_F(DatagramFlowManagerTest, CloseEmptyFlow) {
   EXPECT_TRUE(setPriResult.hasError());
 }
 
-TEST_F(DatagramFlowManagerTest, CloseFlowWithPendingDatagrams) {
-  manager_->addDatagram(makeBuf("first"), 1);
-  manager_->addDatagram(makeBuf("second"), 1);
-  manager_->addDatagram(makeBuf("third"), 1);
+TEST_F(DatagramFlowManagerTest, CloseFlowNowWithPendingDatagrams) {
+  (void)manager_->addDatagram(makeBuf("first"), 1);
+  (void)manager_->addDatagram(makeBuf("second"), 1);
+  (void)manager_->addDatagram(makeBuf("third"), 1);
 
   EXPECT_EQ(3, manager_->getDatagramCount());
 
   // Close flow with pending datagrams
-  auto result = manager_->closeFlow(1);
+  auto result = manager_->closeFlowNow(1);
   EXPECT_TRUE(result.has_value());
 
   // All datagrams should be dropped
@@ -235,15 +235,15 @@ TEST_F(DatagramFlowManagerTest, CloseNonExistentFlow) {
 }
 
 TEST_F(DatagramFlowManagerTest, CloseOneFlowDoesNotAffectOthers) {
-  manager_->addDatagram(makeBuf("flow1-data1"), 1);
-  manager_->addDatagram(makeBuf("flow1-data2"), 1);
-  manager_->addDatagram(makeBuf("flow2-data"), 2);
-  manager_->addDatagram(makeBuf("flow3-data"), 3);
+  (void)manager_->addDatagram(makeBuf("flow1-data1"), 1);
+  (void)manager_->addDatagram(makeBuf("flow1-data2"), 1);
+  (void)manager_->addDatagram(makeBuf("flow2-data"), 2);
+  (void)manager_->addDatagram(makeBuf("flow3-data"), 3);
 
   EXPECT_EQ(4, manager_->getDatagramCount());
 
   // Close flow 1
-  auto result = manager_->closeFlow(1);
+  auto result = manager_->closeFlowNow(1);
   EXPECT_TRUE(result.has_value());
 
   // Flow 1 should be gone, but flows 2 and 3 should remain
@@ -262,7 +262,7 @@ TEST_F(DatagramFlowManagerTest, CloseOneFlowDoesNotAffectOthers) {
 
 TEST_F(DatagramFlowManagerTest, DefaultFlowUsesDefaultPriority) {
   // Add datagram without explicit priority
-  manager_->addDatagram(makeBuf("data"), 1);
+  (void)manager_->addDatagram(makeBuf("data"), 1);
 
   // Datagram should be added successfully
   EXPECT_TRUE(manager_->hasDatagramsForFlow(1));
@@ -273,15 +273,15 @@ TEST_F(DatagramFlowManagerTest, AddDatagramUpdatesPriorityOnExistingFlow) {
   HTTPPriorityQueue::Priority pri2(3, false);
 
   // Add first datagram with priority 5
-  manager_->addDatagram(makeBuf("first"), 1);
+  (void)manager_->addDatagram(makeBuf("first"), 1);
   (void)manager_->setFlowPriority(1, pri1);
 
   // Add second datagram with priority 3 to same flow
-  manager_->addDatagram(makeBuf("second"), 1);
+  (void)manager_->addDatagram(makeBuf("second"), 1);
   (void)manager_->setFlowPriority(1, pri2);
 
   // Add third datagram without explicit priority (should keep existing)
-  manager_->addDatagram(makeBuf("third"), 1);
+  (void)manager_->addDatagram(makeBuf("third"), 1);
 
   // All three datagrams should be in the flow
   EXPECT_EQ(3, manager_->getDatagramCount());
@@ -289,28 +289,58 @@ TEST_F(DatagramFlowManagerTest, AddDatagramUpdatesPriorityOnExistingFlow) {
 }
 
 TEST_F(DatagramFlowManagerTest, PopDatagramWithoutFitCheck) {
-  manager_->addDatagram(makeBuf("data1"), 1);
-  manager_->addDatagram(makeBuf("data2"), 2);
+  (void)manager_->addDatagram(makeBuf("data1"), 1);
+  (void)manager_->addDatagram(makeBuf("data2"), 2);
 
   EXPECT_EQ(2, manager_->getDatagramCount());
 
-  // popDatagram() pops from arbitrary flow
-  manager_->popDatagram();
+  // popDatagram() pops from arbitrary flow. Neither flow is draining, so both
+  // outlive the pop and there is nothing to report to the caller.
+  EXPECT_FALSE(manager_->popDatagram().has_value());
   EXPECT_EQ(1, manager_->getDatagramCount());
 
-  manager_->popDatagram();
+  EXPECT_FALSE(manager_->popDatagram().has_value());
+  EXPECT_EQ(0, manager_->getDatagramCount());
+}
+
+// Drop the only queued datagram, which belongs to an ephemeral flow. The flow
+// has nothing left to deliver, so popDatagram must retire it the way
+// popDatagramIfFits does; otherwise it is stranded in the write buffer. The id
+// comes back so the caller can drop its own scheduling state for the flow.
+TEST_F(DatagramFlowManagerTest, PopDatagramRetiresEmptiedDrainingFlow) {
+  (void)manager_->addDatagram(
+      makeBuf("ephemeral"), 100, std::nullopt, /*draining=*/true);
+  EXPECT_EQ(1, manager_->getFlowCount());
+
+  EXPECT_EQ(100, manager_->popDatagram());
+
+  EXPECT_EQ(0, manager_->getDatagramCount());
+  EXPECT_EQ(0, manager_->getFlowCount());
+  EXPECT_FALSE(manager_->hasFlow(100));
+}
+
+// Drop from a write buffer whose only flow was created but never written to.
+// There is nothing to pop, so the datagram count must stay put -- it is
+// unsigned, and decrementing it here wraps and defeats every size check.
+TEST_F(DatagramFlowManagerTest, PopDatagramIgnoresEmptyFlows) {
+  manager_->createFlow(100);
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_EQ(0, manager_->getDatagramCount());
+
+  EXPECT_FALSE(manager_->popDatagram().has_value());
+
   EXPECT_EQ(0, manager_->getDatagramCount());
 }
 
 TEST_F(DatagramFlowManagerTest, SingleToMultiQueueTransition) {
   // Add first datagram - uses single queue
-  manager_->addDatagram(makeBuf("first"), 1);
+  (void)manager_->addDatagram(makeBuf("first"), 1);
 
   // Add second datagram - transitions to multi queue
-  manager_->addDatagram(makeBuf("second"), 1);
+  (void)manager_->addDatagram(makeBuf("second"), 1);
 
   // Add third datagram - uses existing multi queue
-  manager_->addDatagram(makeBuf("third"), 1);
+  (void)manager_->addDatagram(makeBuf("third"), 1);
 
   EXPECT_EQ(3, manager_->getDatagramCount());
 
@@ -324,4 +354,196 @@ TEST_F(DatagramFlowManagerTest, SingleToMultiQueueTransition) {
   auto r3 = manager_->popDatagramIfFits(1, 1000);
   EXPECT_EQ("third", toString(r3.buf));
   EXPECT_TRUE(r3.flowEmpty);
+}
+
+TEST_F(DatagramFlowManagerTest, EphemeralFlowSingleDatagramCleanup) {
+  EXPECT_EQ(0, manager_->getFlowCount());
+
+  // Add ephemeral datagram
+  (void)manager_->addDatagram(makeBuf("ephemeral"), 100, std::nullopt, true);
+
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_TRUE(manager_->isFlowDraining(100));
+  EXPECT_TRUE(manager_->hasDatagramsForFlow(100));
+
+  // Pop the datagram - flow should be automatically cleaned up
+  auto result = manager_->popDatagramIfFits(100, 1000);
+  EXPECT_EQ("ephemeral", toString(result.buf));
+  EXPECT_TRUE(result.flowEmpty);
+
+  // Flow should be removed from writeBuffer
+  EXPECT_EQ(0, manager_->getFlowCount());
+  EXPECT_FALSE(manager_->hasDatagramsForFlow(100));
+}
+
+TEST_F(DatagramFlowManagerTest, CannotAddToExistingEphemeralFlow) {
+  // Add ephemeral datagram
+  auto result1 =
+      manager_->addDatagram(makeBuf("first"), 100, std::nullopt, true);
+  ASSERT_TRUE(result1.has_value());
+
+  EXPECT_EQ(1, manager_->getDatagramCount());
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_TRUE(manager_->isFlowDraining(100));
+
+  // Try to add another datagram to the same ephemeral flow - should fail
+  auto result2 = manager_->addDatagram(makeBuf("second"), 100);
+  ASSERT_TRUE(result2.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, result2.error());
+
+  // Original datagram should still be there
+  EXPECT_EQ(1, manager_->getDatagramCount());
+  EXPECT_EQ(1, manager_->getFlowCount());
+}
+
+TEST_F(DatagramFlowManagerTest, NonEphemeralFlowNotCleanedUpWhenEmpty) {
+  // Add non-ephemeral datagram
+  (void)manager_->addDatagram(makeBuf("data"), 100, std::nullopt, false);
+
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_FALSE(manager_->isFlowDraining(100));
+
+  // Pop the datagram
+  auto result = manager_->popDatagramIfFits(100, 1000);
+  EXPECT_EQ("data", toString(result.buf));
+  EXPECT_TRUE(result.flowEmpty);
+
+  // Flow should still exist (not cleaned up)
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_TRUE(manager_->hasDatagramsForFlow(100) == false); // Empty but exists
+}
+
+TEST_F(DatagramFlowManagerTest, MixedEphemeralAndNonEphemeralFlows) {
+  // Create ephemeral flow
+  (void)manager_->addDatagram(makeBuf("ephemeral1"), 100, std::nullopt, true);
+
+  // Create non-ephemeral flow
+  (void)manager_->addDatagram(makeBuf("persistent1"), 200, std::nullopt, false);
+
+  // Create another ephemeral flow
+  (void)manager_->addDatagram(makeBuf("ephemeral2"), 300, std::nullopt, true);
+
+  EXPECT_EQ(3, manager_->getFlowCount());
+  EXPECT_TRUE(manager_->isFlowDraining(100));
+  EXPECT_FALSE(manager_->isFlowDraining(200));
+  EXPECT_TRUE(manager_->isFlowDraining(300));
+
+  // Pop from ephemeral flow 100 - should be cleaned up
+  auto r1 = manager_->popDatagramIfFits(100, 1000);
+  EXPECT_EQ("ephemeral1", toString(r1.buf));
+  EXPECT_EQ(2, manager_->getFlowCount());
+  EXPECT_FALSE(manager_->hasDatagramsForFlow(100));
+
+  // Pop from non-ephemeral flow 200 - should NOT be cleaned up
+  auto r2 = manager_->popDatagramIfFits(200, 1000);
+  EXPECT_EQ("persistent1", toString(r2.buf));
+  EXPECT_EQ(2, manager_->getFlowCount()); // Still 2 (200 and 300)
+  EXPECT_FALSE(manager_->hasDatagramsForFlow(200)); // Empty but exists
+
+  // Pop from ephemeral flow 300 - should be cleaned up
+  auto r3 = manager_->popDatagramIfFits(300, 1000);
+  EXPECT_EQ("ephemeral2", toString(r3.buf));
+  EXPECT_EQ(1, manager_->getFlowCount()); // Only 200 remains
+}
+
+TEST_F(DatagramFlowManagerTest, EphemeralFlowNotSentDueToSpaceConstraint) {
+  // Add ephemeral datagram
+  (void)manager_->addDatagram(
+      makeBuf("large ephemeral datagram"), 100, std::nullopt, true);
+
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_TRUE(manager_->isFlowDraining(100));
+
+  // Try to pop with insufficient space
+  auto result = manager_->popDatagramIfFits(100, 10);
+  EXPECT_EQ(nullptr, result.buf);
+  EXPECT_FALSE(result.flowEmpty);
+
+  // Flow should still exist (not cleaned up because datagram wasn't sent)
+  EXPECT_EQ(1, manager_->getFlowCount());
+  EXPECT_TRUE(manager_->hasDatagramsForFlow(100));
+  EXPECT_TRUE(manager_->isFlowDraining(100));
+
+  // Now pop with sufficient space - should be cleaned up
+  auto result2 = manager_->popDatagramIfFits(100, 1000);
+  EXPECT_NE(nullptr, result2.buf);
+  EXPECT_TRUE(result2.flowEmpty);
+  EXPECT_EQ(0, manager_->getFlowCount());
+}
+
+TEST_F(DatagramFlowManagerTest, IsFlowDrainingOnNonExistentFlow) {
+  // Check ephemeral status on non-existent flow
+  EXPECT_FALSE(manager_->isFlowDraining(999));
+}
+
+TEST_F(DatagramFlowManagerTest, GetFlowCountWithMultipleFlows) {
+  EXPECT_EQ(0, manager_->getFlowCount());
+
+  (void)manager_->addDatagram(makeBuf("flow1"), 1);
+  EXPECT_EQ(1, manager_->getFlowCount());
+
+  (void)manager_->addDatagram(makeBuf("flow2"), 2);
+  EXPECT_EQ(2, manager_->getFlowCount());
+
+  (void)manager_->addDatagram(makeBuf("flow3"), 3);
+  EXPECT_EQ(3, manager_->getFlowCount());
+
+  // Close one flow
+  (void)manager_->closeFlowNow(2);
+  EXPECT_EQ(2, manager_->getFlowCount());
+}
+
+TEST_F(DatagramFlowManagerTest, CloseFlowKeepsQueuedDatagrams) {
+  (void)manager_->addDatagram(makeBuf("first"), 1);
+  (void)manager_->addDatagram(makeBuf("second"), 1);
+
+  auto result = manager_->closeFlow(1);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(2, manager_->getDatagramCount());
+  EXPECT_TRUE(manager_->hasFlow(1));
+
+  EXPECT_EQ("first", toString(manager_->popDatagramIfFits(1, 1000).buf));
+  EXPECT_TRUE(manager_->hasFlow(1));
+  EXPECT_EQ("second", toString(manager_->popDatagramIfFits(1, 1000).buf));
+  EXPECT_FALSE(manager_->hasFlow(1));
+}
+
+TEST_F(DatagramFlowManagerTest, CloseEmptyFlowRemovesItImmediately) {
+  manager_->createFlow(1);
+  ASSERT_TRUE(manager_->hasFlow(1));
+
+  auto result = manager_->closeFlow(1);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_FALSE(manager_->hasFlow(1));
+}
+
+TEST_F(DatagramFlowManagerTest, CannotAddToClosedFlowStillDraining) {
+  (void)manager_->addDatagram(makeBuf("queued"), 1);
+  ASSERT_TRUE(manager_->closeFlow(1).has_value());
+
+  // The id is finished as soon as the flow is closed, whether or not the
+  // scheduler has drained it yet.
+  auto result = manager_->addDatagram(makeBuf("late"), 1);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, result.error());
+
+  EXPECT_EQ("queued", toString(manager_->popDatagramIfFits(1, 1000).buf));
+  EXPECT_FALSE(manager_->hasFlow(1));
+}
+
+TEST_F(DatagramFlowManagerTest, CloseFlowNowOnDrainingFlowDropsRemainder) {
+  (void)manager_->addDatagram(makeBuf("first"), 1);
+  (void)manager_->addDatagram(makeBuf("second"), 1);
+  ASSERT_TRUE(manager_->closeFlow(1).has_value());
+
+  // Escalating from a graceful close discards whatever has not gone out yet.
+  ASSERT_TRUE(manager_->closeFlowNow(1).has_value());
+  EXPECT_EQ(0, manager_->getDatagramCount());
+  EXPECT_FALSE(manager_->hasFlow(1));
+}
+
+TEST_F(DatagramFlowManagerTest, CloseFlowNowOnNonExistentFlow) {
+  auto result = manager_->closeFlowNow(999);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, result.error());
 }
