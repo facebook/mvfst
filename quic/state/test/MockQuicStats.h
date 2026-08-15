@@ -24,6 +24,8 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onPacketSent, ());
   MOCK_METHOD(void, onPacketRetransmission, ());
   MOCK_METHOD(void, onPacketLoss, ());
+  MOCK_METHOD(void, onPacketLossByTimeout, ());
+  MOCK_METHOD(void, onPacketLossByReorderingThreshold, ());
   MOCK_METHOD(void, onPacketSpuriousLoss, ());
   MOCK_METHOD(void, onPersistentCongestion, ());
   MOCK_METHOD(void, onPacketDropped, (PacketDropReason));

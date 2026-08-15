@@ -73,6 +73,10 @@ class QuicTransportStatsCallback {
 
   virtual void onPacketLoss() = 0;
 
+  virtual void onPacketLossByTimeout() = 0;
+
+  virtual void onPacketLossByReorderingThreshold() = 0;
+
   virtual void onPacketSpuriousLoss() = 0;
 
   virtual void onPersistentCongestion() = 0;

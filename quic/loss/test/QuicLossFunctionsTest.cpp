@@ -2236,6 +2236,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventReorder) {
 
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
   ackState.largestAckedByPeer = largestSent;
+  EXPECT_CALL(*quicStats_, onPacketLossByTimeout()).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketLossByReorderingThreshold()).Times(2);
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2328,6 +2330,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeout) {
       .Times(1);
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
   ackState.largestAckedByPeer = largestSent;
+  EXPECT_CALL(*quicStats_, onPacketLossByTimeout()).Times(6);
+  EXPECT_CALL(*quicStats_, onPacketLossByReorderingThreshold()).Times(0);
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,
@@ -2429,6 +2433,8 @@ TEST_F(QuicLossFunctionsTest, ObserverLossEventTimeoutAndReorder) {
       .Times(1);
   auto& ackState = getAckState(*conn, PacketNumberSpace::AppData);
   ackState.largestAckedByPeer = largestSent;
+  EXPECT_CALL(*quicStats_, onPacketLossByTimeout()).Times(3);
+  EXPECT_CALL(*quicStats_, onPacketLossByReorderingThreshold()).Times(2);
   ASSERT_FALSE(detectLossPackets(
                    *conn,
                    ackState,

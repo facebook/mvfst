@@ -52,6 +52,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     MVVLOG(2) << prefix_ << __func__;
   }
 
+  void onPacketLossByTimeout() override {
+    MVVLOG(2) << prefix_ << __func__;
+  }
+
+  void onPacketLossByReorderingThreshold() override {
+    MVVLOG(2) << prefix_ << __func__;
+  }
+
   void onPacketSpuriousLoss() override {
     MVVLOG(2) << prefix_ << __func__;
   }

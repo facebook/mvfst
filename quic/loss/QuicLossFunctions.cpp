@@ -419,11 +419,13 @@ quic::Expected<bool, QuicError> processOutstandingsForLoss(
     conn.lossState.totalPacketsMarkedLost++;
     if (lostByTimeout && rttSample.count() > 0) {
       conn.lossState.totalPacketsMarkedLostByTimeout++;
+      QUIC_STATS(conn.statsCallback, onPacketLossByTimeout);
       pkt.metadata.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
           conn.transportSettings.timeReorderingThreshDivisor / rttSample;
     }
     if (lostByReorder) {
       conn.lossState.totalPacketsMarkedLostByReorderingThreshold++;
+      QUIC_STATS(conn.statsCallback, onPacketLossByReorderingThreshold);
       iter->metadata.lossReorderDistance = reorderDistance;
     }
     lossEvent.addLostPacket(pkt);
