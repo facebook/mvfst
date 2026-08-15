@@ -4152,27 +4152,6 @@ TEST_F(QuicServerTransportTest, TestSkipKnobsWhenNotAdvertisingSupport) {
   EXPECT_TRUE(server->getConn().pendingEvents.knobs.empty());
 }
 
-TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
-  auto mockCongestionController =
-      std::make_unique<NiceMock<MockCongestionController>>();
-  auto rawCongestionController = mockCongestionController.get();
-  server->getNonConstConn().congestionController =
-      std::move(mockCongestionController);
-
-  EXPECT_CALL(*rawCongestionController, setExperimental(true)).Times(2);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-        .val = uint64_t{1}}});
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-        .val = uint64_t{2}}});
-
-  EXPECT_CALL(*rawCongestionController, setExperimental(false)).Times(1);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-        .val = uint64_t{0}}});
-}
-
 TEST_F(QuicServerTransportTest, TestCCConfigKnobHandler) {
   auto& transportSettings = server->getNonConstConn().transportSettings;
 
@@ -4242,68 +4221,7 @@ TEST_F(QuicServerTransportTest, TestAutotuneStreamFlowControlKnobHandler) {
   EXPECT_FALSE(transportSettings.autotuneReceiveStreamFlowControl);
 }
 
-TEST_F(QuicServerTransportTest, TestAckFrequencyPolicyKnobHandler) {
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = uint64_t{1}}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "blah,blah,blah"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "1,1,"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "1,1,1,1"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "10,3,1,1"}});
-  ASSERT_TRUE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  EXPECT_EQ(
-      server->getTransportSettings()
-          .ccaConfig.ackFrequencyConfig->ackElicitingThreshold,
-      10);
-  EXPECT_EQ(
-      server->getTransportSettings()
-          .ccaConfig.ackFrequencyConfig->reorderingThreshold,
-      3);
-  EXPECT_EQ(
-      server->getTransportSettings()
-          .ccaConfig.ackFrequencyConfig->minRttDivisor,
-      1);
-  EXPECT_EQ(
-      server->getTransportSettings()
-          .ccaConfig.ackFrequencyConfig->useSmallThresholdDuringStartup,
-      true);
-  server->getNonConstConn()
-      .transportSettings.ccaConfig.ackFrequencyConfig.reset();
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "10,3,-1,1"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "10,-1,1,1"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "-1,3,1,1"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "10,3,0,1"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "10,1,1,1"}});
-  EXPECT_FALSE(server->getTransportSettings().ccaConfig.ackFrequencyConfig);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-        .val = "1,3,1,1"}});
+TEST_F(QuicServerTransportTest, TestDefaultStreamPriorityKnobHandler) {
   server->handleKnobParams(
       {{.id = static_cast<uint64_t>(
             TransportKnobParamId::DEFAULT_STREAM_PRIORITY),

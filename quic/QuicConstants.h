@@ -183,8 +183,6 @@ QUIC_ENUM(
     FORCIBLY_SET_UDP_PAYLOAD_SIZE = 0xba92,
     // Set congestion control algorithm
     CC_ALGORITHM_KNOB = 0xccaa,
-    // Enable experimental CC settings
-    CC_EXPERIMENTAL = 0xccac,
     // Change congestion control config struct
     CC_CONFIG = 0xccad,
     // Set pacing rtt factor used only during startup phase
@@ -194,8 +192,6 @@ QUIC_ENUM(
     // Set max pacing rate in bytes per second to be used if pacing
     // is enabled
     MAX_PACING_RATE_KNOB = 0x4444,
-    // Enable experimental pacer settings
-    PACER_EXPERIMENTAL = 0x5557,
     // Set short header padding modulo size
     SHORT_HEADER_PADDING_KNOB = 0x6666,
     // Set fixed short header padding size
@@ -208,8 +204,6 @@ QUIC_ENUM(
     KEEPALIVE_ENABLED = 0x7777,
     // Knob for setting max pacing rate, with sequence number
     MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999,
-    // Control ACK_FREQUENCY policy
-    ACK_FREQUENCY_POLICY = 0x10000,
     // Controls the timer tick used for pacing
     PACING_TIMER_TICK = 0x10002,
     // Controls default stream priority

@@ -1133,25 +1133,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val val) -> quic::Expected<void, QuicError> {
-        auto server_conn = serverTransport.serverConn_;
-        if (server_conn->congestionController) {
-          auto enableExperimental = static_cast<bool>(std::get<uint64_t>(val));
-          server_conn->congestionController->setExperimental(
-              enableExperimental);
-          MVVLOG(3) << fmt::format(
-              "CC_EXPERIMENTAL KnobParam received, setting experimental={} "
-              "settings for congestion controller. Current congestion controller={}",
-              enableExperimental,
-              congestionControlTypeToString(
-                  server_conn->congestionController->type()));
-        }
-        return {};
-      });
-
-  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB),
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
@@ -1186,62 +1167,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         if (val >= 5000) {
           server_conn->transportSettings.keepAliveTimeout =
               std::chrono::milliseconds(val);
-        }
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::ACK_FREQUENCY_POLICY),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        const std::string* valPtr = std::get_if<std::string>(&value);
-        if (!valPtr) {
-          auto errMsg =
-              "Received invalid type for ACK_FREQUENCY_POLICY KnobParam: expected string";
-          MVVLOG(3) << errMsg;
-          return quic::make_unexpected(
-              QuicError(TransportErrorCode::INTERNAL_ERROR, errMsg));
-        }
-
-        const std::string& val = *valPtr;
-        CongestionControlConfig::AckFrequencyConfig ackFrequencyConfig;
-        bool parseSuccess = false;
-        try {
-          parseSuccess = folly::split(
-              ',',
-              val,
-              ackFrequencyConfig.ackElicitingThreshold,
-              ackFrequencyConfig.reorderingThreshold,
-              ackFrequencyConfig.minRttDivisor,
-              ackFrequencyConfig.useSmallThresholdDuringStartup);
-          // Sanity check the values.
-          parseSuccess = parseSuccess &&
-              ackFrequencyConfig.ackElicitingThreshold > 1 &&
-              ackFrequencyConfig.reorderingThreshold > 1 &&
-              ackFrequencyConfig.minRttDivisor > 0;
-        } catch (std::exception&) {
-          parseSuccess = false;
-        }
-        if (parseSuccess) {
-          MVVLOG(3) << fmt::format(
-              "ACK_FREQUENCY_POLICY KnobParam received, "
-              "ackElicitingThreshold={}, "
-              "reorderingThreshold={}, "
-              "minRttDivisor={}, "
-              "useSmallThresholdDuringStartup={}, "
-              "raw knob={}",
-              ackFrequencyConfig.ackElicitingThreshold,
-              ackFrequencyConfig.reorderingThreshold,
-              ackFrequencyConfig.minRttDivisor,
-              ackFrequencyConfig.useSmallThresholdDuringStartup,
-              val);
-          serverTransport.conn_->transportSettings.ccaConfig
-              .ackFrequencyConfig = ackFrequencyConfig;
-        } else {
-          auto errMsg = fmt::format(
-              "Received invalid KnobParam for ACK_FREQUENCY_POLICY: {}", val);
-          MVVLOG(3) << errMsg;
-          return quic::make_unexpected(
-              QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
         }
         return {};
       });

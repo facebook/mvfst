@@ -105,12 +105,6 @@ class Cubic : public CongestionController {
 
   [[nodiscard]] CongestionControlType type() const noexcept override;
 
-  void setExperimental(bool experimental) override {
-    // This is a transitional change. Experimental setting will be removed.
-    conn_.transportSettings.ccaConfig.additiveIncreaseAfterHystart =
-        experimental;
-  }
-
  protected:
   CubicStates state_{CubicStates::Hystart};
 

@@ -151,10 +151,6 @@ void BbrCongestionController::onPacketSent(
 }
 
 uint64_t BbrCongestionController::updateAckAggregation(const AckEvent& ack) {
-  if (isExperimental_) {
-    // Experiment with disabling this ack aggregation logic
-    return 0;
-  }
   if (!ackAggregationStartTime_) {
     // Ideally one'd DCHECK/CHECK ackAggregationStartTime_ has some value, as we
     // can't possibly get an ack or loss without onPacketSent ever. However
@@ -661,10 +657,6 @@ void BbrCongestionController::setAppLimited() {
 
 bool BbrCongestionController::isAppLimited() const noexcept {
   return bandwidthSampler_ ? bandwidthSampler_->isAppLimited() : false;
-}
-
-void BbrCongestionController::setExperimental(bool experimental) {
-  isExperimental_ = experimental;
 }
 
 void BbrCongestionController::getStats(CongestionControllerStats& stats) const {

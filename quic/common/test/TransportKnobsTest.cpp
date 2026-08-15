@@ -36,7 +36,8 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
 }
 
 TEST(QuicKnobsParsingTest, Simple) {
-  auto id1 = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  auto id1 = static_cast<uint64_t>(
+      TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
   auto id2 =
       static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB);
   auto id3 = static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED);
@@ -90,7 +91,8 @@ TEST(QuicKnobsParsingTest, Characters) {
 }
 
 TEST(QuicKnobsParsingTest, NegativeNumbers) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  auto key = static_cast<uint64_t>(
+      TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
   std::string args = fmt::format(R"({{"{}" : -1}})", key);
   QuicKnobsParsingTestFixture fixture = {
       .serializedKnobs = args, .expectError = true, .expectParams = {}};
@@ -258,7 +260,8 @@ TEST(QuicKnobsParsingTest, MaxPacingRateWithSequenceNumber) {
 }
 
 TEST(QuicKnobsParsingTest, NonStringKey) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  auto key = static_cast<uint64_t>(
+      TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
   std::string args = fmt::format(R"({{{} : 1}})", key);
   QuicKnobsParsingTestFixture fixture = {
       .serializedKnobs = args,
@@ -276,7 +279,8 @@ TEST(QuicKnobsParsingTest, DoubleKey) {
 }
 
 TEST(QuicKnobsParsingTest, DoubleValue) {
-  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  auto key = static_cast<uint64_t>(
+      TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
   std::string args = fmt::format(R"({{"{}" : 0.1}})", key);
   QuicKnobsParsingTestFixture fixture = {
       .serializedKnobs = args, .expectError = true, .expectParams = {}};
@@ -284,7 +288,8 @@ TEST(QuicKnobsParsingTest, DoubleValue) {
 }
 
 TEST(QuicKnobsParsingTest, UInt64Max) {
-  const auto id = static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL);
+  const auto id = static_cast<uint64_t>(
+      TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
   const uint64_t val = std::numeric_limits<uint64_t>::max();
   std::string str = fmt::format("{{\"{}\" : {}}}", id, val);
   QuicKnobsParsingTestFixture fixture = {

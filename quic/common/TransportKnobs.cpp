@@ -82,9 +82,7 @@ Optional<TransportKnobParams> parseTransportKnobs(
       }
       switch (*knobId) {
         case TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE:
-        case TransportKnobParamId::CC_EXPERIMENTAL:
         case TransportKnobParamId::MAX_PACING_RATE_KNOB:
-        case TransportKnobParamId::PACER_EXPERIMENTAL:
         case TransportKnobParamId::SHORT_HEADER_PADDING_KNOB:
         case TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB:
         case TransportKnobParamId::KEEPALIVE_ENABLED:
@@ -122,7 +120,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
         }
         case TransportKnobParamId::CC_ALGORITHM_KNOB:
         case TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED:
-        case TransportKnobParamId::ACK_FREQUENCY_POLICY:
         case TransportKnobParamId::CC_CONFIG:
         case TransportKnobParamId::EGRESS_POLICER_CONFIG:
         case TransportKnobParamId::RX_PACKETS_BEFORE_ACK: {

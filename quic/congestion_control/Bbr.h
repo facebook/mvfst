@@ -145,8 +145,6 @@ class BbrCongestionController : public CongestionController {
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
-  void setExperimental(bool experimental) override;
-
   [[nodiscard]] bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
@@ -229,7 +227,6 @@ class BbrCongestionController : public CongestionController {
   void updateCwnd(uint64_t ackedBytes, uint64_t excessiveBytes) noexcept;
   [[nodiscard]] std::chrono::microseconds minRtt() const noexcept;
 
-  bool isExperimental_{false};
   // Number of round trips the connection has witnessed
   uint64_t roundTripCounter_{0};
   // When a packet with send time later than endOfRoundTrip_ is acked, the

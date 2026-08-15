@@ -41,7 +41,6 @@ class MockCongestionController : public CongestionController {
   MOCK_METHOD(void, setAppLimited, ());
   MOCK_METHOD(bool, isAppLimited, (), (const));
   MOCK_METHOD(void, getStats, (CongestionControllerStats&), (const));
-  MOCK_METHOD(void, setExperimental, (bool));
 };
 
 class MockPacketProcessor : public PacketProcessor {
