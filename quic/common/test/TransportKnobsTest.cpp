@@ -224,6 +224,17 @@ TEST(QuicKnobsParsingTest, ValidMaxPacingRateAsString) {
   run(fixture);
 }
 
+TEST(QuicKnobsParsingTest, AdaptiveLossReorderingThresholds) {
+  auto key = static_cast<uint64_t>(
+      TransportKnobParamId::ADAPTIVE_LOSS_REORDERING_THRESHOLDS);
+  std::string args = fmt::format(R"({{"{}" : true}})", key);
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = args,
+      .expectError = false,
+      .expectParams = {{.id = key, .val = uint64_t{1}}}};
+  run(fixture);
+}
+
 TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   // Decimal is UINT64_MAX + 1

@@ -99,7 +99,8 @@ Optional<TransportKnobParams> parseTransportKnobs(
         case TransportKnobParamId::EXCESS_CWND_PCT_FOR_IMMINENT_STREAMS:
         case TransportKnobParamId::SEND_CLOSE_ON_IDLE_TIMEOUT:
         case TransportKnobParamId::MAX_PTO:
-        case TransportKnobParamId::SCONE_KNOB: {
+        case TransportKnobParamId::SCONE_KNOB:
+        case TransportKnobParamId::ADAPTIVE_LOSS_REORDERING_THRESHOLDS: {
           // uint64_t knobs
           auto parsed = parseAsUint64(val);
           if (!parsed) {

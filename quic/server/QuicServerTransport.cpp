@@ -1423,6 +1423,24 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::ADAPTIVE_LOSS_REORDERING_THRESHOLDS),
+      [](QuicServerTransport& serverTransport,
+         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
+        const auto* val = std::get_if<uint64_t>(&value);
+        if (!val || *val > 1) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              "ADAPTIVE_LOSS_REORDERING_THRESHOLDS KnobParam expects 0 or 1"));
+        }
+        auto serverConn = serverTransport.serverConn_;
+        serverConn->transportSettings.useAdaptiveLossReorderingThresholds =
+            *val == 1;
+        MVVLOG(3) << "ADAPTIVE_LOSS_REORDERING_THRESHOLDS KnobParam received: "
+                  << *val;
+        return {};
+      });
+  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::EGRESS_POLICER_CONFIG),
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {

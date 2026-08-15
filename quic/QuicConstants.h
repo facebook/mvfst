@@ -244,7 +244,9 @@ QUIC_ENUM(
     SCONE_KNOB = 0x5C0E,
     // Controls rx packets before ack thresholds
     // (beforeInit,afterInit)
-    RX_PACKETS_BEFORE_ACK = 0x10013)
+    RX_PACKETS_BEFORE_ACK = 0x10013,
+    // Controls adaptive packet loss reordering thresholds
+    ADAPTIVE_LOSS_REORDERING_THRESHOLDS = 0x10014)
 
 #if defined(__GNUC__) || defined(__clang__)
 _Pragma("GCC diagnostic pop")
