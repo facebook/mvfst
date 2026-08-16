@@ -519,7 +519,11 @@ uint16_t QuicTransportBase::getDatagramSizeLimit() const {
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
     BufPtr buf) {
   return writeDatagramInternal(
-      std::move(buf), kDefaultDatagramFlowId, std::nullopt, false);
+      std::move(buf),
+      kDefaultDatagramFlowId,
+      std::nullopt,
+      false,
+      std::nullopt);
 }
 
 quic::Expected<uint32_t, LocalErrorCode>
@@ -531,9 +535,11 @@ QuicTransportBase::createDatagramFlowId() {
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
     PriorityQueue::Priority priority,
-    BufPtr buf) {
+    BufPtr buf,
+    std::optional<std::chrono::milliseconds> maxQueueTime) {
   uint32_t ephemeralFlowId = nextDatagramFlowId_++;
-  return writeDatagramInternal(std::move(buf), ephemeralFlowId, priority, true);
+  return writeDatagramInternal(
+      std::move(buf), ephemeralFlowId, priority, true, maxQueueTime);
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
@@ -545,14 +551,16 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
   if (!flowManager.hasFlow(flowId) || flowManager.isFlowDraining(flowId)) {
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
-  return writeDatagramInternal(std::move(buf), flowId, std::nullopt, false);
+  return writeDatagramInternal(
+      std::move(buf), flowId, std::nullopt, false, std::nullopt);
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
     BufPtr buf,
     uint32_t flowId,
     std::optional<PriorityQueue::Priority> priority,
-    bool ephemeralFlow) {
+    bool ephemeralFlow,
+    std::optional<std::chrono::milliseconds> maxQueueTime) {
   // TODO(lniccolini) update max datagram frame size
   // https://github.com/quicwg/datagram/issues/3
   // For now, max_datagram_size > 0 means the peer supports datagram frames
@@ -588,7 +596,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
   }
 
   auto flowPriorityResult = conn_->datagramState.flowManager.addDatagram(
-      std::move(buf), flowId, priority, ephemeralFlow);
+      std::move(buf), flowId, priority, ephemeralFlow, maxQueueTime);
   if (flowPriorityResult.hasError()) {
     QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
     return quic::make_unexpected(flowPriorityResult.error());
@@ -625,6 +633,13 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::setDatagramFlowPriority(
   }
 
   return {};
+}
+
+quic::Expected<void, LocalErrorCode>
+QuicTransportBase::setDatagramFlowMaxQueueTime(
+    uint32_t flowId,
+    std::chrono::milliseconds maxTime) {
+  return conn_->datagramState.flowManager.setMaxQueueTime(flowId, maxTime);
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::closeDatagramFlow(

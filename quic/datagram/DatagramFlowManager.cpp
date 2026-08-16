@@ -12,27 +12,28 @@ namespace quic {
 // Default priority for datagrams
 const PriorityQueue::Priority kDefaultDatagramPriority{};
 
-void DatagramFlowManager::DatagramFlowQueue::push(BufQueue buf) {
+void DatagramFlowManager::DatagramFlowQueue::push(QueuedDatagram datagram) {
   if (multi) {
     // Already using multi queue
-    multi->emplace_back(std::move(buf));
-  } else if (single.empty()) {
+    multi->emplace_back(std::move(datagram));
+  } else if (single.buf.empty()) {
     // First datagram
-    single = std::move(buf);
+    single = std::move(datagram);
   } else {
     // Transition from single to multi
-    multi = std::make_unique<CircularDeque<BufQueue>>();
+    multi = std::make_unique<CircularDeque<QueuedDatagram>>();
     multi->emplace_back(std::move(single));
-    multi->emplace_back(std::move(buf));
+    multi->emplace_back(std::move(datagram));
   }
 }
 
-BufQueue& DatagramFlowManager::DatagramFlowQueue::front() {
+DatagramFlowManager::QueuedDatagram&
+DatagramFlowManager::DatagramFlowQueue::front() {
   if (multi) {
     CHECK(!multi->empty());
     return multi->front();
   }
-  CHECK(!single.empty());
+  CHECK(!single.buf.empty());
   return single;
 }
 
@@ -42,8 +43,8 @@ void DatagramFlowManager::DatagramFlowQueue::pop() {
       multi->pop_front();
     }
     // Don't deallocate multi even if it becomes empty
-  } else if (!single.empty()) {
-    single = BufQueue();
+  } else if (!single.buf.empty()) {
+    single = QueuedDatagram();
   }
 }
 
@@ -52,7 +53,8 @@ DatagramFlowManager::addDatagram(
     BufQueue buf,
     uint32_t flowId,
     std::optional<PriorityQueue::Priority> priority,
-    bool draining) {
+    bool draining,
+    std::optional<std::chrono::milliseconds> maxQueueTime) {
   auto it = writeBuffer_.find(flowId);
 
   // Rejected whether or not the scheduler has finished draining, so the
@@ -68,7 +70,18 @@ DatagramFlowManager::addDatagram(
   if (priority) {
     flow.priority = *priority;
   }
-  flow.push(std::move(buf));
+  if (maxQueueTime) {
+    flow.maxQueueTime = sanitizeMaxQueueTime(*maxQueueTime);
+    if (flow.maxQueueTime.count() > 0) {
+      usesExpiration_ = true;
+    }
+  }
+  QueuedDatagram queuedDatagram;
+  queuedDatagram.buf = std::move(buf);
+  if (flow.maxQueueTime.count() > 0) {
+    queuedDatagram.enqueueTime = Clock::now();
+  }
+  flow.push(std::move(queuedDatagram));
   ++datagramCount_;
   return flow.priority;
 }
@@ -84,34 +97,92 @@ quic::Expected<bool, LocalErrorCode> DatagramFlowManager::setFlowPriority(
   return it->second.empty();
 }
 
+quic::Expected<void, LocalErrorCode> DatagramFlowManager::setMaxQueueTime(
+    uint32_t flowId,
+    std::chrono::milliseconds maxQueueTime) {
+  auto it = writeBuffer_.find(flowId);
+  if (it == writeBuffer_.end()) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  it->second.maxQueueTime = sanitizeMaxQueueTime(maxQueueTime);
+  if (it->second.maxQueueTime.count() > 0) {
+    usesExpiration_ = true;
+  }
+  return {};
+}
+
 DatagramFlowManager::DatagramPopResult DatagramFlowManager::popDatagramIfFits(
     uint32_t flowId,
-    uint64_t availableSpace) {
+    uint64_t availableSpace,
+    TimePoint now) {
   auto it = writeBuffer_.find(flowId);
   CHECK(it != writeBuffer_.end() && !it->second.empty())
       << "popDatagramIfFits called for flow with no datagrams";
 
-  auto& datagram = it->second.front();
-  uint64_t datagramLen = datagram.chainLength();
+  auto& flow = it->second;
+  uint64_t numExpired = 0;
 
-  // Calculate overhead using stored calculator
-  uint64_t overhead =
-      overheadCalculator_ ? overheadCalculator_(datagramLen) : 0;
-  uint64_t totalSize = datagramLen + overhead;
+  // Anything enqueued before this is too old. A flow with no deadline gets a
+  // cutoff nothing can predate, and a datagram queued before its flow had a
+  // deadline carries TimePoint::max(), so one comparison covers both cases.
+  // Subtracting from now rather than adding to enqueueTime keeps that
+  // sentinel from overflowing.
+  const TimePoint expiryCutoff = flow.maxQueueTime.count() > 0
+      ? now - flow.maxQueueTime
+      : TimePoint::min();
 
-  if (totalSize > availableSpace) {
-    return {nullptr, false, 0};
+  while (!flow.empty()) {
+    auto& queuedDatagram = flow.front();
+
+    if (expiryCutoff > queuedDatagram.enqueueTime) {
+      // Expired - drop it and continue
+      flow.pop();
+      --datagramCount_;
+      ++numExpired;
+      continue;
+    }
+
+    // Found non-expired datagram - check if it fits
+    uint64_t datagramLen = queuedDatagram.buf.chainLength();
+
+    // Calculate overhead using stored calculator
+    uint64_t overhead =
+        overheadCalculator_ ? overheadCalculator_(datagramLen) : 0;
+    uint64_t totalSize = datagramLen + overhead;
+
+    if (totalSize > availableSpace) {
+      // Doesn't fit - return without popping
+      return {
+          .buf = nullptr,
+          .flowEmpty = false,
+          .datagramLen = 0,
+          .numExpired = numExpired};
+    }
+
+    // Fits! Pop and return it
+    BufPtr result = queuedDatagram.buf.move();
+    flow.pop();
+    --datagramCount_;
+    bool flowEmpty = flow.empty();
+    if (flowEmpty && flow.draining) {
+      writeBuffer_.erase(it);
+    }
+    return {
+        .buf = std::move(result),
+        .flowEmpty = flowEmpty,
+        .datagramLen = datagramLen,
+        .numExpired = numExpired};
   }
 
-  // Fits! Pop and return it
-  BufPtr result = datagram.move();
-  it->second.pop();
-  --datagramCount_;
-  bool flowEmpty = it->second.empty();
-  if (flowEmpty && it->second.draining) {
+  // All datagrams expired - flow is now empty
+  if (it->second.draining) {
     writeBuffer_.erase(it);
   }
-  return {std::move(result), flowEmpty, datagramLen};
+  return {
+      .buf = nullptr,
+      .flowEmpty = true,
+      .datagramLen = 0,
+      .numExpired = numExpired};
 }
 
 std::optional<uint32_t> DatagramFlowManager::popDatagram() {

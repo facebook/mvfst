@@ -2763,6 +2763,41 @@ TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerDrainsAllFlows) {
   EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 0);
 }
 
+TEST_P(QuicPacketSchedulerTest, DatagramFrameSchedulerStatsExpiredDatagrams) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+  conn.transportSettings.datagramConfig.framePerPacket = false;
+  DatagramFrameScheduler scheduler(conn);
+  // Two datagrams that will age out before the scheduler runs.
+  constexpr uint32_t kFlowId = 7;
+  auto maxQueueTime = std::chrono::milliseconds(1);
+  for (char fill : {'*', '%'}) {
+    std::string s(conn.udpSendPacketLen / 8, fill);
+    BufQueue buf;
+    buf.append(folly::IOBuf::copyBuffer(s));
+    (void)conn.datagramState.flowManager.addDatagram(
+        std::move(buf), kFlowId, std::nullopt, false, maxQueueTime);
+  }
+  NiceMock<MockQuicPacketBuilder> builder;
+  EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly([&](const auto& f) {
+    builder.frames_.push_back(f);
+  });
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(0);
+  EXPECT_CALL(quicStats, onDatagramDroppedOnWrite()).Times(2);
+
+  /* sleep override */
+  std::this_thread::sleep_for(maxQueueTime * 5);
+  ASSERT_FALSE(scheduler.writeDatagramFrames(builder).hasError());
+
+  EXPECT_TRUE(builder.frames_.empty());
+  EXPECT_EQ(conn.datagramState.flowManager.getDatagramCount(), 0);
+}
+
 TEST_P(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

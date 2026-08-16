@@ -639,10 +639,15 @@ static quic::Expected<DatagramFlowManager::DatagramPopResult, QuicError>
 writeDatagramFrame(
     QuicConnectionStateBase& conn,
     uint32_t flowId,
-    PacketBuilderInterface& builder) {
+    PacketBuilderInterface& builder,
+    TimePoint now) {
   // Try to pop the datagram if it fits (overhead calculated internally)
   auto popResult = conn.datagramState.flowManager.popDatagramIfFits(
-      flowId, builder.remainingSpaceInPkt());
+      flowId, builder.remainingSpaceInPkt(), now);
+
+  for (uint64_t i = 0; i < popResult.numExpired; ++i) {
+    QUIC_STATS(conn.statsCallback, onDatagramDroppedOnWrite);
+  }
 
   if (!popResult.buf) {
     // Doesn't fit - return popResult as-is
@@ -673,29 +678,37 @@ quic::Expected<void, QuicError> StreamFrameScheduler::writeStreamsHelper(
   // conn flow control, we can only write loss data.  In order to
   // advance the write queue, we have to remove the elements.  Store
   // them in QuicStreamManager and re-insert when more f/c arrives
+  // Only datagrams need the clock, and only expiring ones at that; resolve it
+  // once, on the first one.
+  Optional<TimePoint> now;
   while (!writableStreams.empty() && builder.remainingSpaceInPkt() > 0) {
     auto id = writableStreams.peekNextScheduledID();
 
     // Handle datagrams scheduled via PriorityQueue
     if (id.isDatagramFlowID()) {
       auto flowId = id.asDatagramFlowID();
-      auto writeResult = writeDatagramFrame(conn_, flowId, builder);
+      if (!now) {
+        now = conn_.datagramState.flowManager.nowForExpiration();
+      }
+      auto writeResult = writeDatagramFrame(conn_, flowId, builder, *now);
       if (!writeResult.has_value()) {
         return quic::make_unexpected(writeResult.error());
       }
       auto& result = writeResult.value();
-      if (result.datagramLen == 0) {
-        // Front Datagram doesn't fit
-        break;
-      }
-      // Successfully wrote datagram
+
       if (result.flowEmpty) {
+        // Flow is now empty (either datagram written or all expired)
         writableStreams.erase(id);
+      } else if (result.datagramLen == 0) {
+        // Front datagram doesn't fit - try next packet
+        break;
       } else {
-        // Consume bytes written for fairness
+        // Datagram written, consume bytes for fairness
         writableStreams.consume(result.datagramLen);
       }
-      if (conn_.transportSettings.datagramConfig.framePerPacket) {
+
+      if (result.datagramLen > 0 &&
+          conn_.transportSettings.datagramConfig.framePerPacket) {
         break;
       }
     } else {
@@ -976,6 +989,7 @@ quic::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
   // otherwise never be sent. Flow order is unspecified here; callers that need
   // priority ordering must enable PriorityQueue scheduling.
   auto& flowManager = conn_.datagramState.flowManager;
+  auto now = flowManager.nowForExpiration();
   // Every iteration either writes or expires at least one datagram, so the
   // total datagram count bounds the loop.
   size_t maxIters = flowManager.getDatagramCount();
@@ -984,7 +998,7 @@ quic::Expected<bool, QuicError> DatagramFrameScheduler::writeDatagramFrames(
     if (!flowId) {
       break;
     }
-    auto writeResult = writeDatagramFrame(conn_, *flowId, builder);
+    auto writeResult = writeDatagramFrame(conn_, *flowId, builder, now);
     if (!writeResult.has_value()) {
       return quic::make_unexpected(writeResult.error());
     }

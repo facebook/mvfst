@@ -28,12 +28,22 @@ extern const PriorityQueue::Priority kDefaultDatagramPriority;
  */
 class DatagramFlowManager {
  public:
+  // Timestamped datagram with enqueue time for expiration. A datagram queued
+  // while its flow had no deadline keeps max(): a deadline set later does not
+  // reach back to age it, and a flow that never sets one never reads the
+  // clock.
+  struct QueuedDatagram {
+    BufQueue buf;
+    TimePoint enqueueTime{TimePoint::max()};
+  };
+
   // Per-flow datagram storage
   // Stores single datagram inline, allocates CircularDeque only when needed
   struct DatagramFlowQueue {
-    BufQueue single;
-    std::unique_ptr<CircularDeque<BufQueue>> multi;
+    QueuedDatagram single;
+    std::unique_ptr<CircularDeque<QueuedDatagram>> multi;
     PriorityQueue::Priority priority{kDefaultDatagramPriority};
+    std::chrono::milliseconds maxQueueTime{0}; // 0 = no timeout
     // Closing: rejects further writes and is erased once its last datagram is
     // popped. Set by closeFlow(), and at creation for ephemeral flows.
     bool draining{false};
@@ -48,15 +58,15 @@ class DatagramFlowManager {
     DatagramFlowQueue& operator=(const DatagramFlowQueue&) = delete;
 
     [[nodiscard]] bool empty() const {
-      return multi ? multi->empty() : single.empty();
+      return multi ? multi->empty() : single.buf.empty();
     }
 
     [[nodiscard]] size_t size() const {
-      return multi ? multi->size() : (single.empty() ? 0 : 1);
+      return multi ? multi->size() : (single.buf.empty() ? 0 : 1);
     }
 
-    void push(BufQueue buf);
-    BufQueue& front();
+    void push(QueuedDatagram datagram);
+    QueuedDatagram& front();
     void pop();
   };
 
@@ -65,7 +75,13 @@ class DatagramFlowManager {
     BufPtr buf; // The datagram buffer (nullptr if doesn't fit or no datagram)
     bool flowEmpty; // True if the flow is now empty after pop
     uint64_t datagramLen; // Length of the datagram (0 if buf is nullptr)
+    uint64_t numExpired{0}; // Datagrams dropped for exceeding maxQueueTime
   };
+
+  // Longest deadline that means anything. A datagram queue drains or overflows
+  // in milliseconds, so a longer deadline is indistinguishable from none.
+  static constexpr std::chrono::milliseconds kMaxQueueTime =
+      std::chrono::hours(24);
 
   DatagramFlowManager() = default;
   ~DatagramFlowManager() = default;
@@ -126,6 +142,8 @@ class DatagramFlowManager {
    * Returns the flow's priority (either newly set or existing).
    * Pass draining for an ephemeral flow: one that takes this datagram and is
    * erased once it is written.
+   * maxQueueTime is applied to the flow like setMaxQueueTime() would: nullopt
+   * leaves the flow's current setting alone, and 0 clears it.
    * Returns error if the flow is already draining - a closed flow id is
    * finished, and the caller must allocate a new one.
    */
@@ -133,7 +151,8 @@ class DatagramFlowManager {
       BufQueue buf,
       uint32_t flowId = kDefaultDatagramFlowId,
       std::optional<PriorityQueue::Priority> priority = std::nullopt,
-      bool draining = false);
+      bool draining = false,
+      std::optional<std::chrono::milliseconds> maxQueueTime = std::nullopt);
 
   /**
    * Set priority for an existing flow.
@@ -145,11 +164,32 @@ class DatagramFlowManager {
       PriorityQueue::Priority priority);
 
   /**
+   * Set max queue time for an existing flow. Anything longer than kMaxQueueTime
+   * is stored as 0, meaning no timeout. Returns error if flow doesn't exist.
+   * Any datagrams enqueued while the flow had no queue time set never expire.
+   */
+  quic::Expected<void, LocalErrorCode> setMaxQueueTime(
+      uint32_t flowId,
+      std::chrono::milliseconds maxQueueTime);
+
+  /**
+   * Only reads the clock if any datagram queue for this connection ever had an
+   * expiration time.
+   */
+  [[nodiscard]] TimePoint nowForExpiration() const {
+    return usesExpiration_ ? Clock::now() : TimePoint();
+  }
+
+  /**
    * Pop a datagram from a flow if it fits in the available space.
    * @param flowId The flow to pop from
    * @param availableSpace Available space in bytes
+   * @param now From nowForExpiration(). Required rather than defaulted: a
+   *        write loop pops from several flows and must judge them all
+   *        against one reading, not one per call.
    */
-  DatagramPopResult popDatagramIfFits(uint32_t flowId, uint64_t availableSpace);
+  DatagramPopResult
+  popDatagramIfFits(uint32_t flowId, uint64_t availableSpace, TimePoint now);
 
   /**
    * Drop a datagram from the first non-empty flow. Returns the id of the flow
@@ -193,10 +233,19 @@ class DatagramFlowManager {
   quic::Expected<void, LocalErrorCode> closeFlowNow(uint32_t flowId);
 
  private:
+  [[nodiscard]] static std::chrono::milliseconds sanitizeMaxQueueTime(
+      std::chrono::milliseconds maxQueueTime) {
+    return (maxQueueTime.count() < 0 || maxQueueTime > kMaxQueueTime)
+        ? std::chrono::milliseconds(0)
+        : maxQueueTime;
+  }
+
   // Buffers Outgoing Datagrams per-flow
   folly::F14FastMap<uint32_t, DatagramFlowQueue> writeBuffer_;
   // Total count of datagrams across all flows
   size_t datagramCount_{0};
+  // Whether any flow has ever carried a deadline. See nowForExpiration().
+  bool usesExpiration_{false};
   // Function to calculate framing overhead for datagrams
   OverheadCalculator overheadCalculator_;
 };
