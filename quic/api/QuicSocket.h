@@ -407,8 +407,14 @@ class QuicSocket : virtual public QuicSocketLite {
   /**
    * Writes a Datagram frame to a specific flow. The flow's priority
    * determines scheduling order relative to other flows and streams.
+   * Optional intraFlowPriority orders this datagram against the others queued
+   * on the same flow; lower is sent first and equal values stay FIFO.
+   * sendDropOldDataFirst then drops the next to send, not the oldest.
    */
-  virtual WriteResult writeDatagram(uint32_t flowId, BufPtr buf) = 0;
+  virtual WriteResult writeDatagram(
+      uint32_t flowId,
+      BufPtr buf,
+      uint64_t intraFlowPriority = 0) = 0;
 
   /**
    * Sets the priority for a datagram flow. Lower values = higher priority.

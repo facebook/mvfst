@@ -179,7 +179,8 @@ class QuicTransportBase : public QuicSocket,
 
   quic::Expected<void, LocalErrorCode> writeDatagram(
       uint32_t flowId,
-      BufPtr buf) override;
+      BufPtr buf,
+      uint64_t intraFlowPriority = 0) override;
 
   quic::Expected<void, LocalErrorCode> setDatagramFlowPriority(
       uint32_t flowId,
@@ -316,7 +317,8 @@ class QuicTransportBase : public QuicSocket,
       uint32_t flowId,
       std::optional<PriorityQueue::Priority> priority,
       bool ephemeralFlow,
-      std::optional<std::chrono::milliseconds> maxQueueTime);
+      std::optional<std::chrono::milliseconds> maxQueueTime,
+      uint64_t intraFlowPriority = 0);
 
   void maybeEraseDatagramFlowFromWriteQueue(uint32_t flowId);
 };

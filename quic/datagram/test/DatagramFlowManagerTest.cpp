@@ -908,3 +908,96 @@ TEST_F(DatagramFlowManagerTest, DatagramDoesNotFitAfterExpiredOnesDropped) {
   EXPECT_EQ("small", toString(result.buf));
   EXPECT_EQ(1, manager_->getDatagramCount()); // Large one remains
 }
+
+TEST_F(DatagramFlowManagerTest, IntraFlowPriorityOrdersAscending) {
+  const auto noPriority = std::nullopt;
+  const auto noTimeout = std::chrono::milliseconds(0);
+  (void)manager_->addDatagram(
+      makeBuf("c"), 1, noPriority, false, noTimeout, 30);
+  (void)manager_->addDatagram(
+      makeBuf("a"), 1, noPriority, false, noTimeout, 10);
+  (void)manager_->addDatagram(
+      makeBuf("d"), 1, noPriority, false, noTimeout, 40);
+  (void)manager_->addDatagram(
+      makeBuf("b"), 1, noPriority, false, noTimeout, 20);
+
+  std::string order;
+  while (manager_->hasDatagramsForFlow(1)) {
+    order += toString(popIfFits(1, 1000).buf);
+  }
+  EXPECT_EQ("abcd", order);
+}
+
+TEST_F(DatagramFlowManagerTest, IntraFlowPriorityIsStableForEqualKeys) {
+  const auto noPriority = std::nullopt;
+  const auto noTimeout = std::chrono::milliseconds(0);
+  (void)manager_->addDatagram(
+      makeBuf("hi1"), 1, noPriority, false, noTimeout, 5);
+  (void)manager_->addDatagram(
+      makeBuf("lo1"), 1, noPriority, false, noTimeout, 9);
+  (void)manager_->addDatagram(
+      makeBuf("hi2"), 1, noPriority, false, noTimeout, 5);
+  (void)manager_->addDatagram(
+      makeBuf("lo2"), 1, noPriority, false, noTimeout, 9);
+  (void)manager_->addDatagram(
+      makeBuf("hi3"), 1, noPriority, false, noTimeout, 5);
+
+  std::string order;
+  while (manager_->hasDatagramsForFlow(1)) {
+    order += toString(popIfFits(1, 1000).buf);
+  }
+  EXPECT_EQ("hi1hi2hi3lo1lo2", order);
+}
+
+TEST_F(DatagramFlowManagerTest, DefaultIntraFlowPriorityPreservesFifo) {
+  (void)manager_->addDatagram(makeBuf("1"), 1);
+  (void)manager_->addDatagram(makeBuf("2"), 1);
+  (void)manager_->addDatagram(makeBuf("3"), 1);
+  (void)manager_->addDatagram(makeBuf("4"), 1);
+
+  std::string order;
+  while (manager_->hasDatagramsForFlow(1)) {
+    order += toString(popIfFits(1, 1000).buf);
+  }
+  EXPECT_EQ("1234", order);
+}
+
+TEST_F(
+    DatagramFlowManagerTest,
+    IntraFlowPriorityAcrossSingleToMultiTransition) {
+  const auto noPriority = std::nullopt;
+  const auto noTimeout = std::chrono::milliseconds(0);
+  // The first datagram lands in the inline `single` slot; the second forces
+  // the transition to the deque and must sort ahead of it.
+  (void)manager_->addDatagram(
+      makeBuf("late"), 1, noPriority, false, noTimeout, 100);
+  EXPECT_EQ(1, manager_->getDatagramCount());
+  (void)manager_->addDatagram(
+      makeBuf("early"), 1, noPriority, false, noTimeout, 1);
+  EXPECT_EQ(2, manager_->getDatagramCount());
+
+  EXPECT_EQ("early", toString(popIfFits(1, 1000).buf));
+  EXPECT_EQ("late", toString(popIfFits(1, 1000).buf));
+  EXPECT_FALSE(manager_->hasDatagramsForFlow(1));
+}
+
+TEST_F(DatagramFlowManagerTest, IntraFlowPriorityAfterQueueDrains) {
+  const auto noPriority = std::nullopt;
+  const auto noTimeout = std::chrono::milliseconds(0);
+  // Drain the flow to leave an allocated-but-empty deque behind, then verify
+  // ordering still holds for datagrams pushed afterwards.
+  (void)manager_->addDatagram(makeBuf("x"), 1, noPriority, false, noTimeout, 1);
+  (void)manager_->addDatagram(makeBuf("y"), 1, noPriority, false, noTimeout, 2);
+  (void)popIfFits(1, 1000);
+  (void)popIfFits(1, 1000);
+  EXPECT_FALSE(manager_->hasDatagramsForFlow(1));
+
+  (void)manager_->addDatagram(makeBuf("z"), 1, noPriority, false, noTimeout, 7);
+  (void)manager_->addDatagram(makeBuf("w"), 1, noPriority, false, noTimeout, 3);
+
+  std::string order;
+  while (manager_->hasDatagramsForFlow(1)) {
+    order += toString(popIfFits(1, 1000).buf);
+  }
+  EXPECT_EQ("wz", order);
+}

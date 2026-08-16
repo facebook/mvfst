@@ -13,18 +13,33 @@ namespace quic {
 const PriorityQueue::Priority kDefaultDatagramPriority{};
 
 void DatagramFlowManager::DatagramFlowQueue::push(QueuedDatagram datagram) {
-  if (multi) {
-    // Already using multi queue
-    multi->emplace_back(std::move(datagram));
-  } else if (single.buf.empty()) {
-    // First datagram
-    single = std::move(datagram);
-  } else {
-    // Transition from single to multi
+  if (!multi) {
+    if (single.buf.empty()) {
+      single = std::move(datagram);
+      return;
+    }
     multi = std::make_unique<CircularDeque<QueuedDatagram>>();
     multi->emplace_back(std::move(single));
-    multi->emplace_back(std::move(datagram));
   }
+
+  // Scanning from the back keeps the common append case O(1) -- O(N) only if
+  // priorities arrive descending -- and makes the insert stable for equal
+  // intraFlowPriority values.
+  if (multi->empty() ||
+      multi->back().intraFlowPriority <= datagram.intraFlowPriority) {
+    multi->emplace_back(std::move(datagram));
+    return;
+  }
+  auto pos = multi->end();
+  while (pos != multi->begin()) {
+    auto prev = pos;
+    --prev;
+    if (prev->intraFlowPriority <= datagram.intraFlowPriority) {
+      break;
+    }
+    pos = prev;
+  }
+  multi->insert(pos, std::move(datagram));
 }
 
 DatagramFlowManager::QueuedDatagram&
@@ -54,7 +69,8 @@ DatagramFlowManager::addDatagram(
     uint32_t flowId,
     std::optional<PriorityQueue::Priority> priority,
     bool draining,
-    std::optional<std::chrono::milliseconds> maxQueueTime) {
+    std::optional<std::chrono::milliseconds> maxQueueTime,
+    uint64_t intraFlowPriority) {
   auto it = writeBuffer_.find(flowId);
 
   // Rejected whether or not the scheduler has finished draining, so the
@@ -81,6 +97,7 @@ DatagramFlowManager::addDatagram(
   if (flow.maxQueueTime.count() > 0) {
     queuedDatagram.enqueueTime = Clock::now();
   }
+  queuedDatagram.intraFlowPriority = intraFlowPriority;
   flow.push(std::move(queuedDatagram));
   ++datagramCount_;
   return flow.priority;

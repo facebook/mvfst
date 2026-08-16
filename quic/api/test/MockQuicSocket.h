@@ -365,7 +365,8 @@ class MockQuicSocket : public QuicSocket {
 
   quic::Expected<void, LocalErrorCode> writeDatagram(
       uint32_t flowId,
-      BufPtr data) override {
+      BufPtr data,
+      uint64_t /*intraFlowPriority*/ = 0) override {
     SharedBuf sharedData(data.release());
     return writeDatagramWithFlowId(flowId, sharedData);
   }

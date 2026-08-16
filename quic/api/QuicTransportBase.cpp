@@ -544,7 +544,8 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
     uint32_t flowId,
-    BufPtr buf) {
+    BufPtr buf,
+    uint64_t intraFlowPriority) {
   auto& flowManager = conn_->datagramState.flowManager;
   // A draining flow is refused here rather than in addDatagram: a full buffer
   // drops a queued datagram to make room before the write gets that far.
@@ -552,7 +553,12 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
   return writeDatagramInternal(
-      std::move(buf), flowId, std::nullopt, false, std::nullopt);
+      std::move(buf),
+      flowId,
+      std::nullopt,
+      false,
+      std::nullopt,
+      intraFlowPriority);
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
@@ -560,7 +566,8 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
     uint32_t flowId,
     std::optional<PriorityQueue::Priority> priority,
     bool ephemeralFlow,
-    std::optional<std::chrono::milliseconds> maxQueueTime) {
+    std::optional<std::chrono::milliseconds> maxQueueTime,
+    uint64_t intraFlowPriority) {
   // TODO(lniccolini) update max datagram frame size
   // https://github.com/quicwg/datagram/issues/3
   // For now, max_datagram_size > 0 means the peer supports datagram frames
@@ -596,7 +603,12 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
   }
 
   auto flowPriorityResult = conn_->datagramState.flowManager.addDatagram(
-      std::move(buf), flowId, priority, ephemeralFlow, maxQueueTime);
+      std::move(buf),
+      flowId,
+      priority,
+      ephemeralFlow,
+      maxQueueTime,
+      intraFlowPriority);
   if (flowPriorityResult.hasError()) {
     QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
     return quic::make_unexpected(flowPriorityResult.error());

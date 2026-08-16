@@ -35,6 +35,9 @@ class DatagramFlowManager {
   struct QueuedDatagram {
     BufQueue buf;
     TimePoint enqueueTime{TimePoint::max()};
+    // Orders this datagram against others in the same flow; lower is sent
+    // first. Equal values retain enqueue order.
+    uint64_t intraFlowPriority{0};
   };
 
   // Per-flow datagram storage
@@ -65,6 +68,7 @@ class DatagramFlowManager {
       return multi ? multi->size() : (single.buf.empty() ? 0 : 1);
     }
 
+    // Inserts in ascending intraFlowPriority order, stably.
     void push(QueuedDatagram datagram);
     QueuedDatagram& front();
     void pop();
@@ -146,13 +150,16 @@ class DatagramFlowManager {
    * leaves the flow's current setting alone, and 0 clears it.
    * Returns error if the flow is already draining - a closed flow id is
    * finished, and the caller must allocate a new one.
+   * intraFlowPriority orders this datagram against the others already queued
+   * on the flow; lower is sent first and equal values stay FIFO.
    */
   quic::Expected<PriorityQueue::Priority, LocalErrorCode> addDatagram(
       BufQueue buf,
       uint32_t flowId = kDefaultDatagramFlowId,
       std::optional<PriorityQueue::Priority> priority = std::nullopt,
       bool draining = false,
-      std::optional<std::chrono::milliseconds> maxQueueTime = std::nullopt);
+      std::optional<std::chrono::milliseconds> maxQueueTime = std::nullopt,
+      uint64_t intraFlowPriority = 0);
 
   /**
    * Set priority for an existing flow.
