@@ -43,12 +43,18 @@ Bbr2Startup::Bbr2Startup(QuicConnectionStateBase& conn)
 void Bbr2Startup::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (shared_->resolveSpuriousLossUndo(ackEvent, lossEvent)) {
+    finishSpuriousLossUndo();
+  }
   if (ackEvent && !ackEvent->largestNewlyAckedPacket && !lossEvent) {
     return;
   }
   if (lossEvent && lossEvent->lostPackets > 0) {
     auto ackedBytes = ackEvent ? ackEvent->ackedBytes : 0;
-    if (conn_.transportSettings.ccaConfig.enableRecoveryInStartup) {
+    const bool recoveryEnabled =
+        conn_.transportSettings.ccaConfig.enableRecoveryInStartup;
+    shared_->updateSpuriousLossUndoOnLoss(*lossEvent);
+    if (recoveryEnabled) {
       shared_->onPacketLoss(*lossEvent, ackedBytes);
     }
   }
@@ -97,9 +103,9 @@ void Bbr2Startup::onPacketAckOrLoss(
     // Bound bandwidth for model - apply short-term limit in Drain
     Optional<Bandwidth> bwUpperBound;
     if (shared_->state_ != Bbr2State::Startup &&
-        bandwidthShortTerm_.has_value() &&
+        shared_->bandwidthShortTerm_.has_value() &&
         !conn_.transportSettings.ccaConfig.ignoreShortTerm) {
-      bwUpperBound = bandwidthShortTerm_;
+      bwUpperBound = shared_->bandwidthShortTerm_;
     }
     shared_->boundBwForModel(std::move(bwUpperBound));
 
@@ -110,8 +116,8 @@ void Bbr2Startup::onPacketAckOrLoss(
         calculateCwnd(),
         *ackEvent,
         0, // inflightLongTerm_ not used in Startup
-        inflightShortTerm_.value_or(0),
-        bandwidthShortTerm_);
+        shared_->inflightShortTerm_.value_or(0),
+        shared_->bandwidthShortTerm_);
   }
 }
 
@@ -127,8 +133,8 @@ void Bbr2Startup::setResumeHints(
 // Internals
 
 void Bbr2Startup::resetShortTermModel() {
-  bandwidthShortTerm_.reset();
-  inflightShortTerm_.reset();
+  shared_->bandwidthShortTerm_.reset();
+  shared_->inflightShortTerm_.reset();
 }
 
 void Bbr2Startup::enterStartup() {
@@ -192,15 +198,33 @@ uint64_t Bbr2Startup::calculateCwnd() const {
     cwndBytes = std::min(cwndBytes, shared_->recoveryWindow_);
   }
 
+  return boundCwndForModel(cwndBytes);
+}
+
+uint64_t Bbr2Startup::boundCwndForModel(uint64_t cwndBytes) const {
   cwndBytes = std::max(cwndBytes, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 
   // Apply short-term model bounds in Drain
-  if (shared_->state_ == Bbr2State::Drain && inflightShortTerm_.has_value() &&
+  if (shared_->state_ == Bbr2State::Drain &&
+      shared_->inflightShortTerm_.has_value() &&
       !conn_.transportSettings.ccaConfig.ignoreShortTerm) {
-    cwndBytes = std::min(cwndBytes, *inflightShortTerm_);
+    cwndBytes = std::min(cwndBytes, *shared_->inflightShortTerm_);
   }
 
   return cwndBytes;
+}
+
+void Bbr2Startup::finishSpuriousLossUndo() {
+  Optional<Bandwidth> bwUpperBound;
+  if (shared_->state_ == Bbr2State::Drain &&
+      shared_->bandwidthShortTerm_.has_value() &&
+      !conn_.transportSettings.ccaConfig.ignoreShortTerm) {
+    bwUpperBound = shared_->bandwidthShortTerm_;
+  }
+  shared_->boundBwForModel(std::move(bwUpperBound));
+  shared_->setSendQuantum();
+  setPacing();
+  shared_->applyCwnd(boundCwndForModel(shared_->cwndBytes_));
 }
 
 void Bbr2Startup::updateCongestionSignals() {
@@ -212,7 +236,7 @@ void Bbr2Startup::updateCongestionSignals() {
   if (shared_->lossPctInLastRound_ > 0 &&
       shared_->state_ == Bbr2State::Startup) {
     shared_->updateShortTermModelOnLoss(
-        bandwidthShortTerm_, inflightShortTerm_);
+        shared_->bandwidthShortTerm_, shared_->inflightShortTerm_);
   }
 }
 
@@ -305,8 +329,8 @@ void Bbr2Startup::checkFullBwReached() {
     fullBw_ = maxBw; /* record new baseline level */
     return;
   }
-  fullBwCount_++; /* another round w/o much growth */
-  fullBwNow_ = (fullBwCount_ >= 3);
+  shared_->fullBwCount_++; /* another round w/o much growth */
+  fullBwNow_ = (shared_->fullBwCount_ >= 3);
   if (fullBwNow_) {
     fullBwReached_ = true;
   }
@@ -315,7 +339,7 @@ void Bbr2Startup::checkFullBwReached() {
 void Bbr2Startup::resetFullBw() {
   fullBw_ = Bandwidth();
   fullBwNow_ = false;
-  fullBwCount_ = 0;
+  shared_->fullBwCount_ = 0;
 }
 
 void Bbr2Startup::enterDrain() {

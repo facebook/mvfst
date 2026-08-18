@@ -71,11 +71,17 @@ void Bbr2ProbeRtt::onPacketSent(const OutstandingPacketWrapper& packet) {
 void Bbr2ProbeRtt::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (shared_->resolveSpuriousLossUndo(ackEvent, lossEvent)) {
+    finishSpuriousLossUndo();
+  }
   if (ackEvent && !ackEvent->largestNewlyAckedPacket && !lossEvent) {
     return;
   }
   if (lossEvent && lossEvent->lostPackets > 0) {
-    if (conn_.transportSettings.ccaConfig.enableRecoveryInProbeStates) {
+    const bool recoveryEnabled =
+        conn_.transportSettings.ccaConfig.enableRecoveryInProbeStates;
+    shared_->updateSpuriousLossUndoOnLoss(*lossEvent);
+    if (recoveryEnabled) {
       auto ackedBytes = ackEvent ? ackEvent->ackedBytes : 0;
       shared_->onPacketLoss(*lossEvent, ackedBytes);
     }
@@ -127,6 +133,13 @@ uint64_t Bbr2ProbeRtt::calculateCwnd() const {
     return std::min(shared_->cwndBytes_, getProbeRTTCwnd());
   }
   return shared_->cwndBytes_;
+}
+
+void Bbr2ProbeRtt::finishSpuriousLossUndo() {
+  shared_->boundBwForModel(std::nullopt);
+  shared_->setSendQuantum();
+  shared_->setPacing(conn_.transportSettings.defaultRttFactor);
+  shared_->applyCwnd(calculateCwnd());
 }
 
 // ProbeRTT state management

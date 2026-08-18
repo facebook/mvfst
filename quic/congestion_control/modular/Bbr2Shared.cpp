@@ -28,6 +28,16 @@ constexpr std::chrono::microseconds kMinRttFilterLen =
 // TODO: Restore this margin to a non-zero value
 constexpr uint8_t kPacingMarginPercent = 0;
 
+template <typename T>
+Optional<T> restoreLessRestrictiveBound(
+    const Optional<T>& currentBound,
+    const Optional<T>& priorBound) {
+  if (!currentBound.has_value() || !priorBound.has_value()) {
+    return std::nullopt;
+  }
+  return std::max(*currentBound, *priorBound);
+}
+
 Bbr2Shared::Bbr2Shared(QuicConnectionStateBase& conn)
     : conn_(conn),
       cwndBytes_(
@@ -411,6 +421,121 @@ void Bbr2Shared::updateShortTermModelOnLoss(
 
 // ===== Recovery State =====
 
+bool Bbr2Shared::resolveSpuriousLossUndo(
+    const AckEvent* FOLLY_NULLABLE ackEvent,
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (!conn_.transportSettings.ccaConfig.enableSpuriousLossRecovery) {
+    invalidateSpuriousLossUndo();
+    return false;
+  }
+  if (!spuriousLossUndoState_.has_value()) {
+    return false;
+  }
+
+  const uint64_t numPacketsSpuriouslyAcked =
+      ackEvent ? ackEvent->numPacketsSpuriouslyAcked : 0;
+  const uint64_t numNewLostPackets = lossEvent ? lossEvent->lostPackets : 0;
+  const auto declaredLostCount = conn_.outstandings.declaredLostCount;
+  if (numPacketsSpuriouslyAcked > spuriousLossUndoState_->pendingLostPackets ||
+      numNewLostPackets > declaredLostCount) {
+    invalidateSpuriousLossUndo();
+    return false;
+  }
+
+  // ACK handling has already removed spurious ACKs from declaredLostCount,
+  // while loss detection has already added this event's new losses.
+  const auto remainingLostPackets =
+      spuriousLossUndoState_->pendingLostPackets - numPacketsSpuriouslyAcked;
+  const auto previouslyDeclaredLostPackets =
+      declaredLostCount - numNewLostPackets;
+  if (remainingLostPackets != previouslyDeclaredLostPackets) {
+    invalidateSpuriousLossUndo();
+    return false;
+  }
+
+  spuriousLossUndoState_->pendingLostPackets = remainingLostPackets;
+  if (remainingLostPackets != 0) {
+    return false;
+  }
+
+  undoSpuriousLoss();
+  return true;
+}
+
+void Bbr2Shared::updateSpuriousLossUndoOnLoss(const LossEvent& lossEvent) {
+  if (!conn_.transportSettings.ccaConfig.enableSpuriousLossRecovery ||
+      lossEvent.persistentCongestion) {
+    invalidateSpuriousLossUndo();
+    return;
+  }
+
+  const bool continuesCurrentEpisode = spuriousLossUndoState_.has_value() &&
+      lossEvent.largestLostSentTime.has_value() &&
+      *lossEvent.largestLostSentTime < spuriousLossUndoState_->episodeStartTime;
+  if (continuesCurrentEpisode) {
+    extendSpuriousLossUndo(lossEvent);
+  } else {
+    armSpuriousLossUndo(lossEvent);
+  }
+}
+
+void Bbr2Shared::armSpuriousLossUndo(const LossEvent& lossEvent) {
+  invalidateSpuriousLossUndo();
+  // Older retained losses make aggregate episode accounting ambiguous.
+  if (conn_.outstandings.declaredLostCount != lossEvent.lostPackets) {
+    return;
+  }
+
+  spuriousLossUndoState_ = SpuriousLossUndoState{
+      .priorCwndBytes = cwndBytes_,
+      .priorBandwidthShortTerm = bandwidthShortTerm_,
+      .priorInflightShortTerm = inflightShortTerm_,
+      .priorInflightLongTerm = inflightLongTerm_,
+      .pendingLostPackets = lossEvent.lostPackets,
+      .episodeStartTime = Clock::now(),
+  };
+}
+
+void Bbr2Shared::extendSpuriousLossUndo(const LossEvent& lossEvent) {
+  if (!spuriousLossUndoState_.has_value()) {
+    return;
+  }
+
+  spuriousLossUndoState_->pendingLostPackets += lossEvent.lostPackets;
+  if (spuriousLossUndoState_->pendingLostPackets !=
+      conn_.outstandings.declaredLostCount) {
+    invalidateSpuriousLossUndo();
+  }
+}
+
+void Bbr2Shared::undoSpuriousLoss() {
+  MVCHECK(spuriousLossUndoState_.has_value());
+  auto undoState = *spuriousLossUndoState_;
+  spuriousLossUndoState_.reset();
+
+  cwndBytes_ = std::max(cwndBytes_, undoState.priorCwndBytes);
+  bandwidthShortTerm_ = restoreLessRestrictiveBound(
+      bandwidthShortTerm_, undoState.priorBandwidthShortTerm);
+  inflightShortTerm_ = restoreLessRestrictiveBound(
+      inflightShortTerm_, undoState.priorInflightShortTerm);
+  inflightLongTerm_ = restoreLessRestrictiveBound(
+      inflightLongTerm_, undoState.priorInflightLongTerm);
+
+  recoveryState_ = RecoveryState::NOT_RECOVERY;
+  recoveryWindow_ = cwndBytes_;
+
+  // The current loss round and full-bandwidth samples may include effects of
+  // the falsely declared loss and must not trigger another loss response.
+  lossBytesInRound_ = 0;
+  lossEventsInRound_ = 0;
+  largestLostPacketNumInRound_ = 0;
+  fullBwCount_ = 0;
+}
+
+void Bbr2Shared::invalidateSpuriousLossUndo() noexcept {
+  spuriousLossUndoState_.reset();
+}
+
 void Bbr2Shared::onPacketLoss(const LossEvent& lossEvent, uint64_t ackedBytes) {
   saveCwnd();
   recoveryStartTime_ = Clock::now();
@@ -565,6 +690,7 @@ void Bbr2Shared::onPacketSent(const OutstandingPacketWrapper& packet) {
 
   // Handle restart from idle
   if (wasIdle && appLimited_) {
+    invalidateSpuriousLossUndo();
     idleRestart_ = true;
     // Reset ack aggregation tracking
     extraAckedStartTimestamp_ = Clock::now();

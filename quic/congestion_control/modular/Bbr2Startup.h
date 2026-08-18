@@ -27,6 +27,8 @@ namespace quic {
  * Bbr2ProbeBw.
  */
 class Bbr2Startup : public CongestionController {
+  friend class Bbr2ModularTestPeer;
+
  public:
   explicit Bbr2Startup(QuicConnectionStateBase& conn);
 
@@ -91,6 +93,8 @@ class Bbr2Startup : public CongestionController {
 
   // Cwnd/pacing (startup-specific)
   [[nodiscard]] uint64_t calculateCwnd() const;
+  [[nodiscard]] uint64_t boundCwndForModel(uint64_t cwndBytes) const;
+  void finishSpuriousLossUndo();
   void setPacing();
   void updatePacingGain();
 
@@ -106,11 +110,6 @@ class Bbr2Startup : public CongestionController {
   bool fullBwReached_{false};
   bool fullBwNow_{false};
   Bandwidth fullBw_;
-  uint64_t fullBwCount_{0};
-
-  // Short term model - used for drain
-  Optional<Bandwidth> bandwidthShortTerm_;
-  Optional<uint64_t> inflightShortTerm_;
 
   // Resume state
   bool isResuming_{false};

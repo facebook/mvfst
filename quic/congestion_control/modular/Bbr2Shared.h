@@ -61,6 +61,7 @@ class Bbr2Shared {
   friend class Bbr2Startup;
   friend class Bbr2ProbeBw;
   friend class Bbr2ProbeRtt;
+  friend class Bbr2ModularTestPeer;
 
  public:
   // Recovery state enum (shared across all modules)
@@ -130,6 +131,10 @@ class Bbr2Shared {
       Optional<uint64_t>& inflightShortTerm);
 
   // ===== Recovery State =====
+  bool resolveSpuriousLossUndo(
+      const AckEvent* FOLLY_NULLABLE ackEvent,
+      const LossEvent* FOLLY_NULLABLE lossEvent);
+  void updateSpuriousLossUndoOnLoss(const LossEvent& lossEvent);
   void onPacketLoss(const LossEvent& lossEvent, uint64_t ackedBytes);
   void updateRecoveryOnAck();
 
@@ -174,6 +179,20 @@ class Bbr2Shared {
   void getStats(CongestionControllerStats& stats) const;
 
  private:
+  struct SpuriousLossUndoState {
+    uint64_t priorCwndBytes;
+    Optional<Bandwidth> priorBandwidthShortTerm;
+    Optional<uint64_t> priorInflightShortTerm;
+    Optional<uint64_t> priorInflightLongTerm;
+    uint64_t pendingLostPackets;
+    TimePoint episodeStartTime;
+  };
+
+  void armSpuriousLossUndo(const LossEvent& lossEvent);
+  void extendSpuriousLossUndo(const LossEvent& lossEvent);
+  void undoSpuriousLoss();
+  void invalidateSpuriousLossUndo() noexcept;
+
   QuicConnectionStateBase& conn_;
 
   // Note: fields are ordered for efficient packing
@@ -213,6 +232,8 @@ class Bbr2Shared {
 
   // Loss & congestion signals
   Optional<uint64_t> inflightLongTerm_;
+  Optional<Bandwidth> bandwidthShortTerm_;
+  Optional<uint64_t> inflightShortTerm_;
   Bandwidth bandwidthLatest_;
   uint64_t inflightLatest_{0};
   uint64_t lossBytesInRound_{0};
@@ -224,6 +245,10 @@ class Bbr2Shared {
   // Recovery state
   uint64_t recoveryWindow_{0};
   TimePoint recoveryStartTime_;
+  Optional<SpuriousLossUndoState> spuriousLossUndoState_;
+
+  // Full bandwidth detection
+  uint64_t fullBwCount_{0};
 
   // Current ACK state
   const AckEvent* currentAckEvent_{nullptr};

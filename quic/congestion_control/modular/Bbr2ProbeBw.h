@@ -108,6 +108,8 @@ class Bbr2ProbeBw : public CongestionController {
 
   // Cwnd
   [[nodiscard]] uint64_t calculateCwnd() const;
+  [[nodiscard]] uint64_t boundCwndForModel(uint64_t cwndBytes) const;
+  void finishSpuriousLossUndo();
   void updatePacingAndCwndGain();
 
   // Short-term model (ProbeBw-specific)
@@ -120,10 +122,6 @@ class Bbr2ProbeBw : public CongestionController {
 
   QuicConnectionStateBase& conn_;
   std::shared_ptr<Bbr2Shared> shared_;
-
-  // Short-term model (response to loss)
-  Optional<Bandwidth> bandwidthShortTerm_;
-  Optional<uint64_t> inflightShortTerm_;
 
   // ProbeBw cycle timing
   TimePoint probeBWCycleStart_;
@@ -142,7 +140,6 @@ class Bbr2ProbeBw : public CongestionController {
   // Full bandwidth detection (for ProbeBw_Up → ProbeBw_Down transition)
   bool fullBwNow_{false};
   Bandwidth fullBw_;
-  uint64_t fullBwCount_{0};
 };
 
 } // namespace quic

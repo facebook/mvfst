@@ -82,6 +82,7 @@ class Bbr2ProbeRtt : public CongestionController {
  private:
   // Cwnd management
   [[nodiscard]] uint64_t calculateCwnd() const;
+  void finishSpuriousLossUndo();
 
   // ProbeRTT state management
   void enterProbeRtt();
