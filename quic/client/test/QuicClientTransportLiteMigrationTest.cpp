@@ -548,6 +548,11 @@ TEST_F(
       res.error().message.find("available") != std::string::npos ||
       res.error().message.find("connection id") != std::string::npos)
       << "Error message should mention connection IDs or availability";
+
+  // The failed probe must not leave a path or scheduled validation behind.
+  EXPECT_EQ(conn->pathManager->getPath(localAddr, conn->peerAddress), nullptr);
+  EXPECT_TRUE(conn->pendingEvents.pathChallenges.empty());
+  EXPECT_FALSE(callback.called);
 }
 
 TEST_F(

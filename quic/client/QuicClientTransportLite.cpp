@@ -2049,6 +2049,19 @@ quic::Expected<PathIdType, QuicError> QuicClientTransportLite::startPathProbe(
   }
   auto pathId = pathIdRes.value();
 
+  // Assign the new path a connection id before registering callbacks or
+  // scheduling work for it.
+  auto connIdRes = conn_->pathManager->assignDestinationCidForPath(pathId);
+  if (connIdRes.hasError()) {
+    auto removeRes = conn_->pathManager->removePath(pathId);
+    if (removeRes.hasError()) {
+      MVLOG_WARNING << "Failed to remove path " << pathId
+                    << " after connection id assignment failed: "
+                    << removeRes.error();
+    }
+    return quic::make_unexpected(connIdRes.error());
+  }
+
   // Set the callback
   if (probeResultCallback) {
     pathValidationCallbacks_[pathId] = probeResultCallback;
@@ -2057,14 +2070,6 @@ quic::Expected<PathIdType, QuicError> QuicClientTransportLite::startPathProbe(
   // Schedule a path challenge for the new path. The actual payload is minted
   // at write time by the path manager.
   conn_->pendingEvents.pathChallenges.insert(pathId);
-
-  // Assign it a new connection id to use. This is done as the last step to
-  // avoid assigning a connection id then returning an error leaving a
-  // connection id mistakenly marked as in use.
-  auto connIdRes = conn_->pathManager->assignDestinationCidForPath(pathId);
-  if (connIdRes.hasError()) {
-    return quic::make_unexpected(connIdRes.error());
-  }
 
   // Schedule a write.
   updateWriteLooper(true);
