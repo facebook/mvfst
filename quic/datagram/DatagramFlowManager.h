@@ -33,6 +33,10 @@ class DatagramFlowManager {
   // reach back to age it, and a flow that never sets one never reads the
   // clock.
   struct QueuedDatagram {
+    // User-provided, not `= default`: writeBuffer_ instantiates F14FastMap over
+    // these nested types before gcc has evaluated their member initializers.
+    QueuedDatagram() {}
+
     BufQueue buf;
     TimePoint enqueueTime{TimePoint::max()};
     // Orders this datagram against others in the same flow; lower is sent
@@ -51,7 +55,7 @@ class DatagramFlowManager {
     // popped. Set by closeFlow(), and at creation for ephemeral flows.
     bool draining{false};
 
-    DatagramFlowQueue() = default;
+    DatagramFlowQueue() {} // Not `= default`; see QueuedDatagram above.
     ~DatagramFlowQueue() = default;
 
     // Move-only
