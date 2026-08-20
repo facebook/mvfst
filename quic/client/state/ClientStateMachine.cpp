@@ -52,6 +52,10 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->udpSendPacketLen = conn->udpSendPacketLen;
   newConn->supportedVersions = conn->supportedVersions;
   newConn->transportSettings = conn->transportSettings;
+  if (newConn->transportSettings.advertiseSconeSupport ||
+      newConn->transportSettings.enableSconeSend) {
+    newConn->scone.emplace(QuicConnectionStateBase::SconeState{});
+  }
   newConn->datagramState.maxReadFrameSize =
       conn->datagramState.maxReadFrameSize;
   newConn->datagramState.maxWriteFrameSize =

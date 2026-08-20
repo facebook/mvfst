@@ -146,6 +146,42 @@ TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   EXPECT_NE(nullptr, newConn->happyEyeballsState.secondSocket);
 }
 
+TEST_F(ClientStateMachineTest, PreserveSconeReceiveStateDuringUndo) {
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.has_value());
+  client_->clientConnectionId = randomCid.value();
+  client_->transportSettings.advertiseSconeSupport = true;
+  client_->scone.emplace();
+  client_->scone->configuredRateSignal = 42;
+
+  auto newConn = undoAllClientStateForRetry(std::move(client_));
+
+  ASSERT_TRUE(newConn->scone.has_value());
+  EXPECT_EQ(newConn->scone->configuredRateSignal, kSconeNoAdvice);
+}
+
+TEST_F(ClientStateMachineTest, PreserveSconeSendStateDuringUndo) {
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.has_value());
+  client_->clientConnectionId = randomCid.value();
+  client_->transportSettings.enableSconeSend = true;
+  client_->scone.emplace();
+
+  auto newConn = undoAllClientStateForRetry(std::move(client_));
+
+  EXPECT_TRUE(newConn->scone.has_value());
+}
+
+TEST_F(ClientStateMachineTest, KeepSconeDisabledDuringUndo) {
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.has_value());
+  client_->clientConnectionId = randomCid.value();
+
+  auto newConn = undoAllClientStateForRetry(std::move(client_));
+
+  EXPECT_FALSE(newConn->scone.has_value());
+}
+
 TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
   auto socket = std::make_shared<MockQuicSocket>();
   const auto observerContainer =
