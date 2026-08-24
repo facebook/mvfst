@@ -7921,6 +7921,31 @@ void setReceiveTimestampsConfig(
           .receiveTimestampsExponent = 0};
 }
 
+struct LegacyAckFrameSpec {
+  PacketNum largestAcked;
+  PacketNum latestRecvdPacketNum;
+  RecvdPacketsTimestampsRangeVec ranges;
+};
+
+ReadAckFrame makeLegacyAckFrame(LegacyAckFrameSpec spec) {
+  ReadAckFrame frame;
+  frame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS;
+  frame.largestAcked = spec.largestAcked;
+  frame.ackBlocks.emplace_back(0, spec.largestAcked);
+  frame.timestampsVersion = AckReceiveTimestampsVersion::LegacyMvfst;
+  frame.maybeLatestRecvdPacketNum = spec.latestRecvdPacketNum;
+  frame.maybeLatestRecvdPacketTime = 500us;
+  frame.recvdPacketsTimestampRanges = std::move(spec.ranges);
+  return frame;
+}
+
+UnorderedMap<PacketNum, uint64_t> timestampsByPacketNum(
+    std::initializer_list<std::pair<const PacketNum, uint64_t>> entries) {
+  UnorderedMap<PacketNum, uint64_t> timestamps;
+  timestamps.insert(entries);
+  return timestamps;
+}
+
 } // namespace
 
 TEST(Draft02AckProcessing, UsesDraft02ParserAndComputesPktNumsFromDelta) {
@@ -8113,6 +8138,52 @@ TEST(Draft02AckProcessing, RejectsTimestampUnderflow) {
   auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
   ASSERT_TRUE(res.hasError());
   EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+}
+
+TEST(LegacyAckProcessing, AnchorsRangesOnLargestAcked) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // Packets 99 and 100 overtook packet 98, so the last packet to arrive is not
+  // the highest-numbered one and `maybeLatestRecvdPacketNum` trails Largest
+  // Acknowledged. The peer still seeds the walk at Largest Acknowledged, so the
+  // timestamped run starts at 100 - gap == 98.
+  auto frame = makeLegacyAckFrame(
+      {.largestAcked = 100,
+       .latestRecvdPacketNum = 98,
+       .ranges = {
+           {.gap = 2, .timestamp_delta_count = 3, .deltas = {500, 10, 20}}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(out, timestampsByPacketNum({{98, 500}, {97, 490}, {96, 470}}));
+}
+
+TEST(LegacyAckProcessing, DecodesTwoRangesTheEncoderWould) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  setReceiveTimestampsConfig(conn, 10);
+  // Gaps as `fillFrameWithPacketReceiveTimestamps()` computes them for
+  // timestamped runs [97,98] and [91,92] under Largest Acknowledged 100:
+  //   range 1 is seeded from largestAcked:   gap = 100 - 98        == 2
+  //   range 2 chains off the previous
+  //   range's start, less the implicit -1
+  //   on each side of the boundary:          gap = 97 - 2 - 92     == 3
+  // `latestRecvdPacketNum` is the last packet to *arrive*, picked
+  // independently of the first range's end, and the parser only checks it for
+  // presence -- so its value does not affect the expectation below.
+  // Decoding those two gaps must land back on 98 and 92.
+  auto frame = makeLegacyAckFrame(
+      {.largestAcked = 100,
+       .latestRecvdPacketNum = 98,
+       .ranges = {
+           {.gap = 2, .timestamp_delta_count = 2, .deltas = {500, 10}},
+           {.gap = 3, .timestamp_delta_count = 2, .deltas = {40, 20}}}});
+  UnorderedMap<PacketNum, uint64_t> out;
+  auto res = parseAckReceiveTimestamps(conn, frame, out, /*firstPacketNum=*/0);
+  ASSERT_FALSE(res.hasError());
+  EXPECT_EQ(
+      out, timestampsByPacketNum({{98, 500}, {97, 490}, {92, 450}, {91, 430}}));
 }
 
 } // namespace quic::test

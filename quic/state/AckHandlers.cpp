@@ -700,8 +700,8 @@ PacketNum decrementPacketNum(PacketNum pktNum) {
 }
 
 // Legacy mvfst receive-timestamp parser. Uses `recvdPacketsTimestampRanges`
-// with `gap` semantics derived from `maybeLatestRecvdPacketNum`. Over-limit
-// is soft-logged and the parser returns early without raising an error.
+// with `gap` semantics derived from `largestAcked`. Over-limit is soft-logged
+// and the parser returns early without raising an error.
 void parseAckReceiveTimestampsLegacy(
     const QuicConnectionStateBase& conn,
     const quic::ReadAckFrame& frame,
@@ -724,7 +724,12 @@ void parseAckReceiveTimestampsLegacy(
     return;
   }
 
-  auto receivedPacketNum = frame.maybeLatestRecvdPacketNum.value();
+  // Wire invariant: the peer seeds its packet-number walk at Largest
+  // Acknowledged. Only the first range's `gap` is relative to it; later gaps
+  // chain off the previous range's start. Unlike draft-02, which anchors every
+  // range on Largest Acknowledged independently. See
+  // `fillFrameWithPacketReceiveTimestamps()` in QuicWriteCodec.cpp.
+  auto receivedPacketNum = frame.largestAcked;
 
   if (!firstPacketNum.has_value() ||
       receivedPacketNum < firstPacketNum.value()) {
@@ -761,9 +766,8 @@ void parseAckReceiveTimestampsLegacy(
                     << packetReceiveTimeStamps.size()
                     << " than requested timestamps from peer: "
                     << maxReceiveTimestampsRequestedFromPeer << " current PN "
-                    << receivedPacketNum << " largest PN "
-                    << frame.maybeLatestRecvdPacketNum.value() << " deltas  "
-                    << timeStampRange.deltas.size();
+                    << receivedPacketNum << " largest PN " << frame.largestAcked
+                    << " deltas  " << timeStampRange.deltas.size();
         return;
       }
       receiveTimeStamp -= delta;

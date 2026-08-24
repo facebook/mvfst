@@ -66,7 +66,8 @@ void commonAckVisitorForAckFrame(
 /**
  * Parse receive timestamps from an ACK frame into a packet-number to
  * timestamp map. Dispatches on `ReadAckFrame::timestampsVersion`:
- *   - `LegacyMvfst`: legacy `gap` / `maybeLatestRecvdPacketNum` layout.
+ *   - `LegacyMvfst`: legacy chained `gap` layout, seeded from `largestAcked`.
+ *     `maybeLatestRecvdPacketNum` stays a required legacy header field.
  *     Over-limit is soft-logged.
  *   - `DraftIetf02`: draft-ietf-quic-receive-ts-02's
  *     `deltaLargestAcknowledged` layout. Over-limit returns
