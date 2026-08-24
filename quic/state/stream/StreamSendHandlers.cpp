@@ -184,6 +184,32 @@ quic::Expected<void, QuicError> sendRstSMHandler(
 quic::Expected<void, QuicError> sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame) {
+  if (stream.streamSendBuffer && stream.sendState != StreamSendState::Invalid) {
+    auto ackResult = stream.streamSendBuffer->markAcked(
+        {.offset = ackedFrame.offset,
+         .len = ackedFrame.len,
+         .fin = ackedFrame.fin});
+    if (!ackResult) {
+      return quic::make_unexpected(QuicError(
+          TransportErrorCode::INTERNAL_ERROR,
+          "Failed to update unified stream send buffer ACK state"));
+    }
+
+    stream.conn.streamManager->addDeliverable(stream.id);
+
+    const bool allReliableDataDelivered = stream.minReliableSizeAcked &&
+        (*stream.minReliableSizeAcked == 0 ||
+         stream.allBytesAckedTill(*stream.minReliableSizeAcked - 1));
+    if (allBytesTillFinAcked(stream) || allReliableDataDelivered) {
+      stream.sendState = StreamSendState::Closed;
+      if (stream.inTerminalStates()) {
+        stream.conn.streamManager->addClosed(stream.id);
+      }
+    }
+    stream.conn.streamManager->updateWritableStreams(stream);
+    return {};
+  }
+
   switch (stream.sendState) {
     case StreamSendState::Open:
     case StreamSendState::ResetSent: {

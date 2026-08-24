@@ -22,6 +22,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "//quic/state:quic_state_machine",
+        "//quic/state:quic_stream_utilities",
         "//quic/state:stream_functions",
     ],
 )

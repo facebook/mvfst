@@ -17,6 +17,7 @@ mvfst_add_library(mvfst_state_stream
     mvfst_state_connection_oops_fields
   EXPORTED_DEPS
     mvfst_state_quic_state_machine
+    mvfst_state_quic_stream_utilities
     mvfst_state_stream_functions
 )
 

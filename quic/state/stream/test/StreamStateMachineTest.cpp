@@ -280,6 +280,51 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   ASSERT_EQ(stream->ackedIntervals.front().end, 20);
 }
 
+TEST_F(QuicOpenStateTest, UnifiedAckHandlesReorderingAndDuplicates) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(
+      stream->streamSendBuffer->append(IOBuf::copyBuffer("abcdef"), true));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 6, true}));
+
+  const WriteStreamFrame tailFrame(stream->id, 3, 3, true);
+  ASSERT_FALSE(sendAckSMHandler(*stream, tailFrame).hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+  EXPECT_EQ(stream->streamSendBuffer->ackInsertVersion(), 1);
+  EXPECT_FALSE(stream->streamSendBuffer->largestDeliverableOffset());
+  EXPECT_TRUE(conn->streamManager->deliverableContains(stream->id));
+
+  ASSERT_FALSE(sendAckSMHandler(*stream, tailFrame).hasError());
+  EXPECT_EQ(stream->streamSendBuffer->ackInsertVersion(), 1);
+
+  const WriteStreamFrame headFrame(stream->id, 0, 3, false);
+  ASSERT_FALSE(sendAckSMHandler(*stream, headFrame).hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+  EXPECT_EQ(stream->streamSendBuffer->ackInsertVersion(), 2);
+  ASSERT_TRUE(stream->streamSendBuffer->largestDeliverableOffset().has_value());
+  EXPECT_EQ(6u, *stream->streamSendBuffer->largestDeliverableOffset());
+}
+
+TEST_F(QuicOpenStateTest, UnifiedAckHandlesFinOnly) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(stream->streamSendBuffer->append(nullptr, true));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 0, true}));
+
+  const WriteStreamFrame finFrame(stream->id, 0, 0, true);
+  ASSERT_FALSE(sendAckSMHandler(*stream, finFrame).hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+  EXPECT_TRUE(stream->streamSendBuffer->finAcked());
+
+  const auto ackVersion = stream->streamSendBuffer->ackInsertVersion();
+  ASSERT_FALSE(sendAckSMHandler(*stream, finFrame).hasError());
+  EXPECT_EQ(stream->streamSendBuffer->ackInsertVersion(), ackVersion);
+}
+
 TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();

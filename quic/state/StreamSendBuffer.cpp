@@ -8,6 +8,7 @@
 #include <quic/state/StreamSendBuffer.h>
 
 #include <algorithm>
+#include <array>
 #include <limits>
 
 namespace quic {
@@ -20,29 +21,73 @@ Optional<uint64_t> rangeEnd(uint64_t offset, uint64_t len) {
   return offset + len;
 }
 
-template <typename Func>
-void forEachUnackedRange(
-    const IntervalSet<uint64_t>& acked,
+template <size_t N, typename Func>
+void forEachCoveredRange(
+    const std::array<const IntervalSet<uint64_t>*, N>& coveredSets,
     uint64_t start,
     uint64_t end,
-    Func&& func) {
-  auto cursor = start;
-  for (const auto& interval : acked) {
-    if (interval.end < cursor) {
-      continue;
+    Func func) {
+  using Iterator = IntervalSet<uint64_t>::const_iterator;
+  std::array<Iterator, N> iterators;
+  std::array<Iterator, N> ends;
+  for (size_t i = 0; i < N; ++i) {
+    iterators[i] = std::ranges::lower_bound(
+        *coveredSets[i], start, {}, [](const auto& interval) {
+          return interval.end;
+        });
+    ends[i] = coveredSets[i]->end();
+  }
+
+  Optional<uint64_t> coveredStart;
+  uint64_t coveredEnd = 0;
+  while (true) {
+    size_t nextSet = N;
+    for (size_t i = 0; i < N; ++i) {
+      if (iterators[i] != ends[i] &&
+          (nextSet == N || iterators[i]->start < iterators[nextSet]->start)) {
+        nextSet = i;
+      }
     }
-    if (interval.start >= end) {
+    if (nextSet == N || iterators[nextSet]->start >= end) {
       break;
     }
-    if (cursor < interval.start) {
-      const auto unackedEnd = std::min(end, interval.start);
-      func(cursor, unackedEnd);
-    }
-    cursor = std::max(cursor, interval.end + 1);
-    if (cursor >= end) {
-      return;
+
+    const auto& interval = *iterators[nextSet]++;
+    const auto intervalStart = std::max(start, interval.start);
+    const auto intervalEnd = std::min(end, interval.end + 1);
+    if (!coveredStart) {
+      coveredStart = intervalStart;
+      coveredEnd = intervalEnd;
+    } else if (intervalStart <= coveredEnd) {
+      coveredEnd = std::max(coveredEnd, intervalEnd);
+    } else {
+      func(*coveredStart, coveredEnd);
+      coveredStart = intervalStart;
+      coveredEnd = intervalEnd;
     }
   }
+  if (coveredStart) {
+    func(*coveredStart, coveredEnd);
+  }
+}
+
+template <size_t N, typename Func>
+void forEachUncoveredRange(
+    const std::array<const IntervalSet<uint64_t>*, N>& coveredSets,
+    uint64_t start,
+    uint64_t end,
+    Func func) {
+  auto cursor = start;
+  forEachCoveredRange(
+      coveredSets,
+      start,
+      end,
+      [&cursor, &func](uint64_t coveredStart, uint64_t coveredEnd) {
+        if (cursor < coveredStart) {
+          func(cursor, coveredStart);
+        }
+        cursor = std::max(cursor, coveredEnd);
+      });
   if (cursor < end) {
     func(cursor, end);
   }
@@ -188,21 +233,26 @@ bool StreamSendBuffer::markNewDataSent(const SendRange& range) {
   return true;
 }
 
-void StreamSendBuffer::markLoss(const SendRange& range) {
+bool StreamSendBuffer::markLoss(const SendRange& range) {
   if (cancelled_) {
-    return;
+    return false;
   }
   const auto requestedEnd = rangeEnd(range.offset, range.len);
   if (!requestedEnd) {
-    return;
+    return false;
   }
+  bool addedLoss = false;
   const auto end = std::min(*requestedEnd, nextUnsentOffset_);
   if (range.offset < end) {
+    addedLoss = countNewLoss(range.offset, end) > 0;
     insertOutstandingIntoPending(range.offset, end);
   }
-  if (range.fin && *requestedEnd == tailOffset_ && finSent_ && !finAcked_) {
+  if (range.fin && *requestedEnd == tailOffset_ && finSent_ && !finAcked_ &&
+      !finAbandoned_) {
+    addedLoss = addedLoss || !finLost_;
     finLost_ = true;
   }
+  return addedLoss;
 }
 
 void StreamSendBuffer::markRetransmissionSent(const SendRange& range) {
@@ -217,6 +267,35 @@ void StreamSendBuffer::markRetransmissionSent(const SendRange& range) {
   if (range.fin && *end == tailOffset_) {
     finLost_ = false;
   }
+}
+
+Optional<bool> StreamSendBuffer::abandon(const SendRange& range) {
+  if (cancelled_) {
+    return false;
+  }
+  const auto requestedEnd = rangeEnd(range.offset, range.len);
+  if (!requestedEnd) {
+    return std::nullopt;
+  }
+  bool retired = false;
+  const auto end = std::min(*requestedEnd, nextUnsentOffset_);
+  if (range.offset < end) {
+    const auto retiredOutstanding = countOutstanding(range.offset, end);
+    if (retiredOutstanding > outstandingBytes_) {
+      return std::nullopt;
+    }
+    retired = retiredOutstanding > 0;
+    outstandingBytes_ -= retiredOutstanding;
+    abandonedIntervals_.insert(range.offset, end - 1);
+    pendingRetransmissions_.withdraw(Interval<uint64_t>{range.offset, end - 1});
+    releaseRetiredEntries(range.offset, end);
+  }
+  if (range.fin && *requestedEnd == tailOffset_ && finSent_ && !finAcked_) {
+    retired = retired || !finAbandoned_;
+    finAbandoned_ = true;
+    finLost_ = false;
+  }
+  return retired;
 }
 
 Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
@@ -245,12 +324,13 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
   if (range.len > 0) {
     pendingRetransmissions_.withdraw(
         Interval<uint64_t>{range.offset, *end - 1});
-    releaseAckedEntries(range.offset, *end);
+    releaseRetiredEntries(range.offset, *end);
   }
   if (range.fin) {
     result.newlyAckedFin = !finAcked_;
     finAcked_ = true;
     finLost_ = false;
+    finAbandoned_ = false;
   }
   return result;
 }
@@ -309,6 +389,7 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
   finSent_ = false;
   finLost_ = false;
   finAcked_ = false;
+  finAbandoned_ = false;
   writeClosed_ = true;
   cleanUpEntries();
   return true;
@@ -326,6 +407,7 @@ void StreamSendBuffer::cancelAll() {
   finSent_ = false;
   finLost_ = false;
   finAcked_ = false;
+  finAbandoned_ = false;
   writeClosed_ = true;
   cancelled_ = true;
 }
@@ -393,48 +475,51 @@ bool StreamSendBuffer::writeEntryRange(
 
 uint64_t StreamSendBuffer::countUnacked(uint64_t start, uint64_t end) const {
   uint64_t count = 0;
-  forEachUnackedRange(
-      ackedIntervals_, start, end, [&count](uint64_t begin, uint64_t finish) {
-        count += finish - begin;
-      });
+  forEachUncoveredRange(
+      std::array{&ackedIntervals_},
+      start,
+      end,
+      [&count](uint64_t begin, uint64_t finish) { count += finish - begin; });
   return count;
 }
 
 uint64_t StreamSendBuffer::countOutstanding(uint64_t start, uint64_t end)
     const {
   uint64_t count = 0;
-  forEachUnackedRange(
-      ackedIntervals_,
+  forEachUncoveredRange(
+      std::array<const IntervalSet<uint64_t>*, 2>{
+          &ackedIntervals_, &abandonedIntervals_},
       start,
       end,
-      [this, &count](uint64_t begin, uint64_t finish) {
-        forEachUnackedRange(
-            abandonedIntervals_,
-            begin,
-            finish,
-            [&count](uint64_t activeBegin, uint64_t activeEnd) {
-              count += activeEnd - activeBegin;
-            });
-      });
+      [&count](uint64_t begin, uint64_t finish) { count += finish - begin; });
+  return count;
+}
+
+uint64_t StreamSendBuffer::countNewLoss(uint64_t start, uint64_t end) const {
+  uint64_t count = 0;
+  forEachUncoveredRange(
+      std::array{
+          &ackedIntervals_, &abandonedIntervals_, &pendingRetransmissions_},
+      start,
+      end,
+      [&count](uint64_t begin, uint64_t finish) { count += finish - begin; });
   return count;
 }
 
 void StreamSendBuffer::insertOutstandingIntoPending(
     uint64_t start,
     uint64_t end) {
-  forEachUnackedRange(
-      ackedIntervals_, start, end, [this](uint64_t begin, uint64_t finish) {
-        forEachUnackedRange(
-            abandonedIntervals_,
-            begin,
-            finish,
-            [this](uint64_t activeBegin, uint64_t activeEnd) {
-              pendingRetransmissions_.insert(activeBegin, activeEnd - 1);
-            });
+  forEachUncoveredRange(
+      std::array<const IntervalSet<uint64_t>*, 2>{
+          &ackedIntervals_, &abandonedIntervals_},
+      start,
+      end,
+      [this](uint64_t begin, uint64_t finish) {
+        pendingRetransmissions_.insert(begin, finish - 1);
       });
 }
 
-void StreamSendBuffer::releaseAckedEntries(uint64_t start, uint64_t end) {
+void StreamSendBuffer::releaseRetiredEntries(uint64_t start, uint64_t end) {
   if (entries_.empty() || entries_.front().offset >= end) {
     cleanUpEntries();
     return;
@@ -445,18 +530,37 @@ void StreamSendBuffer::releaseAckedEntries(uint64_t start, uint64_t end) {
     cleanUpEntries();
     return;
   }
-  while (*entryIndex < entries_.size()) {
-    auto& entry = entries_[*entryIndex];
-    if (entry.offset >= end) {
-      break;
-    }
-    if (entry.data &&
-        ackedIntervals_.contains(entry.offset, entry.offset + entry.len - 1)) {
-      // Keep the offset metadata until earlier entries can also be removed.
-      entry.data.reset();
-    }
-    ++*entryIndex;
+  const auto scanStart = entries_[*entryIndex].offset;
+  auto scanEnd = scanStart;
+  for (auto i = *entryIndex; i < entries_.size() && entries_[i].offset < end;
+       ++i) {
+    scanEnd = std::max(scanEnd, entries_[i].offset + entries_[i].len);
   }
+  forEachCoveredRange(
+      std::array<const IntervalSet<uint64_t>*, 2>{
+          &ackedIntervals_, &abandonedIntervals_},
+      scanStart,
+      scanEnd,
+      [this, &entryIndex](uint64_t retiredStart, uint64_t retiredEnd) {
+        while (*entryIndex < entries_.size() &&
+               entries_[*entryIndex].offset + entries_[*entryIndex].len <=
+                   retiredStart) {
+          ++*entryIndex;
+        }
+        while (*entryIndex < entries_.size()) {
+          auto& entry = entries_[*entryIndex];
+          if (entry.offset >= retiredEnd) {
+            break;
+          }
+          if (entry.offset >= retiredStart &&
+              entry.offset + entry.len <= retiredEnd) {
+            // Keep the offset metadata until earlier entries can also be
+            // removed.
+            entry.data.reset();
+          }
+          ++*entryIndex;
+        }
+      });
   cleanUpEntries();
 }
 

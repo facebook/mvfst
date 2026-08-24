@@ -323,6 +323,14 @@ RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
   return packet;
 }
 
+RegularQuicWritePacket
+makeStreamPacket(StreamId streamId, uint64_t offset, uint64_t len, bool fin) {
+  RegularQuicWritePacket packet(
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0));
+  packet.frames.push_back(WriteStreamFrame(streamId, offset, len, fin));
+  return packet;
+}
+
 TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onPTO()).Times(0);
@@ -542,6 +550,122 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   EXPECT_EQ(buffer.offset, 0);
   EXPECT_EQ(
       ByteRange(buf->data(), buf->length()), buffer.data.getHead()->getRange());
+}
+
+TEST_F(QuicLossFunctionsTest, UnifiedLossExcludesPreviouslyAckedBytes) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(stream->streamSendBuffer->append(
+      folly::IOBuf::copyBuffer("abcdefgh"), true));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 8, true}));
+
+  ASSERT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 2, 4, false))
+          .hasError());
+  auto packet = makeStreamPacket(stream->id, 0, 8, true);
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+
+  EXPECT_EQ(stream->streamLossCount, 1);
+  EXPECT_TRUE(stream->hasLoss());
+  EXPECT_TRUE(conn->streamManager->hasLoss());
+  EXPECT_EQ(
+      stream->streamSendBuffer->nextLoss(8),
+      StreamSendBuffer::SendRange(0, 2, false));
+
+  stream->streamSendBuffer->markRetransmissionSent(
+      {.offset = 0, .len = 2, .fin = false});
+  EXPECT_EQ(
+      stream->streamSendBuffer->nextLoss(8),
+      StreamSendBuffer::SendRange(6, 2, true));
+
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, true).hasError());
+  EXPECT_EQ(stream->streamLossCount, 1);
+
+  ASSERT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 8, true))
+          .hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+  EXPECT_FALSE(stream->hasLoss());
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+}
+
+TEST_F(QuicLossFunctionsTest, UnifiedLossAfterDuplicateAckIsIgnored) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(
+      stream->streamSendBuffer->append(folly::IOBuf::copyBuffer("data"), true));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 4, true}));
+
+  const WriteStreamFrame frame(stream->id, 0, 4, true);
+  ASSERT_FALSE(sendAckSMHandler(*stream, frame).hasError());
+  const auto ackVersion = stream->streamSendBuffer->ackInsertVersion();
+  ASSERT_FALSE(sendAckSMHandler(*stream, frame).hasError());
+  EXPECT_EQ(stream->streamSendBuffer->ackInsertVersion(), ackVersion);
+
+  auto packet = makeStreamPacket(stream->id, 0, 4, true);
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+  EXPECT_FALSE(stream->hasLoss());
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+  EXPECT_EQ(stream->streamLossCount, 0);
+}
+
+TEST_F(QuicLossFunctionsTest, UnifiedFinOnlyLossIsClearedByAck) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(stream->streamSendBuffer->append(nullptr, true));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 0, true}));
+
+  auto packet = makeStreamPacket(stream->id, 0, 0, true);
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+  EXPECT_EQ(
+      stream->streamSendBuffer->nextLoss(1),
+      StreamSendBuffer::SendRange(0, 0, true));
+  EXPECT_EQ(stream->streamLossCount, 1);
+  EXPECT_TRUE(conn->streamManager->hasLoss());
+
+  ASSERT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 0, true))
+          .hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+  EXPECT_FALSE(stream->hasLoss());
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+}
+
+TEST_F(
+    QuicLossFunctionsTest,
+    UnifiedLossIsAbandonedWhenRetransmissionDisabled) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(
+      stream->streamSendBuffer->append(folly::IOBuf::copyBuffer("data"), true));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 4, true}));
+  stream->retransmissionDisabled_ = true;
+
+  auto packet = makeStreamPacket(stream->id, 0, 4, true);
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+
+  EXPECT_EQ(stream->streamSendBuffer->outstandingBytes(), 0);
+  EXPECT_FALSE(stream->hasLoss());
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+  EXPECT_EQ(stream->streamLossCount, 0);
+  EXPECT_FALSE(writeQueueContains(*conn, stream->id));
 }
 
 bool areEqual(folly::IOBuf* ptr, ChainedByteRangeHead* rch) {

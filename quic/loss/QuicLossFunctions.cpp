@@ -215,6 +215,30 @@ quic::Expected<void, QuicError> markPacketLoss(
           break;
         }
 
+        if (stream->streamSendBuffer) {
+          const StreamSendBuffer::SendRange range{
+              .offset = frame.offset, .len = frame.len, .fin = frame.fin};
+          bool addedLoss = false;
+          if (streamRetransmissionDisabled(conn, *stream)) {
+            const auto abandonResult = stream->streamSendBuffer->abandon(range);
+            if (!abandonResult.has_value()) {
+              return quic::make_unexpected(QuicError(
+                  TransportErrorCode::INTERNAL_ERROR,
+                  "Failed to abandon unified stream send buffer range"));
+            }
+          } else {
+            addedLoss = stream->streamSendBuffer->markLoss(range);
+          }
+          if (addedLoss &&
+              streamsWithAddedStreamLossForPacket.find(frame.streamId) ==
+                  streamsWithAddedStreamLossForPacket.end()) {
+            stream->streamLossCount++;
+            streamsWithAddedStreamLossForPacket.insert(frame.streamId);
+          }
+          conn.streamManager->updateWritableStreams(*stream);
+          break;
+        }
+
         auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
         if (bufferItr == stream->retransmissionBuffer.end()) {
           break;

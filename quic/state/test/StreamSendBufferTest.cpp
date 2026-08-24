@@ -7,6 +7,7 @@
 
 #include <quic/state/StreamSendBuffer.h>
 
+#include <limits>
 #include <string>
 
 #include <folly/portability/GTest.h>
@@ -339,6 +340,10 @@ TEST(StreamSendBufferTest, CancelAllReleasesAllPendingState) {
   EXPECT_FALSE(buffer.append(makeBuffer("g"), false));
   EXPECT_FALSE(
       buffer.markAcked({.offset = 0, .len = 0, .fin = false}).has_value());
+  const auto abandoned = buffer.abandon(
+      {.offset = std::numeric_limits<uint64_t>::max(), .len = 1, .fin = false});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_FALSE(*abandoned);
 }
 
 TEST(StreamSendBufferTest, CancelPreservesLargestSentOffset) {
@@ -385,6 +390,77 @@ TEST(StreamSendBufferTest, AckOfEitherFinOnlyDuplicateRetiresLossState) {
 
   ASSERT_TRUE(buffer.markAcked({0, 0, true}).has_value());
   EXPECT_FALSE(buffer.hasPendingLoss());
+}
+
+TEST(StreamSendBufferTest, LossReportsOnlyNewPendingRanges) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 6, .fin = false}));
+
+  EXPECT_TRUE(buffer.markLoss({.offset = 0, .len = 2, .fin = false}));
+  EXPECT_FALSE(buffer.markLoss({.offset = 0, .len = 2, .fin = false}));
+  EXPECT_TRUE(buffer.markLoss({.offset = 4, .len = 2, .fin = false}));
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 2, .len = 2, .fin = false}).has_value());
+  EXPECT_FALSE(buffer.markLoss({.offset = 2, .len = 2, .fin = false}));
+}
+
+TEST(StreamSendBufferTest, FragmentedAcksRetireManyEntries) {
+  StreamSendBuffer buffer;
+  constexpr uint64_t kEntryCount = 64;
+  constexpr uint64_t kEntrySize = 8;
+  constexpr uint64_t kTotalBytes = kEntryCount * kEntrySize;
+  for (uint64_t i = 0; i < kEntryCount; ++i) {
+    ASSERT_TRUE(buffer.append(makeBuffer(std::string(kEntrySize, 'x')), false));
+  }
+  ASSERT_TRUE(
+      buffer.markNewDataSent({.offset = 0, .len = kTotalBytes, .fin = false}));
+
+  for (uint64_t i = 0; i < kTotalBytes; i += 2) {
+    ASSERT_TRUE(
+        buffer.markAcked({.offset = i, .len = 1, .fin = false}).has_value());
+  }
+  EXPECT_EQ(kTotalBytes / 2, buffer.outstandingBytes());
+
+  for (uint64_t i = 1; i < kTotalBytes; i += 2) {
+    ASSERT_TRUE(
+        buffer.markAcked({.offset = i, .len = 1, .fin = false}).has_value());
+  }
+  EXPECT_EQ(0, buffer.outstandingBytes());
+  EXPECT_FALSE(buffer.writeAt(0, 1, [](ByteRange) { return true; }));
+}
+
+TEST(StreamSendBufferTest, AbandonRetiresDataAndFinWithoutDelivery) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abc"), true));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 3, .fin = true}));
+  ASSERT_TRUE(buffer.markLoss({.offset = 0, .len = 3, .fin = true}));
+
+  auto abandoned = buffer.abandon({.offset = 0, .len = 3, .fin = true});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
+  EXPECT_EQ(0, buffer.outstandingBytes());
+  EXPECT_FALSE(buffer.hasPendingLoss());
+  EXPECT_FALSE(buffer.allBytesAckedTill(3));
+  abandoned = buffer.abandon({.offset = 0, .len = 3, .fin = true});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_FALSE(*abandoned);
+  EXPECT_FALSE(buffer.markLoss({.offset = 0, .len = 3, .fin = true}));
+}
+
+TEST(StreamSendBufferTest, AbandonClampsToTransmittedPrefix) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 4, .fin = false}));
+
+  const auto abandoned = buffer.abandon({.offset = 2, .len = 4, .fin = false});
+
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
+  EXPECT_EQ(2, buffer.outstandingBytes());
+  const auto duplicate = buffer.abandon({.offset = 2, .len = 2, .fin = false});
+  ASSERT_TRUE(duplicate.has_value());
+  EXPECT_FALSE(*duplicate);
 }
 
 } // namespace

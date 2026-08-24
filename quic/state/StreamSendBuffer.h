@@ -62,8 +62,9 @@ class StreamSendBuffer {
       const;
 
   [[nodiscard]] bool markNewDataSent(const SendRange& range);
-  void markLoss(const SendRange& range);
+  bool markLoss(const SendRange& range);
   void markRetransmissionSent(const SendRange& range);
+  [[nodiscard]] Optional<bool> abandon(const SendRange& range);
   [[nodiscard]] Optional<AckResult> markAcked(const SendRange& range);
 
   [[nodiscard]] bool truncateFrom(uint64_t offset);
@@ -136,8 +137,9 @@ class StreamSendBuffer {
       DataWriter writer) const;
   [[nodiscard]] uint64_t countUnacked(uint64_t start, uint64_t end) const;
   [[nodiscard]] uint64_t countOutstanding(uint64_t start, uint64_t end) const;
+  [[nodiscard]] uint64_t countNewLoss(uint64_t start, uint64_t end) const;
   void insertOutstandingIntoPending(uint64_t start, uint64_t end);
-  void releaseAckedEntries(uint64_t start, uint64_t end);
+  void releaseRetiredEntries(uint64_t start, uint64_t end);
   void cleanUpEntries();
 
   CircularDeque<Entry> entries_;
@@ -152,6 +154,7 @@ class StreamSendBuffer {
   bool finSent_{false};
   bool finLost_{false};
   bool finAcked_{false};
+  bool finAbandoned_{false};
   bool writeClosed_{false};
   bool cancelled_{false};
 };
