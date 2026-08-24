@@ -64,6 +64,32 @@ Optional<uint64_t> getAckIntervalSetVersion(
   return getAckIntervalSetVersion(*maybeAckedStreamState);
 }
 
+quic::Expected<void, QuicError> processUnifiedStreamFramesForSpuriousAck(
+    QuicConnectionStateBase& conn,
+    const OutstandingPacketWrapper& packet,
+    const AckedFrameVisitor& ackedFrameVisitor) {
+  if (packet.packet.header.getPacketNumberSpace() !=
+      PacketNumberSpace::AppData) {
+    return {};
+  }
+
+  for (const auto& packetFrame : packet.packet.frames) {
+    const auto* streamFrame = packetFrame.asWriteStreamFrame();
+    if (!streamFrame) {
+      continue;
+    }
+    const auto* stream = conn.streamManager->findStream(streamFrame->streamId);
+    if (!stream || !stream->streamSendBuffer) {
+      continue;
+    }
+    auto result = ackedFrameVisitor(packet, packetFrame);
+    if (!result.has_value()) {
+      return result;
+    }
+  }
+  return {};
+}
+
 void updateCongestionControllerForAck(
     QuicConnectionStateBase& conn,
     AckEvent& ack,
@@ -284,6 +310,11 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
             ackedPacketIterator->metadata,
             ackedPacketIterator->packet.header.getPacketSequenceNum(),
             ackedPacketIterator->packet.header.getPacketNumberSpace());
+      }
+      auto dataAckResult = processUnifiedStreamFramesForSpuriousAck(
+          conn, *ackedPacketIterator, ackedFrameVisitor);
+      if (!dataAckResult.has_value()) {
+        return quic::make_unexpected(dataAckResult.error());
       }
       ackedPacketIterator.next();
       continue;

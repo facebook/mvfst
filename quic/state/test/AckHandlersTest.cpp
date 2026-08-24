@@ -4561,6 +4561,160 @@ class AckEventForAppDataTest : public Test {
   std::unique_ptr<QuicServerConnectionState> conn_;
 };
 
+TEST_F(AckEventForAppDataTest, SpuriousAckProcessesUnifiedStreamData) {
+  getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  ASSERT_NE(nullptr, stream);
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(stream->id, "data", false);
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(frame);
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  auto& outstanding = getConn()->outstandings.packets.back();
+  outstanding.declaredLost = true;
+  ++getConn()->outstandings.declaredLostCount;
+  --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+  EXPECT_TRUE(
+      stream->streamSendBuffer->markLoss({frame.offset, frame.len, frame.fin}));
+  EXPECT_TRUE(stream->streamSendBuffer->hasPendingLoss());
+
+  const auto ack = deliverAckForAppDataPackets(packetNum, packetNum);
+
+  EXPECT_EQ(1, ack.numPacketsSpuriouslyAcked);
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+  EXPECT_EQ(0, stream->streamSendBuffer->outstandingBytes());
+  EXPECT_EQ(frame.offset + frame.len - 1, getLargestDeliverableOffset(*stream));
+  EXPECT_TRUE(getConn()->streamManager->deliverableContains(stream->id));
+}
+
+TEST_F(AckEventForAppDataTest, DuplicateSpuriousAckIsIdempotent) {
+  getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  ASSERT_NE(nullptr, stream);
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(stream->id, "data", false);
+  auto firstPacket = buildEmptyPacket(PacketNumberSpace::AppData);
+  firstPacket.packet.frames.emplace_back(frame);
+  sendAppDataPacket(firstPacket);
+  const auto firstPacketNum = firstPacket.packet.header.getPacketSequenceNum();
+  auto& firstOutstanding = getConn()->outstandings.packets.back();
+  firstOutstanding.declaredLost = true;
+  ++getConn()->outstandings.declaredLostCount;
+  --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+  ASSERT_TRUE(
+      stream->streamSendBuffer->markLoss({frame.offset, frame.len, frame.fin}));
+
+  auto secondPacket = buildEmptyPacket(PacketNumberSpace::AppData);
+  secondPacket.packet.frames.emplace_back(frame);
+  sendAppDataPacket(secondPacket);
+  const auto secondPacketNum =
+      secondPacket.packet.header.getPacketSequenceNum();
+  auto& secondOutstanding = getConn()->outstandings.packets.back();
+  secondOutstanding.declaredLost = true;
+  ++getConn()->outstandings.declaredLostCount;
+  --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+  ASSERT_TRUE(
+      stream->streamSendBuffer->markLoss({frame.offset, frame.len, frame.fin}));
+
+  deliverAckForAppDataPackets(firstPacketNum, firstPacketNum);
+  const auto versionAfterFirstAck =
+      stream->streamSendBuffer->ackInsertVersion();
+  deliverAckForAppDataPackets(secondPacketNum, secondPacketNum);
+
+  EXPECT_EQ(versionAfterFirstAck, stream->streamSendBuffer->ackInsertVersion());
+  EXPECT_EQ(0, stream->streamSendBuffer->outstandingBytes());
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+}
+
+TEST_F(AckEventForAppDataTest, SpuriousAckProcessesUnifiedFinOnly) {
+  getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  ASSERT_NE(nullptr, stream);
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(stream->id, std::string(), true);
+  ASSERT_EQ(0, frame.len);
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(frame);
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  auto& outstanding = getConn()->outstandings.packets.back();
+  outstanding.declaredLost = true;
+  ++getConn()->outstandings.declaredLostCount;
+  --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+  EXPECT_TRUE(
+      stream->streamSendBuffer->markLoss({frame.offset, frame.len, frame.fin}));
+  EXPECT_TRUE(stream->streamSendBuffer->finLost());
+
+  deliverAckForAppDataPackets(packetNum, packetNum);
+
+  EXPECT_TRUE(stream->streamSendBuffer->finAcked());
+  EXPECT_FALSE(stream->streamSendBuffer->finLost());
+  EXPECT_EQ(StreamSendState::Closed, stream->sendState);
+}
+
+TEST_F(AckEventForAppDataTest, SpuriousAckDoesNotReplayControlFrames) {
+  getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  ASSERT_NE(nullptr, stream);
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(stream->id, "data", false);
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(frame);
+  packet.packet.frames.emplace_back(PingFrame());
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  auto& outstanding = getConn()->outstandings.packets.back();
+  outstanding.declaredLost = true;
+  ++getConn()->outstandings.declaredLostCount;
+  --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+  ASSERT_TRUE(
+      stream->streamSendBuffer->markLoss({frame.offset, frame.len, frame.fin}));
+
+  uint64_t streamFramesVisited = 0;
+  uint64_t controlFramesVisited = 0;
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = packetNum;
+  ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
+  auto result = processAckFrame(
+      *getConn(),
+      PacketNumberSpace::AppData,
+      ackFrame,
+      [](const auto&) -> quic::Expected<void, QuicError> { return {}; },
+      [&](const auto&,
+          const QuicWriteFrame& ackedFrame) -> quic::Expected<void, QuicError> {
+        if (const auto* streamFrame = ackedFrame.asWriteStreamFrame()) {
+          ++streamFramesVisited;
+          return sendAckSMHandler(*stream, *streamFrame);
+        }
+        ++controlFramesVisited;
+        return {};
+      },
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, QuicError> {
+        return {};
+      },
+      Clock::now());
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(1, streamFramesVisited);
+  EXPECT_EQ(0, controlFramesVisited);
+}
+
 /**
  * Check AckEvent::ackTime, adjustedAckTime, and rttSample.
  *
