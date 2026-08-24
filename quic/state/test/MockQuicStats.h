@@ -45,6 +45,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onPathValidationSuccess, ());
   MOCK_METHOD(void, onPathValidationFailure, ());
   MOCK_METHOD(void, onNewQuicStream, ());
+  MOCK_METHOD(void, onNewUnifiedAppStream, ());
   MOCK_METHOD(void, onQuicStreamClosed, ());
   MOCK_METHOD(void, onQuicStreamReset, (QuicErrorCode));
   MOCK_METHOD(void, onConnFlowControlUpdate, ());

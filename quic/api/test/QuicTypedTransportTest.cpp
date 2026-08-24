@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <string_view>
 #include <utility>
 
 #include <quic/api/test/Mocks.h>
@@ -144,6 +145,56 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoConnectionTime) {
           ->getTransportInfo()
           .connectionTime.time_since_epoch()
           .count());
+  this->destroyTransport();
+}
+
+TYPED_TEST(QuicTypedTransportTest, UnifiedSendBufferRetransmitsDeclaredLoss) {
+  TestFixture::startTransport();
+  auto& conn = this->getNonConstConn();
+  conn.outstandings.reset();
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->usesUnifiedSendBuffer());
+
+  constexpr std::string_view kData = "unified retransmission";
+  ASSERT_FALSE(this->getTransport()
+                   ->writeChain(streamId, IOBuf::copyBuffer(kData), false)
+                   .hasError());
+  ASSERT_TRUE(this->loopForWrites().has_value());
+
+  auto originalPacketIt =
+      getLastOutstandingPacket(conn, PacketNumberSpace::AppData);
+  ASSERT_NE(originalPacketIt, conn.outstandings.packets.rend());
+  ASSERT_TRUE(hasStreamFrame(originalPacketIt->packet.frames));
+  const auto originalPacketNum =
+      originalPacketIt->packet.header.getPacketSequenceNum();
+  const auto originalPathId = originalPacketIt->metadata.pathId;
+  const auto retransmittedBefore = conn.lossState.totalBytesRetransmitted;
+
+  EXPECT_CALL(*this->quicStats_, onPacketRetransmission()).Times(1);
+  auto lossResult =
+      markPacketLoss(conn, originalPathId, originalPacketIt->packet, false);
+  ASSERT_FALSE(lossResult.hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->hasPendingLoss());
+
+  this->getTestTransport()->writeLooper()->run(true);
+  ASSERT_TRUE(this->loopForWrites().has_value());
+
+  const auto* retransmission = this->getNewestAppDataOutstandingPacket();
+  ASSERT_NE(retransmission, nullptr);
+  EXPECT_NE(
+      retransmission->packet.header.getPacketSequenceNum(), originalPacketNum);
+  EXPECT_TRUE(hasStreamFrame(retransmission->packet.frames));
+  EXPECT_FALSE(retransmission->maybeClonedPacketIdentifier.has_value());
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+  EXPECT_EQ(
+      conn.lossState.totalBytesRetransmitted - retransmittedBefore,
+      kData.size());
+
   this->destroyTransport();
 }
 

@@ -151,7 +151,9 @@ fb_dirsync_cpp_unittest(
     srcs = [
         "QuicClientServerIntegrationTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
+        "//folly/container:f14_hash",
         "//folly/portability:gmock",
         "//folly/portability:gtest",
         "//quic/api/test:mocks",

@@ -16,6 +16,7 @@
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/test/MockQuicStats.h>
 
 using namespace folly;
 using namespace testing;
@@ -117,6 +118,10 @@ TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferDisabledByDefault) {
 
 TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferForSendCapableStreams) {
   conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  NiceMock<MockQuicStats> stats;
+  conn.statsCallback = &stats;
+  EXPECT_CALL(stats, onNewQuicStream()).Times(3);
+  EXPECT_CALL(stats, onNewUnifiedAppStream()).Times(2);
 
   const auto bidiId =
       conn.streamManager->createNextBidirectionalStream().value()->id;

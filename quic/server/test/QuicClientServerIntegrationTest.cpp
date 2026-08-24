@@ -13,12 +13,21 @@
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
 
+#include <folly/container/F14Map.h>
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
+#include <chrono>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 using namespace testing;
+using namespace std::chrono_literals;
 
 namespace quic::test {
 
@@ -32,19 +41,28 @@ class MockMergedConnectionCallbacks : public MockConnectionSetupCallback,
 // thread while the test thread reads via `get()` after `clientConnect()`.
 class ServerTransportCapture {
  public:
-  void set(std::shared_ptr<QuicServerTransport> t) {
-    std::lock_guard<std::mutex> g(mutex_);
+  void set(
+      std::shared_ptr<QuicServerTransport> t,
+      std::shared_ptr<MockMergedConnectionCallbacks> callbacks) {
+    std::scoped_lock g(mutex_);
     transport_ = t;
+    callbacks_.push_back(std::move(callbacks));
   }
 
   std::shared_ptr<QuicServerTransport> get() const {
-    std::lock_guard<std::mutex> g(mutex_);
+    std::scoped_lock g(mutex_);
     return transport_.lock();
+  }
+
+  std::shared_ptr<MockMergedConnectionCallbacks> callbacks() const {
+    std::scoped_lock g(mutex_);
+    return callbacks_.empty() ? nullptr : callbacks_.back();
   }
 
  private:
   mutable std::mutex mutex_;
   std::weak_ptr<QuicServerTransport> transport_;
+  std::vector<std::shared_ptr<MockMergedConnectionCallbacks>> callbacks_;
 };
 
 class QuicTransportFactory : public quic::QuicServerTransportFactory {
@@ -60,18 +78,11 @@ class QuicTransportFactory : public quic::QuicServerTransportFactory {
       quic::QuicVersion /*quicVersion*/,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
-    // delete mocked object as soon as terminal callback is rx'd
-    auto noopCb = new MockMergedConnectionCallbacks();
-    EXPECT_CALL(*noopCb, onConnectionEnd())
-        .Times(AtMost(1))
-        .WillRepeatedly([noopCb] { delete noopCb; });
-    EXPECT_CALL(*noopCb, onConnectionError(_))
-        .Times(AtMost(1))
-        .WillRepeatedly([noopCb] { delete noopCb; });
+    auto noopCb = std::make_shared<NiceMock<MockMergedConnectionCallbacks>>();
     auto transport = quic::QuicServerTransport::make(
-        evb, std::move(socket), noopCb, noopCb, ctx);
+        evb, std::move(socket), noopCb.get(), noopCb.get(), ctx);
     if (capture_) {
-      capture_->set(transport);
+      capture_->set(transport, std::move(noopCb));
     }
     return transport;
   }
@@ -94,6 +105,45 @@ struct ServerConnStateSnapshot {
   uint64_t peerMaxReceiveTimestampsPerAck{0};
 };
 
+class EndpointReadState {
+ public:
+  void append(StreamId id, const folly::IOBuf* data, bool eof) {
+    std::scoped_lock g(mutex_);
+    auto& state = streams_[id];
+    if (data) {
+      state.data += data->clone()->moveToFbString().toStdString();
+    }
+    state.eof = state.eof || eof;
+  }
+
+  void setError(StreamId id) {
+    std::scoped_lock g(mutex_);
+    streams_[id].error = true;
+  }
+
+  bool received(StreamId id, std::string_view data) const {
+    std::scoped_lock g(mutex_);
+    const auto it = streams_.find(id);
+    return it != streams_.end() && it->second.data == data && it->second.eof;
+  }
+
+  bool receivedError(StreamId id) const {
+    std::scoped_lock g(mutex_);
+    const auto it = streams_.find(id);
+    return it != streams_.end() && it->second.error;
+  }
+
+ private:
+  struct StreamReadState {
+    std::string data;
+    bool eof{false};
+    bool error{false};
+  };
+
+  mutable std::mutex mutex_;
+  folly::F14FastMap<StreamId, StreamReadState> streams_;
+};
+
 class ServerTransportParameters : public testing::Test {
  public:
   void SetUp() override {
@@ -113,12 +163,10 @@ class ServerTransportParameters : public testing::Test {
 
   void clientConnect() {
     CHECK(client_) << "client not initialized";
-    MockConnectionSetupCallback setupCb;
-    MockConnectionCallback connCb;
-    EXPECT_CALL(setupCb, onReplaySafe()).WillOnce(Invoke([&] {
+    EXPECT_CALL(clientSetupCb_, onReplaySafe()).WillOnce([&] {
       evb_.terminateLoopSoon();
-    }));
-    client_->start(&setupCb, &connCb);
+    });
+    client_->start(&clientSetupCb_, &clientConnCb_);
 
     evb_.loopForever();
   }
@@ -186,13 +234,182 @@ class ServerTransportParameters : public testing::Test {
     return client;
   }
 
+  bool waitUntil(const std::function<bool()>& condition) {
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    bool satisfied = false;
+    std::function<void()> poll;
+    poll = [&] {
+      satisfied = condition();
+      if (satisfied || std::chrono::steady_clock::now() >= deadline) {
+        evb_.terminateLoopSoon();
+        return;
+      }
+      evb_.runAfterDelay(poll, 1);
+    };
+    evb_.runInLoop(poll);
+    evb_.loopForever();
+    return satisfied;
+  }
+
   std::shared_ptr<QuicClientTransport> client_;
   std::shared_ptr<QuicServer> server_;
   std::shared_ptr<ServerTransportCapture> serverCapture_;
   TransportSettings serverTs_{};
   folly::EventBase evb_;
   std::shared_ptr<FollyQuicEventBase> qEvb_;
+  NiceMock<MockConnectionSetupCallback> clientSetupCb_;
+  NiceMock<MockConnectionCallback> clientConnCb_;
+  NiceMock<MockReadCallback> clientReadCb_;
+  NiceMock<MockReadCallback> serverReadCb_;
+  EndpointReadState clientReadState_;
+  EndpointReadState serverReadState_;
 };
+
+struct UnifiedBufferEndpointConfig {
+  bool clientUnified{false};
+  bool serverUnified{false};
+};
+
+class UnifiedBufferClientServerIntegrationTest
+    : public ServerTransportParameters,
+      public WithParamInterface<UnifiedBufferEndpointConfig> {};
+
+TEST_P(
+    UnifiedBufferClientServerIntegrationTest,
+    DataFinAndResetUseEachEndpointsLocalSetting) {
+  serverTs_.useUnifiedAppStreamSendBuffer = GetParam().serverUnified;
+  startServer();
+
+  client_ = createQuicClient();
+  auto clientSettings = client_->getTransportSettings();
+  clientSettings.useUnifiedAppStreamSendBuffer = GetParam().clientUnified;
+  client_->setTransportSettings(std::move(clientSettings));
+  clientConnect();
+
+  auto serverTransport = serverCapture_->get();
+  auto serverCallbacks = serverCapture_->callbacks();
+  ASSERT_NE(serverTransport, nullptr);
+  ASSERT_NE(serverCallbacks, nullptr);
+
+  ON_CALL(*serverCallbacks, onNewBidirectionalStream(_))
+      .WillByDefault([this, serverTransport](StreamId id) {
+        serverTransport->setReadCallback(id, &serverReadCb_);
+      });
+  ON_CALL(serverReadCb_, readAvailable(_))
+      .WillByDefault([this, serverTransport](StreamId id) {
+        auto result =
+            serverTransport->read(id, std::numeric_limits<uint64_t>::max());
+        if (result.has_value()) {
+          serverReadState_.append(
+              id, result->first.get(), result->second /* eof */);
+        }
+      });
+  ON_CALL(serverReadCb_, readError(_, _))
+      .WillByDefault([this](StreamId id, const QuicError&) {
+        serverReadState_.setError(id);
+      });
+
+  ON_CALL(clientConnCb_, onNewBidirectionalStream(_))
+      .WillByDefault([this](StreamId id) {
+        client_->setReadCallback(id, &clientReadCb_);
+      });
+  ON_CALL(clientReadCb_, readAvailable(_)).WillByDefault([this](StreamId id) {
+    auto result = client_->read(id, std::numeric_limits<uint64_t>::max());
+    if (result.has_value()) {
+      clientReadState_.append(
+          id, result->first.get(), result->second /* eof */);
+    }
+  });
+
+  constexpr std::string_view kClientData = "client unified data";
+  const auto clientStreamId = client_->createBidirectionalStream().value();
+  auto* clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+  ASSERT_NE(clientConn, nullptr);
+  auto* clientStream = clientConn->streamManager->findStream(clientStreamId);
+  ASSERT_NE(clientStream, nullptr);
+  EXPECT_EQ(clientStream->usesUnifiedSendBuffer(), GetParam().clientUnified);
+  ASSERT_FALSE(
+      client_
+          ->writeChain(
+              clientStreamId, folly::IOBuf::copyBuffer(kClientData), true)
+          .hasError());
+  ASSERT_TRUE(waitUntil(
+      [&] { return serverReadState_.received(clientStreamId, kClientData); }));
+
+  bool serverPeerUsesUnified = false;
+  serverTransport->getEventBase()->runInEventBaseThreadAndWait([&] {
+    auto* serverConn = dynamic_cast<const QuicServerConnectionState*>(
+        serverTransport->getState());
+    auto* stream = serverConn->streamManager->findStream(clientStreamId);
+    serverPeerUsesUnified = stream && stream->usesUnifiedSendBuffer();
+  });
+  EXPECT_EQ(serverPeerUsesUnified, GetParam().serverUnified);
+
+  constexpr std::string_view kServerData = "server unified data";
+  std::optional<StreamId> serverStreamId;
+  bool serverLocalUsesUnified = false;
+  bool serverWriteSucceeded = false;
+  serverTransport->getEventBase()->runInEventBaseThreadAndWait([&] {
+    auto streamResult = serverTransport->createBidirectionalStream();
+    if (streamResult.hasError()) {
+      return;
+    }
+    serverStreamId = streamResult.value();
+    auto* serverConn = dynamic_cast<const QuicServerConnectionState*>(
+        serverTransport->getState());
+    auto* stream = serverConn->streamManager->findStream(*serverStreamId);
+    serverLocalUsesUnified = stream && stream->usesUnifiedSendBuffer();
+    serverWriteSucceeded =
+        serverTransport
+            ->writeChain(
+                *serverStreamId, folly::IOBuf::copyBuffer(kServerData), true)
+            .has_value();
+  });
+  ASSERT_TRUE(serverStreamId.has_value());
+  ASSERT_TRUE(serverWriteSucceeded);
+  EXPECT_EQ(serverLocalUsesUnified, GetParam().serverUnified);
+  ASSERT_TRUE(waitUntil(
+      [&] { return clientReadState_.received(*serverStreamId, kServerData); }));
+
+  auto* clientPeerStream =
+      clientConn->streamManager->findStream(*serverStreamId);
+  ASSERT_NE(clientPeerStream, nullptr);
+  EXPECT_EQ(
+      clientPeerStream->usesUnifiedSendBuffer(), GetParam().clientUnified);
+
+  const auto resetStreamId = client_->createBidirectionalStream().value();
+  auto* resetStream = clientConn->streamManager->findStream(resetStreamId);
+  ASSERT_NE(resetStream, nullptr);
+  EXPECT_EQ(resetStream->usesUnifiedSendBuffer(), GetParam().clientUnified);
+  ASSERT_FALSE(
+      client_->resetStream(resetStreamId, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
+  ASSERT_TRUE(
+      waitUntil([&] { return serverReadState_.receivedError(resetStreamId); }));
+
+  serverTransport->getEventBase()->runInEventBaseThreadAndWait([&] {
+    auto* serverConn = dynamic_cast<const QuicServerConnectionState*>(
+        serverTransport->getState());
+    auto* stream = serverConn->streamManager->findStream(resetStreamId);
+    serverPeerUsesUnified = stream && stream->usesUnifiedSendBuffer();
+  });
+  EXPECT_EQ(serverPeerUsesUnified, GetParam().serverUnified);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    UnifiedBufferModes,
+    UnifiedBufferClientServerIntegrationTest,
+    Values(
+        UnifiedBufferEndpointConfig{false, false},
+        UnifiedBufferEndpointConfig{true, false},
+        UnifiedBufferEndpointConfig{false, true},
+        UnifiedBufferEndpointConfig{true, true}),
+    [](const TestParamInfo<UnifiedBufferEndpointConfig>& info) {
+      return std::string(
+                 info.param.clientUnified ? "ClientUnified" : "ClientLegacy") +
+          (info.param.serverUnified ? "ServerUnified" : "ServerLegacy");
+    });
 
 /**
  * Tests the parameters that are sent with the default TransportSettings. Test

@@ -56,6 +56,15 @@ static bool isStreamUnopened(
   return streamId >= nextAcceptableStreamId;
 }
 
+static void recordNewStream(
+    QuicConnectionStateBase& conn,
+    const QuicStreamState& stream) {
+  QUIC_STATS(conn.statsCallback, onNewQuicStream);
+  if (stream.usesUnifiedSendBuffer()) {
+    QUIC_STATS(conn.statsCallback, onNewUnifiedAppStream);
+  }
+}
+
 // If a stream is un-opened, these automatically creates all lower streams.
 // Returns false if the stream is closed or already opened.
 static LocalErrorCode openPeerStreamIfNotClosed(
@@ -690,7 +699,7 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
       return quic::make_unexpected(QuicError(
           TransportErrorCode::STREAM_STATE_ERROR, "Creating an active stream"));
     }
-    QUIC_STATS(conn_.statsCallback, onNewQuicStream);
+    recordNewStream(conn_, it.first->second);
     return &it.first->second;
   }
   return nullptr;
@@ -807,7 +816,7 @@ QuicStreamManager::instantiatePeerStream(StreamId streamId) {
   auto [it, inserted] = streams_.try_emplace(streamId, streamId, conn_);
 
   if (inserted) {
-    QUIC_STATS(conn_.statsCallback, onNewQuicStream);
+    recordNewStream(conn_, it->second);
   }
   return &it->second;
 }
@@ -986,7 +995,7 @@ quic::Expected<QuicStreamState*, QuicError> QuicStreamManager::createStream(
         "Failed to emplace stream state after opening"));
   }
 
-  QUIC_STATS(conn_.statsCallback, onNewQuicStream);
+  recordNewStream(conn_, it->second);
   updateAppIdleState();
   return &it->second;
 }

@@ -124,6 +124,8 @@ class QuicTransportStatsCallback {
   // stream level metrics
   virtual void onNewQuicStream() = 0;
 
+  virtual void onNewUnifiedAppStream() {}
+
   virtual void onQuicStreamClosed() = 0;
 
   virtual void onQuicStreamReset(QuicErrorCode code) = 0;
