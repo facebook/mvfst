@@ -2,6 +2,17 @@ load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_cpp_test")
 
 oncall("traffic_protocols")
 
+mvfst_cpp_test(
+    name = "stream_send_buffer_test",
+    srcs = [
+        "StreamSendBufferTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/state:stream_send_buffer",
+    ],
+)
+
 mvfst_cpp_library(
     name = "mocks",
     headers = [

@@ -3,6 +3,23 @@ load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
 oncall("traffic_protocols")
 
 mvfst_cpp_library(
+    name = "stream_send_buffer",
+    srcs = [
+        "StreamSendBuffer.cpp",
+    ],
+    headers = [
+        "StreamSendBuffer.h",
+    ],
+    exported_deps = [
+        "//quic:constants",
+        "//quic/common:circular_deque",
+        "//quic/common:function_ref",
+        "//quic/common:interval_set",
+        "//quic/common:optional",
+    ],
+)
+
+mvfst_cpp_library(
     name = "outstanding_packet",
     headers = [
         "OutstandingPacket.h",
