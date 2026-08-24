@@ -119,7 +119,7 @@ quic::Expected<size_t, LocalErrorCode> QuicTransportBase::getStreamWriteOffset(
     if (!stream) {
       return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    return stream->currentWriteOffset;
+    return stream->writeOffset();
   } catch (const QuicInternalException& ex) {
     MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(ex.errorCode());
@@ -142,7 +142,7 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
     if (!stream) {
       return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    return stream->pendingWrites.chainLength();
+    return stream->pendingWriteBytes();
   } catch (const QuicInternalException& ex) {
     MVVLOG(4) << __func__ << " " << ex.what() << " " << *this;
     return quic::make_unexpected(ex.errorCode());
@@ -865,8 +865,7 @@ QuicTransportBase::updateReliableDeliveryCheckpoint(StreamId id) {
     // increase the reliable size in subsequent resets.
     return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
   }
-  stream->reliableResetCheckpoint =
-      stream->currentWriteOffset + stream->pendingWrites.chainLength();
+  stream->reliableResetCheckpoint = stream->writeBufferEndOffset();
   return {};
 }
 

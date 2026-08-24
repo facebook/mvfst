@@ -45,6 +45,10 @@ class StreamSendBuffer {
   StreamSendBuffer(StreamSendBuffer&&) noexcept = default;
   StreamSendBuffer& operator=(StreamSendBuffer&&) noexcept = default;
 
+  [[nodiscard]] bool canAppend(uint64_t len) const {
+    return !writeClosed_ && !cancelled_ && len <= kMaxVarInt - tailOffset_;
+  }
+
   [[nodiscard]] bool append(BufPtr data, bool fin);
 
   // maxLen limits payload bytes; FIN-only ranges can still be returned at 0.

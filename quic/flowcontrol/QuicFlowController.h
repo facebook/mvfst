@@ -66,6 +66,9 @@ bool maybeSendStreamWindowUpdate(QuicStreamState& stream, TimePoint updateTime);
     Optional<uint64_t> reliableSize = std::nullopt);
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream);
+void maybeWriteBlockAfterAPIWrite(
+    QuicStreamState& stream,
+    bool hadPendingWrites);
 
 void maybeWriteDataBlockedAfterSocketWrite(QuicConnectionStateBase& conn);
 

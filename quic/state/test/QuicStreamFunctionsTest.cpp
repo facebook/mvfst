@@ -209,6 +209,8 @@ TEST_F(QuicStreamFunctionsTestBase, TestWriteStream) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you");
   auto buf2 = IOBuf::copyBuffer("and this is crazy");
+  const auto expectedLength =
+      buf1->computeChainDataLength() + buf2->computeChainDataLength();
 
   ASSERT_FALSE(writeDataToQuicStream(*stream, buf1->clone(), false).hasError());
   ASSERT_FALSE(writeDataToQuicStream(*stream, buf2->clone(), false).hasError());
@@ -216,7 +218,71 @@ TEST_F(QuicStreamFunctionsTestBase, TestWriteStream) {
   IOBufEqualTo eq;
   buf1->appendToChain(std::move(buf2));
 
+  EXPECT_FALSE(stream->usesUnifiedSendBuffer());
+  EXPECT_EQ(stream->pendingWrites.chainLength(), expectedLength);
   EXPECT_TRUE(eq(stream->writeBuffer.move(), buf1));
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedWriteOwnsChainedData) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("abc");
+  data->appendChain(IOBuf::copyBuffer("def"));
+
+  auto result = writeDataToQuicStream(*stream, std::move(data), false);
+
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  EXPECT_EQ(stream->pendingWriteBytes(), 6);
+  EXPECT_TRUE(stream->pendingWrites.empty());
+  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 6);
+  EXPECT_TRUE(writableContains(*conn.streamManager, stream->id));
+
+  std::string written;
+  ASSERT_TRUE(
+      stream->streamSendBuffer->writeAt(0, 6, [&written](ByteRange range) {
+        written.append(
+            reinterpret_cast<const char*>(range.data()), range.size());
+        return true;
+      }));
+  EXPECT_EQ(written, "abcdef");
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedEmptyWriteAndFin) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+
+  ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, false).hasError());
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  EXPECT_EQ(stream->pendingWriteBytes(), 0);
+  EXPECT_FALSE(stream->finalWriteOffset.has_value());
+  EXPECT_FALSE(writableContains(*conn.streamManager, stream->id));
+
+  ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, true).hasError());
+  ASSERT_TRUE(stream->finalWriteOffset.has_value());
+  EXPECT_EQ(*stream->finalWriteOffset, 0);
+  EXPECT_TRUE(stream->streamSendBuffer->finBuffered());
+  EXPECT_TRUE(writableContains(*conn.streamManager, stream->id));
+  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 0);
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedWriteAfterFinReturnsError) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(*stream, IOBuf::copyBuffer("abc"), true)
+                   .hasError());
+  const auto bufferedBytes = conn.flowControlState.sumCurStreamBufferLen;
+
+  auto result = writeDataToQuicStream(*stream, IOBuf::copyBuffer("def"), false);
+
+  ASSERT_TRUE(result.hasError());
+  const auto* localError = result.error().code.asLocalErrorCode();
+  ASSERT_NE(localError, nullptr);
+  EXPECT_EQ(*localError, LocalErrorCode::INVALID_WRITE_DATA);
+  EXPECT_EQ(stream->pendingWriteBytes(), 3);
+  EXPECT_EQ(stream->writeBufferEndOffset(), 3);
+  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, bufferedBytes);
 }
 
 TEST_F(QuicStreamFunctionsTestBase, TestReadDataWrittenInOrder) {

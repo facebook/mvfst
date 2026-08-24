@@ -51,12 +51,8 @@ void forEachUnackedRange(
 } // namespace
 
 bool StreamSendBuffer::append(BufPtr data, bool fin) {
-  if (writeClosed_ || cancelled_) {
-    return false;
-  }
-
   const auto len = data ? data->computeChainDataLength() : 0;
-  if (len > kMaxVarInt - tailOffset_) {
+  if (!canAppend(len)) {
     return false;
   }
   auto entryOffset = tailOffset_;

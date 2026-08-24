@@ -478,10 +478,10 @@ struct QuicStreamState : public QuicStreamLike {
   [[nodiscard]] bool hasWritableData(
       bool connFlowControlOpen = true) const noexcept {
     if (pendingWriteBytes() > 0) {
-      const auto writeOffset = nextOffsetToWrite();
-      MVCHECK_GE(flowControlState.peerAdvertisedMaxOffset, writeOffset);
+      const auto nextWriteOffset = nextOffsetToWrite();
+      MVCHECK_GE(flowControlState.peerAdvertisedMaxOffset, nextWriteOffset);
       return connFlowControlOpen &&
-          flowControlState.peerAdvertisedMaxOffset - writeOffset > 0;
+          flowControlState.peerAdvertisedMaxOffset - nextWriteOffset > 0;
     }
     if (streamSendBuffer) {
       return streamSendBuffer->finBuffered() && !streamSendBuffer->finSent();
@@ -515,6 +515,12 @@ struct QuicStreamState : public QuicStreamLike {
 
   [[nodiscard]] uint64_t nextOffsetToWrite() const noexcept {
     return streamSendBuffer ? streamSendBuffer->nextUnsentOffset()
+                            : currentWriteOffset;
+  }
+
+  [[nodiscard]] uint64_t writeOffset() const noexcept {
+    return streamSendBuffer ? streamSendBuffer->nextUnsentOffset() +
+            static_cast<uint64_t>(streamSendBuffer->finSent())
                             : currentWriteOffset;
   }
 

@@ -33,16 +33,26 @@ writeDataToQuicStream(QuicStreamState& stream, BufPtr data, bool eof) {
   if (data) {
     len = data->computeChainDataLength();
   }
-  if (len > 0) {
-    // We call this before updating the writeBuffer because we only want to
-    // write a blocked frame first time the stream becomes blocked
-    maybeWriteBlockAfterAPIWrite(stream);
+  const bool hadPendingWrites = stream.pendingWriteBytes() > 0;
+  if (stream.streamSendBuffer) {
+    if (!stream.streamSendBuffer->append(std::move(data), eof)) {
+      return quic::make_unexpected(QuicError(
+          QuicErrorCode(LocalErrorCode::INVALID_WRITE_DATA),
+          "Cannot append data to the unified stream send buffer"));
+    }
+    if (eof) {
+      stream.finalWriteOffset = stream.streamSendBuffer->tailOffset();
+    }
+  } else {
+    stream.pendingWrites.append(data);
+    stream.writeBuffer.append(std::move(data));
+    if (eof) {
+      auto bufferSize = stream.pendingWrites.chainLength();
+      stream.finalWriteOffset = stream.currentWriteOffset + bufferSize;
+    }
   }
-  stream.pendingWrites.append(data);
-  stream.writeBuffer.append(std::move(data));
-  if (eof) {
-    auto bufferSize = stream.pendingWrites.chainLength();
-    stream.finalWriteOffset = stream.currentWriteOffset + bufferSize;
+  if (len > 0) {
+    maybeWriteBlockAfterAPIWrite(stream, hadPendingWrites);
   }
   auto result = updateFlowControlOnWriteToStream(stream, len);
   if (!result.has_value()) {

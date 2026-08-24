@@ -2188,6 +2188,32 @@ TEST_F(QuicTransportTest, CheckpointBeforeAnyWrites) {
   EXPECT_EQ(streamState->reliableResetCheckpoint, 0);
 }
 
+TEST_F(QuicTransportTest, UnifiedWriteQueriesAndCheckpoint) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+
+  ASSERT_FALSE(
+      transport_->writeChain(streamId, IOBuf::copyBuffer("abcdef"), true)
+          .hasError());
+
+  EXPECT_EQ(transport_->getStreamWriteOffset(streamId).value(), 0);
+  EXPECT_EQ(transport_->getStreamWriteBufferedBytes(streamId).value(), 6);
+  ASSERT_FALSE(
+      transport_->updateReliableDeliveryCheckpoint(streamId).hasError());
+  EXPECT_EQ(stream->reliableResetCheckpoint, 6);
+
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  auto range = stream->streamSendBuffer->nextNewData(6);
+  ASSERT_TRUE(range.has_value());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent(*range));
+
+  EXPECT_EQ(transport_->getStreamWriteOffset(streamId).value(), 7);
+  EXPECT_EQ(transport_->getStreamWriteBufferedBytes(streamId).value(), 0);
+}
+
 TEST_F(QuicTransportTest, CheckpointAfterWriteBuffered) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto streamState =

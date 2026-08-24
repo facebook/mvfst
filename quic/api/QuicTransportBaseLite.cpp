@@ -64,17 +64,17 @@ quic::QuicError maybeSetGenericAppError(
   std::string headPart = "none";
   if (head != nullptr) {
     headPart = fmt::format(
-        "id={} ctrl={} hasWritable={} hasWritableNoFc={} lossBuf={} pending={} streamFc={} writeErr={} sendState={}",
+        "id={} ctrl={} hasWritable={} hasWritableNoFc={} hasLoss={} pending={} streamFc={} writeErr={} sendState={}",
         headId,
         head->isControl,
         head->hasWritableData(true),
         head->hasWritableData(false),
-        head->lossBuffer.size(),
-        head->pendingWrites.chainLength(),
+        head->hasLoss(),
+        head->pendingWriteBytes(),
         head->flowControlState.peerAdvertisedMaxOffset >=
-                head->currentWriteOffset
+                head->nextOffsetToWrite()
             ? head->flowControlState.peerAdvertisedMaxOffset -
-                head->currentWriteOffset
+                head->nextOffsetToWrite()
             : 0,
         head->streamWriteError.has_value(),
         static_cast<int>(head->sendState));

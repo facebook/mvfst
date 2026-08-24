@@ -372,14 +372,12 @@ quic::Expected<void, QuicError> updateFlowControlOnResetStream(
   uint64_t decrementAmount = 0;
   if (reliableSize && *reliableSize > 0) {
     // This is the amount of pending data that we are "throwing away"
-    if (stream.pendingWrites.chainLength() + stream.currentWriteOffset >
-        *reliableSize) {
-      decrementAmount +=
-          (stream.pendingWrites.chainLength() + stream.currentWriteOffset -
-           std::max(*reliableSize, stream.currentWriteOffset));
+    if (stream.writeBufferEndOffset() > *reliableSize) {
+      decrementAmount += stream.writeBufferEndOffset() -
+          std::max(*reliableSize, stream.nextOffsetToWrite());
     }
   } else {
-    decrementAmount = static_cast<uint64_t>(stream.pendingWrites.chainLength());
+    decrementAmount = stream.pendingWriteBytes();
   }
 
   return decrementWithOverFlowCheck(
@@ -387,9 +385,14 @@ quic::Expected<void, QuicError> updateFlowControlOnResetStream(
 }
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
+  maybeWriteBlockAfterAPIWrite(stream, stream.pendingWriteBytes() > 0);
+}
+
+void maybeWriteBlockAfterAPIWrite(
+    QuicStreamState& stream,
+    bool hadPendingWrites) {
   // Only write blocked when stream becomes blocked
-  if (getSendStreamFlowControlBytesWire(stream) == 0 &&
-      stream.pendingWrites.empty()) {
+  if (getSendStreamFlowControlBytesWire(stream) == 0 && !hadPendingWrites) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
     // Note: Flow control blocked events are redundant
@@ -426,7 +429,7 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
   } else {
     shouldEmitStreamBlockedFrame =
         getSendStreamFlowControlBytesWire(stream) == 0 &&
-        !stream.pendingWrites.empty();
+        stream.pendingWriteBytes() > 0;
   }
 
   if (shouldEmitStreamBlockedFrame &&
@@ -452,7 +455,7 @@ void handleStreamWindowUpdate(
     stream.flowControlState.peerAdvertisedMaxOffset = maximumData;
     stream.flowControlState.pendingBlockedFrame = false;
     if (stream.flowControlState.peerAdvertisedMaxOffset >
-        stream.currentWriteOffset + stream.pendingWrites.chainLength()) {
+        stream.writeBufferEndOffset()) {
       updateFlowControlList(stream);
     }
     stream.conn.streamManager->updateWritableStreams(
@@ -518,7 +521,7 @@ uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
 
 uint64_t getSendStreamFlowControlBytesAPI(const QuicStreamState& stream) {
   auto sendFlowControlBytes = getSendStreamFlowControlBytesWire(stream);
-  auto dataInBuffer = stream.pendingWrites.chainLength();
+  auto dataInBuffer = stream.pendingWriteBytes();
   if (dataInBuffer > sendFlowControlBytes) {
     return 0;
   } else {
