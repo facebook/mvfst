@@ -503,6 +503,8 @@ struct TransportSettings {
 
   // Temporary flag to test new stream blocked condition.
   bool useNewStreamBlockedCondition{false};
+  // Whether app streams use the unified owning send buffer.
+  bool useUnifiedAppStreamSendBuffer{false};
   bool scheduleTimerForExcessWrites{false};
 
   // Whether to read ECN bits from ingress packets

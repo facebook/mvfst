@@ -488,8 +488,13 @@ bool allBytesTillFinAcked(const QuicStreamState& stream) {
    * 4. We have no bytes left to write
    * 5. We have no bytes that are detected as lost.
    */
+  if (stream.streamSendBuffer) {
+    return stream.streamSendBuffer->finBuffered() &&
+        stream.streamSendBuffer->allBytesAckedTill(
+            stream.streamSendBuffer->tailOffset());
+  }
   return stream.hasSentFIN() && stream.retransmissionBuffer.empty() &&
-      stream.pendingWrites.empty() && stream.lossBuffer.empty();
+      stream.pendingWrites.empty() && !stream.hasLoss();
 }
 
 void appendPendingStreamReset(
@@ -514,7 +519,7 @@ void appendPendingStreamReset(
    * RESET_STREAM_AT frames by virtue of the fact that it's the maxiumum of the
    * current write offset and the new reliable size.
    */
-  uint64_t finalSize = stream.currentWriteOffset;
+  uint64_t finalSize = stream.nextOffsetToWrite();
   if (reliableSize) {
     // It's possible that we've queued up data at the socket, but haven't yet
     // written it out to the wire, so stream.currentWriteOffset could be
@@ -532,20 +537,26 @@ void appendPendingStreamReset(
 }
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
-  return stream.finalWriteOffset.value_or(
-      stream.currentWriteOffset + stream.pendingWrites.chainLength());
+  return stream.finalWriteOffset.value_or(stream.writeBufferEndOffset());
 }
 
 Optional<uint64_t> getLargestWriteOffsetTxed(const QuicStreamState& stream) {
-  // currentWriteOffset is really nextWriteOffset
+  if (stream.streamSendBuffer && stream.streamSendBuffer->finSent()) {
+    return stream.streamSendBuffer->tailOffset();
+  }
+  const auto nextWriteOffset = stream.nextOffsetToWrite();
+  // nextWriteOffset is the next offset to transmit.
   // when 0, it indicates nothing has been written yet
-  if (stream.currentWriteOffset == 0) {
+  if (nextWriteOffset == 0) {
     return std::nullopt;
   }
-  return stream.currentWriteOffset - 1;
+  return nextWriteOffset - 1;
 }
 
 Optional<uint64_t> getLargestDeliverableOffset(const QuicStreamState& stream) {
+  if (stream.streamSendBuffer) {
+    return stream.streamSendBuffer->largestDeliverableOffset();
+  }
   // If the acked intervals is not empty, then the furthest acked interval
   // starting at zero is the next offset. If there is no interval starting at
   // zero then we cannot deliver any offsets.
@@ -557,7 +568,8 @@ Optional<uint64_t> getLargestDeliverableOffset(const QuicStreamState& stream) {
 }
 
 uint64_t getAckIntervalSetVersion(const QuicStreamState& stream) {
-  return stream.ackedIntervals.insertVersion();
+  return stream.streamSendBuffer ? stream.streamSendBuffer->ackInsertVersion()
+                                 : stream.ackedIntervals.insertVersion();
 }
 
 uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream) {

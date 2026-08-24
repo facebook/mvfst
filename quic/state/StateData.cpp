@@ -42,6 +42,10 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
       sendState = StreamSendState::Invalid;
     }
   }
+  if (connIn.transportSettings.useUnifiedAppStreamSendBuffer &&
+      sendState != StreamSendState::Invalid) {
+    streamSendBuffer.emplace();
+  }
   priority = connIn.transportSettings.defaultPriority;
 }
 

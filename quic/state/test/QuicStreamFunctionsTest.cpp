@@ -109,6 +109,102 @@ TEST_F(QuicStreamFunctionsTestBase, TestCreateBoth) {
   }
 }
 
+TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferDisabledByDefault) {
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+
+  EXPECT_FALSE(stream->usesUnifiedSendBuffer());
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferForSendCapableStreams) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+
+  const auto bidiId =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  const auto localUniId =
+      conn.streamManager->createNextUnidirectionalStream().value()->id;
+  auto* peerUni = conn.streamManager->getStream(0x03).value();
+  auto* bidi = conn.streamManager->findStream(bidiId);
+  auto* localUni = conn.streamManager->findStream(localUniId);
+
+  ASSERT_NE(bidi, nullptr);
+  ASSERT_NE(localUni, nullptr);
+  ASSERT_NE(peerUni, nullptr);
+  EXPECT_TRUE(bidi->usesUnifiedSendBuffer());
+  EXPECT_TRUE(localUni->usesUnifiedSendBuffer());
+  EXPECT_EQ(peerUni->sendState, StreamSendState::Invalid);
+  EXPECT_FALSE(peerUni->usesUnifiedSendBuffer());
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferModeSurvivesMigration) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  QuicStreamState source(0x00, conn);
+  QuicClientConnectionState disabledDestination(
+      FizzClientQuicHandshakeContext::Builder().build());
+  disabledDestination.transportSettings.useUnifiedAppStreamSendBuffer = false;
+
+  QuicStreamState migratedToDisabled(disabledDestination, std::move(source));
+
+  QuicClientConnectionState disabledSource(
+      FizzClientQuicHandshakeContext::Builder().build());
+  disabledSource.transportSettings.useUnifiedAppStreamSendBuffer = false;
+  QuicStreamState sourceWithoutUnifiedBuffer(0x00, disabledSource);
+  QuicClientConnectionState enabledDestination(
+      FizzClientQuicHandshakeContext::Builder().build());
+  enabledDestination.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  QuicStreamState migratedToEnabled(
+      enabledDestination, std::move(sourceWithoutUnifiedBuffer));
+
+  EXPECT_TRUE(migratedToDisabled.usesUnifiedSendBuffer());
+  EXPECT_FALSE(migratedToEnabled.usesUnifiedSendBuffer());
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferFacades) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  QuicStreamState stream(0x00, conn);
+  ASSERT_TRUE(stream.streamSendBuffer.has_value());
+  ASSERT_TRUE(
+      stream.streamSendBuffer->append(IOBuf::copyBuffer("hello"), true));
+
+  EXPECT_EQ(stream.pendingWriteBytes(), 5);
+  EXPECT_EQ(stream.writeBufferEndOffset(), 5);
+  EXPECT_EQ(stream.nextOffsetToWrite(), 0);
+  EXPECT_TRUE(stream.hasWritableData());
+
+  auto range = stream.streamSendBuffer->nextNewData(5);
+  ASSERT_TRUE(range.has_value());
+  ASSERT_TRUE(stream.streamSendBuffer->markNewDataSent(*range));
+  EXPECT_EQ(stream.nextOffsetToWrite(), 5);
+  EXPECT_TRUE(stream.hasSentFIN());
+  EXPECT_EQ(*getLargestWriteOffsetTxed(stream), 5);
+
+  stream.streamSendBuffer->markLoss(*range);
+  EXPECT_TRUE(stream.hasLoss());
+  conn.streamManager->updateWritableStreams(stream);
+  EXPECT_TRUE(conn.streamManager->hasLoss());
+
+  ASSERT_TRUE(stream.streamSendBuffer->markAcked(*range).has_value());
+  conn.streamManager->updateWritableStreams(stream);
+  EXPECT_FALSE(stream.hasLoss());
+  EXPECT_FALSE(conn.streamManager->hasLoss());
+  EXPECT_EQ(*getLargestDeliverableOffset(stream), 5);
+  EXPECT_GT(getAckIntervalSetVersion(stream), 0);
+  EXPECT_TRUE(allBytesTillFinAcked(stream));
+}
+
+TEST_F(QuicStreamFunctionsTestBase, UnifiedFinOnlyUsesVirtualByteOffset) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  QuicStreamState stream(0x00, conn);
+  ASSERT_TRUE(stream.streamSendBuffer.has_value());
+  ASSERT_TRUE(stream.streamSendBuffer->append(nullptr, true));
+
+  const auto range = stream.streamSendBuffer->nextNewData(0);
+  ASSERT_TRUE(range.has_value());
+  ASSERT_TRUE(stream.streamSendBuffer->markNewDataSent(*range));
+
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(0u, *getLargestWriteOffsetTxed(stream));
+}
+
 TEST_F(QuicStreamFunctionsTestBase, TestWriteStream) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("I just met you");

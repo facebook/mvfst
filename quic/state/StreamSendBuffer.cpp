@@ -59,16 +59,24 @@ bool StreamSendBuffer::append(BufPtr data, bool fin) {
   if (len > kMaxVarInt - tailOffset_) {
     return false;
   }
-  if (len > 0) {
-    entries_.push_back(
-        Entry{.offset = tailOffset_, .len = len, .data = std::move(data)});
-    tailOffset_ += len;
+  auto entryOffset = tailOffset_;
+  while (data) {
+    auto next = data->pop();
+    const auto entryLen = data->length();
+    if (entryLen > 0) {
+      entries_.push_back(
+          Entry{
+              .offset = entryOffset, .len = entryLen, .data = std::move(data)});
+      entryOffset += entryLen;
+    }
+    data = std::move(next);
   }
+  tailOffset_ += len;
   if (fin) {
     finBuffered_ = true;
     writeClosed_ = true;
   }
-  return len > 0 || fin;
+  return true;
 }
 
 Optional<StreamSendBuffer::SendRange> StreamSendBuffer::nextNewData(
@@ -183,7 +191,7 @@ void StreamSendBuffer::markLoss(const SendRange& range) {
   }
   const auto end = std::min(*requestedEnd, nextUnsentOffset_);
   if (range.offset < end) {
-    insertUnackedIntoPending(range.offset, end);
+    insertOutstandingIntoPending(range.offset, end);
   }
   if (range.fin && *requestedEnd == tailOffset_ && finSent_ && !finAcked_) {
     finLost_ = true;
@@ -217,12 +225,17 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
 
   AckResult result;
   if (range.len > 0) {
-    result.newlyAckedBytes = countUnacked(range.offset, *end);
-    if (result.newlyAckedBytes > outstandingBytes_) {
+    const auto newlyRetiredOutstanding = countOutstanding(range.offset, *end);
+    if (newlyRetiredOutstanding > outstandingBytes_) {
       return std::nullopt;
     }
-    outstandingBytes_ -= result.newlyAckedBytes;
-    ackedIntervals_.insert(range.offset, *end - 1);
+    result.newlyAckedBytes = newlyRetiredOutstanding;
+    outstandingBytes_ -= newlyRetiredOutstanding;
+  }
+  if (range.len > 0 || range.fin) {
+    ackedIntervals_.insert(range.offset, range.fin ? *end : *end - 1);
+  }
+  if (range.len > 0) {
     pendingRetransmissions_.withdraw(
         Interval<uint64_t>{range.offset, *end - 1});
     releaseAckedEntries(range.offset, *end);
@@ -233,6 +246,18 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
     finLost_ = false;
   }
   return result;
+}
+
+bool StreamSendBuffer::allBytesAckedTill(uint64_t offset) const {
+  return !ackedIntervals_.empty() && ackedIntervals_.front().start == 0 &&
+      ackedIntervals_.front().end >= offset;
+}
+
+Optional<uint64_t> StreamSendBuffer::largestDeliverableOffset() const {
+  if (ackedIntervals_.empty() || ackedIntervals_.front().start != 0) {
+    return std::nullopt;
+  }
+  return ackedIntervals_.front().end;
 }
 
 bool StreamSendBuffer::truncateFrom(uint64_t offset) {
@@ -246,16 +271,17 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
   const auto oldTail = tailOffset_;
   const auto sentEnd = std::min(nextUnsentOffset_, oldTail);
   if (offset < sentEnd) {
-    const auto discardedOutstanding = countUnacked(offset, sentEnd);
+    const auto discardedOutstanding = countOutstanding(offset, sentEnd);
     if (discardedOutstanding > outstandingBytes_) {
       return false;
     }
     outstandingBytes_ -= discardedOutstanding;
+    abandonedIntervals_.insert(offset, sentEnd - 1);
   }
-  if (offset < oldTail) {
-    const Interval<uint64_t> discarded{offset, oldTail - 1};
-    ackedIntervals_.withdraw(discarded);
-    pendingRetransmissions_.withdraw(discarded);
+  const Interval<uint64_t> discarded{offset, oldTail - 1};
+  pendingRetransmissions_.withdraw(discarded);
+  if (finAcked_) {
+    ackedIntervals_.withdraw(Interval<uint64_t>{oldTail, oldTail});
   }
 
   while (!entries_.empty() && entries_.back().offset >= offset) {
@@ -269,8 +295,7 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
     }
   }
 
-  tailOffset_ = offset;
-  nextUnsentOffset_ = std::min(nextUnsentOffset_, offset);
+  tailOffset_ = std::max(offset, nextUnsentOffset_);
   cachedEntryIndex_ = 0;
   // Truncating before the tail invalidates the FIN at the old final offset.
   finBuffered_ = false;
@@ -285,8 +310,9 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
 void StreamSendBuffer::cancelAll() {
   entries_.clear();
   ackedIntervals_.clear();
+  abandonedIntervals_.clear();
   pendingRetransmissions_.clear();
-  nextUnsentOffset_ = tailOffset_;
+  tailOffset_ = nextUnsentOffset_;
   outstandingBytes_ = 0;
   cachedEntryIndex_ = 0;
   finBuffered_ = false;
@@ -367,10 +393,37 @@ uint64_t StreamSendBuffer::countUnacked(uint64_t start, uint64_t end) const {
   return count;
 }
 
-void StreamSendBuffer::insertUnackedIntoPending(uint64_t start, uint64_t end) {
+uint64_t StreamSendBuffer::countOutstanding(uint64_t start, uint64_t end)
+    const {
+  uint64_t count = 0;
+  forEachUnackedRange(
+      ackedIntervals_,
+      start,
+      end,
+      [this, &count](uint64_t begin, uint64_t finish) {
+        forEachUnackedRange(
+            abandonedIntervals_,
+            begin,
+            finish,
+            [&count](uint64_t activeBegin, uint64_t activeEnd) {
+              count += activeEnd - activeBegin;
+            });
+      });
+  return count;
+}
+
+void StreamSendBuffer::insertOutstandingIntoPending(
+    uint64_t start,
+    uint64_t end) {
   forEachUnackedRange(
       ackedIntervals_, start, end, [this](uint64_t begin, uint64_t finish) {
-        pendingRetransmissions_.insert(begin, finish - 1);
+        forEachUnackedRange(
+            abandonedIntervals_,
+            begin,
+            finish,
+            [this](uint64_t activeBegin, uint64_t activeEnd) {
+              pendingRetransmissions_.insert(activeBegin, activeEnd - 1);
+            });
       });
 }
 

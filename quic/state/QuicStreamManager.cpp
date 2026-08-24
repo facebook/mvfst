@@ -1129,13 +1129,13 @@ void QuicStreamManager::updateWritableStreams(
     bool connFlowControlOpen) {
   // Check for terminal write errors first
   if (stream.streamWriteError.has_value() && !stream.reliableSizeToPeer) {
-    MVCHECK(stream.lossBuffer.empty());
+    MVCHECK(!stream.hasLoss());
     removeWritable(stream);
     return;
   }
 
   // Update loss counter using state transition logic
-  bool newHasLoss = !stream.lossBuffer.empty();
+  bool newHasLoss = stream.hasLoss();
   if (!stream.inLossSet_ && newHasLoss) {
     stream.inLossSet_ = true;
     numStreamsWithLoss_++;

@@ -112,6 +112,7 @@ mvfst_add_library(mvfst_state_quic_state_machine
     mvfst_state_outstanding_packet
     mvfst_state_quic_connection_stats
     mvfst_state_stats_callback
+    mvfst_state_stream_send_buffer
     mvfst_state_transport_settings
     Folly::folly_container_f14_hash
     Folly::folly_io_async_delayed_destruction

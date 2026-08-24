@@ -15,6 +15,7 @@
 #include <quic/common/Expected.h>
 #include <quic/common/IntervalSet.h>
 #include <quic/priority/PriorityQueue.h>
+#include <quic/state/StreamSendBuffer.h>
 
 namespace quic {
 
@@ -352,6 +353,7 @@ struct QuicStreamState : public QuicStreamLike {
       : QuicStreamLike(std::move(other)), conn(connIn), id(other.id) {
     // QuicStreamState fields
     finalWriteOffset = other.finalWriteOffset;
+    streamSendBuffer = std::move(other.streamSendBuffer);
     flowControlState = other.flowControlState;
     streamReadError = other.streamReadError;
     streamWriteError = other.streamWriteError;
@@ -375,6 +377,10 @@ struct QuicStreamState : public QuicStreamLike {
 
   // Write side eof offset. This represents only the final FIN offset.
   Optional<uint64_t> finalWriteOffset;
+
+  // Present only for send-capable app streams created with the unified send
+  // buffer enabled. Crypto streams continue to use QuicStreamLike storage.
+  Optional<StreamSendBuffer> streamSendBuffer;
 
   struct StreamFlowControlState {
     uint64_t windowSize{0};
@@ -448,6 +454,20 @@ struct QuicStreamState : public QuicStreamLike {
     return sendState == StreamSendState::Open && !finalWriteOffset.has_value();
   }
 
+  [[nodiscard]] bool usesUnifiedSendBuffer() const noexcept {
+    return streamSendBuffer.has_value();
+  }
+
+  [[nodiscard]] uint64_t pendingWriteBytes() const noexcept {
+    return streamSendBuffer ? streamSendBuffer->unsentBytes()
+                            : pendingWrites.chainLength();
+  }
+
+  [[nodiscard]] uint64_t writeBufferEndOffset() const noexcept {
+    return streamSendBuffer ? streamSendBuffer->tailOffset()
+                            : currentWriteOffset + pendingWrites.chainLength();
+  }
+
   [[nodiscard]] bool shouldSendFlowControl() const noexcept {
     return recvState == StreamRecvState::Open;
   }
@@ -457,10 +477,14 @@ struct QuicStreamState : public QuicStreamLike {
   // needs to have data in the pendingWrites chain, or it has EOF to send.
   [[nodiscard]] bool hasWritableData(
       bool connFlowControlOpen = true) const noexcept {
-    if (!pendingWrites.empty()) {
-      MVCHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
+    if (pendingWriteBytes() > 0) {
+      const auto writeOffset = nextOffsetToWrite();
+      MVCHECK_GE(flowControlState.peerAdvertisedMaxOffset, writeOffset);
       return connFlowControlOpen &&
-          flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
+          flowControlState.peerAdvertisedMaxOffset - writeOffset > 0;
+    }
+    if (streamSendBuffer) {
+      return streamSendBuffer->finBuffered() && !streamSendBuffer->finSent();
     }
     if (finalWriteOffset) {
       return currentWriteOffset <= *finalWriteOffset;
@@ -471,10 +495,13 @@ struct QuicStreamState : public QuicStreamLike {
   // Whether this stream has data in the write buffer or loss buffer.
   [[nodiscard]] bool hasSchedulableData(
       bool connFlowControlOpen = true) const noexcept {
-    return hasWritableData(connFlowControlOpen) || !lossBuffer.empty();
+    return hasWritableData(connFlowControlOpen) || hasLoss();
   }
 
   [[nodiscard]] bool hasSentFIN() const noexcept {
+    if (streamSendBuffer) {
+      return streamSendBuffer->finSent();
+    }
     if (!finalWriteOffset) {
       return false;
     }
@@ -482,11 +509,18 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   [[nodiscard]] bool hasLoss() const noexcept {
-    return !lossBuffer.empty();
+    return streamSendBuffer ? streamSendBuffer->hasPendingLoss()
+                            : !lossBuffer.empty();
   }
 
   [[nodiscard]] uint64_t nextOffsetToWrite() const noexcept {
-    return currentWriteOffset;
+    return streamSendBuffer ? streamSendBuffer->nextUnsentOffset()
+                            : currentWriteOffset;
+  }
+
+  [[nodiscard]] bool allBytesAckedTill(uint64_t offset) const {
+    return streamSendBuffer ? streamSendBuffer->allBytesAckedTill(offset)
+                            : QuicStreamLike::allBytesAckedTill(offset);
   }
 
   [[nodiscard]] bool hasReadableData() const noexcept {

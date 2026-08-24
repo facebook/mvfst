@@ -103,6 +103,14 @@ class StreamSendBuffer {
     return cancelled_;
   }
 
+  [[nodiscard]] bool allBytesAckedTill(uint64_t offset) const;
+
+  [[nodiscard]] Optional<uint64_t> largestDeliverableOffset() const;
+
+  [[nodiscard]] uint64_t ackInsertVersion() const {
+    return ackedIntervals_.insertVersion();
+  }
+
  private:
   struct Entry {
     uint64_t offset;
@@ -121,12 +129,14 @@ class StreamSendBuffer {
       const DataRange& range,
       DataWriter writer) const;
   [[nodiscard]] uint64_t countUnacked(uint64_t start, uint64_t end) const;
-  void insertUnackedIntoPending(uint64_t start, uint64_t end);
+  [[nodiscard]] uint64_t countOutstanding(uint64_t start, uint64_t end) const;
+  void insertOutstandingIntoPending(uint64_t start, uint64_t end);
   void releaseAckedEntries(uint64_t start, uint64_t end);
   void cleanUpEntries();
 
   CircularDeque<Entry> entries_;
   IntervalSet<uint64_t> ackedIntervals_;
+  IntervalSet<uint64_t> abandonedIntervals_;
   IntervalSet<uint64_t> pendingRetransmissions_;
   uint64_t nextUnsentOffset_{0};
   uint64_t tailOffset_{0};

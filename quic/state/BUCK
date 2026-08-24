@@ -147,6 +147,7 @@ mvfst_cpp_library(
         ":outstanding_packet",
         ":quic_connection_stats",
         ":stats_callback",
+        ":stream_send_buffer",
         ":transport_settings",
         "//folly:token_bucket",
         "//folly/container:f14_hash",

@@ -185,6 +185,30 @@ TEST(StreamSendBufferTest, DataAndFinShareRangeStateTransitions) {
   EXPECT_TRUE(ack->newlyAckedFin);
   EXPECT_TRUE(buffer.finAcked());
   EXPECT_EQ(0, buffer.outstandingBytes());
+  EXPECT_TRUE(buffer.allBytesAckedTill(3));
+  ASSERT_TRUE(buffer.largestDeliverableOffset().has_value());
+  EXPECT_EQ(3u, *buffer.largestDeliverableOffset());
+}
+
+TEST(StreamSendBufferTest, AckMetadataMatchesDeliveryOffsetSemantics) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abc"), true));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 3, true}));
+
+  EXPECT_EQ(0, buffer.ackInsertVersion());
+  ASSERT_TRUE(buffer.markAcked({1, 2, true}).has_value());
+  EXPECT_EQ(1, buffer.ackInsertVersion());
+  EXPECT_FALSE(buffer.largestDeliverableOffset().has_value());
+
+  ASSERT_TRUE(buffer.markAcked({0, 1, false}).has_value());
+  EXPECT_EQ(2, buffer.ackInsertVersion());
+  ASSERT_TRUE(buffer.largestDeliverableOffset().has_value());
+  EXPECT_EQ(3u, *buffer.largestDeliverableOffset());
+  EXPECT_TRUE(buffer.allBytesAckedTill(3));
+
+  ASSERT_TRUE(buffer.markAcked({1, 2, true}).has_value());
+  EXPECT_EQ(2, buffer.ackInsertVersion());
+  EXPECT_FALSE(buffer.markAcked({0, 0, false}).has_value());
 }
 
 TEST(StreamSendBufferTest, AppendAfterFinIsRejected) {
@@ -198,6 +222,14 @@ TEST(StreamSendBufferTest, AppendAfterFinIsRejected) {
   EXPECT_EQ("abc", output);
 }
 
+TEST(StreamSendBufferTest, EmptyWriteWithoutFinIsAcceptedAsNoOp) {
+  StreamSendBuffer buffer;
+
+  EXPECT_TRUE(buffer.append(nullptr, false));
+  EXPECT_EQ(0, buffer.tailOffset());
+  EXPECT_FALSE(buffer.nextNewData(10).has_value());
+}
+
 TEST(StreamSendBufferTest, TruncateDiscardsTailStateAndOutstandingBytes) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(makeBuffer("abc"), false));
@@ -207,8 +239,8 @@ TEST(StreamSendBufferTest, TruncateDiscardsTailStateAndOutstandingBytes) {
   buffer.markLoss({.offset = 0, .len = 6, .fin = true});
 
   ASSERT_TRUE(buffer.truncateFrom(4));
-  EXPECT_EQ(4, buffer.tailOffset());
-  EXPECT_EQ(4, buffer.nextUnsentOffset());
+  EXPECT_EQ(6, buffer.tailOffset());
+  EXPECT_EQ(6, buffer.nextUnsentOffset());
   EXPECT_EQ(2, buffer.outstandingBytes());
   EXPECT_FALSE(buffer.finBuffered());
   EXPECT_FALSE(buffer.finLost());
@@ -246,6 +278,34 @@ TEST(StreamSendBufferTest, TruncateBeforeTailDiscardsAcknowledgedFin) {
   EXPECT_FALSE(buffer.finAcked());
 }
 
+TEST(StreamSendBufferTest, TruncateBeyondSentRetainsReliablePrefix) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdefghij"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 3, false}));
+
+  ASSERT_TRUE(buffer.truncateFrom(5));
+  EXPECT_EQ(5, buffer.tailOffset());
+  EXPECT_EQ(3, buffer.nextUnsentOffset());
+  EXPECT_EQ(2, buffer.unsentBytes());
+  expectRange(buffer.nextNewData(10), {.offset = 3, .len = 2, .fin = false});
+
+  std::string output;
+  EXPECT_TRUE(writeToString(buffer, 3, 2, output));
+  EXPECT_EQ("de", output);
+}
+
+TEST(StreamSendBufferTest, AckAfterTruncateExcludesAbandonedBytes) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 6, false}));
+  ASSERT_TRUE(buffer.truncateFrom(4));
+
+  const auto ack = buffer.markAcked({.offset = 3, .len = 3, .fin = false});
+  ASSERT_TRUE(ack.has_value());
+  EXPECT_EQ(1, ack->newlyAckedBytes);
+  EXPECT_EQ(3, buffer.outstandingBytes());
+}
+
 TEST(StreamSendBufferTest, CancelAllReleasesAllPendingState) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), true));
@@ -263,6 +323,52 @@ TEST(StreamSendBufferTest, CancelAllReleasesAllPendingState) {
   EXPECT_FALSE(buffer.append(makeBuffer("g"), false));
   EXPECT_FALSE(
       buffer.markAcked({.offset = 0, .len = 0, .fin = false}).has_value());
+}
+
+TEST(StreamSendBufferTest, CancelPreservesLargestSentOffset) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdefghij"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 4, false}));
+
+  buffer.cancelAll();
+  EXPECT_EQ(4, buffer.tailOffset());
+  EXPECT_EQ(4, buffer.nextUnsentOffset());
+  EXPECT_EQ(0, buffer.unsentBytes());
+}
+
+TEST(StreamSendBufferTest, AckOfEitherDuplicateRetiresLossState) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abc"), true));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 3, true}));
+
+  buffer.markLoss({.offset = 0, .len = 3, .fin = true});
+  buffer.markRetransmissionSent({.offset = 0, .len = 3, .fin = true});
+  ASSERT_TRUE(buffer.markAcked({0, 3, true}).has_value());
+  buffer.markLoss({.offset = 0, .len = 3, .fin = true});
+  EXPECT_FALSE(buffer.hasPendingLoss());
+
+  StreamSendBuffer reordered;
+  ASSERT_TRUE(reordered.append(makeBuffer("abc"), true));
+  ASSERT_TRUE(reordered.markNewDataSent({0, 3, true}));
+  reordered.markLoss({.offset = 0, .len = 3, .fin = true});
+  reordered.markRetransmissionSent({.offset = 0, .len = 3, .fin = true});
+  reordered.markLoss({.offset = 0, .len = 3, .fin = true});
+  EXPECT_TRUE(reordered.hasPendingLoss());
+  ASSERT_TRUE(reordered.markAcked({0, 3, true}).has_value());
+  EXPECT_FALSE(reordered.hasPendingLoss());
+}
+
+TEST(StreamSendBufferTest, AckOfEitherFinOnlyDuplicateRetiresLossState) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(nullptr, true));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 0, true}));
+  buffer.markLoss({.offset = 0, .len = 0, .fin = true});
+  buffer.markRetransmissionSent({.offset = 0, .len = 0, .fin = true});
+  buffer.markLoss({.offset = 0, .len = 0, .fin = true});
+  EXPECT_TRUE(buffer.hasPendingLoss());
+
+  ASSERT_TRUE(buffer.markAcked({0, 0, true}).has_value());
+  EXPECT_FALSE(buffer.hasPendingLoss());
 }
 
 } // namespace
