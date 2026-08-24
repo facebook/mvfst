@@ -21,6 +21,17 @@ enum class OutstandingPacketMark : uint8_t {
   NONE = 0, // No marking.
   TTLD = 1, // Marked for TTL-D retransmission.
 };
+static_assert(static_cast<uint8_t>(OutstandingPacketMark::TTLD) <= 0b1);
+
+enum class PacketTransmissionReason : uint8_t {
+  Normal,
+  Clone,
+  PtoProbe,
+  ImmediateInitialProbe,
+};
+static_assert(
+    static_cast<uint8_t>(PacketTransmissionReason::ImmediateInitialProbe) <=
+    0b11);
 
 struct OutstandingPacketMetadata {
   // Time that the packet was sent.
@@ -115,9 +126,12 @@ struct OutstandingPacketMetadata {
   // Size of only the body within the packet sent on the wire.
   uint16_t encodedBodySize;
 
-  bool scheduledForDestruction : 1;
+  bool scheduledForDestruction : 1 {false};
 
-  OutstandingPacketMark mark : 7;
+  // These fields share the byte previously occupied by mark.
+  OutstandingPacketMark mark : 1 {OutstandingPacketMark::NONE};
+  PacketTransmissionReason transmissionReason
+      : 2 {PacketTransmissionReason::Normal};
 
   OutstandingPacketMetadata(
       TimePoint timeIn,
@@ -139,9 +153,7 @@ struct OutstandingPacketMetadata {
         totalAppLimitedTimeUsecs(totalAppLimitedTimeUsecsIn),
         inflightBytes(inflightBytesIn),
         encodedSize(encodedSizeIn),
-        encodedBodySize(encodedBodySizeIn),
-        scheduledForDestruction(false),
-        mark(OutstandingPacketMark::NONE) {}
+        encodedBodySize(encodedBodySizeIn) {}
 };
 
 // Data structure to represent outstanding retransmittable packets

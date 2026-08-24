@@ -1889,6 +1889,7 @@ TEST_F(
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   auto conn = createConn();
+  EXPECT_FALSE(conn->transportSettings.useNonCloningPto);
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
@@ -1953,6 +1954,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
       clonedPacketIdentifier,
       *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
            ->maybeClonedPacketIdentifier);
+  EXPECT_EQ(
+      PacketTransmissionReason::Clone,
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->metadata.transmissionReason);
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
 }
 

@@ -505,6 +505,8 @@ struct TransportSettings {
   bool useNewStreamBlockedCondition{false};
   // Whether app streams use the unified owning send buffer.
   bool useUnifiedAppStreamSendBuffer{false};
+  // Whether PTO probes retransmit frames without cloning packets.
+  bool useNonCloningPto{false};
   bool scheduleTimerForExcessWrites{false};
 
   // Whether to read ECN bits from ingress packets

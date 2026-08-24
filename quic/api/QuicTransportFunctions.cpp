@@ -1229,6 +1229,7 @@ quic::Expected<void, QuicError> updateConnection(
     MVDCHECK(conn.outstandings.clonedPacketIdentifiers.count(
         *clonedPacketIdentifier));
     pkt.maybeClonedPacketIdentifier = std::move(clonedPacketIdentifier);
+    pkt.metadata.transmissionReason = PacketTransmissionReason::Clone;
     conn.lossState.totalBytesCloned += encodedSize;
   }
 
