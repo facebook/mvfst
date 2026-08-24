@@ -633,6 +633,48 @@ TEST_P(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   EXPECT_FALSE(conn.cryptoState->initialStream.lossBuffer.empty());
 }
 
+TEST_P(QuicPacketSchedulerTest, CryptoSchedulerReadsOwningSendBuffer) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  writeDataToQuicStream(
+      conn,
+      conn.cryptoState->handshakeStream,
+      folly::IOBuf::copyBuffer("handshake"));
+  LongHeader header(
+      LongHeader::Types::Handshake,
+      getTestConnectionId(1),
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::Handshake),
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.handshakeAckState->largestAckedByPeer.value_or(0));
+  auto scheduler = std::move(
+                       FrameScheduler::Builder(
+                           conn,
+                           EncryptionLevel::Handshake,
+                           PacketNumberSpace::Handshake,
+                           "CryptoOnlyScheduler")
+                           .cryptoFrames())
+                       .build();
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  const auto* frame =
+      result->packet->packet.frames.front().asWriteCryptoFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(WriteCryptoFrame(0, 9), *frame);
+  EXPECT_EQ(
+      conn.cryptoState->handshakeStream.streamSendBuffer->nextUnsentOffset(),
+      0);
+}
+
 TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -732,6 +774,338 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerTest) {
   EXPECT_TRUE(
       result->clonedPacketIdentifier.has_value() && result->packet.has_value());
   EXPECT_EQ(packetNum, result->clonedPacketIdentifier->packetNumber);
+}
+
+TEST_P(QuicPacketSchedulerTest, AppDataPtoSchedulerPrefersOrdinaryUnifiedLoss) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("ordinary-loss"), false)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 13, false}));
+  ASSERT_TRUE(stream->streamSendBuffer->markLoss({0, 13, false}));
+  conn.streamManager->updateWritableStreams(*stream);
+
+  auto frameScheduler = std::move(
+                            FrameScheduler::Builder(
+                                conn,
+                                EncryptionLevel::AppData,
+                                PacketNumberSpace::AppData,
+                                "AppDataFrameScheduler")
+                                .streamFrames())
+                            .build();
+  AppDataPtoScheduler scheduler(frameScheduler, conn, "AppDataPtoScheduler");
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  const auto frameIt = std::find_if(
+      result->packet->packet.frames.begin(),
+      result->packet->packet.frames.end(),
+      [](const auto& frame) { return frame.asWriteStreamFrame() != nullptr; });
+  ASSERT_NE(frameIt, result->packet->packet.frames.end());
+  const auto* frame = frameIt->asWriteStreamFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(WriteStreamFrame(streamId, 0, 13, false), *frame);
+  EXPECT_EQ(PacketTransmissionReason::PtoProbe, result->transmissionReason);
+  EXPECT_FALSE(result->isPtoRetransmission);
+}
+
+TEST_P(
+    QuicPacketSchedulerTest,
+    AppDataPtoSchedulerSelectsOldestUnackedRangesOnce) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("abcdefghij"), true)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 10, true}));
+  ASSERT_TRUE(stream->streamSendBuffer->markAcked({0, 2, false}).has_value());
+
+  addOutstandingPacket(conn);
+  conn.outstandings.packets.back().declaredLost = true;
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteStreamFrame(streamId, 0, 2, false));
+  addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteStreamFrame(streamId, 0, 6, false));
+  addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteStreamFrame(streamId, 6, 4, true));
+
+  FrameScheduler noopScheduler("frame", conn);
+  AppDataPtoScheduler scheduler(noopScheduler, conn, "AppDataPtoScheduler");
+  const auto schedule = [&]() {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        getTestConnectionId(),
+        getNextPacketNum(conn, PacketNumberSpace::AppData));
+    RegularQuicPacketBuilder builder(
+        static_cast<uint32_t>(conn.udpSendPacketLen),
+        std::move(header),
+        conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+    return scheduler.scheduleFramesForPacket(
+        std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+  };
+
+  auto first = schedule();
+  ASSERT_TRUE(first.has_value());
+  ASSERT_TRUE(first->packet.has_value());
+  ASSERT_EQ(1, first->packet->packet.frames.size());
+  const auto* firstFrame =
+      first->packet->packet.frames.front().asWriteStreamFrame();
+  ASSERT_NE(firstFrame, nullptr);
+  EXPECT_EQ(WriteStreamFrame(streamId, 2, 4, false), *firstFrame);
+  EXPECT_FALSE(first->clonedPacketIdentifier.has_value());
+  EXPECT_EQ(PacketTransmissionReason::PtoProbe, first->transmissionReason);
+  EXPECT_TRUE(first->isPtoRetransmission);
+
+  const auto encodedSize = first->packet->header.computeChainDataLength() +
+      first->packet->body.computeChainDataLength();
+  ASSERT_TRUE(updateConnection(
+      conn,
+      *MVCHECK_NOTNULL(conn.pathManager->getPath(conn.currentPathId)),
+      std::nullopt,
+      std::move(first->packet->packet),
+      Clock::now(),
+      encodedSize,
+      first->packet->body.computeChainDataLength(),
+      first->transmissionReason,
+      first->isPtoRetransmission));
+  EXPECT_EQ(
+      PacketTransmissionReason::PtoProbe,
+      conn.outstandings.packets.back().metadata.transmissionReason);
+  EXPECT_FALSE(
+      conn.outstandings.packets.back().maybeClonedPacketIdentifier.has_value());
+  EXPECT_EQ(8, stream->streamSendBuffer->outstandingBytes());
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+
+  auto second = schedule();
+  ASSERT_TRUE(second.has_value());
+  ASSERT_TRUE(second->packet.has_value());
+  ASSERT_EQ(1, second->packet->packet.frames.size());
+  const auto* secondFrame =
+      second->packet->packet.frames.front().asWriteStreamFrame();
+  ASSERT_NE(secondFrame, nullptr);
+  EXPECT_EQ(WriteStreamFrame(streamId, 6, 4, true), *secondFrame);
+
+  auto third = schedule();
+  ASSERT_TRUE(third.has_value());
+  ASSERT_TRUE(third->packet.has_value());
+  ASSERT_EQ(1, third->packet->packet.frames.size());
+  EXPECT_NE(third->packet->packet.frames.front().asPingFrame(), nullptr);
+  EXPECT_FALSE(third->isPtoRetransmission);
+}
+
+TEST_P(QuicPacketSchedulerTest, AppDataPtoSchedulerWritesFinOnlyProbe) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, true).hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 0, true}));
+  addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteStreamFrame(streamId, 0, 0, true));
+
+  FrameScheduler noopScheduler("frame", conn);
+  AppDataPtoScheduler scheduler(noopScheduler, conn, "AppDataPtoScheduler");
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  ASSERT_EQ(1, result->packet->packet.frames.size());
+  const auto* frame =
+      result->packet->packet.frames.front().asWriteStreamFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(WriteStreamFrame(streamId, 0, 0, true), *frame);
+  EXPECT_TRUE(result->isPtoRetransmission);
+}
+
+TEST_P(QuicPacketSchedulerTest, AppDataPtoSchedulerSkipsDisabledStream) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("disabled"), false)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 8, false}));
+  stream->retransmissionDisabled_ = true;
+  addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteStreamFrame(streamId, 0, 8, false));
+
+  FrameScheduler noopScheduler("frame", conn);
+  AppDataPtoScheduler scheduler(noopScheduler, conn, "AppDataPtoScheduler");
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  ASSERT_EQ(1, result->packet->packet.frames.size());
+  EXPECT_NE(result->packet->packet.frames.front().asPingFrame(), nullptr);
+  EXPECT_FALSE(result->isPtoRetransmission);
+}
+
+TEST_P(
+    QuicPacketSchedulerTest,
+    CryptoPtoSchedulerWritesUnackedInitialRangeWithoutMutation) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->initialStream;
+  writeDataToQuicStream(
+      conn, cryptoStream, folly::IOBuf::copyBuffer("initial"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markNewDataSent({0, 7, false}));
+  ASSERT_TRUE(
+      cryptoStream.streamSendBuffer->markAcked({0, 2, false}).has_value());
+  addInitialOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteCryptoFrame(0, 7));
+  FrameScheduler noopScheduler("frame", conn);
+  CryptoPtoScheduler scheduler(
+      noopScheduler, conn, EncryptionLevel::Initial, "CryptoPtoScheduler");
+  LongHeader header(
+      LongHeader::Types::Initial,
+      getTestConnectionId(1),
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.initialAckState->largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  const auto* frame =
+      result->packet->packet.frames.front().asWriteCryptoFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(WriteCryptoFrame(2, 5), *frame);
+  EXPECT_TRUE(result->isPtoRetransmission);
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 5);
+  EXPECT_FALSE(cryptoStream.streamSendBuffer->hasPendingLoss());
+}
+
+TEST_P(QuicPacketSchedulerTest, CryptoPtoSchedulerUsesHandshakeSpace) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->handshakeStream;
+  writeDataToQuicStream(conn, cryptoStream, folly::IOBuf::copyBuffer("hs"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markNewDataSent({0, 2, false}));
+  addHandshakeOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteCryptoFrame(0, 2));
+  FrameScheduler noopScheduler("frame", conn);
+  CryptoPtoScheduler scheduler(
+      noopScheduler, conn, EncryptionLevel::Handshake, "CryptoPtoScheduler");
+  LongHeader header(
+      LongHeader::Types::Handshake,
+      getTestConnectionId(1),
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::Handshake),
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.handshakeAckState->largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  const auto* frame =
+      result->packet->packet.frames.front().asWriteCryptoFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(WriteCryptoFrame(0, 2), *frame);
+  EXPECT_TRUE(result->isPtoRetransmission);
+}
+
+TEST_P(QuicPacketSchedulerTest, AppDataPtoSchedulerWritesOneRttCrypto) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->oneRttStream;
+  writeDataToQuicStream(conn, cryptoStream, folly::IOBuf::copyBuffer("ticket"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markNewDataSent({0, 6, false}));
+  addOutstandingPacket(conn);
+  conn.outstandings.packets.back().packet.frames.emplace_back(
+      WriteCryptoFrame(0, 6));
+  FrameScheduler noopScheduler("frame", conn);
+  AppDataPtoScheduler scheduler(noopScheduler, conn, "AppDataPtoScheduler");
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      static_cast<uint32_t>(conn.udpSendPacketLen),
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), static_cast<uint32_t>(conn.udpSendPacketLen));
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result->packet.has_value());
+  const auto* frame =
+      result->packet->packet.frames.front().asWriteCryptoFrame();
+  ASSERT_NE(frame, nullptr);
+  EXPECT_EQ(WriteCryptoFrame(0, 6), *frame);
+  EXPECT_TRUE(result->isPtoRetransmission);
 }
 
 TEST_P(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {

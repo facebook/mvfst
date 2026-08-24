@@ -297,7 +297,7 @@ void ServerHandshake::onWriteData(fizz::WriteToSocket& write) {
       continue;
     }
     auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
-    writeDataToQuicStream(*cryptoStream, std::move(content.data));
+    writeDataToQuicStream(*conn_, *cryptoStream, std::move(content.data));
   }
   handshakeEventAvailable_ = true;
 }

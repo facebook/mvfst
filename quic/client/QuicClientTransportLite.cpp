@@ -601,8 +601,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         auto cryptoStream = getCryptoStream(
             *conn_->cryptoState,
             protectionTypeToEncryptionLevel(outstandingProtectionType));
-        processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
-        break;
+        return processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
       }
       case QuicWriteFrame::Type::PingFrame:
         conn_->pendingEvents.cancelPingTimeout = true;

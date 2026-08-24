@@ -1631,10 +1631,15 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
       }
       // Check if we are app-limited after finish this round of sending
       auto currentSendBufLen = conn_->flowControlState.sumCurStreamBufferLen;
+      const auto cryptoLossBufferEmpty = [](const QuicCryptoStream& stream) {
+        return stream.streamSendBuffer
+            ? !stream.streamSendBuffer->hasPendingLoss()
+            : stream.lossBuffer.empty();
+      };
       auto lossBufferEmpty = !conn_->streamManager->hasLoss() &&
-          conn_->cryptoState->initialStream.lossBuffer.empty() &&
-          conn_->cryptoState->handshakeStream.lossBuffer.empty() &&
-          conn_->cryptoState->oneRttStream.lossBuffer.empty();
+          cryptoLossBufferEmpty(conn_->cryptoState->initialStream) &&
+          cryptoLossBufferEmpty(conn_->cryptoState->handshakeStream) &&
+          cryptoLossBufferEmpty(conn_->cryptoState->oneRttStream);
       if (conn_->congestionController &&
           currentSendBufLen < conn_->udpSendPacketLen && lossBufferEmpty &&
           conn_->congestionController->getWritableBytes()) {

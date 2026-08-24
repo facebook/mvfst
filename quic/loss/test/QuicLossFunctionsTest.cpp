@@ -331,6 +331,20 @@ makeStreamPacket(StreamId streamId, uint64_t offset, uint64_t len, bool fin) {
   return packet;
 }
 
+RegularQuicWritePacket makeInitialCryptoPacket(
+    const QuicConnectionStateBase& conn,
+    uint64_t offset,
+    uint64_t len) {
+  RegularQuicWritePacket packet(LongHeader(
+      LongHeader::Types::Initial,
+      *conn.clientConnectionId,
+      *conn.serverConnectionId,
+      0,
+      *conn.version));
+  packet.frames.push_back(WriteCryptoFrame(offset, len));
+  return packet;
+}
+
 TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onPTO()).Times(0);
@@ -592,6 +606,31 @@ TEST_F(QuicLossFunctionsTest, UnifiedLossExcludesPreviouslyAckedBytes) {
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
   EXPECT_FALSE(stream->hasLoss());
   EXPECT_FALSE(conn->streamManager->hasLoss());
+}
+
+TEST_F(QuicLossFunctionsTest, CryptoLossExcludesPreviouslyAckedBytes) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->initialStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("abcdefgh"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 8, .fin = false}));
+  ASSERT_TRUE(processCryptoStreamAck(cryptoStream, 2, 4).has_value());
+
+  auto packet = makeInitialCryptoPacket(*conn, 0, 8);
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+
+  EXPECT_EQ(
+      cryptoStream.streamSendBuffer->nextLoss(8),
+      StreamSendBuffer::SendRange(0, 2, false));
+  cryptoStream.streamSendBuffer->markRetransmissionSent(
+      {.offset = 0, .len = 2, .fin = false});
+  EXPECT_EQ(
+      cryptoStream.streamSendBuffer->nextLoss(8),
+      StreamSendBuffer::SendRange(6, 2, false));
 }
 
 TEST_F(QuicLossFunctionsTest, UnifiedLossAfterDuplicateAckIsIgnored) {
@@ -1611,6 +1650,20 @@ TEST_F(QuicLossFunctionsTest, PTOAvoidPointless) {
   EXPECT_EQ(
       conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake], 1);
   EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData], 1);
+}
+
+TEST_F(QuicLossFunctionsTest, PTOLegacyPendingCryptoDoesNotAddProbe) {
+  auto conn = createConn();
+  conn->initialWriteCipher = createNoOpAead();
+  conn->initialHeaderCipher = createNoOpHeaderCipher().value();
+  conn->outstandings.packetCount[PacketNumberSpace::Initial] = 1;
+  conn->cryptoState->initialStream.pendingWrites.append(
+      folly::IOBuf::copyBuffer("pending"));
+
+  const auto result = onPTOAlarm(*conn);
+
+  EXPECT_FALSE(result.hasError());
+  EXPECT_EQ(conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial], 1);
 }
 
 TEST_F(QuicLossFunctionsTest, EmptyOutstandingNoTimeout) {

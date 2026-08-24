@@ -189,9 +189,10 @@ void writeStreamFrameData(
   }
 }
 
-quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrameHeader(
     uint64_t offsetIn,
-    const ChainedByteRangeHead& data,
+    uint64_t dataLen,
     PacketBuilderInterface& builder) {
   uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
   QuicInteger intFrameType(static_cast<uint64_t>(FrameType::CRYPTO_FRAME));
@@ -216,8 +217,8 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
     return Optional<WriteCryptoFrame>(std::nullopt);
   }
   size_t spaceRemaining = spaceLeftInPkt - cryptoFrameHeaderSize;
-  size_t dataLength = data.chainLength();
-  size_t writableData = std::min(dataLength, spaceRemaining);
+  size_t writableData = static_cast<size_t>(
+      std::min<uint64_t>(dataLen, static_cast<uint64_t>(spaceRemaining)));
 
   QuicInteger lengthVarInt(writableData);
   auto lengthVarIntSizeRes = lengthVarInt.getSize();
@@ -231,10 +232,23 @@ quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
   builder.write(intFrameType);
   builder.write(offsetInteger);
   builder.write(lengthVarInt);
-  builder.insert(data, writableData);
   builder.appendFrame(WriteCryptoFrame(offsetIn, lengthVarInt.getValue()));
   return Optional<WriteCryptoFrame>(
       WriteCryptoFrame(offsetIn, lengthVarInt.getValue()));
+}
+
+quic::Expected<Optional<WriteCryptoFrame>, QuicError> writeCryptoFrame(
+    uint64_t offsetIn,
+    const ChainedByteRangeHead& data,
+    PacketBuilderInterface& builder) {
+  auto result = writeCryptoFrameHeader(offsetIn, data.chainLength(), builder);
+  if (!result.has_value()) {
+    return quic::make_unexpected(result.error());
+  }
+  if (*result) {
+    builder.insert(data, (*result)->len);
+  }
+  return result;
 }
 
 /*

@@ -4529,6 +4529,11 @@ class AckEventForAppDataTest : public Test {
                     << ackedSMHandlerResult.error();
               }
             } break;
+            case QuicWriteFrame::Type::WriteCryptoFrame: {
+              const auto& frame = *packetFrame.asWriteCryptoFrame();
+              return processCryptoStreamAck(
+                  conn_->cryptoState->oneRttStream, frame.offset, frame.len);
+            }
             default:
               CHECK(false);
           }
@@ -4590,6 +4595,30 @@ TEST_F(AckEventForAppDataTest, SpuriousAckProcessesUnifiedStreamData) {
   EXPECT_EQ(0, stream->streamSendBuffer->outstandingBytes());
   EXPECT_EQ(frame.offset + frame.len - 1, getLargestDeliverableOffset(*stream));
   EXPECT_TRUE(getConn()->streamManager->deliverableContains(stream->id));
+}
+
+TEST_F(AckEventForAppDataTest, SpuriousAckProcessesUnifiedCryptoData) {
+  getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  getConn()->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = getConn()->cryptoState->oneRttStream;
+  writeDataToQuicStream(
+      *getConn(), cryptoStream, folly::IOBuf::copyBuffer("ticket"));
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData, true);
+  packet.packet.frames.emplace_back(WriteCryptoFrame(0, 6));
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  auto& outstanding = getConn()->outstandings.packets.back();
+  outstanding.declaredLost = true;
+  ++getConn()->outstandings.declaredLostCount;
+  --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markLoss({0, 6, false}));
+
+  const auto ack = deliverAckForAppDataPackets(packetNum, packetNum);
+
+  EXPECT_EQ(ack.numPacketsSpuriouslyAcked, 1);
+  EXPECT_FALSE(cryptoStream.streamSendBuffer->hasPendingLoss());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 0);
 }
 
 TEST_F(AckEventForAppDataTest, DuplicateSpuriousAckIsIdempotent) {

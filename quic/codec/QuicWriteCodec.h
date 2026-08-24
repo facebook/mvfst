@@ -71,6 +71,16 @@ void writeStreamFrameData(
     uint64_t dataLen);
 
 /**
+ * Write a CryptoFrame header for up to dataLen bytes. The caller writes the
+ * returned number of bytes to the builder after this function returns.
+ */
+[[nodiscard]] quic::Expected<Optional<WriteCryptoFrame>, QuicError>
+writeCryptoFrameHeader(
+    uint64_t offsetIn,
+    uint64_t dataLen,
+    PacketBuilderInterface& builder);
+
+/**
  * Write a CryptoFrame into builder. The builder may not be able to accept all
  * the bytes that are supplied to writeCryptoFrame.
  *

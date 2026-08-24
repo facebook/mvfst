@@ -228,6 +228,63 @@ bool StreamSendBuffer::isOutstanding(const SendRange& range) const {
       (finSent_ && !finAcked_ && !finAbandoned_ && *end == tailOffset_);
 }
 
+std::optional<StreamSendBuffer::SendRange> StreamSendBuffer::firstOutstandingIn(
+    const SendRange& range,
+    uint64_t maxLen) const {
+  const auto end = rangeEnd(range.offset, range.len);
+  if (!end || cancelled_ || *end > nextUnsentOffset_) {
+    return std::nullopt;
+  }
+
+  auto acked = std::ranges::lower_bound(
+      ackedIntervals_, range.offset, {}, [](const auto& interval) {
+        return interval.end;
+      });
+  auto abandoned = std::ranges::lower_bound(
+      abandonedIntervals_, range.offset, {}, [](const auto& interval) {
+        return interval.end;
+      });
+  auto cursor = range.offset;
+  while (cursor < *end) {
+    auto outstandingEnd = *end;
+    bool cursorRetired = false;
+    const auto inspectRetired = [&](auto& interval, const auto intervalEnd) {
+      while (interval != intervalEnd && interval->end < cursor) {
+        ++interval;
+      }
+      if (interval != intervalEnd) {
+        if (interval->start <= cursor) {
+          cursor = interval->end + 1;
+          cursorRetired = true;
+        } else {
+          outstandingEnd = std::min(outstandingEnd, interval->start);
+        }
+      }
+    };
+    inspectRetired(acked, ackedIntervals_.end());
+    inspectRetired(abandoned, abandonedIntervals_.end());
+    if (cursorRetired) {
+      continue;
+    }
+    if (maxLen == 0) {
+      return std::nullopt;
+    }
+    const auto selectedLen = std::min(maxLen, outstandingEnd - cursor);
+    const auto selectedEnd = cursor + selectedLen;
+    return SendRange{
+        .offset = cursor,
+        .len = selectedEnd - cursor,
+        .fin = range.fin && *end == tailOffset_ && selectedEnd == *end &&
+            finSent_ && !finAcked_ && !finAbandoned_};
+  }
+
+  if (range.fin && *end == tailOffset_ && finSent_ && !finAcked_ &&
+      !finAbandoned_) {
+    return SendRange{.offset = *end, .len = 0, .fin = true};
+  }
+  return std::nullopt;
+}
+
 bool StreamSendBuffer::markNewDataSent(const SendRange& range) {
   const auto end = rangeEnd(range.offset, range.len);
   if (!end || cancelled_ || range.offset != nextUnsentOffset_ ||
@@ -394,7 +451,7 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
 
   tailOffset_ = std::max(offset, nextUnsentOffset_);
   cachedEntryIndex_ = 0;
-  // Truncating before the tail invalidates the FIN at the old final offset.
+  // Truncation drops buffered FIN intent but preserves transmitted FIN state.
   finBuffered_ = false;
   finSent_ = finWasSent;
   finLost_ = false;

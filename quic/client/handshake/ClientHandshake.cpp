@@ -262,7 +262,7 @@ void ClientHandshake::writeDataToStream(
     return;
   }
   auto cryptoStream = getCryptoStream(*conn_->cryptoState, encryptionLevel);
-  writeDataToQuicStream(*cryptoStream, std::move(data));
+  writeDataToQuicStream(*conn_, *cryptoStream, std::move(data));
 }
 
 void ClientHandshake::handshakeInitiated() {

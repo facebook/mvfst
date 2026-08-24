@@ -67,6 +67,28 @@ void writeDataToQuicStream(QuicCryptoStream& stream, BufPtr data) {
   stream.writeBuffer.append(std::move(data));
 }
 
+void writeDataToQuicStream(
+    QuicConnectionStateBase& conn,
+    QuicCryptoStream& stream,
+    BufPtr data) {
+  if (!stream.streamSendBuffer) {
+    const bool useOwnedSendBuffer =
+        conn.transportSettings.useUnifiedAppStreamSendBuffer &&
+        conn.transportSettings.useNonCloningPto &&
+        stream.pendingWrites.empty() && stream.writeBuffer.empty() &&
+        stream.retransmissionBuffer.empty() && stream.lossBuffer.empty() &&
+        stream.currentWriteOffset == 0;
+    if (!useOwnedSendBuffer) {
+      writeDataToQuicStream(stream, std::move(data));
+      return;
+    }
+    stream.streamSendBuffer.emplace();
+  }
+  MVCHECK(
+      stream.streamSendBuffer->append(std::move(data), false),
+      "Cannot append data to the crypto stream send buffer");
+}
+
 // Helper function which appends a raw data range to what MUST be a "tail" of
 // a logic IOBuf chain, buf. The function will pack data into the available
 // tail agressively, and allocate in terms of appendLen until the push is
@@ -606,18 +628,29 @@ QuicCryptoStream* getCryptoStream(
   folly::assume_unreachable();
 }
 
-void processCryptoStreamAck(
+quic::Expected<void, QuicError> processCryptoStreamAck(
     QuicCryptoStream& cryptoStream,
     uint64_t offset,
     uint64_t len) {
+  if (cryptoStream.streamSendBuffer) {
+    const auto ackResult = cryptoStream.streamSendBuffer->markAcked(
+        {.offset = offset, .len = len, .fin = false});
+    if (!ackResult.has_value()) {
+      return quic::make_unexpected(QuicError(
+          TransportErrorCode::INTERNAL_ERROR,
+          "ACK range is not valid for the crypto stream send buffer"));
+    }
+    return {};
+  }
   auto ackedBuffer = cryptoStream.retransmissionBuffer.find(offset);
   if (ackedBuffer == cryptoStream.retransmissionBuffer.end() ||
       ackedBuffer->second->offset != offset ||
       ackedBuffer->second->data.chainLength() != len) {
     // It's possible retransmissions of crypto data were canceled.
-    return;
+    return {};
   }
   cryptoStream.retransmissionBuffer.erase(ackedBuffer);
+  return {};
 }
 
 void processTxStopSending(QuicStreamState& stream) {

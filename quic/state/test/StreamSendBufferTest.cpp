@@ -44,8 +44,9 @@ bool writeToString(
   return buffer.writeAt(offset, len, writer);
 }
 
+template <typename OptionalRange>
 void expectRange(
-    const Optional<StreamSendBuffer::SendRange>& actual,
+    const OptionalRange& actual,
     const StreamSendBuffer::SendRange& expected) {
   ASSERT_TRUE(actual.has_value());
   EXPECT_EQ(expected, *actual);
@@ -468,23 +469,88 @@ TEST(StreamSendBufferTest, AbandonClampsToTransmittedPrefix) {
 TEST(StreamSendBufferTest, OutstandingRequiresEveryRequestedByteAndFin) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), true));
-  ASSERT_TRUE(buffer.markNewDataSent({0, 6, true}));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 6, .fin = true}));
 
-  EXPECT_TRUE(buffer.isOutstanding({1, 4, false}));
-  EXPECT_TRUE(buffer.isOutstanding({3, 3, true}));
-  ASSERT_TRUE(buffer.markAcked({2, 2, false}).has_value());
-  EXPECT_FALSE(buffer.isOutstanding({1, 4, false}));
-  EXPECT_TRUE(buffer.isOutstanding({4, 2, true}));
+  EXPECT_TRUE(buffer.isOutstanding({.offset = 1, .len = 4, .fin = false}));
+  EXPECT_TRUE(buffer.isOutstanding({.offset = 3, .len = 3, .fin = true}));
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 2, .len = 2, .fin = false}).has_value());
+  EXPECT_FALSE(buffer.isOutstanding({.offset = 1, .len = 4, .fin = false}));
+  EXPECT_TRUE(buffer.isOutstanding({.offset = 4, .len = 2, .fin = true}));
 
-  auto abandoned = buffer.abandon({.offset = 4, .len = 1, .fin = false});
-  ASSERT_TRUE(abandoned.has_value());
-  EXPECT_TRUE(*abandoned);
-  EXPECT_FALSE(buffer.isOutstanding({4, 2, true}));
-  EXPECT_TRUE(buffer.isOutstanding({5, 1, true}));
-  abandoned = buffer.abandon({.offset = 5, .len = 1, .fin = true});
-  ASSERT_TRUE(abandoned.has_value());
-  EXPECT_TRUE(*abandoned);
-  EXPECT_FALSE(buffer.isOutstanding({5, 1, true}));
+  EXPECT_TRUE(buffer.abandon({.offset = 4, .len = 1, .fin = false}));
+  EXPECT_FALSE(buffer.isOutstanding({.offset = 4, .len = 2, .fin = true}));
+  EXPECT_TRUE(buffer.isOutstanding({.offset = 5, .len = 1, .fin = true}));
+  EXPECT_TRUE(buffer.abandon({.offset = 5, .len = 1, .fin = true}));
+  EXPECT_FALSE(buffer.isOutstanding({.offset = 5, .len = 1, .fin = true}));
+}
+
+TEST(StreamSendBufferTest, FindsFirstOutstandingSubrangeWithoutMutation) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdefghij"), true));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 10, .fin = true}));
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 0, .len = 2, .fin = false}).has_value());
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 5, .len = 2, .fin = false}).has_value());
+  ASSERT_TRUE(buffer.abandon({.offset = 3, .len = 1, .fin = false}));
+
+  expectRange(
+      buffer.firstOutstandingIn({.offset = 0, .len = 10, .fin = true}, 10),
+      StreamSendBuffer::SendRange{.offset = 2, .len = 1, .fin = false});
+  expectRange(
+      buffer.firstOutstandingIn(
+          {.offset = 2, .len = 8, .fin = true},
+          std::numeric_limits<uint64_t>::max()),
+      StreamSendBuffer::SendRange{.offset = 2, .len = 1, .fin = false});
+  expectRange(
+      buffer.firstOutstandingIn({.offset = 4, .len = 6, .fin = true}, 2),
+      StreamSendBuffer::SendRange{.offset = 4, .len = 1, .fin = false});
+  expectRange(
+      buffer.firstOutstandingIn({.offset = 7, .len = 3, .fin = true}, 10),
+      StreamSendBuffer::SendRange{.offset = 7, .len = 3, .fin = true});
+  EXPECT_EQ(5, buffer.outstandingBytes());
+  EXPECT_FALSE(buffer.hasPendingLoss());
+}
+
+TEST(StreamSendBufferTest, FindsOutstandingRangesAcrossRetiredFragments) {
+  StreamSendBuffer buffer;
+  constexpr uint64_t kByteCount = 64;
+  ASSERT_TRUE(buffer.append(makeBuffer(std::string(kByteCount, 'a')), false));
+  ASSERT_TRUE(
+      buffer.markNewDataSent({.offset = 0, .len = kByteCount, .fin = false}));
+  for (uint64_t offset = 0; offset < kByteCount; offset += 4) {
+    ASSERT_TRUE(buffer.markAcked({.offset = offset, .len = 1, .fin = false})
+                    .has_value());
+    const auto abandoned =
+        buffer.abandon({.offset = offset + 2, .len = 1, .fin = false});
+    ASSERT_TRUE(abandoned.has_value());
+    EXPECT_TRUE(*abandoned);
+  }
+
+  for (uint64_t offset = 0; offset < kByteCount; offset += 4) {
+    expectRange(
+        buffer.firstOutstandingIn(
+            {.offset = offset, .len = kByteCount - offset, .fin = false}, 1),
+        {.offset = offset + 1, .len = 1, .fin = false});
+  }
+}
+
+TEST(StreamSendBufferTest, FindsOutstandingFinAfterPayloadIsRetired) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abc"), true));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 3, .fin = true}));
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 0, .len = 3, .fin = false}).has_value());
+
+  expectRange(
+      buffer.firstOutstandingIn({.offset = 0, .len = 3, .fin = true}, 0),
+      StreamSendBuffer::SendRange{.offset = 3, .len = 0, .fin = true});
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 3, .len = 0, .fin = true}).has_value());
+  EXPECT_FALSE(
+      buffer.firstOutstandingIn({.offset = 0, .len = 3, .fin = true}, 3)
+          .has_value());
 }
 
 } // namespace

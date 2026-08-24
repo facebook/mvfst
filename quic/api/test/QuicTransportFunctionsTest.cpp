@@ -259,6 +259,33 @@ class QuicTransportFunctionsTest : public Test {
         static_cast<uint32_t>(getEncodedBodySize(packet)));
   }
 
+  Expected<void, QuicError> updateCryptoFrame(
+      QuicServerConnectionState& conn,
+      EncryptionLevel encryptionLevel,
+      WriteCryptoFrame frame,
+      PacketTransmissionReason transmissionReason =
+          PacketTransmissionReason::Normal,
+      bool isPtoRetransmission = false) {
+    const auto packetNumberSpace = encryptionLevel == EncryptionLevel::Initial
+        ? PacketNumberSpace::Initial
+        : encryptionLevel == EncryptionLevel::Handshake
+        ? PacketNumberSpace::Handshake
+        : PacketNumberSpace::AppData;
+    auto packet = buildEmptyPacket(
+        conn, packetNumberSpace, encryptionLevel == EncryptionLevel::AppData);
+    packet.packet.frames.emplace_back(frame);
+    return updateConnection(
+        conn,
+        *currentPathInfo_,
+        std::nullopt,
+        packet.packet,
+        TimePoint{},
+        static_cast<uint32_t>(getEncodedSize(packet)),
+        static_cast<uint32_t>(getEncodedBodySize(packet)),
+        transmissionReason,
+        isPtoRetransmission);
+  }
+
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<MockQuicStats> quicStats_;
@@ -426,6 +453,91 @@ TEST_F(QuicTransportFunctionsTest, UnifiedStreamDuplicateWithoutLossIsError) {
   EXPECT_EQ(
       *result.error().code.asTransportErrorCode(),
       TransportErrorCode::INTERNAL_ERROR);
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedCryptoPartialNewData) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->initialStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("abcdef"));
+
+  auto result = updateCryptoFrame(*conn, EncryptionLevel::Initial, {0, 3});
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->nextUnsentOffset(), 3);
+  EXPECT_EQ(cryptoStream.streamSendBuffer->unsentBytes(), 3);
+  EXPECT_EQ(cryptoStream.currentWriteOffset, 3);
+  EXPECT_TRUE(cryptoStream.retransmissionBuffer.empty());
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedCryptoLossWriteWithdrawsLoss) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->handshakeStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("handshake"));
+  ASSERT_TRUE(
+      updateCryptoFrame(*conn, EncryptionLevel::Handshake, {0, 9}).has_value());
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markLoss({0, 9, false}));
+  EXPECT_CALL(*quicStats_, onPacketRetransmission()).Times(1);
+
+  auto result = updateCryptoFrame(*conn, EncryptionLevel::Handshake, {0, 9});
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_FALSE(cryptoStream.streamSendBuffer->hasPendingLoss());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->nextUnsentOffset(), 9);
+  EXPECT_EQ(cryptoStream.currentWriteOffset, 9);
+  EXPECT_EQ(conn->lossState.totalBytesRetransmitted, 9);
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedCryptoPtoWriteDoesNotMutateState) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->initialStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("initial"));
+  ASSERT_TRUE(
+      updateCryptoFrame(*conn, EncryptionLevel::Initial, {0, 7}).has_value());
+  const auto outstandingBytes =
+      cryptoStream.streamSendBuffer->outstandingBytes();
+
+  auto result = updateCryptoFrame(
+      *conn,
+      EncryptionLevel::Initial,
+      {0, 7},
+      PacketTransmissionReason::PtoProbe,
+      true);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(
+      cryptoStream.streamSendBuffer->outstandingBytes(), outstandingBytes);
+  EXPECT_FALSE(cryptoStream.streamSendBuffer->hasPendingLoss());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->nextUnsentOffset(), 7);
+  EXPECT_EQ(cryptoStream.currentWriteOffset, 7);
+  EXPECT_EQ(
+      conn->outstandings.packets.back().metadata.transmissionReason,
+      PacketTransmissionReason::PtoProbe);
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedOneRttCryptoUsesOwnedBuffer) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->oneRttStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("ticket"));
+
+  auto result = updateCryptoFrame(*conn, EncryptionLevel::AppData, {0, 6});
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->nextUnsentOffset(), 6);
+  EXPECT_EQ(cryptoStream.currentWriteOffset, 6);
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
@@ -1486,6 +1598,50 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAckWithSkippedPacketNumber) {
   EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
   EXPECT_TRUE(initialStream->pendingWrites.empty());
   EXPECT_TRUE(initialStream->lossBuffer.empty());
+}
+
+TEST_F(QuicTransportFunctionsTest, ImplicitAckCancelsOwnedCryptoBuffer) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->initialStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("pending initial"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer.has_value());
+
+  implicitAckCryptoStream(*conn, EncryptionLevel::Initial);
+
+  EXPECT_TRUE(cryptoStream.streamSendBuffer->cancelled());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 0);
+  EXPECT_FALSE(cryptoStream.streamSendBuffer
+                   ->nextNewData(std::numeric_limits<uint64_t>::max())
+                   .has_value());
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    ImplicitAckClearsLostOwnedCryptoPacketAndBuffer) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn->cryptoState->initialStream;
+  writeDataToQuicStream(
+      *conn, cryptoStream, folly::IOBuf::copyBuffer("pending initial"));
+  ASSERT_TRUE(
+      updateCryptoFrame(*conn, EncryptionLevel::Initial, {0, 15}).has_value());
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markLoss({0, 15, false}));
+  ASSERT_EQ(conn->outstandings.packets.size(), 1);
+  conn->outstandings.packets.front().declaredLost = true;
+  conn->outstandings.declaredLostCount++;
+  --conn->outstandings.packetCount[PacketNumberSpace::Initial];
+
+  implicitAckCryptoStream(*conn, EncryptionLevel::Initial);
+
+  EXPECT_TRUE(conn->outstandings.packets.empty());
+  EXPECT_EQ(conn->outstandings.declaredLostCount, 0);
+  EXPECT_TRUE(cryptoStream.streamSendBuffer->cancelled());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 0);
+  EXPECT_FALSE(cryptoStream.streamSendBuffer->hasPendingLoss());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
@@ -3888,6 +4044,170 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
   EXPECT_EQ(1, conn->outstandings.packets.size());
 }
 
+TEST_F(
+    QuicTransportFunctionsTest,
+    NonCloningAppPtoWritesDistinctUnifiedRangesWithZeroCwnd) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdef"), false)
+          .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 3, 3, false))
+          .hasError());
+
+  auto congestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  ON_CALL(*congestionController, getWritableBytes()).WillByDefault(Return(0));
+  conn->congestionController = std::move(congestionController);
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  ON_CALL(*socket, getGSO).WillByDefault(Return(0));
+  EXPECT_CALL(*socket, write(_, _, _))
+      .Times(2)
+      .WillRepeatedly(
+          [](const SocketAddress&, const struct iovec* vec, size_t iovecLen) {
+            return getTotalIovecLen(vec, iovecLen);
+          });
+
+  ASSERT_EQ(
+      2,
+      writeProbingDataToSocketForTest(
+          *socket, *conn, 2, *aead, *headerCipher, getVersion(*conn)));
+  ASSERT_GE(conn->outstandings.packets.size(), 4);
+  const auto& firstProbe = conn->outstandings.packets[2];
+  const auto& secondProbe = conn->outstandings.packets[3];
+  EXPECT_EQ(
+      PacketTransmissionReason::PtoProbe,
+      firstProbe.metadata.transmissionReason);
+  EXPECT_EQ(
+      PacketTransmissionReason::PtoProbe,
+      secondProbe.metadata.transmissionReason);
+  EXPECT_FALSE(firstProbe.maybeClonedPacketIdentifier.has_value());
+  EXPECT_FALSE(secondProbe.maybeClonedPacketIdentifier.has_value());
+  ASSERT_EQ(1, firstProbe.packet.frames.size());
+  ASSERT_EQ(1, secondProbe.packet.frames.size());
+  EXPECT_EQ(
+      WriteStreamFrame(stream->id, 0, 3, false),
+      *firstProbe.packet.frames.front().asWriteStreamFrame());
+  EXPECT_EQ(
+      WriteStreamFrame(stream->id, 3, 3, false),
+      *secondProbe.packet.frames.front().asWriteStreamFrame());
+}
+
+TEST_F(QuicTransportFunctionsTest, NonCloningAppPtoReservesImmediateAckProbe) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  conn->peerMinAckDelay = 1ms;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abc"), false)
+          .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  ON_CALL(*socket, getGSO).WillByDefault(Return(0));
+  EXPECT_CALL(*socket, write(_, _, _))
+      .Times(2)
+      .WillRepeatedly(
+          [](const SocketAddress&, const struct iovec* vec, size_t iovecLen) {
+            return getTotalIovecLen(vec, iovecLen);
+          });
+
+  ASSERT_EQ(
+      2,
+      writeProbingDataToSocketForTest(
+          *socket, *conn, 2, *aead, *headerCipher, getVersion(*conn)));
+  ASSERT_GE(conn->outstandings.packets.size(), 3);
+  EXPECT_NE(
+      conn->outstandings.packets[2].packet.frames[0].asImmediateAckFrame(),
+      nullptr);
+  EXPECT_EQ(
+      PacketTransmissionReason::PtoProbe,
+      conn->outstandings.packets[2].metadata.transmissionReason);
+}
+
+TEST_F(QuicTransportFunctionsTest, NonCloningPtoRequiresUnifiedBufferMode) {
+  auto conn = createConn();
+  conn->transportSettings.useNonCloningPto = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abc"), false)
+          .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  ON_CALL(*socket, getGSO).WillByDefault(Return(0));
+  EXPECT_CALL(*socket, write(_, _, _))
+      .Times(1)
+      .WillOnce(
+          [](const SocketAddress&, const struct iovec* vec, size_t iovecLen) {
+            return getTotalIovecLen(vec, iovecLen);
+          });
+
+  ASSERT_EQ(
+      1,
+      writeProbingDataToSocketForTest(
+          *socket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  ASSERT_GE(conn->outstandings.packets.size(), 2);
+  const auto& probe = conn->outstandings.packets.back();
+  EXPECT_TRUE(probe.maybeClonedPacketIdentifier.has_value());
+  EXPECT_EQ(PacketTransmissionReason::Clone, probe.metadata.transmissionReason);
+}
+
+TEST_F(QuicTransportFunctionsTest, NonCloningPtoFallsBackForLegacyStream) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  stream->streamSendBuffer.reset();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abc"), false)
+          .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  ON_CALL(*socket, getGSO).WillByDefault(Return(0));
+  EXPECT_CALL(*socket, write(_, _, _))
+      .Times(1)
+      .WillOnce(
+          [](const SocketAddress&, const struct iovec* vec, size_t iovecLen) {
+            return getTotalIovecLen(vec, iovecLen);
+          });
+
+  ASSERT_EQ(
+      1,
+      writeProbingDataToSocketForTest(
+          *socket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
+  ASSERT_GE(conn->outstandings.packets.size(), 2);
+  const auto& probe = conn->outstandings.packets.back();
+  EXPECT_TRUE(probe.maybeClonedPacketIdentifier.has_value());
+  EXPECT_EQ(PacketTransmissionReason::Clone, probe.metadata.transmissionReason);
+}
+
 TEST_F(QuicTransportFunctionsTest, ProbingFallbackToImmediateAck) {
   auto conn = createConn();
   conn->peerMinAckDelay = 1ms;
@@ -4002,6 +4322,58 @@ TEST_F(QuicTransportFunctionsTest, ImmediatelyRetransmitInitialPackets) {
   ASSERT_EQ(4, conn->outstandings.packets.size());
   ASSERT_EQ(2, cryptoStream->retransmissionBuffer.size());
   ASSERT_TRUE(cryptoStream->pendingWrites.empty());
+  EXPECT_EQ(
+      conn->outstandings.packets[2].metadata.transmissionReason,
+      PacketTransmissionReason::ImmediateInitialProbe);
+  EXPECT_EQ(
+      conn->outstandings.packets[3].metadata.transmissionReason,
+      PacketTransmissionReason::ImmediateInitialProbe);
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    ImmediatelyRetransmitInitialPacketsWithOwnedCryptoBuffer) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->transportSettings.useNonCloningPto = true;
+  conn->transportSettings.immediatelyRetransmitInitialPackets = true;
+  auto& cryptoStream = conn->cryptoState->initialStream;
+  auto buf = buildRandomInputData(1600);
+  writeDataToQuicStream(*conn, cryptoStream, buf->clone());
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto socket =
+      std::make_unique<NiceMock<quic::test::MockAsyncUDPSocket>>(qEvb);
+  ON_CALL(*socket, getGSO).WillByDefault(testing::Return(0));
+
+  auto result = writeCryptoAndAckDataToSocket(
+      *socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      LongHeader::Types::Initial,
+      *conn->initialWriteCipher,
+      *conn->initialHeaderCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->packetsWritten, 2);
+  EXPECT_EQ(result->probesWritten, 2);
+  ASSERT_EQ(conn->outstandings.packets.size(), 4);
+  EXPECT_FALSE(
+      conn->outstandings.packets[2].maybeClonedPacketIdentifier.has_value());
+  EXPECT_FALSE(
+      conn->outstandings.packets[3].maybeClonedPacketIdentifier.has_value());
+  EXPECT_EQ(
+      conn->outstandings.packets[2].metadata.transmissionReason,
+      PacketTransmissionReason::ImmediateInitialProbe);
+  EXPECT_EQ(
+      conn->outstandings.packets[3].metadata.transmissionReason,
+      PacketTransmissionReason::ImmediateInitialProbe);
+  ASSERT_TRUE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 1600);
+  EXPECT_TRUE(cryptoStream.retransmissionBuffer.empty());
 }
 
 TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {

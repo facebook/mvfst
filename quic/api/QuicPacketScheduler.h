@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <map>
+#include <set>
+
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicAckScheduler.h>
@@ -15,6 +18,7 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/TimestampFrameFunctions.h>
@@ -27,14 +31,21 @@ struct SchedulingResult {
   Optional<ClonedPacketIdentifier> clonedPacketIdentifier;
   Optional<PacketBuilderInterface::Packet> packet;
   size_t shortHeaderPadding;
+  PacketTransmissionReason transmissionReason;
+  bool isPtoRetransmission;
 
   explicit SchedulingResult(
       Optional<ClonedPacketIdentifier> clonedPacketIdentifierIn,
       Optional<PacketBuilderInterface::Packet> packetIn,
-      size_t shortHeaderPaddingIn = 0)
+      size_t shortHeaderPaddingIn = 0,
+      PacketTransmissionReason transmissionReasonIn =
+          PacketTransmissionReason::Normal,
+      bool isPtoRetransmissionIn = false)
       : clonedPacketIdentifier(std::move(clonedPacketIdentifierIn)),
         packet(std::move(packetIn)),
-        shortHeaderPadding(shortHeaderPaddingIn) {}
+        shortHeaderPadding(shortHeaderPaddingIn),
+        transmissionReason(transmissionReasonIn),
+        isPtoRetransmission(isPtoRetransmissionIn) {}
 };
 
 /**
@@ -238,7 +249,7 @@ class CryptoStreamScheduler {
  public:
   explicit CryptoStreamScheduler(
       const QuicConnectionStateBase& conn,
-      const QuicCryptoStream& cryptoStream);
+      QuicCryptoStream& cryptoStream);
 
   /**
    * Returns whether or we could write data to the stream.
@@ -254,7 +265,7 @@ class CryptoStreamScheduler {
 
  private:
   const QuicConnectionStateBase& conn_;
-  const QuicCryptoStream& cryptoStream_;
+  QuicCryptoStream& cryptoStream_;
 };
 
 class ImmediateAckFrameScheduler {
@@ -349,6 +360,10 @@ class FrameScheduler : public QuicPacketScheduler {
   // If any of the non-Ack scheduler has pending data to send
   [[nodiscard]] virtual bool hasImmediateData() const;
 
+  void setTransmissionReason(PacketTransmissionReason reason) {
+    transmissionReason_ = reason;
+  }
+
   [[nodiscard]] folly::StringPiece name() const override;
 
  private:
@@ -366,6 +381,8 @@ class FrameScheduler : public QuicPacketScheduler {
   Optional<PathValidationFrameScheduler> pathValidationFrameScheduler_;
   folly::StringPiece name_;
   QuicConnectionStateBase& conn_;
+  PacketTransmissionReason transmissionReason_{
+      PacketTransmissionReason::Normal};
 };
 
 /**
@@ -384,7 +401,9 @@ class CloningScheduler : public QuicPacketScheduler {
       FrameScheduler& scheduler,
       QuicConnectionStateBase& conn,
       const folly::StringPiece name,
-      uint64_t cipherOverhead);
+      uint64_t cipherOverhead,
+      PacketTransmissionReason transmissionReason =
+          PacketTransmissionReason::PtoProbe);
 
   [[nodiscard]] bool hasData() const override;
 
@@ -405,6 +424,79 @@ class CloningScheduler : public QuicPacketScheduler {
   QuicConnectionStateBase& conn_;
   folly::StringPiece name_;
   uint64_t cipherOverhead_;
+  PacketTransmissionReason transmissionReason_;
+};
+
+class CryptoPtoScheduler : public QuicPacketScheduler {
+ public:
+  CryptoPtoScheduler(
+      FrameScheduler& scheduler,
+      QuicConnectionStateBase& conn,
+      EncryptionLevel encryptionLevel,
+      folly::StringPiece name,
+      PacketTransmissionReason transmissionReason =
+          PacketTransmissionReason::PtoProbe);
+
+  [[nodiscard]] bool hasData() const override;
+
+  [[nodiscard]] quic::Expected<SchedulingResult, QuicError>
+  scheduleFramesForPacket(
+      PacketBuilderInterface&& builder,
+      uint32_t writableBytes) override;
+
+  [[nodiscard]] folly::StringPiece name() const override;
+
+ private:
+  [[nodiscard]] std::optional<StreamSendBuffer::SendRange>
+  nextUnselectedOutstanding(
+      const StreamSendBuffer::SendRange& originalRange) const;
+
+  FrameScheduler& frameScheduler_;
+  QuicConnectionStateBase& conn_;
+  QuicCryptoStream& cryptoStream_;
+  PacketNumberSpace packetNumberSpace_;
+  folly::StringPiece name_;
+  IntervalSet<uint64_t> selectedCryptoData_;
+  PacketTransmissionReason transmissionReason_;
+};
+
+class AppDataPtoScheduler : public QuicPacketScheduler {
+ public:
+  AppDataPtoScheduler(
+      FrameScheduler& scheduler,
+      QuicConnectionStateBase& conn,
+      folly::StringPiece name,
+      PacketTransmissionReason transmissionReason =
+          PacketTransmissionReason::PtoProbe);
+
+  [[nodiscard]] bool hasData() const override;
+
+  [[nodiscard]] quic::Expected<SchedulingResult, QuicError>
+  scheduleFramesForPacket(
+      PacketBuilderInterface&& builder,
+      uint32_t writableBytes) override;
+
+  [[nodiscard]] folly::StringPiece name() const override;
+
+ private:
+  [[nodiscard]] std::optional<StreamSendBuffer::SendRange>
+  nextUnselectedOutstanding(
+      const StreamSendBuffer& sendBuffer,
+      StreamId streamId,
+      const StreamSendBuffer::SendRange& originalRange) const;
+
+  [[nodiscard]] std::optional<StreamSendBuffer::SendRange>
+  nextUnselectedCryptoOutstanding(
+      const StreamSendBuffer& sendBuffer,
+      const StreamSendBuffer::SendRange& originalRange) const;
+
+  FrameScheduler& frameScheduler_;
+  QuicConnectionStateBase& conn_;
+  folly::StringPiece name_;
+  std::map<StreamId, IntervalSet<uint64_t>> selectedStreamData_;
+  std::set<StreamId> selectedStreamFin_;
+  IntervalSet<uint64_t> selectedCryptoData_;
+  PacketTransmissionReason transmissionReason_;
 };
 
 } // namespace quic

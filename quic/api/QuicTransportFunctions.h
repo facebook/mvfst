@@ -225,7 +225,10 @@ bool handleStreamBufMetaWritten(
     RegularQuicWritePacket packet,
     TimePoint time,
     uint32_t encodedSize,
-    uint32_t encodedBodySize);
+    uint32_t encodedBodySize,
+    PacketTransmissionReason transmissionReason =
+        PacketTransmissionReason::Normal,
+    bool isPtoRetransmission = false);
 
 /**
  * Returns the number of writable bytes available for constructing a PTO packet.
@@ -345,7 +348,9 @@ writeProbingDataToSocket(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
-    const std::string& token = std::string());
+    const std::string& token = std::string(),
+    PacketTransmissionReason transmissionReason =
+        PacketTransmissionReason::PtoProbe);
 
 inline HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType) {
   return HeaderBuilder::makeLong(packetType);

@@ -2666,8 +2666,79 @@ TEST_F(QuicStreamFunctionsTestBase, AckCryptoStream) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   conn.cryptoState->handshakeStream.retransmissionBuffer.emplace(
       0, std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(chlo), 0));
-  processCryptoStreamAck(conn.cryptoState->handshakeStream, 0, chlo->length());
+  ASSERT_TRUE(processCryptoStreamAck(
+                  conn.cryptoState->handshakeStream, 0, chlo->length())
+                  .has_value());
   EXPECT_EQ(conn.cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
+}
+
+TEST_F(QuicStreamFunctionsTestBase, CryptoStreamUsesLegacyBufferByDefault) {
+  auto& cryptoStream = conn.cryptoState->handshakeStream;
+
+  writeDataToQuicStream(conn, cryptoStream, IOBuf::copyBuffer("CHLO"));
+
+  EXPECT_FALSE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(cryptoStream.pendingWrites.chainLength(), 4);
+
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  writeDataToQuicStream(conn, cryptoStream, IOBuf::copyBuffer("more"));
+  EXPECT_FALSE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(cryptoStream.pendingWrites.chainLength(), 8);
+}
+
+TEST_F(QuicStreamFunctionsTestBase, CryptoStreamUsesOwningSendBuffer) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->handshakeStream;
+
+  writeDataToQuicStream(conn, cryptoStream, IOBuf::copyBuffer("CHLO"));
+
+  ASSERT_TRUE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(
+      cryptoStream.streamSendBuffer->nextNewData(10),
+      (StreamSendBuffer::SendRange{0, 4, false}));
+  EXPECT_TRUE(cryptoStream.pendingWrites.empty());
+  EXPECT_TRUE(cryptoStream.writeBuffer.empty());
+}
+
+TEST_F(QuicStreamFunctionsTestBase, CryptoStreamRequiresBothPtoSettings) {
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->handshakeStream;
+
+  writeDataToQuicStream(conn, cryptoStream, IOBuf::copyBuffer("CHLO"));
+
+  EXPECT_FALSE(cryptoStream.streamSendBuffer.has_value());
+  EXPECT_EQ(cryptoStream.pendingWrites.chainLength(), 4);
+}
+
+TEST_F(QuicStreamFunctionsTestBase, AckCryptoStreamRangeInOwningSendBuffer) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->initialStream;
+  writeDataToQuicStream(conn, cryptoStream, IOBuf::copyBuffer("0123456789"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markNewDataSent({0, 10, false}));
+  EXPECT_TRUE(cryptoStream.streamSendBuffer->markLoss({0, 10, false}));
+
+  ASSERT_TRUE(processCryptoStreamAck(cryptoStream, 2, 4).has_value());
+  ASSERT_TRUE(processCryptoStreamAck(cryptoStream, 2, 4).has_value());
+
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 6);
+  EXPECT_EQ(
+      cryptoStream.streamSendBuffer->nextLoss(10),
+      (StreamSendBuffer::SendRange{0, 2, false}));
+}
+
+TEST_F(QuicStreamFunctionsTestBase, AckCryptoStreamRejectsInvalidOwningRange) {
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn.transportSettings.useNonCloningPto = true;
+  auto& cryptoStream = conn.cryptoState->initialStream;
+  writeDataToQuicStream(conn, cryptoStream, IOBuf::copyBuffer("initial"));
+  ASSERT_TRUE(cryptoStream.streamSendBuffer->markNewDataSent({0, 7, false}));
+
+  const auto result = processCryptoStreamAck(cryptoStream, 6, 2);
+
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(cryptoStream.streamSendBuffer->outstandingBytes(), 7);
 }
 
 TEST_F(QuicStreamFunctionsTestBase, AckCryptoStreamOffsetLengthMismatch) {
@@ -2675,13 +2746,16 @@ TEST_F(QuicStreamFunctionsTestBase, AckCryptoStreamOffsetLengthMismatch) {
   auto& cryptoStream = conn.cryptoState->handshakeStream;
   cryptoStream.retransmissionBuffer.emplace(
       0, std::make_unique<WriteStreamBuffer>(ChainedByteRangeHead(chlo), 0));
-  processCryptoStreamAck(cryptoStream, 1, chlo->length());
+  ASSERT_TRUE(
+      processCryptoStreamAck(cryptoStream, 1, chlo->length()).has_value());
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 
-  processCryptoStreamAck(cryptoStream, 0, chlo->length() - 2);
+  ASSERT_TRUE(
+      processCryptoStreamAck(cryptoStream, 0, chlo->length() - 2).has_value());
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 
-  processCryptoStreamAck(cryptoStream, 20, chlo->length());
+  ASSERT_TRUE(
+      processCryptoStreamAck(cryptoStream, 20, chlo->length()).has_value());
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 }
 

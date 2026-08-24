@@ -46,6 +46,7 @@ mvfst_add_library(mvfst_api_transport
     mvfst_loss
     mvfst_observer_socket_observer_macros
     mvfst_state_pacing_functions
+    mvfst_state_quic_stream_utilities
     mvfst_state_state_functions
     mvfst_state_stream_functions
     Folly::folly_chrono
@@ -159,6 +160,7 @@ mvfst_add_library(mvfst_api_transport_helpers
     mvfst_exception
     mvfst_flowcontrol_flow_control
     mvfst_handshake_transport_parameters
+    mvfst_state_outstanding_packet
     mvfst_state_quic_state_machine
     mvfst_state_state_functions
     mvfst_state_stats_callback

@@ -1495,8 +1495,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
           auto cryptoStream =
               getCryptoStream(*conn.cryptoState, encryptionLevel);
-          processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
-          break;
+          return processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
         }
         case QuicWriteFrame::Type::RstStreamFrame: {
           const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();

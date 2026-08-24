@@ -63,6 +63,10 @@ class StreamSendBuffer {
 
   [[nodiscard]] bool isOutstanding(const SendRange& range) const;
 
+  [[nodiscard]] std::optional<SendRange> firstOutstandingIn(
+      const SendRange& range,
+      uint64_t maxLen) const;
+
   [[nodiscard]] bool markNewDataSent(const SendRange& range);
   bool markLoss(const SendRange& range);
   void markRetransmissionSent(const SendRange& range);

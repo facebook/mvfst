@@ -240,6 +240,9 @@ struct PacingRate {
 
 struct QuicCryptoStream : public QuicStreamLike {
   ~QuicCryptoStream() override = default;
+
+  // Present when crypto writes are owned independently of packet clones.
+  Optional<StreamSendBuffer> streamSendBuffer;
 };
 
 struct QuicCryptoState {

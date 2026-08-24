@@ -68,18 +68,21 @@ quic::Expected<void, QuicError> processUnifiedStreamFramesForSpuriousAck(
     QuicConnectionStateBase& conn,
     const OutstandingPacketWrapper& packet,
     const AckedFrameVisitor& ackedFrameVisitor) {
-  if (packet.packet.header.getPacketNumberSpace() !=
-      PacketNumberSpace::AppData) {
-    return {};
-  }
-
   for (const auto& packetFrame : packet.packet.frames) {
-    const auto* streamFrame = packetFrame.asWriteStreamFrame();
-    if (!streamFrame) {
-      continue;
+    bool shouldProcess = false;
+    if (const auto* streamFrame = packetFrame.asWriteStreamFrame()) {
+      const auto* stream =
+          conn.streamManager->findStream(streamFrame->streamId);
+      shouldProcess = packet.packet.header.getPacketNumberSpace() ==
+              PacketNumberSpace::AppData &&
+          stream && stream->streamSendBuffer;
+    } else if (packetFrame.asWriteCryptoFrame()) {
+      const auto encryptionLevel = protectionTypeToEncryptionLevel(
+          packet.packet.header.getProtectionType());
+      shouldProcess = getCryptoStream(*conn.cryptoState, encryptionLevel)
+                          ->streamSendBuffer.has_value();
     }
-    const auto* stream = conn.streamManager->findStream(streamFrame->streamId);
-    if (!stream || !stream->streamSendBuffer) {
+    if (!shouldProcess) {
       continue;
     }
     auto result = ackedFrameVisitor(packet, packetFrame);

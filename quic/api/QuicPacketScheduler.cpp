@@ -12,6 +12,7 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/state/ConnectionOopsFields.h>
+#include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/TimestampFrameFunctions.h>
 #include <cstdint>
@@ -34,6 +35,78 @@ quic::Expected<void, QuicError> writeUnifiedStreamData(
         "Failed to read scheduled data from the unified stream send buffer"));
   }
   return {};
+}
+
+quic::Expected<void, QuicError> writeUnifiedCryptoData(
+    PacketBuilderInterface& builder,
+    const StreamSendBuffer& sendBuffer,
+    uint64_t offset,
+    uint64_t len) {
+  if (!sendBuffer.writeAt(offset, len, [&builder](ByteRange range) {
+        builder.push(range.data(), range.size());
+        return true;
+      })) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "Failed to read scheduled crypto data from the send buffer"));
+  }
+  return {};
+}
+
+PacketNumberSpace cryptoPacketNumberSpace(EncryptionLevel encryptionLevel) {
+  switch (encryptionLevel) {
+    case EncryptionLevel::Initial:
+      return PacketNumberSpace::Initial;
+    case EncryptionLevel::Handshake:
+      return PacketNumberSpace::Handshake;
+    case EncryptionLevel::AppData:
+      return PacketNumberSpace::AppData;
+    case EncryptionLevel::EarlyData:
+      MVCHECK(false, "0-RTT packets cannot carry crypto frames");
+    case EncryptionLevel::MAX:
+      MVCHECK(false, "Invalid crypto encryption level");
+  }
+  folly::assume_unreachable();
+}
+
+std::optional<StreamSendBuffer::SendRange> firstUnselectedCryptoRange(
+    const StreamSendBuffer& sendBuffer,
+    const StreamSendBuffer::SendRange& originalRange,
+    const IntervalSet<uint64_t>& selectedData) {
+  auto searchOffset = originalRange.offset;
+  const auto originalEnd = originalRange.offset + originalRange.len;
+  while (searchOffset < originalEnd) {
+    auto candidate = sendBuffer.firstOutstandingIn(
+        {.offset = searchOffset,
+         .len = originalEnd - searchOffset,
+         .fin = false},
+        std::numeric_limits<uint64_t>::max());
+    if (!candidate || candidate->len == 0) {
+      return std::nullopt;
+    }
+
+    const auto candidateEnd = candidate->offset + candidate->len;
+    bool retry = false;
+    for (const auto& selected : selectedData) {
+      if (selected.end < candidate->offset) {
+        continue;
+      }
+      if (selected.start >= candidateEnd) {
+        break;
+      }
+      if (selected.start <= candidate->offset) {
+        searchOffset = selected.end + 1;
+        retry = true;
+        break;
+      }
+      candidate->len = selected.start - candidate->offset;
+      break;
+    }
+    if (!retry) {
+      return candidate;
+    }
+  }
+  return std::nullopt;
 }
 
 /**
@@ -509,7 +582,10 @@ FrameScheduler::scheduleFramesForPacket(
   }
 
   return SchedulingResult(
-      std::nullopt, std::move(packetBuilder).buildPacket(), shortHeaderPadding);
+      std::nullopt,
+      std::move(packetBuilder).buildPacket(),
+      shortHeaderPadding,
+      transmissionReason_);
 }
 
 bool FrameScheduler::hasData() const {
@@ -1191,11 +1267,57 @@ quic::Expected<void, QuicError> BlockedScheduler::writeBlockedFrames(
 
 CryptoStreamScheduler::CryptoStreamScheduler(
     const QuicConnectionStateBase& conn,
-    const QuicCryptoStream& cryptoStream)
+    QuicCryptoStream& cryptoStream)
     : conn_(conn), cryptoStream_(cryptoStream) {}
 
 quic::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
     PacketBuilderInterface& builder) {
+  if (cryptoStream_.streamSendBuffer) {
+    bool cryptoDataWritten = false;
+    auto writeRange = [&](const StreamSendBuffer::SendRange& range)
+        -> quic::Expected<bool, QuicError> {
+      auto frameResult =
+          writeCryptoFrameHeader(range.offset, range.len, builder);
+      if (!frameResult.has_value()) {
+        return quic::make_unexpected(frameResult.error());
+      }
+      if (!*frameResult) {
+        return false;
+      }
+      auto writeResult = writeUnifiedCryptoData(
+          builder,
+          *cryptoStream_.streamSendBuffer,
+          range.offset,
+          (*frameResult)->len);
+      if (!writeResult.has_value()) {
+        return quic::make_unexpected(writeResult.error());
+      }
+      return true;
+    };
+
+    if (auto loss = cryptoStream_.streamSendBuffer->nextLoss(
+            std::numeric_limits<uint64_t>::max())) {
+      auto result = writeRange(*loss);
+      if (!result.has_value()) {
+        return quic::make_unexpected(result.error());
+      }
+      if (!*result) {
+        return false;
+      }
+      cryptoDataWritten = true;
+    }
+
+    if (auto newData = cryptoStream_.streamSendBuffer->nextNewData(
+            std::numeric_limits<uint64_t>::max())) {
+      auto result = writeRange(*newData);
+      if (!result.has_value()) {
+        return quic::make_unexpected(result.error());
+      }
+      cryptoDataWritten = cryptoDataWritten || *result;
+    }
+    return cryptoDataWritten;
+  }
+
   bool cryptoDataWritten = false;
   uint64_t writableData = cryptoStream_.pendingWrites.chainLength();
   // We use the crypto scheduler to reschedule the retransmissions of the
@@ -1231,6 +1353,12 @@ quic::Expected<bool, QuicError> CryptoStreamScheduler::writeCryptoData(
 }
 
 bool CryptoStreamScheduler::hasData() const {
+  if (cryptoStream_.streamSendBuffer) {
+    return cryptoStream_.streamSendBuffer->hasPendingLoss() ||
+        cryptoStream_.streamSendBuffer
+            ->nextNewData(std::numeric_limits<uint64_t>::max())
+            .has_value();
+  }
   return !cryptoStream_.pendingWrites.empty() ||
       !cryptoStream_.lossBuffer.empty();
 }
@@ -1278,11 +1406,13 @@ CloningScheduler::CloningScheduler(
     FrameScheduler& scheduler,
     QuicConnectionStateBase& conn,
     const folly::StringPiece name,
-    uint64_t cipherOverhead)
+    uint64_t cipherOverhead,
+    PacketTransmissionReason transmissionReason)
     : frameScheduler_(scheduler),
       conn_(conn),
       name_(name),
-      cipherOverhead_(cipherOverhead) {}
+      cipherOverhead_(cipherOverhead),
+      transmissionReason_(transmissionReason) {}
 
 bool CloningScheduler::hasData() const {
   return frameScheduler_.hasData() || conn_.outstandings.numOutstanding() > 0;
@@ -1300,8 +1430,12 @@ CloningScheduler::scheduleFramesForPacket(
   // now.
   if (frameScheduler_.hasImmediateData()) {
     // If we have new ack-eliciting data to write, write that first.
-    return frameScheduler_.scheduleFramesForPacket(
+    auto result = frameScheduler_.scheduleFramesForPacket(
         std::move(builder), writableBytes);
+    if (result.has_value() && result->packet) {
+      result->transmissionReason = transmissionReason_;
+    }
+    return result;
   }
   // TODO: We can avoid the copy & rebuild of the header by creating an
   // independent header builder.
@@ -1407,7 +1541,8 @@ CloningScheduler::scheduleFramesForPacket(
       return SchedulingResult(
           std::move(rebuildResultExpected.value()),
           std::move(*internalBuilder).buildPacket(),
-          0);
+          0,
+          transmissionReason_);
     } else if (
         conn_.transportSettings.dataPathType ==
         DataPathType::ContinuousMemory) {
@@ -1429,6 +1564,391 @@ CloningScheduler::scheduleFramesForPacket(
 }
 
 folly::StringPiece CloningScheduler::name() const {
+  return name_;
+}
+
+CryptoPtoScheduler::CryptoPtoScheduler(
+    FrameScheduler& scheduler,
+    QuicConnectionStateBase& conn,
+    EncryptionLevel encryptionLevel,
+    folly::StringPiece name,
+    PacketTransmissionReason transmissionReason)
+    : frameScheduler_(scheduler),
+      conn_(conn),
+      cryptoStream_(*getCryptoStream(*conn.cryptoState, encryptionLevel)),
+      packetNumberSpace_(cryptoPacketNumberSpace(encryptionLevel)),
+      name_(name),
+      transmissionReason_(transmissionReason) {}
+
+bool CryptoPtoScheduler::hasData() const {
+  return true;
+}
+
+std::optional<StreamSendBuffer::SendRange>
+CryptoPtoScheduler::nextUnselectedOutstanding(
+    const StreamSendBuffer::SendRange& originalRange) const {
+  if (!cryptoStream_.streamSendBuffer) {
+    return std::nullopt;
+  }
+  return firstUnselectedCryptoRange(
+      *cryptoStream_.streamSendBuffer, originalRange, selectedCryptoData_);
+}
+
+quic::Expected<SchedulingResult, QuicError>
+CryptoPtoScheduler::scheduleFramesForPacket(
+    PacketBuilderInterface&& builder,
+    uint32_t writableBytes) {
+  if (frameScheduler_.hasImmediateData()) {
+    auto result = frameScheduler_.scheduleFramesForPacket(
+        std::move(builder), writableBytes);
+    if (result.has_value() && result->packet) {
+      result->transmissionReason = transmissionReason_;
+    }
+    return result;
+  }
+
+  if (builder.getPacketHeader().getPacketNumberSpace() != packetNumberSpace_) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "CryptoPtoScheduler used in the wrong packet number space"));
+  }
+  auto encodeResult = builder.encodePacketHeader();
+  if (!encodeResult.has_value()) {
+    return quic::make_unexpected(encodeResult.error());
+  }
+  writableBytes = writableBytes > builder.getHeaderBytes()
+      ? writableBytes - builder.getHeaderBytes()
+      : 0;
+  PacketBuilderWrapper wrapper(builder, writableBytes);
+  bool wroteRetransmission = false;
+
+  for (const auto& outstandingPacket : conn_.outstandings.packets) {
+    if (outstandingPacket.declaredLost ||
+        outstandingPacket.packet.header.getPacketNumberSpace() !=
+            packetNumberSpace_) {
+      continue;
+    }
+    for (const auto& frame : outstandingPacket.packet.frames) {
+      switch (frame.type()) {
+        case QuicWriteFrame::Type::WriteCryptoFrame: {
+          const auto& cryptoFrame = *frame.asWriteCryptoFrame();
+          auto sendRange = nextUnselectedOutstanding(
+              {.offset = cryptoFrame.offset,
+               .len = cryptoFrame.len,
+               .fin = false});
+          if (!sendRange) {
+            break;
+          }
+          auto frameResult = writeCryptoFrameHeader(
+              sendRange->offset, sendRange->len, wrapper);
+          if (!frameResult.has_value()) {
+            return quic::make_unexpected(frameResult.error());
+          }
+          if (!*frameResult) {
+            break;
+          }
+          auto writeResult = writeUnifiedCryptoData(
+              wrapper,
+              *cryptoStream_.streamSendBuffer,
+              sendRange->offset,
+              (*frameResult)->len);
+          if (!writeResult.has_value()) {
+            return quic::make_unexpected(writeResult.error());
+          }
+          selectedCryptoData_.insert(
+              sendRange->offset, sendRange->offset + (*frameResult)->len - 1);
+          wroteRetransmission = true;
+          break;
+        }
+        case QuicWriteFrame::Type::PaddingFrame:
+        case QuicWriteFrame::Type::RstStreamFrame:
+        case QuicWriteFrame::Type::ConnectionCloseFrame:
+        case QuicWriteFrame::Type::MaxDataFrame:
+        case QuicWriteFrame::Type::MaxStreamDataFrame:
+        case QuicWriteFrame::Type::DataBlockedFrame:
+        case QuicWriteFrame::Type::StreamDataBlockedFrame:
+        case QuicWriteFrame::Type::StreamsBlockedFrame:
+        case QuicWriteFrame::Type::WriteAckFrame:
+        case QuicWriteFrame::Type::WriteStreamFrame:
+        case QuicWriteFrame::Type::QuicSimpleFrame:
+        case QuicWriteFrame::Type::PingFrame:
+        case QuicWriteFrame::Type::NoopFrame:
+        case QuicWriteFrame::Type::DatagramFrame:
+        case QuicWriteFrame::Type::TimestampFrame:
+        case QuicWriteFrame::Type::ImmediateAckFrame:
+          break;
+      }
+      if (wroteRetransmission) {
+        break;
+      }
+    }
+    if (wroteRetransmission) {
+      break;
+    }
+  }
+
+  if (!wroteRetransmission) {
+    auto pingResult = writeFrame(PingFrame(), wrapper);
+    if (!pingResult.has_value()) {
+      return quic::make_unexpected(pingResult.error());
+    }
+  }
+  if (!builder.hasFramesPending()) {
+    return SchedulingResult(std::nullopt, std::nullopt, 0);
+  }
+  return SchedulingResult(
+      std::nullopt,
+      std::move(builder).buildPacket(),
+      0,
+      transmissionReason_,
+      wroteRetransmission);
+}
+
+folly::StringPiece CryptoPtoScheduler::name() const {
+  return name_;
+}
+
+AppDataPtoScheduler::AppDataPtoScheduler(
+    FrameScheduler& scheduler,
+    QuicConnectionStateBase& conn,
+    folly::StringPiece name,
+    PacketTransmissionReason transmissionReason)
+    : frameScheduler_(scheduler),
+      conn_(conn),
+      name_(name),
+      transmissionReason_(transmissionReason) {}
+
+bool AppDataPtoScheduler::hasData() const {
+  return true;
+}
+
+std::optional<StreamSendBuffer::SendRange>
+AppDataPtoScheduler::nextUnselectedOutstanding(
+    const StreamSendBuffer& sendBuffer,
+    StreamId streamId,
+    const StreamSendBuffer::SendRange& originalRange) const {
+  auto searchOffset = originalRange.offset;
+  const auto originalEnd = originalRange.offset + originalRange.len;
+  while (searchOffset <= originalEnd) {
+    auto candidate = sendBuffer.firstOutstandingIn(
+        {.offset = searchOffset,
+         .len = originalEnd - searchOffset,
+         .fin = originalRange.fin},
+        std::numeric_limits<uint64_t>::max());
+    if (!candidate) {
+      return std::nullopt;
+    }
+    if (candidate->len == 0) {
+      if (candidate->fin && !selectedStreamFin_.count(streamId)) {
+        return candidate;
+      }
+      return std::nullopt;
+    }
+
+    const auto candidateEnd = candidate->offset + candidate->len;
+    bool retry = false;
+    const auto selectedIt = selectedStreamData_.find(streamId);
+    if (selectedIt != selectedStreamData_.end()) {
+      for (const auto& selected : selectedIt->second) {
+        if (selected.end < candidate->offset) {
+          continue;
+        }
+        if (selected.start >= candidateEnd) {
+          break;
+        }
+        if (selected.start <= candidate->offset) {
+          searchOffset = selected.end + 1;
+          retry = true;
+          break;
+        }
+        candidate->len = selected.start - candidate->offset;
+        candidate->fin = false;
+        break;
+      }
+    }
+    if (retry) {
+      continue;
+    }
+    if (candidate->fin && selectedStreamFin_.count(streamId)) {
+      candidate->fin = false;
+    }
+    return candidate;
+  }
+  return std::nullopt;
+}
+
+std::optional<StreamSendBuffer::SendRange>
+AppDataPtoScheduler::nextUnselectedCryptoOutstanding(
+    const StreamSendBuffer& sendBuffer,
+    const StreamSendBuffer::SendRange& originalRange) const {
+  return firstUnselectedCryptoRange(
+      sendBuffer, originalRange, selectedCryptoData_);
+}
+
+quic::Expected<SchedulingResult, QuicError>
+AppDataPtoScheduler::scheduleFramesForPacket(
+    PacketBuilderInterface&& builder,
+    uint32_t writableBytes) {
+  if (frameScheduler_.hasImmediateData()) {
+    auto result = frameScheduler_.scheduleFramesForPacket(
+        std::move(builder), writableBytes);
+    if (result.has_value() && result->packet) {
+      result->transmissionReason = transmissionReason_;
+    }
+    return result;
+  }
+
+  if (builder.getPacketHeader().getPacketNumberSpace() !=
+      PacketNumberSpace::AppData) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "AppDataPtoScheduler used outside the application-data packet number "
+        "space"));
+  }
+  auto encodeResult = builder.encodePacketHeader();
+  if (!encodeResult.has_value()) {
+    return quic::make_unexpected(encodeResult.error());
+  }
+  writableBytes = writableBytes > builder.getHeaderBytes()
+      ? writableBytes - builder.getHeaderBytes()
+      : 0;
+  PacketBuilderWrapper wrapper(builder, writableBytes);
+  bool wroteRetransmission = false;
+
+  for (const auto& outstandingPacket : conn_.outstandings.packets) {
+    if (outstandingPacket.declaredLost ||
+        outstandingPacket.packet.header.getPacketNumberSpace() !=
+            PacketNumberSpace::AppData) {
+      continue;
+    }
+    bool wroteFromPacket = false;
+    for (const auto& frame : outstandingPacket.packet.frames) {
+      switch (frame.type()) {
+        case QuicWriteFrame::Type::WriteStreamFrame: {
+          const auto& streamFrame = *frame.asWriteStreamFrame();
+          auto* stream = conn_.streamManager->findStream(streamFrame.streamId);
+          if (!stream || !stream->streamSendBuffer ||
+              streamRetransmissionDisabled(conn_, *stream)) {
+            break;
+          }
+          auto sendRange = nextUnselectedOutstanding(
+              *stream->streamSendBuffer,
+              streamFrame.streamId,
+              {.offset = streamFrame.offset,
+               .len = streamFrame.len,
+               .fin = streamFrame.fin});
+          if (!sendRange) {
+            break;
+          }
+          auto headerResult = writeStreamFrameHeader(
+              wrapper,
+              streamFrame.streamId,
+              sendRange->offset,
+              sendRange->len,
+              sendRange->len,
+              sendRange->fin,
+              std::nullopt /* skipLenHint */);
+          if (!headerResult.has_value()) {
+            return quic::make_unexpected(headerResult.error());
+          }
+          if (!*headerResult) {
+            break;
+          }
+          const auto dataLen = **headerResult;
+          auto writeResult = writeUnifiedStreamData(
+              wrapper, *stream->streamSendBuffer, sendRange->offset, dataLen);
+          if (!writeResult.has_value()) {
+            return quic::make_unexpected(writeResult.error());
+          }
+          if (dataLen > 0) {
+            selectedStreamData_[streamFrame.streamId].insert(
+                sendRange->offset, sendRange->offset + dataLen - 1);
+          }
+          if (sendRange->fin && dataLen == sendRange->len) {
+            selectedStreamFin_.insert(streamFrame.streamId);
+          }
+          wroteRetransmission = true;
+          wroteFromPacket = true;
+          break;
+        }
+        case QuicWriteFrame::Type::WriteCryptoFrame: {
+          const auto& cryptoFrame = *frame.asWriteCryptoFrame();
+          auto* cryptoStream =
+              getCryptoStream(*conn_.cryptoState, EncryptionLevel::AppData);
+          if (!cryptoStream->streamSendBuffer) {
+            break;
+          }
+          auto sendRange = nextUnselectedCryptoOutstanding(
+              *cryptoStream->streamSendBuffer,
+              {.offset = cryptoFrame.offset,
+               .len = cryptoFrame.len,
+               .fin = false});
+          if (!sendRange) {
+            break;
+          }
+          auto frameResult = writeCryptoFrameHeader(
+              sendRange->offset, sendRange->len, wrapper);
+          if (!frameResult.has_value()) {
+            return quic::make_unexpected(frameResult.error());
+          }
+          if (!*frameResult) {
+            break;
+          }
+          auto writeResult = writeUnifiedCryptoData(
+              wrapper,
+              *cryptoStream->streamSendBuffer,
+              sendRange->offset,
+              (*frameResult)->len);
+          if (!writeResult.has_value()) {
+            return quic::make_unexpected(writeResult.error());
+          }
+          selectedCryptoData_.insert(
+              sendRange->offset, sendRange->offset + (*frameResult)->len - 1);
+          wroteRetransmission = true;
+          wroteFromPacket = true;
+          break;
+        }
+        case QuicWriteFrame::Type::PaddingFrame:
+        case QuicWriteFrame::Type::RstStreamFrame:
+        case QuicWriteFrame::Type::ConnectionCloseFrame:
+        case QuicWriteFrame::Type::MaxDataFrame:
+        case QuicWriteFrame::Type::MaxStreamDataFrame:
+        case QuicWriteFrame::Type::DataBlockedFrame:
+        case QuicWriteFrame::Type::StreamDataBlockedFrame:
+        case QuicWriteFrame::Type::StreamsBlockedFrame:
+        case QuicWriteFrame::Type::WriteAckFrame:
+        case QuicWriteFrame::Type::QuicSimpleFrame:
+        case QuicWriteFrame::Type::PingFrame:
+        case QuicWriteFrame::Type::NoopFrame:
+        case QuicWriteFrame::Type::DatagramFrame:
+        case QuicWriteFrame::Type::TimestampFrame:
+        case QuicWriteFrame::Type::ImmediateAckFrame:
+          break;
+      }
+    }
+    if (wroteFromPacket) {
+      break;
+    }
+  }
+
+  if (!wroteRetransmission) {
+    auto pingResult = writeFrame(PingFrame(), wrapper);
+    if (!pingResult.has_value()) {
+      return quic::make_unexpected(pingResult.error());
+    }
+  }
+  if (!builder.hasFramesPending()) {
+    return SchedulingResult(std::nullopt, std::nullopt, 0);
+  }
+  return SchedulingResult(
+      std::nullopt,
+      std::move(builder).buildPacket(),
+      0,
+      transmissionReason_,
+      wroteRetransmission);
+}
+
+folly::StringPiece AppDataPtoScheduler::name() const {
   return name_;
 }
 
