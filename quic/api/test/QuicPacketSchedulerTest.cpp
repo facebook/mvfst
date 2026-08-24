@@ -2266,6 +2266,131 @@ TEST_P(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
   EXPECT_EQ(highPriStreamId, writeStreamFrame.streamId);
 }
 
+TEST_P(QuicPacketSchedulerTest, UnifiedSendBufferWritesChainedNewData) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->usesUnifiedSendBuffer());
+
+  auto data = folly::IOBuf::copyBuffer("abc");
+  data->appendToChain(folly::IOBuf::copyBuffer("def"));
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), true).hasError());
+
+  std::string writtenData;
+  auto builder = setupMockPacketBuilder();
+  EXPECT_CALL(*builder, push(_, _))
+      .WillRepeatedly([&writtenData](const uint8_t* bytes, size_t len) {
+        writtenData.append(reinterpret_cast<const char*>(bytes), len);
+      });
+
+  StreamFrameScheduler scheduler(conn);
+  ASSERT_FALSE(scheduler.writeStreams(*builder).hasError());
+
+  verifyStreamFrames(*builder, {WriteStreamFrame(streamId, 0, 6, true)});
+  EXPECT_EQ(writtenData, "abcdef");
+  EXPECT_EQ(stream->streamSendBuffer->nextUnsentOffset(), 0);
+}
+
+TEST_P(QuicPacketSchedulerTest, UnifiedSendBufferWritesFinOnly) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 0, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->usesUnifiedSendBuffer());
+  ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, true).hasError());
+
+  auto builder = setupMockPacketBuilder();
+  EXPECT_CALL(*builder, push(_, _)).Times(0);
+
+  StreamFrameScheduler scheduler(conn);
+  ASSERT_FALSE(scheduler.writeStreams(*builder).hasError());
+
+  verifyStreamFrames(*builder, {WriteStreamFrame(streamId, 0, 0, true)});
+}
+
+TEST_P(QuicPacketSchedulerTest, UnifiedSendBufferWritesAllLossBeforeNewData) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->usesUnifiedSendBuffer());
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("abcdefghi"), false)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 6, .fin = false}));
+  stream->streamSendBuffer->markLoss({.offset = 0, .len = 2, .fin = false});
+  stream->streamSendBuffer->markLoss({.offset = 4, .len = 2, .fin = false});
+  conn.streamManager->updateWritableStreams(*stream);
+
+  std::string writtenData;
+  auto builder = setupMockPacketBuilder();
+  EXPECT_CALL(*builder, push(_, _))
+      .WillRepeatedly([&writtenData](const uint8_t* bytes, size_t len) {
+        writtenData.append(reinterpret_cast<const char*>(bytes), len);
+      });
+
+  StreamFrameScheduler scheduler(conn);
+  ASSERT_FALSE(scheduler.writeStreams(*builder).hasError());
+
+  verifyStreamFrames(
+      *builder,
+      {
+          WriteStreamFrame(streamId, 0, 2, false),
+          WriteStreamFrame(streamId, 4, 2, false),
+          WriteStreamFrame(streamId, 6, 3, false),
+      });
+  EXPECT_EQ(writtenData, "abefghi");
+  const StreamSendBuffer::SendRange expectedLoss{
+      .offset = 0, .len = 2, .fin = false};
+  const StreamSendBuffer::SendRange expectedNewData{
+      .offset = 6, .len = 3, .fin = false};
+  EXPECT_EQ(stream->streamSendBuffer->nextLoss(100), expectedLoss);
+  EXPECT_EQ(stream->streamSendBuffer->nextNewData(100), expectedNewData);
+}
+
+TEST_P(
+    QuicPacketSchedulerTest,
+    UnifiedSendBufferWritesLossWithoutConnectionFlowControl) {
+  transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto connPtr = createConn(10, 0, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto streamId = createStream(conn);
+  auto* stream = conn.streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->usesUnifiedSendBuffer());
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("lossnew"), false)
+          .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 4, .fin = false}));
+  stream->streamSendBuffer->markLoss({.offset = 0, .len = 4, .fin = false});
+  conn.streamManager->updateWritableStreams(*stream);
+
+  auto builder = setupMockPacketBuilder();
+  StreamFrameScheduler scheduler(conn);
+  EXPECT_TRUE(scheduler.hasPendingData());
+  ASSERT_FALSE(scheduler.writeStreams(*builder).hasError());
+
+  verifyStreamFrames(*builder, {WriteStreamFrame(streamId, 0, 4, false)});
+  EXPECT_FALSE(conn.streamManager->hasWritable());
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.streamManager->onMaxData();
+  EXPECT_TRUE(conn.streamManager->hasWritable());
+}
+
 TEST_P(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

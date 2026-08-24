@@ -144,6 +144,22 @@ TEST(StreamSendBufferTest, AckAfterLossWithdrawsPendingBytes) {
   EXPECT_FALSE(buffer.hasPendingLoss());
 }
 
+TEST(StreamSendBufferTest, FindsNextFragmentedLossAtOrAfterOffset) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer(std::string(64, 'a')), false));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 64, .fin = false}));
+  for (uint64_t offset = 0; offset < 64; offset += 2) {
+    buffer.markLoss({.offset = offset, .len = 1, .fin = false});
+  }
+
+  for (uint64_t offset = 1; offset < 63; offset += 2) {
+    expectRange(
+        buffer.nextLossAfter(offset, false, 1),
+        {.offset = offset + 1, .len = 1, .fin = false});
+  }
+  EXPECT_FALSE(buffer.nextLossAfter(64, false, 1).has_value());
+}
+
 TEST(StreamSendBufferTest, FinOnlyTracksSendLossAndAckIndependently) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(nullptr, true));

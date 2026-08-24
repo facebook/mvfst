@@ -15,9 +15,26 @@
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/TimestampFrameFunctions.h>
 #include <cstdint>
+#include <limits>
 
 namespace {
 using namespace quic;
+
+quic::Expected<void, QuicError> writeUnifiedStreamData(
+    PacketBuilderInterface& builder,
+    const StreamSendBuffer& sendBuffer,
+    uint64_t offset,
+    uint64_t len) {
+  if (!sendBuffer.writeAt(offset, len, [&builder](ByteRange range) {
+        builder.push(range.data(), range.size());
+        return true;
+      })) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::INTERNAL_ERROR,
+        "Failed to read scheduled data from the unified stream send buffer"));
+  }
+  return {};
+}
 
 /**
  * A helper iterator adaptor class that starts iteration of streams from a
@@ -528,6 +545,47 @@ folly::StringPiece FrameScheduler::name() const {
 quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamLossBuffers(
     PacketBuilderInterface& builder,
     QuicStreamState& stream) {
+  if (stream.streamSendBuffer) {
+    bool wroteStreamFrame = false;
+    bool wroteFin = false;
+    uint64_t nextLossOffset = 0;
+    while (
+        auto loss = stream.streamSendBuffer->nextLossAfter(
+            nextLossOffset, !wroteFin, std::numeric_limits<uint64_t>::max())) {
+      auto res = writeStreamFrameHeader(
+          builder,
+          stream.id,
+          loss->offset,
+          loss->len,
+          loss->len,
+          loss->fin,
+          std::nullopt /* skipLenHint */);
+      if (!res.has_value()) {
+        return quic::make_unexpected(res.error());
+      }
+      auto dataLen = *res;
+      if (!dataLen) {
+        break;
+      }
+      auto writeResult = writeUnifiedStreamData(
+          builder, *stream.streamSendBuffer, loss->offset, *dataLen);
+      if (!writeResult.has_value()) {
+        return quic::make_unexpected(writeResult.error());
+      }
+      wroteStreamFrame = true;
+      const bool wroteCompleteRange = *dataLen == loss->len;
+      wroteFin = wroteFin || (loss->fin && wroteCompleteRange);
+      MVVLOG(4) << "Wrote loss data for stream=" << stream.id
+                << " offset=" << loss->offset << " bytes=" << *dataLen
+                << " fin=" << (loss->fin && wroteCompleteRange) << " " << conn_;
+      if (!wroteCompleteRange) {
+        break;
+      }
+      nextLossOffset = loss->offset + loss->len;
+    }
+    return wroteStreamFrame;
+  }
+
   bool wroteStreamFrame = false;
   for (auto buffer = stream.lossBuffer.cbegin();
        buffer != stream.lossBuffer.cend();
@@ -569,7 +627,7 @@ StreamFrameScheduler::writeSingleStream(
     QuicStreamState& stream,
     uint64_t& connWritableBytes) {
   StreamWriteResult result = StreamWriteResult::NOT_LIMITED;
-  if (!stream.lossBuffer.empty()) {
+  if (stream.hasLoss()) {
     auto writeResult = writeStreamLossBuffers(builder, stream);
     if (!writeResult.has_value()) {
       return quic::make_unexpected(writeResult.error());
@@ -830,6 +888,37 @@ quic::Expected<bool, QuicError> StreamFrameScheduler::writeStreamFrame(
 
   uint64_t flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(stream), connWritableBytes);
+  if (stream.streamSendBuffer) {
+    auto sendRange = stream.streamSendBuffer->nextNewData(flowControlLen);
+    MVCHECK(sendRange.has_value());
+    auto res = writeStreamFrameHeader(
+        builder,
+        stream.id,
+        sendRange->offset,
+        sendRange->len,
+        sendRange->len,
+        sendRange->fin,
+        std::nullopt /* skipLenHint */);
+    if (!res.has_value()) {
+      return quic::make_unexpected(res.error());
+    }
+    auto dataLen = *res;
+    if (!dataLen) {
+      return false;
+    }
+    auto writeResult = writeUnifiedStreamData(
+        builder, *stream.streamSendBuffer, sendRange->offset, *dataLen);
+    if (!writeResult.has_value()) {
+      return quic::make_unexpected(writeResult.error());
+    }
+    MVVLOG(4) << "Wrote stream frame stream=" << stream.id
+              << " offset=" << sendRange->offset << " bytesWritten=" << *dataLen
+              << " finWritten="
+              << (sendRange->fin && *dataLen == sendRange->len) << " " << conn_;
+    connWritableBytes -= dataLen.value();
+    return true;
+  }
+
   uint64_t bufferLen = stream.pendingWrites.chainLength();
   bool canWriteFin =
       stream.finalWriteOffset.has_value() && bufferLen <= flowControlLen;

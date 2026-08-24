@@ -54,6 +54,8 @@ class StreamSendBuffer {
   // maxLen limits payload bytes; FIN-only ranges can still be returned at 0.
   [[nodiscard]] Optional<SendRange> nextNewData(uint64_t maxLen) const;
   [[nodiscard]] Optional<SendRange> nextLoss(uint64_t maxLen) const;
+  [[nodiscard]] Optional<SendRange>
+  nextLossAfter(uint64_t minOffset, bool includeFin, uint64_t maxLen) const;
 
   // The writer can observe a valid prefix before a later missing range fails.
   [[nodiscard]] bool writeAt(uint64_t offset, uint64_t len, DataWriter writer)

@@ -98,21 +98,32 @@ Optional<StreamSendBuffer::SendRange> StreamSendBuffer::nextNewData(
 
 Optional<StreamSendBuffer::SendRange> StreamSendBuffer::nextLoss(
     uint64_t maxLen) const {
+  return nextLossAfter(0, true, maxLen);
+}
+
+Optional<StreamSendBuffer::SendRange> StreamSendBuffer::nextLossAfter(
+    uint64_t minOffset,
+    bool includeFin,
+    uint64_t maxLen) const {
   if (cancelled_) {
     return std::nullopt;
   }
-  if (!pendingRetransmissions_.empty()) {
+  const auto pending = std::ranges::lower_bound(
+      pendingRetransmissions_, minOffset, {}, [](const auto& interval) {
+        return interval.end;
+      });
+  if (pending != pendingRetransmissions_.end()) {
     if (maxLen == 0) {
       return std::nullopt;
     }
-    const auto& pending = pendingRetransmissions_.front();
-    const auto len = std::min(maxLen, pending.end - pending.start + 1);
+    const auto offset = std::max(minOffset, pending->start);
+    const auto len = std::min(maxLen, pending->end - offset + 1);
     return SendRange{
-        .offset = pending.start,
+        .offset = offset,
         .len = len,
-        .fin = finLost_ && pending.start + len == tailOffset_};
+        .fin = includeFin && finLost_ && offset + len == tailOffset_};
   }
-  if (finLost_) {
+  if (includeFin && finLost_ && minOffset <= tailOffset_) {
     return SendRange{.offset = tailOffset_, .len = 0, .fin = true};
   }
   return std::nullopt;
