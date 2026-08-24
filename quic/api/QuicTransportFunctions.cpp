@@ -827,6 +827,56 @@ quic::Expected<bool, QuicError> handleStreamWritten(
   return false;
 }
 
+static quic::Expected<bool, QuicError> handleUnifiedStreamWritten(
+    QuicConnectionStateBase& conn,
+    QuicStreamState& stream,
+    uint64_t frameOffset,
+    uint64_t frameLen,
+    bool frameFin,
+    PacketNum packetNum,
+    PacketNumberSpace packetNumberSpace,
+    bool isClone) {
+  auto& sendBuffer = *stream.streamSendBuffer;
+  const StreamSendBuffer::SendRange frameRange{
+      .offset = frameOffset, .len = frameLen, .fin = frameFin};
+
+  if (isClone) {
+    conn.lossState.totalStreamBytesCloned += frameLen;
+    return false;
+  }
+
+  const auto pendingLoss = sendBuffer.nextLoss(frameLen);
+  if (pendingLoss && *pendingLoss == frameRange) {
+    sendBuffer.markRetransmissionSent(frameRange);
+    conn.lossState.totalBytesRetransmitted += frameLen;
+    MVVLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
+               << " packetNum=" << packetNum << " " << conn;
+    QUIC_STATS(conn.statsCallback, onPacketRetransmission);
+    return false;
+  }
+
+  const auto newData = sendBuffer.nextNewData(frameLen);
+  if (newData && *newData == frameRange &&
+      sendBuffer.markNewDataSent(frameRange)) {
+    stream.currentWriteOffset = sendBuffer.nextUnsentOffset() +
+        static_cast<uint64_t>(sendBuffer.finSent());
+    ++stream.numPacketsTxWithNewData;
+    MVVLOG(10) << nodeToString(conn.nodeType) << " sent"
+               << " packetNum=" << packetNum << " space=" << packetNumberSpace
+               << " " << conn;
+    return true;
+  }
+
+  return quic::make_unexpected(QuicError(
+      TransportErrorCode::INTERNAL_ERROR,
+      fmt::format(
+          "Written stream frame offset={}, len={}, fin={} does not match "
+          "pending unified stream send state",
+          frameOffset,
+          frameLen,
+          frameFin)));
+}
+
 quic::Expected<void, QuicError> updateConnection(
     QuicConnectionStateBase& conn,
     const PathInfo& pathInfo,
@@ -863,14 +913,24 @@ quic::Expected<void, QuicError> updateConnection(
         }
         auto stream = streamResult.value();
         bool newStreamDataWritten = false;
-        auto streamWrittenResult = handleStreamWritten(
-            conn,
-            *stream,
-            writeStreamFrame.offset,
-            writeStreamFrame.len,
-            writeStreamFrame.fin,
-            packetNum,
-            packetNumberSpace);
+        auto streamWrittenResult = stream->streamSendBuffer
+            ? handleUnifiedStreamWritten(
+                  conn,
+                  *stream,
+                  writeStreamFrame.offset,
+                  writeStreamFrame.len,
+                  writeStreamFrame.fin,
+                  packetNum,
+                  packetNumberSpace,
+                  clonedPacketIdentifier.has_value())
+            : handleStreamWritten(
+                  conn,
+                  *stream,
+                  writeStreamFrame.offset,
+                  writeStreamFrame.len,
+                  writeStreamFrame.fin,
+                  packetNum,
+                  packetNumberSpace);
         if (!streamWrittenResult.has_value()) {
           return quic::make_unexpected(streamWrittenResult.error());
         }

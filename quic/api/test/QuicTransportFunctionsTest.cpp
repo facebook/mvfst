@@ -243,6 +243,22 @@ class QuicTransportFunctionsTest : public Test {
     return conn.version.value_or(*conn.originalVersion);
   }
 
+  Expected<void, QuicError> updateStreamFrame(
+      QuicServerConnectionState& conn,
+      WriteStreamFrame frame,
+      Optional<ClonedPacketIdentifier> clonedPacketIdentifier = std::nullopt) {
+    auto packet = buildEmptyPacket(conn, PacketNumberSpace::AppData);
+    packet.packet.frames.emplace_back(frame);
+    return updateConnection(
+        conn,
+        *currentPathInfo_,
+        std::move(clonedPacketIdentifier),
+        packet.packet,
+        TimePoint{},
+        static_cast<uint32_t>(getEncodedSize(packet)),
+        static_cast<uint32_t>(getEncodedBodySize(packet)));
+  }
+
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<MockQuicStats> quicStats_;
@@ -286,6 +302,131 @@ INSTANTIATE_TEST_SUITE_P(
     PingAndTimestamp,
     QuicTransportFunctionsLossAlarmTest,
     Values(LossAlarmFrameType::Ping, LossAlarmFrameType::Timestamp));
+
+TEST_F(QuicTransportFunctionsTest, UnifiedStreamPartialNewData) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, IOBuf::copyBuffer("abcdef"), false)
+          .hasError());
+
+  auto result =
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false));
+
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  EXPECT_EQ(stream->streamSendBuffer->nextUnsentOffset(), 3);
+  EXPECT_EQ(stream->streamSendBuffer->unsentBytes(), 3);
+  EXPECT_EQ(stream->currentWriteOffset, 3);
+  EXPECT_EQ(stream->numPacketsTxWithNewData, 1);
+  EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 3);
+  EXPECT_EQ(conn->lossState.totalNewStreamBytesSent, 3);
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    UnifiedStreamRetransmissionDoesNotChargeFlowControl) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(*stream, IOBuf::copyBuffer("abc"), false)
+                   .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  stream->streamSendBuffer->markLoss({.offset = 0, .len = 3, .fin = false});
+  EXPECT_CALL(*quicStats_, onPacketRetransmission()).Times(1);
+
+  auto result =
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false));
+
+  ASSERT_FALSE(result.hasError());
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+  EXPECT_EQ(stream->streamSendBuffer->nextUnsentOffset(), 3);
+  EXPECT_EQ(stream->currentWriteOffset, 3);
+  EXPECT_EQ(stream->numPacketsTxWithNewData, 1);
+  EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 3);
+  EXPECT_EQ(conn->lossState.totalNewStreamBytesSent, 3);
+  EXPECT_EQ(conn->lossState.totalBytesRetransmitted, 3);
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedStreamFinOnlyNewAndLost) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, true).hasError());
+  EXPECT_CALL(*quicStats_, onPacketRetransmission()).Times(1);
+
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 0, true))
+          .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  EXPECT_TRUE(stream->streamSendBuffer->finSent());
+  EXPECT_EQ(stream->currentWriteOffset, 1);
+  EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 0);
+
+  stream->streamSendBuffer->markLoss({.offset = 0, .len = 0, .fin = true});
+  ASSERT_TRUE(stream->streamSendBuffer->finLost());
+  auto result =
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 0, true));
+
+  ASSERT_FALSE(result.hasError());
+  EXPECT_FALSE(stream->streamSendBuffer->finLost());
+  EXPECT_EQ(stream->currentWriteOffset, 1);
+  EXPECT_EQ(stream->numPacketsTxWithNewData, 1);
+  EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 0);
+  EXPECT_EQ(conn->lossState.totalBytesRetransmitted, 0);
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedStreamClonePreservesPendingLoss) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(*stream, IOBuf::copyBuffer("abc"), false)
+                   .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  stream->streamSendBuffer->markLoss({.offset = 0, .len = 3, .fin = false});
+  ClonedPacketIdentifier cloneId(PacketNumberSpace::AppData, 0);
+  conn->outstandings.clonedPacketIdentifiers.insert(cloneId);
+
+  auto result = updateStreamFrame(
+      *conn, WriteStreamFrame(stream->id, 0, 3, false), cloneId);
+
+  ASSERT_FALSE(result.hasError());
+  const auto pendingLoss = stream->streamSendBuffer->nextLoss(3);
+  ASSERT_TRUE(pendingLoss.has_value());
+  EXPECT_EQ(
+      *pendingLoss,
+      (StreamSendBuffer::SendRange{.offset = 0, .len = 3, .fin = false}));
+  EXPECT_EQ(conn->lossState.totalStreamBytesCloned, 3);
+  EXPECT_EQ(conn->lossState.totalBytesRetransmitted, 0);
+  EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 3);
+}
+
+TEST_F(QuicTransportFunctionsTest, UnifiedStreamDuplicateWithoutLossIsError) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(*stream, IOBuf::copyBuffer("abc"), false)
+                   .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+
+  auto result =
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false));
+
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::INTERNAL_ERROR);
+}
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto conn = createConn();
