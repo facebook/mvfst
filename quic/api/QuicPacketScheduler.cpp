@@ -972,7 +972,7 @@ quic::Expected<bool, QuicError> RstStreamScheduler::writeRsts(
     MVCHECK(
         streamState,
         "Stream " << streamId << " not found when going through resets");
-    if (streamState->pendingWrites.empty()) {
+    if (streamState->pendingWriteBytes() == 0) {
       //    We only write a RESET_STREAM or RESET_STREAM_AT frame for a stream
       //    once we've written out all data that needs to be delivered reliably.
       //    While this is not something that's mandated by the spec, we're doing

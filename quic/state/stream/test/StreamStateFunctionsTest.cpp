@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -18,6 +19,26 @@
 using namespace ::testing;
 
 namespace quic::test {
+
+namespace {
+
+std::unique_ptr<QuicServerConnectionState> createUnifiedConn() {
+  auto conn = std::make_unique<QuicServerConnectionState>(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
+      kDefaultStreamFlowControlWindow;
+  conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+      kDefaultStreamFlowControlWindow;
+  conn->flowControlState.peerAdvertisedMaxOffset =
+      kDefaultConnectionFlowControlWindow;
+  CHECK(!conn->streamManager
+             ->setMaxLocalBidirectionalStreams(kDefaultMaxStreamsBidirectional)
+             .hasError());
+  return conn;
+}
+
+} // namespace
 
 class StreamStateFunctionsTests : public Test {};
 
@@ -109,6 +130,132 @@ TEST_F(StreamStateFunctionsTests, BasicReliableResetTest) {
 
   EXPECT_EQ(*stream.reliableSizeToPeer, 5);
   EXPECT_EQ(*stream.appErrorCodeToPeer, GenericApplicationErrorCode::UNKNOWN);
+}
+
+TEST_F(StreamStateFunctionsTests, UnifiedResetUsesLargestSentOffset) {
+  auto conn = createUnifiedConn();
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("0123456789"), true)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 4, false}));
+  ASSERT_FALSE(updateFlowControlOnWriteToSocket(*stream, 4).hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markLoss({0, 4, false}));
+  conn->streamManager->updateWritableStreams(*stream);
+  ASSERT_TRUE(conn->streamManager->hasLoss());
+
+  ASSERT_FALSE(sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN)
+                   .hasError());
+
+  const auto& reset = conn->pendingEvents.resets.at(stream->id);
+  EXPECT_EQ(reset.finalSize, 4);
+  EXPECT_FALSE(reset.reliableSize.has_value());
+  EXPECT_EQ(conn->flowControlState.sumCurStreamBufferLen, 0);
+  EXPECT_TRUE(stream->streamSendBuffer->cancelled());
+  EXPECT_EQ(stream->streamSendBuffer->tailOffset(), 4);
+  EXPECT_EQ(stream->streamSendBuffer->outstandingBytes(), 0);
+  EXPECT_FALSE(stream->hasLoss());
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+  EXPECT_FALSE(conn->streamManager->writeQueue().contains(
+      PriorityQueue::Identifier::fromStreamID(stream->id)));
+  EXPECT_FALSE(stream->writable());
+
+  EXPECT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 4, false))
+          .hasError());
+
+  ASSERT_FALSE(sendRstAckSMHandler(*stream, std::nullopt).hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+  EXPECT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 4, false))
+          .hasError());
+}
+
+TEST_F(
+    StreamStateFunctionsTests,
+    UnifiedReliableResetBelowSentOffsetPreservesFinalSize) {
+  auto conn = createUnifiedConn();
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("0123456789"), true)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 8, false}));
+  ASSERT_FALSE(updateFlowControlOnWriteToSocket(*stream, 8).hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markLoss({0, 8, false}));
+  conn->streamManager->updateWritableStreams(*stream);
+
+  ASSERT_FALSE(
+      sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 5)
+          .hasError());
+
+  const auto& reset = conn->pendingEvents.resets.at(stream->id);
+  EXPECT_EQ(reset.finalSize, 8);
+  ASSERT_TRUE(reset.reliableSize.has_value());
+  EXPECT_EQ(*reset.reliableSize, 5);
+  EXPECT_EQ(conn->flowControlState.sumCurStreamBufferLen, 0);
+  EXPECT_EQ(stream->streamSendBuffer->tailOffset(), 8);
+  EXPECT_EQ(stream->streamSendBuffer->nextUnsentOffset(), 8);
+  EXPECT_EQ(stream->streamSendBuffer->outstandingBytes(), 5);
+  EXPECT_EQ(
+      stream->streamSendBuffer->nextLoss(10),
+      StreamSendBuffer::SendRange(0, 5, false));
+}
+
+TEST_F(StreamStateFunctionsTests, UnifiedReliableResetAcceptsLateFinAck) {
+  auto conn = createUnifiedConn();
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("01234567"), true)
+          .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 8, .fin = true}));
+  ASSERT_FALSE(updateFlowControlOnWriteToSocket(*stream, 8).hasError());
+
+  ASSERT_FALSE(
+      sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 5)
+          .hasError());
+  EXPECT_TRUE(stream->streamSendBuffer->finSent());
+  EXPECT_FALSE(stream->streamSendBuffer->finBuffered());
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+
+  auto ackResult =
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 8, true));
+
+  ASSERT_FALSE(ackResult.hasError());
+  EXPECT_TRUE(stream->streamSendBuffer->finAcked());
+}
+
+TEST_F(
+    StreamStateFunctionsTests,
+    UnifiedReliableResetAboveSentOffsetRetainsRequiredData) {
+  auto conn = createUnifiedConn();
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("0123456789"), true)
+                   .hasError());
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 3, false}));
+  ASSERT_FALSE(updateFlowControlOnWriteToSocket(*stream, 3).hasError());
+
+  ASSERT_FALSE(
+      sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 5)
+          .hasError());
+
+  const auto& reset = conn->pendingEvents.resets.at(stream->id);
+  EXPECT_EQ(reset.finalSize, 5);
+  ASSERT_TRUE(reset.reliableSize.has_value());
+  EXPECT_EQ(*reset.reliableSize, 5);
+  EXPECT_EQ(conn->flowControlState.sumCurStreamBufferLen, 2);
+  EXPECT_EQ(stream->streamSendBuffer->tailOffset(), 5);
+  EXPECT_EQ(stream->streamSendBuffer->nextUnsentOffset(), 3);
+  EXPECT_EQ(
+      stream->streamSendBuffer->nextNewData(10),
+      StreamSendBuffer::SendRange(3, 2, false));
+  EXPECT_TRUE(conn->streamManager->writeQueue().contains(
+      PriorityQueue::Identifier::fromStreamID(stream->id)));
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedEmptyStream) {

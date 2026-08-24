@@ -283,7 +283,7 @@ TEST(StreamSendBufferTest, TruncateAtTailPreservesFinState) {
   EXPECT_TRUE(buffer.finAcked());
 }
 
-TEST(StreamSendBufferTest, TruncateBeforeTailDiscardsAcknowledgedFin) {
+TEST(StreamSendBufferTest, TruncateBeforeTailPreservesAcknowledgedFin) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(makeBuffer("abc"), true));
   ASSERT_TRUE(buffer.markNewDataSent({0, 3, true}));
@@ -291,8 +291,8 @@ TEST(StreamSendBufferTest, TruncateBeforeTailDiscardsAcknowledgedFin) {
 
   ASSERT_TRUE(buffer.truncateFrom(2));
   EXPECT_FALSE(buffer.finBuffered());
-  EXPECT_FALSE(buffer.finSent());
-  EXPECT_FALSE(buffer.finAcked());
+  EXPECT_TRUE(buffer.finSent());
+  EXPECT_TRUE(buffer.finAcked());
 }
 
 TEST(StreamSendBufferTest, TruncateBeyondSentRetainsReliablePrefix) {
@@ -338,8 +338,10 @@ TEST(StreamSendBufferTest, CancelAllReleasesAllPendingState) {
   EXPECT_FALSE(buffer.hasPendingLoss());
   EXPECT_FALSE(buffer.writeAt(0, 1, [](ByteRange) { return true; }));
   EXPECT_FALSE(buffer.append(makeBuffer("g"), false));
-  EXPECT_FALSE(
-      buffer.markAcked({.offset = 0, .len = 0, .fin = false}).has_value());
+  const auto lateAck = buffer.markAcked({.offset = 0, .len = 0, .fin = false});
+  ASSERT_TRUE(lateAck.has_value());
+  EXPECT_EQ(0u, lateAck->newlyAckedBytes);
+  EXPECT_FALSE(lateAck->newlyAckedFin);
   const auto abandoned = buffer.abandon(
       {.offset = std::numeric_limits<uint64_t>::max(), .len = 1, .fin = false});
   ASSERT_TRUE(abandoned.has_value());

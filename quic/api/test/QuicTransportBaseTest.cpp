@@ -532,6 +532,14 @@ class TestQuicTransport
     getEventBase()->loopOnce();
   }
 
+  void invokeCheckForClosedStream() {
+    checkForClosedStream();
+  }
+
+  bool hasPendingWriteCallback(StreamId id) const {
+    return pendingWriteCallbacks_.contains(id);
+  }
+
   QuicErrorCode getConnectionError() {
     return conn_->localConnectionError->code;
   }
@@ -1967,6 +1975,28 @@ TEST_F(QuicTransportImplTestBase, CloseStreamAfterReadFin) {
   transport->driveReadCallbacks();
   EXPECT_FALSE(transport->transportConn->streamManager->streamExists(stream2));
   transport.reset();
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    CheckForClosedStreamRemovesPendingWriteCallback) {
+  const auto streamId = transport->createBidirectionalStream().value();
+  NiceMock<MockWriteCallback> writeCb;
+  ASSERT_FALSE(
+      transport->notifyPendingWriteOnStream(streamId, &writeCb).hasError());
+  ASSERT_TRUE(transport->hasPendingWriteCallback(streamId));
+
+  auto* stream = transport->getStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  transport->transportConn->streamManager->addClosed(streamId);
+  EXPECT_CALL(connCallback, onStreamPreReaped(streamId));
+
+  transport->invokeCheckForClosedStream();
+
+  EXPECT_FALSE(transport->hasPendingWriteCallback(streamId));
+  EXPECT_FALSE(transport->transportConn->streamManager->streamExists(streamId));
 }
 
 TEST_F(

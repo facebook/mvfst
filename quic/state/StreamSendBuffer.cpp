@@ -312,7 +312,7 @@ Optional<bool> StreamSendBuffer::abandon(const SendRange& range) {
 Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
     const SendRange& range) {
   if (cancelled_) {
-    return std::nullopt;
+    return AckResult{};
   }
   const auto end = rangeEnd(range.offset, range.len);
   if (!end || *end > nextUnsentOffset_ || (range.len == 0 && !range.fin) ||
@@ -367,6 +367,8 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
   }
 
   const auto oldTail = tailOffset_;
+  const bool finWasSent = finSent_;
+  const bool finWasAcked = finAcked_;
   const auto sentEnd = std::min(nextUnsentOffset_, oldTail);
   if (offset < sentEnd) {
     const auto discardedOutstanding = countOutstanding(offset, sentEnd);
@@ -378,9 +380,6 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
   }
   const Interval<uint64_t> discarded{offset, oldTail - 1};
   pendingRetransmissions_.withdraw(discarded);
-  if (finAcked_) {
-    ackedIntervals_.withdraw(Interval<uint64_t>{oldTail, oldTail});
-  }
 
   while (!entries_.empty() && entries_.back().offset >= offset) {
     entries_.pop_back();
@@ -397,10 +396,10 @@ bool StreamSendBuffer::truncateFrom(uint64_t offset) {
   cachedEntryIndex_ = 0;
   // Truncating before the tail invalidates the FIN at the old final offset.
   finBuffered_ = false;
-  finSent_ = false;
+  finSent_ = finWasSent;
   finLost_ = false;
-  finAcked_ = false;
-  finAbandoned_ = false;
+  finAcked_ = finWasAcked;
+  finAbandoned_ = finWasSent && !finWasAcked;
   writeClosed_ = true;
   cleanUpEntries();
   return true;

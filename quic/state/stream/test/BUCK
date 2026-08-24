@@ -26,6 +26,7 @@ mvfst_cpp_test(
     deps = [
         "//quic/common/test:test_utils",
         "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/flowcontrol:flow_control",
         "//quic/logging:file_qlogger",
         "//quic/server/state:server",
         "//quic/state:stream_functions",

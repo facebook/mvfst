@@ -1436,6 +1436,7 @@ void QuicTransportBaseLite::checkForClosedStream() {
           result.error().code, std::string("checkForClosedStream() error")));
       return;
     }
+    pendingWriteCallbacks_.erase(streamId);
     maybeSendStreamLimitUpdates(*conn_);
     if (readCbIt != readCallbacks_.end()) {
       readCallbacks_.erase(readCbIt);

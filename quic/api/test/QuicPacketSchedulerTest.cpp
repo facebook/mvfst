@@ -3322,6 +3322,35 @@ TEST_P(QuicPacketSchedulerTest, RstStreamSchedulerReliableReset) {
   EXPECT_FALSE(conn.pendingEvents.resets.contains(stream->id));
 }
 
+TEST_P(QuicPacketSchedulerTest, UnifiedRstSchedulerWaitsForReliableData) {
+  auto connPtr = createConn(10, 100000, 100000, GetParam());
+  auto& conn = *connPtr;
+  conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn.streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  auto data = folly::IOBuf::copyBuffer("cupcake");
+  const auto dataLen = data->computeChainDataLength();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, std::move(data), false).hasError());
+  conn.pendingEvents.resets.emplace(
+      stream->id, RstStreamFrame(stream->id, 0, dataLen, dataLen));
+  RstStreamScheduler scheduler(conn);
+
+  auto blockedBuilder = setupMockPacketBuilder();
+  auto blockedResult = scheduler.writeRsts(*blockedBuilder);
+  ASSERT_FALSE(blockedResult.hasError());
+  EXPECT_FALSE(blockedResult.value());
+  EXPECT_TRUE(blockedBuilder->frames_.empty());
+
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, dataLen, false}));
+  auto readyBuilder = setupMockPacketBuilder();
+  auto readyResult = scheduler.writeRsts(*readyBuilder);
+  ASSERT_FALSE(readyResult.hasError());
+  EXPECT_TRUE(readyResult.value());
+  ASSERT_EQ(readyBuilder->frames_.size(), 1);
+  EXPECT_NE(readyBuilder->frames_.front().asRstStreamFrame(), nullptr);
+}
+
 TEST_P(QuicPacketSchedulerTest, PausedPriorityEnabled) {
   static const auto kSequentialPriority = HTTPPriorityQueue::Priority(3, false);
   static const HTTPPriorityQueue::Priority kPausedPriority =

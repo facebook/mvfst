@@ -21,17 +21,29 @@ quic::Expected<void, QuicError> resetQuicStream(
 
   if (reliableSize && *reliableSize > 0) {
     stream.reliableSizeToPeer = *reliableSize;
-    stream.removeFromRetransmissionBufStartingAtOffset(*reliableSize);
-    stream.removeFromWriteBufStartingAtOffset(*reliableSize);
-    stream.removeFromPendingWritesStartingAtOffset(*reliableSize);
-    stream.removeFromLossBufStartingAtOffset(*reliableSize);
+    if (stream.streamSendBuffer) {
+      if (!stream.streamSendBuffer->truncateFrom(*reliableSize)) {
+        return quic::make_unexpected(QuicError(
+            TransportErrorCode::INTERNAL_ERROR,
+            "Failed to truncate unified stream send buffer on reset"));
+      }
+    } else {
+      stream.removeFromRetransmissionBufStartingAtOffset(*reliableSize);
+      stream.removeFromWriteBufStartingAtOffset(*reliableSize);
+      stream.removeFromPendingWritesStartingAtOffset(*reliableSize);
+      stream.removeFromLossBufStartingAtOffset(*reliableSize);
+    }
     stream.streamWriteError = error;
   } else {
     stream.reliableSizeToPeer = std::nullopt;
-    stream.retransmissionBuffer.clear();
-    stream.writeBuffer.move();
-    ChainedByteRangeHead(std::move(stream.pendingWrites)); // Will be destructed
-    stream.lossBuffer.clear();
+    if (stream.streamSendBuffer) {
+      stream.streamSendBuffer->cancelAll();
+    } else {
+      stream.retransmissionBuffer.clear();
+      stream.writeBuffer.move();
+      stream.pendingWrites = ChainedByteRangeHead();
+      stream.lossBuffer.clear();
+    }
     stream.streamWriteError = error;
   }
   stream.conn.streamManager->updateReadableStreams(stream);
