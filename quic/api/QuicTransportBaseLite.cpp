@@ -2229,7 +2229,7 @@ void QuicTransportBaseLite::handleDeliveryCallbacks() {
         conn_->streamManager->getStream(streamId).value_or(nullptr));
     auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
 
-    if (maxOffsetToDeliver.has_value()) {
+    if (maxOffsetToDeliver.has_value() && !stream->usesUnifiedSendBuffer()) {
       size_t amountTrimmed = stream->writeBuffer.trimStartAtMost(
           *maxOffsetToDeliver - stream->writeBufferStartOffset);
       stream->writeBufferStartOffset += amountTrimmed;

@@ -2086,6 +2086,38 @@ TEST_F(QuicTransportImplTestBase, DeliveryCallbackUnsetOne) {
   transport->close(std::nullopt);
 }
 
+TEST_F(
+    QuicTransportImplTestBase,
+    UnifiedAckRetiresPayloadBeforeDeliveryCallback) {
+  transport->transportConn->transportSettings.useUnifiedAppStreamSendBuffer =
+      true;
+  const auto streamId = transport->createBidirectionalStream().value();
+  auto* stream = transport->getStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(
+      stream->streamSendBuffer->append(IOBuf::copyBuffer("abc"), false));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 3, false}));
+  ASSERT_TRUE(stream->writeBuffer.empty());
+
+  StrictMock<MockByteEventCallback> callback;
+  EXPECT_CALL(callback, onByteEventRegistered(getAckMatcher(streamId, 2)));
+  ASSERT_FALSE(
+      transport->registerDeliveryCallback(streamId, 2, &callback).hasError());
+
+  EXPECT_CALL(callback, onByteEvent(getAckMatcher(streamId, 2)));
+  ASSERT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(streamId, 0, 3, false))
+          .hasError());
+  EXPECT_EQ(stream->streamSendBuffer->outstandingBytes(), 0);
+  EXPECT_TRUE(stream->writeBuffer.empty());
+
+  transport->invokeProcessCallbacksAfterNetworkData();
+
+  EXPECT_TRUE(stream->writeBuffer.empty());
+  EXPECT_EQ(stream->writeBufferStartOffset, 0);
+}
+
 TEST_F(QuicTransportImplTestBase, ByteEventCallbacksManagementSingleStream) {
   auto stream = transport->createBidirectionalStream().value();
   uint64_t offset1 = 10, offset2 = 20;

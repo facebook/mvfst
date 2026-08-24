@@ -221,6 +221,9 @@ TEST_F(StreamStateFunctionsTests, UnifiedReliableResetAcceptsLateFinAck) {
   EXPECT_FALSE(stream->streamSendBuffer->finBuffered());
   EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
 
+  ASSERT_FALSE(sendRstAckSMHandler(*stream, std::nullopt).hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+
   auto ackResult =
       sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 8, true));
 
