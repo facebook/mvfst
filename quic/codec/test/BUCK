@@ -67,6 +67,8 @@ mvfst_cpp_test(
         "//quic/common:buf_util",
         "//quic/common:circular_deque",
         "//quic/common/test:test_utils",
+        "//quic/state:ack_handler",
+        "//quic/state:state_functions",
         "//quic/state:transport_settings",
     ],
 )

@@ -39,6 +39,8 @@ quic_add_test(TARGET QuicWriteCodecTest
   mvfst_codec_types
   mvfst_folly_utils
   mvfst_exception
+  mvfst_state_ack_handler
+  mvfst_state_state_functions
   mvfst_test_utils
 )
 
