@@ -217,6 +217,17 @@ bool StreamSendBuffer::writeAt(uint64_t offset, uint64_t len, DataWriter writer)
   return remaining == 0;
 }
 
+bool StreamSendBuffer::isOutstanding(const SendRange& range) const {
+  const auto end = rangeEnd(range.offset, range.len);
+  if (!end || cancelled_ || *end > nextUnsentOffset_ ||
+      (range.len == 0 && !range.fin) ||
+      countOutstanding(range.offset, *end) != range.len) {
+    return false;
+  }
+  return !range.fin ||
+      (finSent_ && !finAcked_ && !finAbandoned_ && *end == tailOffset_);
+}
+
 bool StreamSendBuffer::markNewDataSent(const SendRange& range) {
   const auto end = rangeEnd(range.offset, range.len);
   if (!end || cancelled_ || range.offset != nextUnsentOffset_ ||

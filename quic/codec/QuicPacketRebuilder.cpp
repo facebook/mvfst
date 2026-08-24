@@ -18,6 +18,40 @@
 #include <quic/state/TimestampFrameFunctions.h>
 
 namespace quic {
+namespace {
+
+quic::Expected<bool, QuicError> completeStreamFrameFits(
+    const WriteStreamFrame& frame,
+    bool skipLengthField,
+    uint64_t availableSpace) {
+  uint64_t headerSize = sizeof(uint8_t);
+  auto streamIdSize = QuicInteger(frame.streamId).getSize();
+  if (streamIdSize.hasError()) {
+    return quic::make_unexpected(streamIdSize.error());
+  }
+  headerSize += streamIdSize.value();
+
+  if (frame.offset != 0) {
+    auto offsetSize = QuicInteger(frame.offset).getSize();
+    if (offsetSize.hasError()) {
+      return quic::make_unexpected(offsetSize.error());
+    }
+    headerSize += offsetSize.value();
+  }
+
+  if (!skipLengthField) {
+    const auto lengthFieldSize = getStreamFrameDataLengthSize(frame.len);
+    if (!lengthFieldSize) {
+      return false;
+    }
+    headerSize += *lengthFieldSize;
+  }
+
+  return availableSpace >= headerSize &&
+      frame.len <= availableSpace - headerSize;
+}
+
+} // namespace
 
 PacketRebuilder::PacketRebuilder(
     PacketBuilderInterface& regularBuilder,
@@ -127,6 +161,59 @@ PacketRebuilder::rebuildFromPacket(OutstandingPacketWrapper& packet) {
         }
         auto* stream = streamResult.value();
         if (stream && retransmittable(*stream)) {
+          if (stream->streamSendBuffer) {
+            const bool skipLengthField =
+                lastFrame && streamFrame.len != 0 && !hasAckFrame;
+            const StreamSendBuffer::SendRange sendRange{
+                .offset = streamFrame.offset,
+                .len = streamFrame.len,
+                .fin = streamFrame.fin};
+            if (!stream->streamSendBuffer->isOutstanding(sendRange)) {
+              writeSuccess = false;
+              break;
+            }
+
+            auto frameFits = completeStreamFrameFits(
+                streamFrame,
+                skipLengthField,
+                packetBuilder.remainingSpaceInPkt());
+            if (frameFits.hasError()) {
+              return quic::make_unexpected(frameFits.error());
+            }
+            if (!frameFits.value()) {
+              writeSuccess = false;
+              break;
+            }
+
+            auto res = writeStreamFrameHeader(
+                packetBuilder,
+                streamFrame.streamId,
+                streamFrame.offset,
+                streamFrame.len,
+                streamFrame.len,
+                streamFrame.fin,
+                skipLengthField);
+            if (res.hasError()) {
+              return quic::make_unexpected(res.error());
+            }
+            if (!res.value().has_value() || *res.value() != streamFrame.len) {
+              writeSuccess = false;
+              break;
+            }
+
+            const bool dataWritten = stream->streamSendBuffer->writeAt(
+                streamFrame.offset,
+                streamFrame.len,
+                [&packetBuilder](ByteRange range) {
+                  packetBuilder.push(range.data(), range.size());
+                  return true;
+                });
+            MVCHECK(dataWritten);
+            notPureAck = true;
+            writeSuccess = true;
+            break;
+          }
+
           auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
           auto bufferLen = streamData ? streamData->chainLength() : 0;
           auto res = writeStreamFrameHeader(

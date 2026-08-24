@@ -41,6 +41,8 @@ namespace quic {
 [[nodiscard]] quic::Expected<size_t, QuicError> getTimestampFrameEncodedSize(
     const TimestampFrame& frame);
 
+[[nodiscard]] Optional<uint64_t> getStreamFrameDataLengthSize(uint64_t dataLen);
+
 /**
  * Write a complete stream frame header into builder
  * This writes the stream frame header into the parameter builder and returns

@@ -463,5 +463,27 @@ TEST(StreamSendBufferTest, AbandonClampsToTransmittedPrefix) {
   EXPECT_FALSE(*duplicate);
 }
 
+TEST(StreamSendBufferTest, OutstandingRequiresEveryRequestedByteAndFin) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), true));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 6, true}));
+
+  EXPECT_TRUE(buffer.isOutstanding({1, 4, false}));
+  EXPECT_TRUE(buffer.isOutstanding({3, 3, true}));
+  ASSERT_TRUE(buffer.markAcked({2, 2, false}).has_value());
+  EXPECT_FALSE(buffer.isOutstanding({1, 4, false}));
+  EXPECT_TRUE(buffer.isOutstanding({4, 2, true}));
+
+  auto abandoned = buffer.abandon({.offset = 4, .len = 1, .fin = false});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
+  EXPECT_FALSE(buffer.isOutstanding({4, 2, true}));
+  EXPECT_TRUE(buffer.isOutstanding({5, 1, true}));
+  abandoned = buffer.abandon({.offset = 5, .len = 1, .fin = true});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
+  EXPECT_FALSE(buffer.isOutstanding({5, 1, true}));
+}
+
 } // namespace
 } // namespace quic::test

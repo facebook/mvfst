@@ -61,6 +61,8 @@ class StreamSendBuffer {
   [[nodiscard]] bool writeAt(uint64_t offset, uint64_t len, DataWriter writer)
       const;
 
+  [[nodiscard]] bool isOutstanding(const SendRange& range) const;
+
   [[nodiscard]] bool markNewDataSent(const SendRange& range);
   bool markLoss(const SendRange& range);
   void markRetransmissionSent(const SendRange& range);

@@ -43,6 +43,22 @@ struct RecvTimeDescComparator {
 } // namespace
 
 namespace quic {
+Optional<uint64_t> getStreamFrameDataLengthSize(uint64_t dataLen) {
+  if (dataLen <= kOneByteLimit - 1) {
+    return 1;
+  }
+  if (dataLen <= kTwoByteLimit - 2) {
+    return 2;
+  }
+  if (dataLen <= kFourByteLimit - 4) {
+    return 4;
+  }
+  if (dataLen <= kEightByteLimit - 8) {
+    return 8;
+  }
+  return std::nullopt;
+}
+
 quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
     StreamId id,
@@ -106,19 +122,14 @@ quic::Expected<Optional<uint64_t>, QuicError> writeStreamFrameHeader(
   // builder allows us to write.
   dataLen = std::min(dataLen, builder.remainingSpaceInPkt() - headerSize);
   if (!shouldSkipLengthField) {
-    if (dataLen <= kOneByteLimit - 1) {
-      dataLenLen = 1;
-    } else if (dataLen <= kTwoByteLimit - 2) {
-      dataLenLen = 2;
-    } else if (dataLen <= kFourByteLimit - 4) {
-      dataLenLen = 4;
-    } else if (dataLen <= kEightByteLimit - 8) {
-      dataLenLen = 8;
-    } else {
+    const auto lengthFieldSize = getStreamFrameDataLengthSize(dataLen);
+    if (!lengthFieldSize) {
       // This should never really happen as dataLen is bounded by the remaining
       // space in the packet which should be << kEightByteLimit.
-      MVCHECK(false, "Stream frame length too large.");
+      return quic::make_unexpected(QuicError(
+          LocalErrorCode::INTERNAL_ERROR, "Stream frame length too large."));
     }
+    dataLenLen = *lengthFieldSize;
   }
   if (dataLenLen > 0) {
     if (dataLen != 0 &&
