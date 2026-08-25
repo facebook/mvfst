@@ -919,6 +919,24 @@ TEST_F(ServerHandshakeZeroRttTest, TestRejectZeroRttInvalidToken) {
   expectOneRttCipher(true);
 }
 
+// The server state machine skips ServerHandshake::accept() when it rejects the
+// client's Initial packet, but the application can still be called back on that
+// error path and query the peer transport parameters. Querying them before
+// accept() must degrade to an empty Optional rather than dereference null.
+TEST(ServerHandshakeNoAcceptTest, GetClientTransportParamsBeforeAccept) {
+  auto fizzServerContext =
+      FizzServerQuicHandshakeContext::Builder()
+          .setFizzServerContext(quic::test::createServerCtx())
+          .build();
+  std::unique_ptr<
+      QuicServerConnectionState,
+      folly::DelayedDestruction::Destructor>
+      conn(new QuicServerConnectionState(std::move(fizzServerContext)));
+
+  EXPECT_FALSE(
+      conn->serverHandshakeLayer->getClientTransportParams().has_value());
+}
+
 namespace {
 size_t countPskKe(const std::vector<fizz::PskKeyExchangeMode>& modes) {
   return std::ranges::count(modes, fizz::PskKeyExchangeMode::psk_ke);

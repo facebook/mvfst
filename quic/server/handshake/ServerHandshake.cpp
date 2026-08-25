@@ -220,6 +220,9 @@ bool ServerHandshake::hasReportedHandshakeSuccess() const {
 
 Optional<ClientTransportParameters>
 ServerHandshake::getClientTransportParams() {
+  if (!transportParams_) {
+    return std::nullopt;
+  }
   return transportParams_->getClientTransportParams();
 }
 
