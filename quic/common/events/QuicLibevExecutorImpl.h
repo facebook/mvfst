@@ -18,7 +18,7 @@ namespace quic {
 class QuicLibevExecutorImpl : public QuicExecutor, public LibevQuicEventBase {
  public:
   explicit QuicLibevExecutorImpl(
-      std::unique_ptr<LibevQuicEventBase::EvLoopWeak> loop);
+      std::unique_ptr<LibevQuicEventBase::EvLoopHolder> loop);
 
   void add(folly::Func func) override;
 

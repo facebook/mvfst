@@ -10,7 +10,7 @@
 namespace quic {
 
 QuicLibevExecutorImpl::QuicLibevExecutorImpl(
-    std::unique_ptr<LibevQuicEventBase::EvLoopWeak> loop)
+    std::unique_ptr<LibevQuicEventBase::EvLoopHolder> loop)
     : LibevQuicEventBase(std::move(loop)) {}
 
 void QuicLibevExecutorImpl::add(folly::Func func) {

@@ -12,7 +12,7 @@
 
 using namespace ::testing;
 
-struct EvLoop : public quic::LibevQuicEventBase::EvLoopWeak {
+struct EvLoop : public quic::LibevQuicEventBase::EvLoopHolder {
   EvLoop() : evLoop_(ev_loop_new(0)) {}
 
   ~EvLoop() override {

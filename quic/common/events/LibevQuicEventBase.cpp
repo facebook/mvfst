@@ -34,8 +34,8 @@ void libEvPrepareCallback(
 } // namespace
 
 namespace quic {
-LibevQuicEventBase::LibevQuicEventBase(std::unique_ptr<EvLoopWeak> loop)
-    : ev_loop_(loop->get()), loopWeak_(std::move(loop)) {
+LibevQuicEventBase::LibevQuicEventBase(std::unique_ptr<EvLoopHolder> loop)
+    : ev_loop_(loop->get()), loopHolder_(std::move(loop)) {
   ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
   prepareWatcher_.data = this;
   ev_prepare_start(ev_loop_, &prepareWatcher_);
@@ -43,7 +43,7 @@ LibevQuicEventBase::LibevQuicEventBase(std::unique_ptr<EvLoopWeak> loop)
 
 LibevQuicEventBase::~LibevQuicEventBase() {
   // If the loop has been destroyed, skip the ev loop operations.
-  if (loopWeak_->get()) {
+  if (loopHolder_->get()) {
     ev_prepare_stop(ev_loop_, &prepareWatcher_);
   }
 
@@ -160,7 +160,7 @@ void LibevQuicEventBase::setLoopCallbackPriority(int priority) {
 }
 
 bool LibevQuicEventBase::isInEventBaseThread() const {
-  auto eventLoopThread = loopWeak_->getEventLoopThread();
+  auto eventLoopThread = loopHolder_->getEventLoopThread();
   MVCHECK(eventLoopThread != std::nullopt);
   return pthread_self() == eventLoopThread;
 }
