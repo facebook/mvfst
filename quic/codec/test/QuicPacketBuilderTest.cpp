@@ -938,6 +938,56 @@ TEST_F(QuicPacketBuilderTest, TestChainedBufferInsert) {
   EXPECT_EQ(bodyContent, "ABCDEFGH"); // This should fail when bug is fixed
 }
 
+TEST_F(QuicPacketBuilderTest, RegularByteRangeInsertReferencesPayload) {
+  const auto emptyCID = ConnectionId::createZeroLength();
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen,
+      LongHeader(
+          LongHeader::Types::Handshake,
+          emptyCID,
+          emptyCID,
+          0,
+          QuicVersion::MVFST),
+      0);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  std::string payload = "zero-copy payload";
+  builder.insert(ByteRange(
+      reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
+  auto builtOut = std::move(builder).buildPacket();
+
+  ASSERT_GT(builtOut.body.countChainElements(), 1);
+  EXPECT_EQ(
+      reinterpret_cast<const uint8_t*>(payload.data()),
+      builtOut.body.prev()->data());
+  EXPECT_EQ(payload, builtOut.body.moveToFbString());
+}
+
+TEST_F(QuicPacketBuilderTest, InplaceByteRangeInsertCopiesPayload) {
+  const auto emptyCID = ConnectionId::createZeroLength();
+  BufAccessor bufAccessor(kDefaultUDPSendPacketLen);
+  InplaceQuicPacketBuilder builder(
+      bufAccessor,
+      kDefaultUDPSendPacketLen,
+      LongHeader(
+          LongHeader::Types::Handshake,
+          emptyCID,
+          emptyCID,
+          0,
+          QuicVersion::MVFST),
+      0);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  const std::string payload = "contiguous payload";
+  builder.insert(ByteRange(
+      reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
+  auto builtOut = std::move(builder).buildPacket();
+
+  EXPECT_NE(
+      reinterpret_cast<const uint8_t*>(payload.data()), builtOut.body.data());
+  EXPECT_EQ(payload, builtOut.body.moveToFbString());
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicPacketBuilderTests,
     QuicPacketBuilderTest,

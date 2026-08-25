@@ -27,7 +27,7 @@ quic::Expected<void, QuicError> writeUnifiedStreamData(
     uint64_t offset,
     uint64_t len) {
   if (!sendBuffer.writeAt(offset, len, [&builder](ByteRange range) {
-        builder.push(range.data(), range.size());
+        builder.insert(range);
         return true;
       })) {
     return quic::make_unexpected(QuicError(
@@ -43,7 +43,7 @@ quic::Expected<void, QuicError> writeUnifiedCryptoData(
     uint64_t offset,
     uint64_t len) {
   if (!sendBuffer.writeAt(offset, len, [&builder](ByteRange range) {
-        builder.push(range.data(), range.size());
+        builder.insert(range);
         return true;
       })) {
     return quic::make_unexpected(QuicError(

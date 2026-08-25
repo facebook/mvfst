@@ -75,6 +75,11 @@ class PacketBuilderInterface {
   appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber) = 0;
   virtual void
   appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber) = 0;
+
+  virtual void insert(ByteRange data) {
+    push(data.data(), data.size());
+  }
+
   virtual void insert(BufPtr buf) = 0;
   virtual void insert(BufPtr buf, size_t limit) = 0;
   virtual void insert(const ChainedByteRangeHead& buf, size_t limit) = 0;
@@ -148,6 +153,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
 
   void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
       override;
+  void insert(ByteRange data) override;
   void insert(BufPtr buf) override;
   void insert(BufPtr buf, size_t limit) override;
   void insert(const ChainedByteRangeHead& buf, size_t limit) override;
@@ -229,6 +235,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
     MVCHECK(false, "Invalid BufWriter");
   }
 
+  void insert(ByteRange data) override;
   void insert(BufPtr buf) override;
   void insert(BufPtr buf, size_t limit) override;
   void insert(const BufQueue& buf, size_t limit) override;
@@ -517,6 +524,10 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
   void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
       override {
     builder.appendBytes(writer, value, byteNumber);
+  }
+
+  void insert(ByteRange data) override {
+    builder.insert(data);
   }
 
   void insert(BufPtr buf) override {

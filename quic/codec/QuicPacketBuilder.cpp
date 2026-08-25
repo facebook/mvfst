@@ -193,6 +193,11 @@ void RegularQuicPacketBuilder::appendBytes(
   remainingBytes_ -= byteNumber;
 }
 
+void RegularQuicPacketBuilder::insert(ByteRange data) {
+  remainingBytes_ -= data.size();
+  bodyAppender_.insert(BufHelpers::wrapBuffer(data));
+}
+
 void RegularQuicPacketBuilder::insert(BufPtr buf) {
   remainingBytes_ -= buf->computeChainDataLength();
   bodyAppender_.insert(std::move(buf));
@@ -688,6 +693,11 @@ void InplaceQuicPacketBuilder::appendBytes(
   bufWriter.push(
       (uint8_t*)&bigValue + sizeof(bigValue) - byteNumber, byteNumber);
   remainingBytes_ -= byteNumber;
+}
+
+void InplaceQuicPacketBuilder::insert(ByteRange data) {
+  bufWriter_.push(data.data(), data.size());
+  remainingBytes_ -= data.size();
 }
 
 void InplaceQuicPacketBuilder::insert(BufPtr buf) {

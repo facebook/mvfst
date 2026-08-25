@@ -2657,9 +2657,10 @@ TEST_P(QuicPacketSchedulerTest, UnifiedSendBufferWritesChainedNewData) {
 
   std::string writtenData;
   auto builder = setupMockPacketBuilder();
-  EXPECT_CALL(*builder, push(_, _))
-      .WillRepeatedly([&writtenData](const uint8_t* bytes, size_t len) {
-        writtenData.append(reinterpret_cast<const char*>(bytes), len);
+  EXPECT_CALL(*builder, _insertRange(_))
+      .WillRepeatedly([&writtenData](ByteRange range) {
+        writtenData.append(
+            reinterpret_cast<const char*>(range.data()), range.size());
       });
 
   StreamFrameScheduler scheduler(conn);
@@ -2682,7 +2683,7 @@ TEST_P(QuicPacketSchedulerTest, UnifiedSendBufferWritesFinOnly) {
   ASSERT_FALSE(writeDataToQuicStream(*stream, nullptr, true).hasError());
 
   auto builder = setupMockPacketBuilder();
-  EXPECT_CALL(*builder, push(_, _)).Times(0);
+  EXPECT_CALL(*builder, _insertRange(_)).Times(0);
 
   StreamFrameScheduler scheduler(conn);
   ASSERT_FALSE(scheduler.writeStreams(*builder).hasError());
@@ -2710,9 +2711,10 @@ TEST_P(QuicPacketSchedulerTest, UnifiedSendBufferWritesAllLossBeforeNewData) {
 
   std::string writtenData;
   auto builder = setupMockPacketBuilder();
-  EXPECT_CALL(*builder, push(_, _))
-      .WillRepeatedly([&writtenData](const uint8_t* bytes, size_t len) {
-        writtenData.append(reinterpret_cast<const char*>(bytes), len);
+  EXPECT_CALL(*builder, _insertRange(_))
+      .WillRepeatedly([&writtenData](ByteRange range) {
+        writtenData.append(
+            reinterpret_cast<const char*>(range.data()), range.size());
       });
 
   StreamFrameScheduler scheduler(conn);

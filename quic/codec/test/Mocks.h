@@ -54,6 +54,10 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
     remainingIt_++;
   }
 
+  void insert(ByteRange data) override {
+    _insertRange(data);
+  }
+
   // override method with unique_ptr since gmock doesn't support it
   void insert(std::unique_ptr<folly::IOBuf> buf) override {
     _insert(buf);
@@ -71,6 +75,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD(void, appendFrame, (QuicWriteFrame));
   MOCK_METHOD(void, appendPaddingFrame, ());
   MOCK_METHOD(void, markNonEmpty, ());
+  MOCK_METHOD(void, _insertRange, (ByteRange));
   MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&));
   MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&, size_t));
   MOCK_METHOD(void, _insertRch, (const ChainedByteRangeHead&, size_t));
