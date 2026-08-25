@@ -379,7 +379,9 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
 
   AckResult result;
   if (range.len > 0) {
-    const auto newlyRetiredOutstanding = countOutstanding(range.offset, *end);
+    const auto newlyRetiredOutstanding = abandonedIntervals_.empty()
+        ? countUnacked(range.offset, *end)
+        : countOutstanding(range.offset, *end);
     if (newlyRetiredOutstanding > outstandingBytes_) {
       return std::nullopt;
     }
@@ -390,8 +392,10 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
     ackedIntervals_.insert(range.offset, range.fin ? *end : *end - 1);
   }
   if (range.len > 0) {
-    pendingRetransmissions_.withdraw(
-        Interval<uint64_t>{range.offset, *end - 1});
+    if (!pendingRetransmissions_.empty()) {
+      pendingRetransmissions_.withdraw(
+          Interval<uint64_t>{range.offset, *end - 1});
+    }
     releaseRetiredEntries(range.offset, *end);
   }
   if (range.fin) {
@@ -541,6 +545,10 @@ bool StreamSendBuffer::writeEntryRange(
 }
 
 uint64_t StreamSendBuffer::countUnacked(uint64_t start, uint64_t end) const {
+  if (ackedIntervals_.empty() || ackedIntervals_.back().end < start ||
+      ackedIntervals_.front().start >= end) {
+    return end - start;
+  }
   uint64_t count = 0;
   forEachUncoveredRange(
       std::array{&ackedIntervals_},
@@ -552,6 +560,9 @@ uint64_t StreamSendBuffer::countUnacked(uint64_t start, uint64_t end) const {
 
 uint64_t StreamSendBuffer::countOutstanding(uint64_t start, uint64_t end)
     const {
+  if (abandonedIntervals_.empty()) {
+    return countUnacked(start, end);
+  }
   uint64_t count = 0;
   forEachUncoveredRange(
       std::array<const IntervalSet<uint64_t>*, 2>{
@@ -563,6 +574,9 @@ uint64_t StreamSendBuffer::countOutstanding(uint64_t start, uint64_t end)
 }
 
 uint64_t StreamSendBuffer::countNewLoss(uint64_t start, uint64_t end) const {
+  if (pendingRetransmissions_.empty()) {
+    return countOutstanding(start, end);
+  }
   uint64_t count = 0;
   forEachUncoveredRange(
       std::array{
@@ -597,37 +611,24 @@ void StreamSendBuffer::releaseRetiredEntries(uint64_t start, uint64_t end) {
     cleanUpEntries();
     return;
   }
-  const auto scanStart = entries_[*entryIndex].offset;
-  auto scanEnd = scanStart;
-  for (auto i = *entryIndex; i < entries_.size() && entries_[i].offset < end;
-       ++i) {
-    scanEnd = std::max(scanEnd, entries_[i].offset + entries_[i].len);
+  while (*entryIndex < entries_.size()) {
+    auto& entry = entries_[*entryIndex];
+    if (entry.offset >= end) {
+      break;
+    }
+    const auto entryEnd = entry.offset + entry.len - 1;
+    const bool retiredByOneSet =
+        ackedIntervals_.contains(entry.offset, entryEnd) ||
+        abandonedIntervals_.contains(entry.offset, entryEnd);
+    if (entry.data &&
+        (retiredByOneSet ||
+         (!ackedIntervals_.empty() && !abandonedIntervals_.empty() &&
+          countOutstanding(entry.offset, entryEnd + 1) == 0))) {
+      // Keep the offset metadata until earlier entries can also be removed.
+      entry.data.reset();
+    }
+    ++*entryIndex;
   }
-  forEachCoveredRange(
-      std::array<const IntervalSet<uint64_t>*, 2>{
-          &ackedIntervals_, &abandonedIntervals_},
-      scanStart,
-      scanEnd,
-      [this, &entryIndex](uint64_t retiredStart, uint64_t retiredEnd) {
-        while (*entryIndex < entries_.size() &&
-               entries_[*entryIndex].offset + entries_[*entryIndex].len <=
-                   retiredStart) {
-          ++*entryIndex;
-        }
-        while (*entryIndex < entries_.size()) {
-          auto& entry = entries_[*entryIndex];
-          if (entry.offset >= retiredEnd) {
-            break;
-          }
-          if (entry.offset >= retiredStart &&
-              entry.offset + entry.len <= retiredEnd) {
-            // Keep the offset metadata until earlier entries can also be
-            // removed.
-            entry.data.reset();
-          }
-          ++*entryIndex;
-        }
-      });
   cleanUpEntries();
 }
 

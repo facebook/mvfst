@@ -267,6 +267,7 @@ quic::Expected<void, QuicError> sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame) {
   if (stream.streamSendBuffer && stream.sendState != StreamSendState::Invalid) {
+    const bool hadLoss = stream.hasLoss();
     auto ackResult = stream.streamSendBuffer->markAcked(
         {.offset = ackedFrame.offset,
          .len = ackedFrame.len,
@@ -288,7 +289,9 @@ quic::Expected<void, QuicError> sendAckSMHandler(
         stream.conn.streamManager->addClosed(stream.id);
       }
     }
-    stream.conn.streamManager->updateWritableStreams(stream);
+    if (hadLoss && !stream.hasLoss()) {
+      stream.conn.streamManager->updateWritableStreams(stream);
+    }
     if (stream.sendState == StreamSendState::Closed) {
       checkClosedSendState(stream);
     }

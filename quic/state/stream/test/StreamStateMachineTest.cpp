@@ -335,6 +335,26 @@ TEST_F(QuicOpenStateTest, UnifiedAckHandlesFinOnly) {
   EXPECT_EQ(stream->streamSendBuffer->ackInsertVersion(), ackVersion);
 }
 
+TEST_F(QuicOpenStateTest, UnifiedAckClearsStreamManagerLossState) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(
+      stream->streamSendBuffer->append(IOBuf::copyBuffer("abcdef"), false));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 6, false}));
+  ASSERT_TRUE(stream->streamSendBuffer->markLoss({0, 6, false}));
+  conn->streamManager->updateWritableStreams(*stream);
+  ASSERT_TRUE(conn->streamManager->hasLoss());
+
+  ASSERT_FALSE(
+      sendAckSMHandler(*stream, WriteStreamFrame(stream->id, 0, 6, false))
+          .hasError());
+
+  EXPECT_FALSE(stream->streamSendBuffer->hasPendingLoss());
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+}
+
 #if !defined(NDEBUG) && !defined(_WIN32)
 TEST_F(QuicOpenStateTest, ClosedUnifiedAckRejectsPendingData) {
   auto conn = createConn();

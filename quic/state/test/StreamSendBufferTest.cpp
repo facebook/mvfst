@@ -466,6 +466,21 @@ TEST(StreamSendBufferTest, AbandonClampsToTransmittedPrefix) {
   EXPECT_FALSE(*duplicate);
 }
 
+TEST(StreamSendBufferTest, AckAndAbandonTogetherReleaseOwnedEntry) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({.offset = 0, .len = 6, .fin = false}));
+
+  ASSERT_TRUE(
+      buffer.markAcked({.offset = 0, .len = 3, .fin = false}).has_value());
+  const auto abandoned = buffer.abandon({.offset = 3, .len = 3, .fin = false});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
+
+  EXPECT_EQ(0, buffer.outstandingBytes());
+  EXPECT_FALSE(buffer.writeAt(0, 6, [](ByteRange) { return true; }));
+}
+
 TEST(StreamSendBufferTest, OutstandingRequiresEveryRequestedByteAndFin) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(makeBuffer("abcdef"), true));
@@ -478,10 +493,14 @@ TEST(StreamSendBufferTest, OutstandingRequiresEveryRequestedByteAndFin) {
   EXPECT_FALSE(buffer.isOutstanding({.offset = 1, .len = 4, .fin = false}));
   EXPECT_TRUE(buffer.isOutstanding({.offset = 4, .len = 2, .fin = true}));
 
-  EXPECT_TRUE(buffer.abandon({.offset = 4, .len = 1, .fin = false}));
+  auto abandoned = buffer.abandon({.offset = 4, .len = 1, .fin = false});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
   EXPECT_FALSE(buffer.isOutstanding({.offset = 4, .len = 2, .fin = true}));
   EXPECT_TRUE(buffer.isOutstanding({.offset = 5, .len = 1, .fin = true}));
-  EXPECT_TRUE(buffer.abandon({.offset = 5, .len = 1, .fin = true}));
+  abandoned = buffer.abandon({.offset = 5, .len = 1, .fin = true});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
   EXPECT_FALSE(buffer.isOutstanding({.offset = 5, .len = 1, .fin = true}));
 }
 
@@ -493,7 +512,9 @@ TEST(StreamSendBufferTest, FindsFirstOutstandingSubrangeWithoutMutation) {
       buffer.markAcked({.offset = 0, .len = 2, .fin = false}).has_value());
   ASSERT_TRUE(
       buffer.markAcked({.offset = 5, .len = 2, .fin = false}).has_value());
-  ASSERT_TRUE(buffer.abandon({.offset = 3, .len = 1, .fin = false}));
+  const auto abandoned = buffer.abandon({.offset = 3, .len = 1, .fin = false});
+  ASSERT_TRUE(abandoned.has_value());
+  EXPECT_TRUE(*abandoned);
 
   expectRange(
       buffer.firstOutstandingIn({.offset = 0, .len = 10, .fin = true}, 10),
