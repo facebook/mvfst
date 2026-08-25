@@ -117,6 +117,36 @@ TEST(StreamSendBufferTest, AckIsIdempotentForPartialOverlappingRanges) {
   EXPECT_EQ(0, ack->newlyAckedBytes);
 }
 
+TEST(StreamSendBufferTest, InOrderAcksRetireOwnedEntriesIncrementally) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeChainedBuffer("abc", "def"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 6, false}));
+
+  ASSERT_TRUE(buffer.markAcked({0, 3, false}).has_value());
+  EXPECT_FALSE(buffer.writeAt(0, 1, [](ByteRange) { return true; }));
+
+  std::string remaining;
+  EXPECT_TRUE(writeToString(buffer, 3, 3, remaining));
+  EXPECT_EQ("def", remaining);
+
+  ASSERT_TRUE(buffer.markAcked({3, 3, false}).has_value());
+  EXPECT_FALSE(buffer.writeAt(3, 1, [](ByteRange) { return true; }));
+}
+
+TEST(StreamSendBufferTest, OutOfOrderAckRetiresOnlyCoveredEntry) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeChainedBuffer("abc", "def"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 6, false}));
+
+  ASSERT_TRUE(buffer.markAcked({3, 3, false}).has_value());
+  EXPECT_FALSE(buffer.writeAt(3, 1, [](ByteRange) { return true; }));
+
+  std::string remaining;
+  EXPECT_TRUE(writeToString(buffer, 0, 3, remaining));
+  EXPECT_EQ("abc", remaining);
+  EXPECT_EQ(3, buffer.outstandingBytes());
+}
+
 TEST(StreamSendBufferTest, AckBeforeLossOnlySchedulesUnackedBytes) {
   StreamSendBuffer buffer;
   ASSERT_TRUE(buffer.append(makeBuffer(std::string(8, 'a')), false));

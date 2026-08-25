@@ -120,27 +120,6 @@ bool StreamSendBuffer::append(BufPtr data, bool fin) {
   return true;
 }
 
-Optional<StreamSendBuffer::SendRange> StreamSendBuffer::nextNewData(
-    uint64_t maxLen) const {
-  if (cancelled_) {
-    return std::nullopt;
-  }
-  if (nextUnsentOffset_ < tailOffset_) {
-    if (maxLen == 0) {
-      return std::nullopt;
-    }
-    const auto len = std::min(maxLen, tailOffset_ - nextUnsentOffset_);
-    return SendRange{
-        .offset = nextUnsentOffset_,
-        .len = len,
-        .fin = finBuffered_ && nextUnsentOffset_ + len == tailOffset_};
-  }
-  if (finBuffered_ && !finSent_) {
-    return SendRange{.offset = tailOffset_, .len = 0, .fin = true};
-  }
-  return std::nullopt;
-}
-
 Optional<StreamSendBuffer::SendRange> StreamSendBuffer::nextLoss(
     uint64_t maxLen) const {
   return nextLossAfter(0, true, maxLen);
@@ -184,33 +163,78 @@ bool StreamSendBuffer::writeAt(uint64_t offset, uint64_t len, DataWriter writer)
     return true;
   }
 
-  auto entryIndex = findEntry(offset);
-  if (!entryIndex) {
-    return false;
+  const auto containsOffset = [](const Entry& entry, uint64_t target) {
+    return entry.offset <= target && target < entry.offset + entry.len;
+  };
+  size_t entryIndex = 0;
+  if (cachedEntryIndex_ < entries_.size() &&
+      containsOffset(entries_[cachedEntryIndex_], offset)) {
+    entryIndex = cachedEntryIndex_;
+  } else if (
+      cachedEntryIndex_ + 1 < entries_.size() &&
+      containsOffset(entries_[cachedEntryIndex_ + 1], offset)) {
+    entryIndex = ++cachedEntryIndex_;
+  } else if (
+      cachedEntryIndex_ != 0 && !entries_.empty() &&
+      containsOffset(entries_.front(), offset)) {
+    entryIndex = cachedEntryIndex_ = 0;
+  } else {
+    const auto it =
+        std::ranges::upper_bound(entries_, offset, {}, [](const Entry& entry) {
+          return entry.offset + entry.len;
+        });
+    if (it == entries_.end() || !containsOffset(*it, offset)) {
+      return false;
+    }
+    entryIndex = cachedEntryIndex_ = static_cast<size_t>(it - entries_.begin());
   }
+
   auto currentOffset = offset;
   auto remaining = len;
-  while (remaining > 0 && *entryIndex < entries_.size()) {
-    const auto& entry = entries_[*entryIndex];
+  while (remaining > 0 && entryIndex < entries_.size()) {
+    const auto& entry = entries_[entryIndex];
     if (!entry.data || currentOffset < entry.offset ||
         currentOffset >= entry.offset + entry.len) {
       return false;
     }
     const auto entryLen =
         std::min(remaining, entry.offset + entry.len - currentOffset);
-    if (!writeEntryRange(
-            entry,
-            DataRange{.offset = currentOffset, .len = entryLen},
-            writer)) {
+    auto skip = currentOffset - entry.offset;
+    auto entryRemaining = entryLen;
+    auto logicalRemaining = entry.len;
+    for (const auto& current : *entry.data) {
+      const auto segmentLen =
+          std::min<uint64_t>(current.size(), logicalRemaining);
+      if (skip >= segmentLen) {
+        skip -= segmentLen;
+      } else {
+        const auto writeLen = std::min(entryRemaining, segmentLen - skip);
+        if (!writer(
+                ByteRange{
+                    current.data() + skip, static_cast<size_t>(writeLen)})) {
+          return false;
+        }
+        entryRemaining -= writeLen;
+        skip = 0;
+        if (entryRemaining == 0) {
+          break;
+        }
+      }
+      logicalRemaining -= segmentLen;
+      if (logicalRemaining == 0) {
+        break;
+      }
+    }
+    if (entryRemaining != 0) {
       return false;
     }
+
     currentOffset += entryLen;
     remaining -= entryLen;
-    cachedEntryIndex_ = *entryIndex;
-    ++*entryIndex;
+    cachedEntryIndex_ = entryIndex++;
     if (remaining > 0 &&
-        (*entryIndex >= entries_.size() ||
-         entries_[*entryIndex].offset != currentOffset)) {
+        (entryIndex >= entries_.size() ||
+         entries_[entryIndex].offset != currentOffset)) {
       return false;
     }
   }
@@ -312,8 +336,14 @@ bool StreamSendBuffer::markLoss(const SendRange& range) {
   bool addedLoss = false;
   const auto end = std::min(*requestedEnd, nextUnsentOffset_);
   if (range.offset < end) {
-    addedLoss = countNewLoss(range.offset, end) > 0;
-    insertOutstandingIntoPending(range.offset, end);
+    if (ackedIntervals_.empty() && abandonedIntervals_.empty() &&
+        pendingRetransmissions_.empty()) {
+      pendingRetransmissions_.insert(range.offset, end - 1);
+      addedLoss = true;
+    } else {
+      addedLoss = countNewLoss(range.offset, end) > 0;
+      insertOutstandingIntoPending(range.offset, end);
+    }
   }
   if (range.fin && *requestedEnd == tailOffset_ && finSent_ && !finAcked_ &&
       !finAbandoned_) {
@@ -379,8 +409,9 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
 
   AckResult result;
   if (range.len > 0) {
-    const auto newlyRetiredOutstanding = abandonedIntervals_.empty()
-        ? countUnacked(range.offset, *end)
+    const auto newlyRetiredOutstanding =
+        ackedIntervals_.empty() && abandonedIntervals_.empty()
+        ? range.len
         : countOutstanding(range.offset, *end);
     if (newlyRetiredOutstanding > outstandingBytes_) {
       return std::nullopt;
@@ -483,67 +514,6 @@ void StreamSendBuffer::cancelAll() {
   cancelled_ = true;
 }
 
-Optional<size_t> StreamSendBuffer::findEntry(uint64_t offset) const {
-  const auto contains = [offset](const Entry& entry) {
-    return entry.offset <= offset && offset < entry.offset + entry.len;
-  };
-  if (cachedEntryIndex_ < entries_.size() &&
-      contains(entries_[cachedEntryIndex_])) {
-    return cachedEntryIndex_;
-  }
-  if (cachedEntryIndex_ + 1 < entries_.size() &&
-      contains(entries_[cachedEntryIndex_ + 1])) {
-    ++cachedEntryIndex_;
-    return cachedEntryIndex_;
-  }
-
-  const auto it =
-      std::ranges::upper_bound(entries_, offset, {}, [](const Entry& entry) {
-        return entry.offset + entry.len;
-      });
-  if (it == entries_.end() || !contains(*it)) {
-    return std::nullopt;
-  }
-  cachedEntryIndex_ = static_cast<size_t>(it - entries_.begin());
-  return cachedEntryIndex_;
-}
-
-bool StreamSendBuffer::writeEntryRange(
-    const Entry& entry,
-    const DataRange& range,
-    DataWriter writer) const {
-  if (!entry.data) {
-    return false;
-  }
-  auto skip = range.offset - entry.offset;
-  auto remaining = range.len;
-  auto logicalRemaining = entry.len;
-  for (const auto& current : *entry.data) {
-    const auto segmentLen =
-        std::min<uint64_t>(current.size(), logicalRemaining);
-    if (skip >= segmentLen) {
-      skip -= segmentLen;
-    } else {
-      const auto writeLen = std::min(remaining, segmentLen - skip);
-      if (!writer(
-              ByteRange{
-                  current.data() + skip, static_cast<size_t>(writeLen)})) {
-        return false;
-      }
-      remaining -= writeLen;
-      skip = 0;
-      if (remaining == 0) {
-        return true;
-      }
-    }
-    logicalRemaining -= segmentLen;
-    if (logicalRemaining == 0) {
-      break;
-    }
-  }
-  return false;
-}
-
 uint64_t StreamSendBuffer::countUnacked(uint64_t start, uint64_t end) const {
   if (ackedIntervals_.empty() || ackedIntervals_.back().end < start ||
       ackedIntervals_.front().start >= end) {
@@ -605,21 +575,66 @@ void StreamSendBuffer::releaseRetiredEntries(uint64_t start, uint64_t end) {
     cleanUpEntries();
     return;
   }
-  start = std::max(start, entries_.front().offset);
-  auto entryIndex = findEntry(start);
-  if (!entryIndex) {
-    cleanUpEntries();
-    return;
+  if (abandonedIntervals_.empty() && !ackedIntervals_.empty() &&
+      ackedIntervals_.front().start == 0) {
+    const auto ackedEnd = ackedIntervals_.front().end + 1;
+    size_t removedEntries = 0;
+    while (!entries_.empty() &&
+           entries_.front().offset + entries_.front().len <= ackedEnd) {
+      entries_.pop_front();
+      ++removedEntries;
+    }
+    adjustCachedEntryIndexAfterPopFront(removedEntries);
+    // With no abandoned ranges, the loop removed every retired front entry.
+    if (end <= ackedEnd || entries_.empty()) {
+      return;
+    }
   }
-  while (*entryIndex < entries_.size()) {
-    auto& entry = entries_[*entryIndex];
+  start = std::max(start, entries_.front().offset);
+  auto acked = std::ranges::lower_bound(
+      ackedIntervals_, start, {}, [](const auto& interval) {
+        return interval.end;
+      });
+  auto abandoned = std::ranges::lower_bound(
+      abandonedIntervals_, start, {}, [](const auto& interval) {
+        return interval.end;
+      });
+  const auto intervalCovers = [](auto& interval,
+                                 const auto intervalEnd,
+                                 uint64_t entryStart,
+                                 uint64_t entryEnd) {
+    while (interval != intervalEnd && interval->end < entryStart) {
+      ++interval;
+    }
+    return interval != intervalEnd && interval->start <= entryStart &&
+        entryEnd <= interval->end;
+  };
+  size_t entryIndex = 0;
+  const auto& firstEntry = entries_.front();
+  if (start < firstEntry.offset ||
+      start >= firstEntry.offset + firstEntry.len) {
+    const auto entryIt =
+        std::ranges::upper_bound(entries_, start, {}, [](const Entry& entry) {
+          return entry.offset + entry.len;
+        });
+    if (entryIt == entries_.end() || start < entryIt->offset) {
+      cleanUpEntries();
+      return;
+    }
+    entryIndex = static_cast<size_t>(entryIt - entries_.begin());
+  }
+  while (entryIndex < entries_.size()) {
+    auto& entry = entries_[entryIndex];
     if (entry.offset >= end) {
       break;
     }
     const auto entryEnd = entry.offset + entry.len - 1;
+    const bool retiredByCurrentRange = start <= entry.offset && entryEnd < end;
     const bool retiredByOneSet =
-        ackedIntervals_.contains(entry.offset, entryEnd) ||
-        abandonedIntervals_.contains(entry.offset, entryEnd);
+        retiredByCurrentRange ||
+        intervalCovers(acked, ackedIntervals_.end(), entry.offset, entryEnd) ||
+        intervalCovers(
+            abandoned, abandonedIntervals_.end(), entry.offset, entryEnd);
     if (entry.data &&
         (retiredByOneSet ||
          (!ackedIntervals_.empty() && !abandonedIntervals_.empty() &&
@@ -627,16 +642,28 @@ void StreamSendBuffer::releaseRetiredEntries(uint64_t start, uint64_t end) {
       // Keep the offset metadata until earlier entries can also be removed.
       entry.data.reset();
     }
-    ++*entryIndex;
+    ++entryIndex;
   }
   cleanUpEntries();
 }
 
 void StreamSendBuffer::cleanUpEntries() {
+  size_t removedEntries = 0;
   while (!entries_.empty() && !entries_.front().data) {
     entries_.pop_front();
+    ++removedEntries;
   }
-  cachedEntryIndex_ = 0;
+  adjustCachedEntryIndexAfterPopFront(removedEntries);
+}
+
+void StreamSendBuffer::adjustCachedEntryIndexAfterPopFront(
+    size_t removedEntries) {
+  cachedEntryIndex_ = removedEntries <= cachedEntryIndex_
+      ? cachedEntryIndex_ - removedEntries
+      : 0;
+  if (cachedEntryIndex_ >= entries_.size()) {
+    cachedEntryIndex_ = 0;
+  }
 }
 
 } // namespace quic

@@ -909,6 +909,20 @@ static quic::Expected<bool, QuicError> handleUnifiedStreamWritten(
     return false;
   }
 
+  if (frameOffset >= sendBuffer.nextUnsentOffset()) {
+    const auto newData = sendBuffer.nextNewData(frameLen);
+    if (newData && *newData == frameRange &&
+        sendBuffer.markNewDataSent(frameRange)) {
+      stream.currentWriteOffset = sendBuffer.nextUnsentOffset() +
+          static_cast<uint64_t>(sendBuffer.finSent());
+      ++stream.numPacketsTxWithNewData;
+      MVVLOG(10) << nodeToString(conn.nodeType) << " sent"
+                 << " packetNum=" << packetNum << " space=" << packetNumberSpace
+                 << " " << conn;
+      return true;
+    }
+  }
+
   const auto pendingLoss = sendBuffer.nextLoss(frameLen);
   if (pendingLoss && *pendingLoss == frameRange) {
     sendBuffer.markRetransmissionSent(frameRange);
@@ -917,18 +931,6 @@ static quic::Expected<bool, QuicError> handleUnifiedStreamWritten(
                << " packetNum=" << packetNum << " " << conn;
     QUIC_STATS(conn.statsCallback, onPacketRetransmission);
     return false;
-  }
-
-  const auto newData = sendBuffer.nextNewData(frameLen);
-  if (newData && *newData == frameRange &&
-      sendBuffer.markNewDataSent(frameRange)) {
-    stream.currentWriteOffset = sendBuffer.nextUnsentOffset() +
-        static_cast<uint64_t>(sendBuffer.finSent());
-    ++stream.numPacketsTxWithNewData;
-    MVVLOG(10) << nodeToString(conn.nodeType) << " sent"
-               << " packetNum=" << packetNum << " space=" << packetNumberSpace
-               << " " << conn;
-    return true;
   }
 
   return quic::make_unexpected(QuicError(
@@ -972,6 +974,15 @@ static quic::Expected<bool, QuicError> handleUnifiedCryptoWritten(
     return false;
   }
 
+  if (frameOffset >= sendBuffer.nextUnsentOffset()) {
+    const auto newData = sendBuffer.nextNewData(frameLen);
+    if (newData && *newData == frameRange &&
+        sendBuffer.markNewDataSent(frameRange)) {
+      stream.currentWriteOffset = sendBuffer.nextUnsentOffset();
+      return true;
+    }
+  }
+
   const auto pendingLoss = sendBuffer.nextLoss(frameLen);
   if (pendingLoss && *pendingLoss == frameRange) {
     sendBuffer.markRetransmissionSent(frameRange);
@@ -981,13 +992,6 @@ static quic::Expected<bool, QuicError> handleUnifiedCryptoWritten(
                << conn;
     QUIC_STATS(conn.statsCallback, onPacketRetransmission);
     return false;
-  }
-
-  const auto newData = sendBuffer.nextNewData(frameLen);
-  if (newData && *newData == frameRange &&
-      sendBuffer.markNewDataSent(frameRange)) {
-    stream.currentWriteOffset = sendBuffer.nextUnsentOffset();
-    return true;
   }
 
   return quic::make_unexpected(QuicError(

@@ -52,7 +52,27 @@ class StreamSendBuffer {
   [[nodiscard]] bool append(BufPtr data, bool fin);
 
   // maxLen limits payload bytes; FIN-only ranges can still be returned at 0.
-  [[nodiscard]] Optional<SendRange> nextNewData(uint64_t maxLen) const;
+  [[nodiscard]] Optional<SendRange> nextNewData(uint64_t maxLen) const {
+    if (cancelled_) {
+      return std::nullopt;
+    }
+    if (nextUnsentOffset_ < tailOffset_) {
+      if (maxLen == 0) {
+        return std::nullopt;
+      }
+      const auto remaining = tailOffset_ - nextUnsentOffset_;
+      const auto len = maxLen < remaining ? maxLen : remaining;
+      return SendRange{
+          .offset = nextUnsentOffset_,
+          .len = len,
+          .fin = finBuffered_ && nextUnsentOffset_ + len == tailOffset_};
+    }
+    if (finBuffered_ && !finSent_) {
+      return SendRange{.offset = tailOffset_, .len = 0, .fin = true};
+    }
+    return std::nullopt;
+  }
+
   [[nodiscard]] Optional<SendRange> nextLoss(uint64_t maxLen) const;
   [[nodiscard]] Optional<SendRange>
   nextLossAfter(uint64_t minOffset, bool includeFin, uint64_t maxLen) const;
@@ -131,22 +151,13 @@ class StreamSendBuffer {
     BufPtr data;
   };
 
-  struct DataRange {
-    uint64_t offset;
-    uint64_t len;
-  };
-
-  [[nodiscard]] Optional<size_t> findEntry(uint64_t offset) const;
-  [[nodiscard]] bool writeEntryRange(
-      const Entry& entry,
-      const DataRange& range,
-      DataWriter writer) const;
   [[nodiscard]] uint64_t countUnacked(uint64_t start, uint64_t end) const;
   [[nodiscard]] uint64_t countOutstanding(uint64_t start, uint64_t end) const;
   [[nodiscard]] uint64_t countNewLoss(uint64_t start, uint64_t end) const;
   void insertOutstandingIntoPending(uint64_t start, uint64_t end);
   void releaseRetiredEntries(uint64_t start, uint64_t end);
   void cleanUpEntries();
+  void adjustCachedEntryIndexAfterPopFront(size_t removedEntries);
 
   CircularDeque<Entry> entries_;
   IntervalSet<uint64_t> ackedIntervals_;
