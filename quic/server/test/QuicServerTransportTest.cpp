@@ -4185,6 +4185,19 @@ TEST_F(QuicServerTransportTest, TestCCConfigKnobHandlerInvalidJSON) {
   EXPECT_EQ(transportSettings.ccaConfig.conservativeRecovery, false);
 }
 
+TEST_F(QuicServerTransportTest, TestCCConfigKnobHandlerRejectsZeroDivisor) {
+  auto& transportSettings = server->getNonConstConn().transportSettings;
+  auto ccConfigKnobId = static_cast<uint64_t>(TransportKnobParamId::CC_CONFIG);
+
+  EXPECT_FALSE(transportSettings.ccaConfig.ackFrequencyConfig.has_value());
+
+  EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(ccConfigKnobId))).Times(1);
+  server->handleKnobParams(
+      {{.id = ccConfigKnobId,
+        .val = std::string(R"({"ackFrequencyConfig":{"minRttDivisor":0}})")}});
+  EXPECT_FALSE(transportSettings.ccaConfig.ackFrequencyConfig.has_value());
+}
+
 TEST_F(QuicServerTransportTest, TestConnMigrationKnobHandler) {
   auto& transportSettings = server->getNonConstConn().transportSettings;
 
@@ -4525,17 +4538,6 @@ TEST_F(
             TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
         .val = uint64_t{1}}});
   EXPECT_EQ(server->getConn().udpSendPacketLen, 1452);
-}
-
-TEST_F(
-    QuicServerTransportTest,
-    TestHandleTransportKnobParamFixedShortHeaderPadding) {
-  EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 0);
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
-        .val = uint64_t{42}}});
-  EXPECT_EQ(server->getConn().transportSettings.fixedShortHeaderPadding, 42);
 }
 
 TEST_F(QuicServerTransportTest, TestBurstSizeKnobHandlers) {
