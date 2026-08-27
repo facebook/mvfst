@@ -1133,30 +1133,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         return {};
       });
   registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        auto val = std::get<uint64_t>(value);
-        serverTransport.serverConn_->transportSettings.paddingModulo = val;
-        MVVLOG(3) << fmt::format(
-            "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
-            val);
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(
-          TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        auto val = std::get<uint64_t>(value);
-        serverTransport.serverConn_->transportSettings.fixedShortHeaderPadding =
-            val;
-        MVVLOG(3) << fmt::format(
-            "FIXED_SHORT_HEADER_PADDING_KNOB KnobParam received, setting fixedShortHeaderPadding={}",
-            val);
-        return {};
-      });
-  registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED),
       [](QuicServerTransport& serverTransport,
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {

@@ -83,8 +83,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
       switch (*knobId) {
         case TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE:
         case TransportKnobParamId::MAX_PACING_RATE_KNOB:
-        case TransportKnobParamId::SHORT_HEADER_PADDING_KNOB:
-        case TransportKnobParamId::FIXED_SHORT_HEADER_PADDING_KNOB:
         case TransportKnobParamId::KEEPALIVE_ENABLED:
         case TransportKnobParamId::PACING_TIMER_TICK:
         case TransportKnobParamId::DEFAULT_STREAM_PRIORITY:

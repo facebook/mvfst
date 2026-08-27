@@ -152,6 +152,29 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.ackFrequencyConfig->useSmallThresholdDuringStartup, true);
 }
 
+TEST_F(TransportSettingsFunctionsTest, RejectZeroAckFrequencyMinRttDivisor) {
+  std::string testString =
+      "{"
+      "\"ackFrequencyConfig\": {"
+      "\"minRttDivisor\": 0"
+      "}"
+      "}";
+  EXPECT_THROW(parseCongestionControlConfig(testString), std::range_error);
+  EXPECT_FALSE(tryParseCongestionControlConfig(testString).has_value());
+}
+
+TEST_F(TransportSettingsFunctionsTest, AcceptOneAckFrequencyMinRttDivisor) {
+  std::string testString =
+      "{"
+      "\"ackFrequencyConfig\": {"
+      "\"minRttDivisor\": 1"
+      "}"
+      "}";
+  auto config = parseCongestionControlConfig(testString);
+  ASSERT_TRUE(config.ackFrequencyConfig.has_value());
+  EXPECT_EQ(config.ackFrequencyConfig->minRttDivisor, 1);
+}
+
 TEST_F(TransportSettingsFunctionsTest, ThrowOnWrongType) {
   std::string testString =
       "{"

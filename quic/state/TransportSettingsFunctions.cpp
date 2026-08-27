@@ -46,15 +46,13 @@ void populateAckFrequencyConfig(
     }
   }
 
-  // Parse known uint32 fields
-  const std::array<std::pair<std::string_view, uint32_t&>, 1> uint32Fields = {{
-      {"minRttDivisor", dstCcaConfig.ackFrequencyConfig->minRttDivisor},
-  }};
-
-  for (const auto& [name, field] : uint32Fields) {
-    if (auto val = srcAckFrequencyConfigDyn.get_ptr(name)) {
-      field = folly::to<uint32_t>(val->asString());
+  if (auto val = srcAckFrequencyConfigDyn.get_ptr("minRttDivisor")) {
+    auto minRttDivisor = folly::to<uint32_t>(val->asString());
+    if (minRttDivisor == 0) {
+      throw std::range_error(
+          "CC_CONFIG field 'ackFrequencyConfig.minRttDivisor' value out of range");
     }
+    dstCcaConfig.ackFrequencyConfig->minRttDivisor = minRttDivisor;
   }
 }
 

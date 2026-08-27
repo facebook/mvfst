@@ -192,10 +192,8 @@ QUIC_ENUM(
     // Set max pacing rate in bytes per second to be used if pacing
     // is enabled
     MAX_PACING_RATE_KNOB = 0x4444,
-    // Set short header padding modulo size
-    SHORT_HEADER_PADDING_KNOB = 0x6666,
-    // Set fixed short header padding size
-    FIXED_SHORT_HEADER_PADDING_KNOB = 0x6667,
+    // DEPRECATED: 0x6666 (do not reuse value).
+    // DEPRECATED: 0x6667 (do not reuse value).
     // Keepalive timer enabled. The value is interpreted as follows:
     // - [1,4999] mean keep alive is enabled with the defaut
     // interval of 0.85 * idle timeout

@@ -38,8 +38,7 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
 TEST(QuicKnobsParsingTest, Simple) {
   auto id1 = static_cast<uint64_t>(
       TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
-  auto id2 =
-      static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB);
+  auto id2 = static_cast<uint64_t>(TransportKnobParamId::MAX_PTO);
   auto id3 = static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED);
   auto id4 = static_cast<uint64_t>(TransportKnobParamId::PACING_TIMER_TICK);
   std::string args = fmt::format(
@@ -48,10 +47,10 @@ TEST(QuicKnobsParsingTest, Simple) {
       .serializedKnobs = args,
       .expectError = false,
       .expectParams = {
-          {.id = id2, .val = uint64_t{5}},
           {.id = id3, .val = uint64_t{6}},
           {.id = id1, .val = uint64_t{1}},
-          {.id = id4, .val = uint64_t{3}}}};
+          {.id = id4, .val = uint64_t{3}},
+          {.id = id2, .val = uint64_t{5}}}};
   run(fixture);
 }
 
