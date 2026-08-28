@@ -75,6 +75,7 @@ class LibevQuicEventBase
       std::chrono::microseconds timeout) override;
 
   bool loop() override {
+    ensurePrepareWatcherStarted();
     return ev_run(ev_loop_, EVRUN_NOWAIT);
   }
 
@@ -107,10 +108,12 @@ class LibevQuicEventBase
   }
 
   bool loopOnce(int /*flags*/) override {
+    ensurePrepareWatcherStarted();
     return ev_run(ev_loop_, EVRUN_ONCE | EVRUN_NOWAIT);
   }
 
   void loopForever() override {
+    ensurePrepareWatcherStarted();
     ev_run(ev_loop_, 0);
   }
 
@@ -183,6 +186,8 @@ class LibevQuicEventBase
   };
 
  private:
+  void ensurePrepareWatcherStarted();
+
   class LoopCallbackWrapper
       : public QuicEventBaseLoopCallback::LoopCallbackImpl {
    public:
