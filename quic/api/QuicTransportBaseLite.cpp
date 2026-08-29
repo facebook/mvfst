@@ -2843,10 +2843,15 @@ QuicTransportBaseLite::consumePendingSconeRate() {
   }
   auto signal = conn_->scone->pendingReceivedSignal.value();
   conn_->scone->pendingReceivedSignal.reset();
-  // Convert SCONE logarithmic rate (0-127) to bps: 100_000 * 10^(rate/20)
-  auto bps = static_cast<uint64_t>(
-      100000.0 * std::pow(10.0, static_cast<double>(signal.rate) / 20.0));
-  return SconeRateInfo{.bps = bps, .receivedTime = signal.receivedTime};
+  Optional<uint64_t> advisedBps;
+  if (signal.rate != kSconeNoAdvice) {
+    advisedBps = static_cast<uint64_t>(
+        100000.0 * std::pow(10.0, static_cast<double>(signal.rate) / 20.0));
+  }
+  return SconeRateInfo{
+      .rateSignal = signal.rate,
+      .advisedBps = advisedBps,
+      .receivedTime = signal.receivedTime};
 }
 
 const TransportSettings& QuicTransportBaseLite::getTransportSettings() const {

@@ -4823,7 +4823,7 @@ TEST_F(QuicServerTransportTest, SconeRateSignalProcessingE2E) {
   // processed followed by successful packet processing that should queue the
   // rate signal
 
-  uint8_t testRate = 0x25;
+  uint8_t testRate = kSconeNoAdvice;
 
   // Create a simple coalesced packet buffer that contains both SCONE and
   // regular packet This approach uses the existing test infrastructure more

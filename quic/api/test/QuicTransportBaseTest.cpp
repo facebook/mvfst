@@ -4987,7 +4987,8 @@ TEST_F(QuicTransportImplTest, ConsumePendingSconeRateEdgeTriggered) {
   // First consume should return the latest signal (rateB, last one delivered).
   auto info = transport->consumePendingSconeRate();
   ASSERT_TRUE(info.has_value());
-  EXPECT_EQ(info->bps, expectedBpsB);
+  EXPECT_EQ(info->rateSignal, rateB);
+  EXPECT_EQ(info->advisedBps, expectedBpsB);
   EXPECT_GE(info->receivedTime, beforeDelivery);
   EXPECT_LE(info->receivedTime, Clock::now());
 
@@ -5000,10 +5001,19 @@ TEST_F(QuicTransportImplTest, ConsumePendingSconeRateEdgeTriggered) {
   transport->invokeReadDataAndCallbacks();
   info = transport->consumePendingSconeRate();
   ASSERT_TRUE(info.has_value());
-  EXPECT_EQ(info->bps, expectedBpsA);
+  EXPECT_EQ(info->rateSignal, rateA);
+  EXPECT_EQ(info->advisedBps, expectedBpsA);
 
   // Consumed again.
   EXPECT_FALSE(transport->consumePendingSconeRate().has_value());
+
+  transport->transportConn->scone->pendingRateSignals.push_back(
+      {.rate = kSconeNoAdvice, .version = testVersion});
+  transport->invokeReadDataAndCallbacks();
+  info = transport->consumePendingSconeRate();
+  ASSERT_TRUE(info.has_value());
+  EXPECT_EQ(info->rateSignal, kSconeNoAdvice);
+  EXPECT_FALSE(info->advisedBps.has_value());
 
   transport->setConnectionCallback(nullptr);
 }

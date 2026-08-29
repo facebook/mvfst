@@ -1290,7 +1290,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
                     "scone_received:rate={}", static_cast<int>(sp->rate)));
           }
 
-          if (conn.scone && sp->rate != kSconeNoAdvice) {
+          if (conn.scone) {
             // Store rate signal conditionally - only queue if subsequent packet
             // processes successfully
             pendingSconeRateSignal = QuicConnectionStateBase::SconeRateSignal{

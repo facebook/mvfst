@@ -400,7 +400,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
           fmt::format("scone_received:rate={}", static_cast<int>(sp->rate)));
     }
 
-    if (conn_->scone && sp->rate != kSconeNoAdvice) {
+    if (conn_->scone) {
       pendingSconeRateSignal_ = QuicConnectionStateBase::SconeRateSignal{
           .rate = sp->rate, .version = static_cast<QuicVersion>(sp->version)};
     }
