@@ -986,6 +986,38 @@ TEST_P(QuicServerTransportAllowMigrationTest, RetireConnIdOfContainingPacket) {
 
 TEST_P(
     QuicServerTransportAllowMigrationTest,
+    RetiredConnIdIsUnboundAfterLaterFrameError) {
+  auto& conn = server->getNonConstConn();
+  const auto retiredConnId = conn.selfConnectionIds[0];
+  const auto packetDestinationConnId = conn.selfConnectionIds[1];
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      packetDestinationConnId.connId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_TRUE(builder.canBuildPacket());
+  ASSERT_FALSE(writeSimpleFrame(
+                   QuicSimpleFrame(
+                       RetireConnectionIdFrame(retiredConnId.sequenceNumber)),
+                   builder)
+                   .hasError());
+  ASSERT_FALSE(writeSimpleFrame(
+                   QuicSimpleFrame(RetireConnectionIdFrame(
+                       packetDestinationConnId.sequenceNumber)),
+                   builder)
+                   .hasError());
+  auto packet = std::move(builder).buildPacket();
+
+  EXPECT_CALL(routingCallback, onConnectionIdRetired(_, retiredConnId.connId));
+  EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
+  server->unbindConnection();
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
     RetireConnIdFrameZeroLengthSrcConnId) {
   /**
    * From RFC9000:

@@ -455,6 +455,11 @@ void QuicServerTransport::unbindConnection() {
   if (routingCb_) {
     auto routingCb = routingCb_;
     routingCb_ = nullptr;
+    // Drain CIDs removed from selfConnectionIds but still in the routing map.
+    for (const auto& connId : *conn_->connIdsRetiringSoon) {
+      routingCb->onConnectionIdRetired(*this, connId);
+    }
+    conn_->connIdsRetiringSoon->clear();
     PROTO_OOPS_LOG_BUILDER_IF(
         !conn_->clientChosenDestConnectionId,
         conn_->oopsLogger,
