@@ -131,6 +131,8 @@ struct MockAsyncUDPSocket : public FollyQuicAsyncUDPSocket {
       (const folly::SocketOptionMap&, folly::SocketOptionKey::ApplyPos));
   MOCK_METHOD((quic::Expected<void, QuicError>), setRecvTos, (bool));
   MOCK_METHOD((quic::Expected<bool, QuicError>), getRecvTos, ());
+  MOCK_METHOD((quic::Expected<void, QuicError>), setRecvTtl, (bool));
+  MOCK_METHOD((quic::Expected<bool, QuicError>), getRecvTtl, ());
   MOCK_METHOD(
       (quic::Expected<void, QuicError>),
       setTosOrTrafficClass,

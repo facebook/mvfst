@@ -126,6 +126,9 @@ void QuicServerWorker::bind(
   if (transportSettings_.readEcnOnIngress) {
     socket_->setRecvTos(true);
   }
+  if (transportSettings_.readTtlOnIngress) {
+    socket_->setRecvTtl(true);
+  }
   socket_->bind(address, bindOptions);
   if (socketOptions_) {
     (void)applySocketOptions(

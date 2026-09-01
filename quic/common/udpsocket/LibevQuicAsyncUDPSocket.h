@@ -106,6 +106,18 @@ class LibevQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
     return false; // Not implemented, return default/false
   }
 
+  // receive ttl cmsgs
+  // if true, the IPv4 TTL/IPv6 Hop Limit field should be populated in
+  // OnDataAvailableParams.
+  quic::Expected<void, QuicError> setRecvTtl(bool /*recvTtl*/) override {
+    MVLOG_WARNING << __func__ << " not implemented in LibevQuicAsyncUDPSocket";
+    return {}; // Or return error if strictness needed
+  }
+
+  quic::Expected<bool, QuicError> getRecvTtl() override {
+    return false; // Not implemented, return default/false
+  }
+
   quic::Expected<void, QuicError> setTosOrTrafficClass(
       uint8_t /*tos*/) override {
     MVLOG_WARNING << __func__ << " not implemented in LibevQuicAsyncUDPSocket";

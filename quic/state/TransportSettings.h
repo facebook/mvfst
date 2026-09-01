@@ -512,6 +512,10 @@ struct TransportSettings {
   // Whether to read ECN bits from ingress packets
   bool readEcnOnIngress{false};
 
+  // Whether to read the IP TTL from ingress packets. Only implemented for
+  // Linux; elsewhere the socket option is never applied and the TTL stays 0.
+  bool readTtlOnIngress{false};
+
   // DSCP value to use for outgoing packet. The two least significant bits of
   // the ToS field are for ECN controlled by the following two options.
   uint8_t dscpValue{0};

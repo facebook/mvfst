@@ -81,6 +81,12 @@ void QuicAsyncUDPSocket::fromMsg(
         (cmsg->cmsg_level == SOL_IP && cmsg->cmsg_type == IP_TOS) ||
         (cmsg->cmsg_level == SOL_IPV6 && cmsg->cmsg_type == IPV6_TCLASS)) {
       params.tos = *(uint8_t*)CMSG_DATA(cmsg);
+    } else if (
+        (cmsg->cmsg_level == SOL_IP && cmsg->cmsg_type == IP_TTL) ||
+        (cmsg->cmsg_level == SOL_IPV6 && cmsg->cmsg_type == IPV6_HOPLIMIT)) {
+      int ttl;
+      memcpy(&ttl, CMSG_DATA(cmsg), sizeof(ttl));
+      params.ttl = static_cast<uint8_t>(ttl);
     }
   }
 #endif

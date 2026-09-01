@@ -138,6 +138,12 @@ class FollyQuicAsyncUDPSocket : public QuicAsyncUDPSocketImpl {
   quic::Expected<void, QuicError> setRecvTos(bool recvTos) override;
   quic::Expected<bool, QuicError> getRecvTos() override;
 
+  // receive ttl cmsgs
+  // if true, the IPv4 TTL/IPv6 Hop Limit field should be populated in
+  // OnDataAvailableParams.
+  quic::Expected<void, QuicError> setRecvTtl(bool recvTtl) override;
+  quic::Expected<bool, QuicError> getRecvTtl() override;
+
   quic::Expected<void, QuicError> setTosOrTrafficClass(uint8_t tos) override;
 
   /**

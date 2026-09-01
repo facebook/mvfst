@@ -384,6 +384,36 @@ quic::Expected<bool, QuicError> FollyQuicAsyncUDPSocket::getRecvTos() {
   }
 }
 
+quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setRecvTtl(
+    bool recvTtl) {
+  try {
+    follySocket_.setRecvTtl(recvTtl);
+    return {};
+  } catch (const folly::AsyncSocketException& ex) {
+    std::string errorMsg = "Folly setRecvTtl failed: " + std::string(ex.what());
+    if (ex.getErrno() != 0) {
+      errorMsg += ": " + quic::errnoStr(ex.getErrno());
+    }
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
+  }
+}
+
+quic::Expected<bool, QuicError> FollyQuicAsyncUDPSocket::getRecvTtl() {
+  try {
+    return follySocket_.getRecvTtl();
+  } catch (const folly::AsyncSocketException& ex) {
+    std::string errorMsg = "Folly getRecvTtl failed: " + std::string(ex.what());
+    if (ex.getErrno() != 0) {
+      errorMsg += ": " + quic::errnoStr(ex.getErrno());
+    }
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::move(errorMsg)));
+  }
+}
+
 quic::Expected<void, QuicError> FollyQuicAsyncUDPSocket::setTosOrTrafficClass(
     uint8_t tos) {
   try {
@@ -689,6 +719,7 @@ void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onDataAvailable(
   QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams localParams;
   localParams.gro = params.gro;
   localParams.tos = params.tos;
+  localParams.ttl = params.ttl;
   if (params.ts) {
     localParams.ts.emplace(*params.ts);
   }

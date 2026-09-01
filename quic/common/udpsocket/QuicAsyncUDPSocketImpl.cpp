@@ -45,9 +45,14 @@ QuicAsyncUDPSocketImpl::recvmmsgNetworkData(
   if (FOLLY_UNLIKELY(recvTosResult.hasError())) {
     return quic::make_unexpected(recvTosResult.error());
   }
+  auto recvTtlResult = getRecvTtl();
+  if (FOLLY_UNLIKELY(recvTtlResult.hasError())) {
+    return quic::make_unexpected(recvTtlResult.error());
+  }
 #if defined(FOLLY_HAVE_MSG_ERRQUEUE) || defined(_WIN32)
   bool useGRO = *groResult > 0;
-  bool checkCmsgs = useGRO || *timestampingResult > 0 || *recvTosResult;
+  bool checkCmsgs =
+      useGRO || *timestampingResult > 0 || *recvTosResult || *recvTtlResult;
   std::vector<std::array<
       char,
       QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams::kCmsgSpace>>
