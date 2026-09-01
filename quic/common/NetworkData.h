@@ -114,6 +114,9 @@ struct ReceivedUdpPacket {
   // ToS / TClass value
   uint8_t tosValue{0};
 
+  // Hop Limit / TTL value
+  OptionalIntegral<uint8_t> ttlValue;
+
   // Source address of the datagram. Populated by socket readers
   // (recvmmsgNetworkData, recvMsg, recvMmsg).
   Optional<quic::SocketAddress> peerAddress;

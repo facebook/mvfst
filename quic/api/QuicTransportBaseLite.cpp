@@ -397,6 +397,9 @@ void QuicTransportBaseLite::onNetworkData(
 
     auto packets = std::move(networkData).movePackets();
     for (auto& packet : packets) {
+      if (!conn_->initialPeerTtl.has_value()) {
+        conn_->initialPeerTtl = packet.ttlValue;
+      }
       for (const auto& pp : conn_->packetProcessors) {
         pp->onPacketRead(packet);
       }

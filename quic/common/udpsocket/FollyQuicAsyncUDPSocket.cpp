@@ -719,7 +719,9 @@ void FollyQuicAsyncUDPSocket::FollyReadCallbackWrapper::onDataAvailable(
   QuicAsyncUDPSocket::ReadCallback::OnDataAvailableParams localParams;
   localParams.gro = params.gro;
   localParams.tos = params.tos;
-  localParams.ttl = params.ttl;
+  if (params.ttl) {
+    localParams.ttl.emplace(*params.ttl);
+  }
   if (params.ts) {
     localParams.ts.emplace(*params.ts);
   }

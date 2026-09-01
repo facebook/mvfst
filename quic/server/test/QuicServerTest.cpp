@@ -1759,6 +1759,33 @@ ConnectionId createConnIdForServer(ProcessId server) {
   return *connIdAlgo->encodeConnectionId(params);
 }
 
+TEST_F(QuicServerWorkerTest, OnDataAvailableRecordsPacketTtl) {
+  // writeTestDataOnWorkersBuf builds an MVFST1 packet.
+  worker_->setSupportedVersions({QuicVersion::MVFST, MVFST1});
+  auto connId = createConnIdForServer(ProcessId::ONE);
+  size_t len{0};
+  writeTestDataOnWorkersBuf(
+      getTestConnectionId(hostId_), connId, len, worker_.get());
+
+  OptionalIntegral<uint8_t> routedTtl;
+  EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _, _, _))
+      .WillOnce([&](const quic::SocketAddress&,
+                    std::unique_ptr<RoutingData>&,
+                    std::unique_ptr<NetworkData>& networkData,
+                    const Optional<QuicVersion>&,
+                    bool) {
+        ASSERT_EQ(networkData->getPackets().size(), 1);
+        routedTtl = networkData->getPackets()[0].ttlValue;
+      });
+
+  OnDataAvailableParams params;
+  params.ttl = 64;
+  worker_->onDataAvailable(kClientAddr, len, false, params);
+
+  ASSERT_TRUE(routedTtl.has_value());
+  EXPECT_EQ(*routedTtl, 64);
+}
+
 class QuicServerWorkerRetryTest : public QuicServerWorkerTest {
  public:
   // Helper method to send a client initial that may contain the retry token to

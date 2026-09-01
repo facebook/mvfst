@@ -51,7 +51,7 @@ class QuicAsyncUDPSocket {
       using Timestamp = std::array<struct timespec, 3>;
       std::optional<Timestamp> ts;
       uint8_t tos = 0;
-      uint8_t ttl = 0;
+      std::optional<uint8_t> ttl;
 #ifdef _WIN32
       // Make control message space for ToS
       static constexpr size_t kCmsgSpace = CMSG_SPACE(sizeof(INT));

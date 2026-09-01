@@ -74,6 +74,40 @@ class QuicServerTransportTest : public QuicServerTransportAfterStartTestBase {
   }
 };
 
+TEST_F(QuicServerTransportTest, CapturesFirstAvailablePeerTtl) {
+  auto deliverPingWithTtl = [&](OptionalIntegral<uint8_t> ttl) {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++);
+    RegularQuicPacketBuilder builder(
+        static_cast<uint32_t>(server->getConn().udpSendPacketLen),
+        std::move(header),
+        0 /* largestAcked */);
+    ASSERT_FALSE(builder.encodePacketHeader().hasError());
+    ASSERT_FALSE(writeFrame(PingFrame(), builder).hasError());
+
+    ReceivedUdpPacket udpPacket(packetToBuf(std::move(builder).buildPacket()));
+    udpPacket.ttlValue = ttl;
+    deliverData(NetworkData(std::move(udpPacket)));
+  };
+
+  EXPECT_FALSE(server->getConn().initialPeerTtl.has_value());
+
+  // A datagram that carried no TTL leaves the latch open.
+  deliverPingWithTtl(std::nullopt);
+  EXPECT_FALSE(server->getConn().initialPeerTtl.has_value());
+
+  deliverPingWithTtl(42);
+  ASSERT_TRUE(server->getConn().initialPeerTtl.has_value());
+  EXPECT_EQ(*server->getConn().initialPeerTtl, 42);
+
+  // Later packets do not overwrite it, so path changes cannot move the value.
+  deliverPingWithTtl(43);
+  ASSERT_TRUE(server->getConn().initialPeerTtl.has_value());
+  EXPECT_EQ(*server->getConn().initialPeerTtl, 42);
+}
+
 TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   PacketNum clientPacketNum = clientNextAppDataPacketNum++;
   ShortHeader header(

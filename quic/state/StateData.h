@@ -796,6 +796,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   TosHeader socketTos;
 
+  // Hop Limit / TTL of the first UDP datagram that carried one
+  OptionalIntegral<uint8_t> initialPeerTtl;
+
   // Number of QUIC initial packets received.
   uint16_t initialPacketsReceived{0};
 
