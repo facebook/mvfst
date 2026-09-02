@@ -378,16 +378,20 @@ struct TransportSettings {
   // Whether to use adaptive loss thresholds for reodering and timeout
   bool useAdaptiveLossReorderingThresholds{false};
   bool useAdaptiveLossTimeThresholds{false};
-  // Whether to automatically increase receive conn flow control. The
-  // determination is based on the frequency we are sending flow control
-  // updates. If there has been less than 2SRTTs between flow control updates
-  // this will double the target window.
+  // Connection-level receive flow control window autotuning.
+  // If locally consumed credit requires an update less than 2SRTTs after the
+  // previous update, this increases the target window by up to 2x.
   bool autotuneReceiveConnFlowControl{false};
+  // Maximum connection receive window that autotuning may select.
+  uint64_t maxAutotunedReceiveConnFlowControlWindow{
+      kDefaultMaxAutotunedReceiveConnFlowControlWindow};
   // Stream level receive flow control window autotuning.
-  // The logic is simple - double the flow control window every time we receive
-  // a stream blocked from the sender and there has been less than 2SRTTs since
-  // last flow control update.
+  // If locally consumed credit requires an update less than 2SRTTs after the
+  // previous update, this increases the target window by up to 2x.
   bool autotuneReceiveStreamFlowControl{false};
+  // Maximum per-stream receive window that autotuning may select.
+  uint64_t maxAutotunedReceiveStreamFlowControlWindow{
+      kDefaultMaxAutotunedReceiveStreamFlowControlWindow};
   // Enable a keepalive timer. This schedules a timer to send a PING ~15%
   // before an idle timeout. To work effectively this means the idle timer
   // has to be set to something >> the RTT of the connection.

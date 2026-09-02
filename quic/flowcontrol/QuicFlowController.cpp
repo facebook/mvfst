@@ -20,26 +20,64 @@
 
 namespace quic {
 namespace {
+uint64_t addAndClampToMaxVarInt(uint64_t offset, uint64_t windowSize) {
+  if (offset >= kMaxVarInt || windowSize >= kMaxVarInt - offset) {
+    return kMaxVarInt;
+  }
+  return offset + windowSize;
+}
+
+bool hasElapsedMoreThanRttMultiple(
+    TimePoint startTime,
+    TimePoint endTime,
+    std::chrono::microseconds srtt,
+    uint16_t multiple) {
+  if (endTime <= startTime) {
+    return false;
+  }
+  if (multiple == 0 || srtt <= 0us) {
+    return true;
+  }
+  using Rep = std::chrono::microseconds::rep;
+  if (srtt.count() > std::numeric_limits<Rep>::max() / multiple) {
+    return false;
+  }
+  const auto threshold =
+      std::chrono::microseconds(srtt.count() * static_cast<Rep>(multiple));
+  const auto elapsed = endTime - startTime;
+  const auto elapsedMicroseconds =
+      std::chrono::duration_cast<std::chrono::microseconds>(elapsed);
+  if (elapsedMicroseconds != threshold) {
+    return elapsedMicroseconds > threshold;
+  }
+  return elapsed >
+      std::chrono::duration_cast<TimePoint::duration>(elapsedMicroseconds);
+}
+
 Optional<uint64_t> calculateNewWindowUpdate(
     uint64_t curReadOffset,
     uint64_t curAdvertisedOffset,
     uint64_t windowSize,
     const std::chrono::microseconds& srtt,
     const TransportSettings& transportSettings,
+    bool autotuneReceiveFlowControl,
     const Optional<TimePoint>& lastSendTime,
     const TimePoint& updateTime) {
   DCHECK_LE(curReadOffset, curAdvertisedOffset);
-  auto nextAdvertisedOffset = curReadOffset + windowSize;
-  if (nextAdvertisedOffset == curAdvertisedOffset) {
+  auto nextAdvertisedOffset = addAndClampToMaxVarInt(curReadOffset, windowSize);
+  if (nextAdvertisedOffset == std::min(curAdvertisedOffset, kMaxVarInt)) {
     // No change in flow control
     return std::nullopt;
   }
-  bool enoughTimeElapsed = lastSendTime && updateTime > *lastSendTime &&
-      (updateTime - *lastSendTime) >
-          transportSettings.flowControlRttFrequency * srtt;
+  bool enoughTimeElapsed = lastSendTime &&
+      hasElapsedMoreThanRttMultiple(
+                               *lastSendTime,
+                               updateTime,
+                               srtt,
+                               transportSettings.flowControlRttFrequency);
   // If we are autotuning then frequent updates aren't required.
   if (!transportSettings.disableFlowControlTimeBasedUpdates &&
-      enoughTimeElapsed && !transportSettings.autotuneReceiveConnFlowControl) {
+      enoughTimeElapsed && !autotuneReceiveFlowControl) {
     return nextAdvertisedOffset;
   }
   // The logic here is that we want to send updates when we have read
@@ -49,9 +87,8 @@ Optional<uint64_t> calculateNewWindowUpdate(
     if (remaining > windowSize) {
       return false;
     }
-    return (windowSize - remaining) *
-        transportSettings.flowControlWindowFrequency >
-        windowSize;
+    const auto frequency = transportSettings.flowControlWindowFrequency;
+    return frequency != 0 && windowSize - remaining > windowSize / frequency;
   }();
   if (enoughWindowElapsed) {
     return nextAdvertisedOffset;
@@ -86,9 +123,35 @@ template <typename T>
 }
 
 inline uint64_t calculateMaximumData(const QuicStreamState& stream) {
-  return std::max(
-      stream.currentReadOffset + stream.flowControlState.windowSize,
-      stream.flowControlState.advertisedMaxOffset);
+  return std::min(
+      kMaxVarInt,
+      std::max(
+          addAndClampToMaxVarInt(
+              stream.currentReadOffset, stream.flowControlState.windowSize),
+          stream.flowControlState.advertisedMaxOffset));
+}
+
+void maybeIncreaseFlowControlWindowWithLimit(
+    const Optional<TimePoint>& timeOfLastFlowControlUpdate,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt,
+    uint64_t maximumWindowSize,
+    uint64_t& windowSize) {
+  if (!timeOfLastFlowControlUpdate || srtt <= 0us ||
+      updateTime <= *timeOfLastFlowControlUpdate) {
+    return;
+  }
+  using Rep = std::chrono::microseconds::rep;
+  const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+      updateTime - *timeOfLastFlowControlUpdate);
+  const bool lessThanTwoRtts =
+      srtt.count() > std::numeric_limits<Rep>::max() / 2 ||
+      elapsed < std::chrono::microseconds(srtt.count() * 2);
+  const auto windowLimit = std::min(maximumWindowSize, kMaxVarInt);
+  if (lessThanTwoRtts && windowSize < windowLimit) {
+    MVVLOG(10) << "increasing flow control window";
+    windowSize += std::min(windowSize, windowLimit - windowSize);
+  }
 }
 
 } // namespace
@@ -98,37 +161,60 @@ void maybeIncreaseFlowControlWindow(
     TimePoint updateTime,
     std::chrono::microseconds srtt,
     uint64_t& windowSize) {
-  if (!timeOfLastFlowControlUpdate || srtt == 0us) {
-    return;
-  }
-  MVCHECK(updateTime > *timeOfLastFlowControlUpdate);
-  if (std::chrono::duration_cast<decltype(srtt)>(
-          updateTime - *timeOfLastFlowControlUpdate) < 2 * srtt) {
-    MVVLOG(10) << "doubling flow control window";
-    windowSize *= 2;
-  }
+  maybeIncreaseFlowControlWindowWithLimit(
+      timeOfLastFlowControlUpdate, updateTime, srtt, kMaxVarInt, windowSize);
 }
+
+namespace {
+
+void maybeIncreaseConnectionFlowControlWindowWithLimit(
+    QuicConnectionStateBase::ConnectionFlowControlState& flowControlState,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt,
+    uint64_t maximumWindowSize) {
+  maybeIncreaseFlowControlWindowWithLimit(
+      flowControlState.timeOfLastFlowControlUpdate,
+      updateTime,
+      srtt,
+      maximumWindowSize,
+      flowControlState.windowSize);
+}
+
+void maybeIncreaseStreamFlowControlWindowWithLimit(
+    QuicStreamState::StreamFlowControlState& flowControlState,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt,
+    uint64_t maximumWindowSize) {
+  maybeIncreaseFlowControlWindowWithLimit(
+      flowControlState.timeOfLastFlowControlUpdate,
+      updateTime,
+      srtt,
+      maximumWindowSize,
+      flowControlState.windowSize);
+}
+
+} // namespace
 
 void maybeIncreaseConnectionFlowControlWindow(
     QuicConnectionStateBase::ConnectionFlowControlState& flowControlState,
     TimePoint updateTime,
     std::chrono::microseconds srtt) {
-  maybeIncreaseFlowControlWindow(
-      flowControlState.timeOfLastFlowControlUpdate,
+  maybeIncreaseConnectionFlowControlWindowWithLimit(
+      flowControlState,
       updateTime,
       srtt,
-      flowControlState.windowSize);
+      kDefaultMaxAutotunedReceiveConnFlowControlWindow);
 }
 
 void maybeIncreaseStreamFlowControlWindow(
     QuicStreamState::StreamFlowControlState& flowControlState,
     TimePoint updateTime,
     std::chrono::microseconds srtt) {
-  maybeIncreaseFlowControlWindow(
-      flowControlState.timeOfLastFlowControlUpdate,
+  maybeIncreaseStreamFlowControlWindowWithLimit(
+      flowControlState,
       updateTime,
       srtt,
-      flowControlState.windowSize);
+      kDefaultMaxAutotunedReceiveStreamFlowControlWindow);
 }
 
 bool maybeSendConnWindowUpdate(
@@ -146,6 +232,7 @@ bool maybeSendConnWindowUpdate(
       flowControlState.windowSize,
       conn.lossState.srtt,
       conn.transportSettings,
+      conn.transportSettings.autotuneReceiveConnFlowControl,
       flowControlState.timeOfLastFlowControlUpdate,
       updateTime);
   if (newAdvertisedOffset) {
@@ -154,8 +241,11 @@ bool maybeSendConnWindowUpdate(
     // Note: Flow control updates are redundant - MAX_DATA frames already
     // logged in packet events
     if (conn.transportSettings.autotuneReceiveConnFlowControl) {
-      maybeIncreaseConnectionFlowControlWindow(
-          flowControlState, updateTime, conn.lossState.srtt);
+      maybeIncreaseConnectionFlowControlWindowWithLimit(
+          flowControlState,
+          updateTime,
+          conn.lossState.srtt,
+          conn.transportSettings.maxAutotunedReceiveConnFlowControlWindow);
     }
     return true;
   }
@@ -178,9 +268,18 @@ bool maybeSendStreamWindowUpdate(
       flowControlState.windowSize,
       stream.conn.lossState.srtt,
       stream.conn.transportSettings,
+      stream.conn.transportSettings.autotuneReceiveStreamFlowControl,
       flowControlState.timeOfLastFlowControlUpdate,
       updateTime);
   if (newAdvertisedOffset) {
+    if (stream.conn.transportSettings.autotuneReceiveStreamFlowControl) {
+      maybeIncreaseStreamFlowControlWindowWithLimit(
+          flowControlState,
+          updateTime,
+          stream.conn.lossState.srtt,
+          stream.conn.transportSettings
+              .maxAutotunedReceiveStreamFlowControlWindow);
+    }
     MVVLOG(10) << "Queued flow control update for stream=" << stream.id
                << " offset=" << *newAdvertisedOffset;
     stream.conn.streamManager->queueWindowUpdate(stream.id);
@@ -487,10 +586,6 @@ void handleConnBlocked(QuicConnectionStateBase& conn) {
 }
 
 void handleStreamBlocked(QuicStreamState& stream) {
-  if (stream.conn.transportSettings.autotuneReceiveStreamFlowControl) {
-    maybeIncreaseStreamFlowControlWindow(
-        stream.flowControlState, Clock::now(), stream.conn.lossState.srtt);
-  }
   stream.conn.streamManager->queueWindowUpdate(stream.id);
   MVVLOG(4) << "Blocked triggered stream window update stream=" << stream.id;
 }
@@ -670,10 +765,13 @@ void updateFlowControlStateWithSettings(
 
 MaxDataFrame generateMaxDataFrame(const QuicConnectionStateBase& conn) {
   return MaxDataFrame(
-      std::max(
-          conn.flowControlState.sumCurReadOffset +
-              conn.flowControlState.windowSize,
-          conn.flowControlState.advertisedMaxOffset));
+      std::min(
+          kMaxVarInt,
+          std::max(
+              addAndClampToMaxVarInt(
+                  conn.flowControlState.sumCurReadOffset,
+                  conn.flowControlState.windowSize),
+              conn.flowControlState.advertisedMaxOffset)));
 }
 
 MaxStreamDataFrame generateMaxStreamDataFrame(const QuicStreamState& stream) {

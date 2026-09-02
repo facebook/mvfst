@@ -13,6 +13,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <array>
+
 using namespace folly;
 using namespace testing;
 
@@ -91,29 +93,285 @@ TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateAndIncrease) {
   EXPECT_EQ(conn_.flowControlState.windowSize, 1000);
 }
 
-TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateAndNoIncrease) {
+TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateAtTwoRttsDoesNotIncrease) {
   conn_.flowControlState.windowSize = 500;
   conn_.flowControlState.advertisedMaxOffset = 400;
-  conn_.flowControlState.sumCurReadOffset = 100;
+  conn_.flowControlState.sumCurReadOffset = 300;
   conn_.transportSettings.autotuneReceiveConnFlowControl = true;
 
   conn_.lossState.srtt = 100us;
   conn_.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
 
-  // Should not send window update
-  EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(0);
-  maybeSendConnWindowUpdate(
-      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 201us);
-  EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
-  EXPECT_EQ(conn_.flowControlState.windowSize, 500);
-
-  conn_.flowControlState.sumCurReadOffset += 200;
-  // Should send window update
   EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(1);
   maybeSendConnWindowUpdate(
-      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 10us);
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 200us);
   EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
-  EXPECT_EQ(conn_.flowControlState.windowSize, 1000);
+  EXPECT_EQ(conn_.flowControlState.windowSize, 500);
+}
+
+TEST(MaybeIncreaseFlowControlWindowTest, HandlesRttAndClockBoundaries) {
+  const auto startTime = TimePoint{} + 1s;
+
+  struct TestCase {
+    const char* name;
+    Optional<TimePoint> lastUpdateTime;
+    TimePoint updateTime;
+    std::chrono::microseconds srtt;
+    uint64_t expectedWindow;
+  };
+
+  const std::array<TestCase, 8> testCases{{
+      {"absent previous update", std::nullopt, startTime + 1us, 100us, 100},
+      {"zero RTT", startTime, startTime + 1us, 0us, 100},
+      {"backward clock", startTime, startTime - 1us, 100us, 100},
+      {"equal clock", startTime, startTime, 100us, 100},
+      {"less than two RTTs", startTime, startTime + 199us, 100us, 200},
+      {"exactly two RTTs", startTime, startTime + 200us, 100us, 100},
+      {"more than two RTTs", startTime, startTime + 201us, 100us, 100},
+      {"unrepresentable two RTTs",
+       startTime,
+       startTime + 1us,
+       std::chrono::microseconds::max(),
+       200},
+  }};
+
+  for (const auto& testCase : testCases) {
+    SCOPED_TRACE(testCase.name);
+    uint64_t windowSize = 100;
+    maybeIncreaseFlowControlWindow(
+        testCase.lastUpdateTime,
+        testCase.updateTime,
+        testCase.srtt,
+        windowSize);
+    EXPECT_EQ(testCase.expectedWindow, windowSize);
+  }
+}
+
+TEST_F(QuicFlowControlTest, ConnAndStreamAutotuningAreIndependent) {
+  struct TestCase {
+    bool connAutotuning;
+    bool streamAutotuning;
+  };
+
+  const std::array<TestCase, 4> testCases{{
+      {false, false},
+      {false, true},
+      {true, false},
+      {true, true},
+  }};
+  const auto lastUpdateTime = TimePoint{} + 1s;
+  conn_.lossState.srtt = 100us;
+
+  for (size_t i = 0; i < testCases.size(); ++i) {
+    const auto& testCase = testCases[i];
+    SCOPED_TRACE(
+        Message() << "conn=" << testCase.connAutotuning
+                  << " stream=" << testCase.streamAutotuning);
+    conn_.transportSettings.autotuneReceiveConnFlowControl =
+        testCase.connAutotuning;
+    conn_.transportSettings.autotuneReceiveStreamFlowControl =
+        testCase.streamAutotuning;
+    conn_.flowControlState.windowSize = 100;
+    conn_.flowControlState.advertisedMaxOffset = 100;
+    conn_.flowControlState.sumCurReadOffset = 51;
+    conn_.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+    conn_.pendingEvents.connWindowUpdate = false;
+
+    QuicStreamState stream(3 + 4 * i, conn_);
+    stream.currentReadOffset = 51;
+    stream.flowControlState.windowSize = 100;
+    stream.flowControlState.advertisedMaxOffset = 100;
+    stream.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+
+    EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(1);
+    EXPECT_CALL(*quicStats_, onStreamFlowControlUpdate()).Times(1);
+    EXPECT_TRUE(maybeSendConnWindowUpdate(conn_, lastUpdateTime + 100us));
+    EXPECT_TRUE(maybeSendStreamWindowUpdate(stream, lastUpdateTime + 100us));
+    EXPECT_EQ(
+        testCase.connAutotuning ? 200 : 100, conn_.flowControlState.windowSize);
+    EXPECT_EQ(
+        testCase.streamAutotuning ? 200 : 100,
+        stream.flowControlState.windowSize);
+
+    conn_.pendingEvents.connWindowUpdate = false;
+    conn_.streamManager->removeWindowUpdate(stream.id);
+  }
+}
+
+TEST_F(QuicFlowControlTest, StreamUpdateCadenceUsesStreamAutotuningFlag) {
+  struct TestCase {
+    bool connAutotuning;
+    bool streamAutotuning;
+    bool expectUpdate;
+  };
+
+  const std::array<TestCase, 2> testCases{{
+      {true, false, true},
+      {false, true, false},
+  }};
+  const auto lastUpdateTime = TimePoint{} + 1s;
+  conn_.lossState.srtt = 100us;
+
+  for (size_t i = 0; i < testCases.size(); ++i) {
+    const auto& testCase = testCases[i];
+    SCOPED_TRACE(
+        Message() << "conn=" << testCase.connAutotuning
+                  << " stream=" << testCase.streamAutotuning);
+    conn_.transportSettings.autotuneReceiveConnFlowControl =
+        testCase.connAutotuning;
+    conn_.transportSettings.autotuneReceiveStreamFlowControl =
+        testCase.streamAutotuning;
+
+    QuicStreamState stream(3 + 4 * i, conn_);
+    stream.currentReadOffset = 1;
+    stream.flowControlState.windowSize = 100;
+    stream.flowControlState.advertisedMaxOffset = 100;
+    stream.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+
+    EXPECT_CALL(*quicStats_, onStreamFlowControlUpdate())
+        .Times(testCase.expectUpdate ? 1 : 0);
+    EXPECT_EQ(
+        testCase.expectUpdate,
+        maybeSendStreamWindowUpdate(stream, lastUpdateTime + 201us));
+    EXPECT_EQ(
+        testCase.expectUpdate,
+        conn_.streamManager->pendingWindowUpdate(stream.id));
+    EXPECT_EQ(100, stream.flowControlState.windowSize);
+    conn_.streamManager->removeWindowUpdate(stream.id);
+  }
+}
+
+TEST_F(QuicFlowControlTest, ConnectionAutotuningHonorsConfiguredCap) {
+  struct TestCase {
+    uint64_t initialWindow;
+    Optional<uint64_t> maximumWindowOverride;
+    uint64_t expectedWindow;
+  };
+
+  const std::array<TestCase, 4> testCases{{
+      {kDefaultMaxAutotunedReceiveConnFlowControlWindow / 2 + 1,
+       std::nullopt,
+       kDefaultMaxAutotunedReceiveConnFlowControlWindow},
+      {500, 750, 750},
+      {750, 750, 750},
+      {800, 750, 800},
+  }};
+  const auto lastUpdateTime = TimePoint{} + 1s;
+  conn_.transportSettings.autotuneReceiveConnFlowControl = true;
+  conn_.lossState.srtt = 100us;
+  EXPECT_EQ(
+      kDefaultMaxAutotunedReceiveConnFlowControlWindow,
+      conn_.transportSettings.maxAutotunedReceiveConnFlowControlWindow);
+  EXPECT_EQ(32 * 1024 * 1024, kDefaultMaxAutotunedReceiveConnFlowControlWindow);
+
+  for (const auto& testCase : testCases) {
+    SCOPED_TRACE(testCase.initialWindow);
+    if (testCase.maximumWindowOverride) {
+      conn_.transportSettings.maxAutotunedReceiveConnFlowControlWindow =
+          *testCase.maximumWindowOverride;
+    }
+    conn_.flowControlState.windowSize = testCase.initialWindow;
+    conn_.flowControlState.advertisedMaxOffset = testCase.initialWindow;
+    conn_.flowControlState.sumCurReadOffset = testCase.initialWindow;
+    conn_.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+    conn_.pendingEvents.connWindowUpdate = false;
+
+    EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(1);
+    EXPECT_TRUE(maybeSendConnWindowUpdate(conn_, lastUpdateTime + 1us));
+    EXPECT_EQ(testCase.expectedWindow, conn_.flowControlState.windowSize);
+    EXPECT_EQ(
+        testCase.initialWindow + testCase.expectedWindow,
+        generateMaxDataFrame(conn_).maximumData);
+  }
+}
+
+TEST_F(QuicFlowControlTest, StreamAutotuningHonorsConfiguredCap) {
+  struct TestCase {
+    uint64_t initialWindow;
+    Optional<uint64_t> maximumWindowOverride;
+    uint64_t expectedWindow;
+  };
+
+  const std::array<TestCase, 4> testCases{{
+      {kDefaultMaxAutotunedReceiveStreamFlowControlWindow / 2 + 1,
+       std::nullopt,
+       kDefaultMaxAutotunedReceiveStreamFlowControlWindow},
+      {500, 750, 750},
+      {750, 750, 750},
+      {800, 750, 800},
+  }};
+  const auto lastUpdateTime = TimePoint{} + 1s;
+  conn_.transportSettings.autotuneReceiveStreamFlowControl = true;
+  conn_.lossState.srtt = 100us;
+  EXPECT_EQ(
+      kDefaultMaxAutotunedReceiveStreamFlowControlWindow,
+      conn_.transportSettings.maxAutotunedReceiveStreamFlowControlWindow);
+  EXPECT_EQ(
+      16 * 1024 * 1024, kDefaultMaxAutotunedReceiveStreamFlowControlWindow);
+
+  for (size_t i = 0; i < testCases.size(); ++i) {
+    const auto& testCase = testCases[i];
+    SCOPED_TRACE(testCase.initialWindow);
+    if (testCase.maximumWindowOverride) {
+      conn_.transportSettings.maxAutotunedReceiveStreamFlowControlWindow =
+          *testCase.maximumWindowOverride;
+    }
+    QuicStreamState stream(3 + 4 * i, conn_);
+    stream.currentReadOffset = testCase.initialWindow;
+    stream.flowControlState.windowSize = testCase.initialWindow;
+    stream.flowControlState.advertisedMaxOffset = testCase.initialWindow;
+    stream.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+
+    EXPECT_CALL(*quicStats_, onStreamFlowControlUpdate()).Times(1);
+    EXPECT_TRUE(maybeSendStreamWindowUpdate(stream, lastUpdateTime + 1us));
+    EXPECT_EQ(testCase.expectedWindow, stream.flowControlState.windowSize);
+    EXPECT_EQ(
+        testCase.initialWindow + testCase.expectedWindow,
+        generateMaxStreamDataFrame(stream).maximumData);
+    conn_.streamManager->removeWindowUpdate(stream.id);
+  }
+}
+
+TEST_F(QuicFlowControlTest, ZeroWindowFrequencyDisablesWindowBasedUpdates) {
+  conn_.transportSettings.flowControlWindowFrequency = 0;
+  conn_.transportSettings.disableFlowControlTimeBasedUpdates = true;
+  conn_.flowControlState.windowSize = 100;
+  conn_.flowControlState.advertisedMaxOffset = 100;
+  conn_.flowControlState.sumCurReadOffset = 100;
+
+  QuicStreamState stream(3, conn_);
+  stream.currentReadOffset = 100;
+  stream.flowControlState.windowSize = 100;
+  stream.flowControlState.advertisedMaxOffset = 100;
+
+  EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(0);
+  EXPECT_CALL(*quicStats_, onStreamFlowControlUpdate()).Times(0);
+  EXPECT_FALSE(maybeSendConnWindowUpdate(conn_, TimePoint{} + 1s));
+  EXPECT_FALSE(maybeSendStreamWindowUpdate(stream, TimePoint{} + 1s));
+  EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
+  EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(stream.id));
+}
+
+TEST_F(QuicFlowControlTest, ZeroRttFrequencyAllowsImmediateTimeBasedUpdates) {
+  const auto lastUpdateTime = TimePoint{} + 1s;
+  conn_.transportSettings.flowControlRttFrequency = 0;
+  conn_.flowControlState.windowSize = 100;
+  conn_.flowControlState.advertisedMaxOffset = 100;
+  conn_.flowControlState.sumCurReadOffset = 1;
+  conn_.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+
+  QuicStreamState stream(3, conn_);
+  stream.currentReadOffset = 1;
+  stream.flowControlState.windowSize = 100;
+  stream.flowControlState.advertisedMaxOffset = 100;
+  stream.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+
+  EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(1);
+  EXPECT_CALL(*quicStats_, onStreamFlowControlUpdate()).Times(1);
+  EXPECT_TRUE(maybeSendConnWindowUpdate(conn_, lastUpdateTime + 1us));
+  EXPECT_TRUE(maybeSendStreamWindowUpdate(stream, lastUpdateTime + 1us));
+  EXPECT_EQ(100, conn_.flowControlState.windowSize);
+  EXPECT_EQ(100, stream.flowControlState.windowSize);
 }
 
 TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateTimeElapsed) {
@@ -237,6 +495,31 @@ TEST_F(QuicFlowControlTest, GenerateMaxDataFrameChangeWindowLarger) {
       frame2.maximumData,
       conn_.flowControlState.sumCurReadOffset +
           conn_.flowControlState.windowSize);
+}
+
+TEST_F(QuicFlowControlTest, GeneratedReceiveLimitsSaturateAtMaxVarInt) {
+  conn_.flowControlState.advertisedMaxOffset = kMaxVarInt - 10;
+  conn_.flowControlState.sumCurReadOffset = kMaxVarInt - 20;
+  conn_.flowControlState.windowSize = 5;
+  const auto firstConnLimit = generateMaxDataFrame(conn_).maximumData;
+  EXPECT_EQ(kMaxVarInt - 10, firstConnLimit);
+
+  conn_.flowControlState.windowSize = 100;
+  const auto secondConnLimit = generateMaxDataFrame(conn_).maximumData;
+  EXPECT_EQ(kMaxVarInt, secondConnLimit);
+  EXPECT_GE(secondConnLimit, firstConnLimit);
+
+  QuicStreamState stream(3, conn_);
+  stream.flowControlState.advertisedMaxOffset = kMaxVarInt - 10;
+  stream.currentReadOffset = kMaxVarInt - 20;
+  stream.flowControlState.windowSize = 5;
+  const auto firstStreamLimit = generateMaxStreamDataFrame(stream).maximumData;
+  EXPECT_EQ(kMaxVarInt - 10, firstStreamLimit);
+
+  stream.flowControlState.windowSize = 100;
+  const auto secondStreamLimit = generateMaxStreamDataFrame(stream).maximumData;
+  EXPECT_EQ(kMaxVarInt, secondStreamLimit);
+  EXPECT_GE(secondStreamLimit, firstStreamLimit);
 }
 
 TEST_F(QuicFlowControlTest, MaybeSendStreamWindowUpdate) {
@@ -521,7 +804,7 @@ TEST_F(QuicFlowControlTest, TestStreamFlowControlAutotuneDisabled) {
       stream.currentReadOffset + stream.flowControlState.windowSize);
 }
 
-TEST_F(QuicFlowControlTest, TestStreamFlowControlAutotuneEnabled) {
+TEST_F(QuicFlowControlTest, HandleStreamBlockedNeverAutotunes) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
   stream.conn.transportSettings.useNewStreamBlockedCondition = true;
@@ -533,10 +816,13 @@ TEST_F(QuicFlowControlTest, TestStreamFlowControlAutotuneEnabled) {
 
   stream.conn.transportSettings.autotuneReceiveStreamFlowControl = true;
 
-  // The window size should double.
+  // BLOCKED frames request the latest credit, but are not an autotuning signal.
   handleStreamBlocked(stream);
+  EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
+  handleStreamBlocked(stream);
+  EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
   auto frameOffset = generateMaxStreamDataFrame(stream).maximumData;
-  EXPECT_EQ(stream.flowControlState.windowSize, 1000);
+  EXPECT_EQ(stream.flowControlState.windowSize, 500);
   EXPECT_EQ(
       frameOffset,
       stream.currentReadOffset + stream.flowControlState.windowSize);
@@ -546,9 +832,12 @@ TEST_F(QuicFlowControlTest, LostConnectionWindowUpdate) {
   conn_.flowControlState.windowSize = 500;
   conn_.flowControlState.advertisedMaxOffset = 400;
   conn_.flowControlState.sumCurReadOffset = 300;
+  conn_.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
+  conn_.transportSettings.autotuneReceiveConnFlowControl = true;
 
   onConnWindowUpdateLost(conn_);
   EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
+  EXPECT_EQ(conn_.flowControlState.windowSize, 500);
   EXPECT_EQ(generateMaxDataFrame(conn_).maximumData, 500 + 300);
 }
 
@@ -584,9 +873,11 @@ TEST_F(QuicFlowControlTest, LostStreamWindowUpdate) {
   stream.currentReadOffset = 300;
   stream.flowControlState.windowSize = 500;
   stream.flowControlState.advertisedMaxOffset = 400;
+  stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
+  conn_.transportSettings.autotuneReceiveStreamFlowControl = true;
 
-  // Should send window update
   onStreamWindowUpdateLost(stream);
+  EXPECT_EQ(stream.flowControlState.windowSize, 500);
   EXPECT_EQ(generateMaxStreamDataFrame(stream).maximumData, 500 + 300);
 }
 
@@ -868,6 +1159,30 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnReceiveReset3) {
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(conn_.flowControlState.sumCurReadOffset, 180);
   EXPECT_EQ(stream.currentReadOffset, 150);
+}
+
+TEST_F(QuicFlowControlTest, ReceiveResetCreditCanAutotuneConnectionWindow) {
+  const auto lastUpdateTime = TimePoint{} + 1s;
+  conn_.transportSettings.autotuneReceiveConnFlowControl = true;
+  conn_.flowControlState.windowSize = 100;
+  conn_.flowControlState.advertisedMaxOffset = 100;
+  conn_.flowControlState.sumCurReadOffset = 0;
+  conn_.flowControlState.timeOfLastFlowControlUpdate = lastUpdateTime;
+  conn_.lossState.srtt = 100us;
+
+  QuicStreamState stream(3, conn_);
+  stream.currentReadOffset = 0;
+  stream.reliableSizeFromPeer = 0;
+  stream.finalReadOffset = 60;
+
+  EXPECT_CALL(*quicStats_, onConnFlowControlUpdate()).Times(1);
+  auto result = updateFlowControlOnReceiveReset(stream, lastUpdateTime + 100us);
+  ASSERT_FALSE(result.hasError());
+  EXPECT_EQ(60, conn_.flowControlState.sumCurReadOffset);
+  EXPECT_EQ(60, stream.currentReadOffset);
+  EXPECT_EQ(200, conn_.flowControlState.windowSize);
+  EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
+  EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(stream.id));
 }
 
 TEST_F(QuicFlowControlTest, UpdateFlowControlOnWrite) {

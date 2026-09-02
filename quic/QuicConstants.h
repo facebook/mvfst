@@ -593,6 +593,10 @@ constexpr float kMaxGainOverride = 10.0f;
 // Default flow control window for HTTP/2 + 1K for headers
 constexpr uint64_t kDefaultStreamFlowControlWindow = (64 + 1) * 1024;
 constexpr uint64_t kDefaultConnectionFlowControlWindow = 1024 * 1024;
+constexpr uint64_t kDefaultMaxAutotunedReceiveStreamFlowControlWindow =
+    16 * 1024 * 1024;
+constexpr uint64_t kDefaultMaxAutotunedReceiveConnFlowControlWindow =
+    32 * 1024 * 1024;
 
 /* Stream Limits */
 constexpr uint64_t kDefaultMaxStreamsBidirectional = 2048;
