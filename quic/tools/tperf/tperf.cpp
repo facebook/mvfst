@@ -7,16 +7,34 @@
 
 #include <quic/common/MvfstLogging.h>
 
+#include <folly/String.h>
 #include <folly/init/Init.h>
 #include <folly/portability/GFlags.h>
 
+#include <string_view>
+
+#ifdef __linux__
+#include <sched.h>
+
+#include <cerrno>
+#include <fstream>
+#include <optional>
+#include <string>
+#include <vector>
+#endif
+
 #include <quic/tools/tperf/TperfClient.h>
+#include <quic/tools/tperf/TperfKnobsPatcher.h>
 #include <quic/tools/tperf/TperfServer.h>
 #include <quic/tools/tperf/TperfTcp.h>
 
 DEFINE_string(host, "::1", "TPerf server hostname/IP");
 DEFINE_int32(port, 6666, "TPerf server port");
 DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
+DEFINE_bool(
+    pin,
+    false,
+    "Best-effort pin server and client to distinct physical CPUs");
 DEFINE_string(
     transport,
     "quic",
@@ -151,10 +169,105 @@ DEFINE_uint32(
     "Cap on the number of slab IOBufs the inplace MSG_ZEROCOPY pool will allocate. "
     "When exhausted, the writer falls back to plain GSO until the kernel "
     "completes outstanding sends and returns slabs to the idle list.");
+DEFINE_string(
+    jks_to_patch,
+    "",
+    "Comma-separated boolean JustKnobs to force true for this process");
 
 namespace quic::tperf {
 
-namespace {} // namespace
+namespace {
+
+#ifdef __linux__
+
+struct CpuTopology {
+  int package;
+  int core;
+};
+
+std::optional<int> readTopologyValue(int cpu, std::string_view name) {
+  std::ifstream input(
+      "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/" +
+      std::string(name));
+  int value = 0;
+  if (input >> value) {
+    return value;
+  }
+  return std::nullopt;
+}
+
+std::optional<CpuTopology> readCpuTopology(int cpu) {
+  const auto package = readTopologyValue(cpu, "physical_package_id");
+  const auto core = readTopologyValue(cpu, "core_id");
+  if (!package || !core) {
+    return std::nullopt;
+  }
+  return CpuTopology{.package = *package, .core = *core};
+}
+
+int selectClientCpu(const std::vector<int>& allowedCpus) {
+  const int serverCpu = allowedCpus.front();
+  const auto serverTopology = readCpuTopology(serverCpu);
+  if (serverTopology) {
+    for (const int cpu : allowedCpus) {
+      const auto topology = readCpuTopology(cpu);
+      if (topology && topology->package == serverTopology->package &&
+          topology->core != serverTopology->core) {
+        return cpu;
+      }
+    }
+  }
+  return allowedCpus.size() > 1 ? allowedCpus[1] : serverCpu;
+}
+
+#endif
+
+void maybePinToCpu(std::string_view mode) {
+  if (!FLAGS_pin) {
+    return;
+  }
+
+#ifdef __linux__
+  if (mode != "server" && mode != "client") {
+    MVLOG_WARNING << "Cannot pin unknown tperf mode " << mode;
+    return;
+  }
+
+  cpu_set_t allowedSet;
+  CPU_ZERO(&allowedSet);
+  if (sched_getaffinity(0, sizeof(allowedSet), &allowedSet) != 0) {
+    MVLOG_WARNING << "Unable to read CPU affinity: " << folly::errnoStr(errno);
+    return;
+  }
+
+  std::vector<int> allowedCpus;
+  for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu) {
+    if (CPU_ISSET(cpu, &allowedSet)) {
+      allowedCpus.push_back(cpu);
+    }
+  }
+  if (allowedCpus.empty()) {
+    MVLOG_WARNING << "Cannot pin tperf: no CPUs in the affinity mask";
+    return;
+  }
+
+  const int cpu =
+      mode == "server" ? allowedCpus.front() : selectClientCpu(allowedCpus);
+  cpu_set_t selectedSet;
+  CPU_ZERO(&selectedSet);
+  CPU_SET(cpu, &selectedSet);
+  if (sched_setaffinity(0, sizeof(selectedSet), &selectedSet) != 0) {
+    MVLOG_WARNING << "Unable to pin tperf to CPU " << cpu << ": "
+                  << folly::errnoStr(errno);
+    return;
+  }
+  MVLOG_INFO << "Pinned tperf " << mode << " to CPU " << cpu;
+#else
+  MVLOG_WARNING << "--pin is not supported on this platform";
+#endif
+}
+
+} // namespace
 
 } // namespace quic::tperf
 
@@ -191,6 +304,12 @@ int main(int argc, char* argv[]) {
 #endif
   gflags::ParseCommandLineFlags(&argc, &argv, false);
   folly::Init init(&argc, &argv);
+  maybePinToCpu(FLAGS_mode);
+
+  TperfKnobsPatcher knobsPatcher;
+  if (!knobsPatcher.patch(FLAGS_jks_to_patch)) {
+    return 1;
+  }
 
   TperfTransportMode transportMode = TperfTransportMode::Quic;
   try {

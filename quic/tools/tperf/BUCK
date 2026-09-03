@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_binary", "mvfst_cpp_library")
+load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 
 oncall("traffic_protocols")
 
@@ -83,12 +84,42 @@ mvfst_cpp_library(
     ],
 )
 
+_TPERF_KNOBS_PATCHER_SRCS = (
+    select({
+        "DEFAULT": ["TperfKnobsPatcherXPlat.cpp"],
+        "ovr_config//os/constraints:linux": ["TperfKnobsPatcherFbcode.cpp"],
+    })
+    if get_fbsource_cell() == "fbcode"
+    else ["TperfKnobsPatcherXPlat.cpp"]
+)
+
+_TPERF_KNOBS_PATCHER_DEPS = (
+    select({
+        "DEFAULT": [],
+        "ovr_config//os/constraints:linux": [
+            "//folly:string",
+            "//justknobs:justknobs_patches",
+        ],
+    })
+    if get_fbsource_cell() == "fbcode"
+    else []
+)
+
+mvfst_cpp_library(
+    name = "tperf_knobs_patcher",
+    srcs = _TPERF_KNOBS_PATCHER_SRCS,
+    headers = ["TperfKnobsPatcher.h"],
+    deps = ["//quic/common:mvfst_logging"] + _TPERF_KNOBS_PATCHER_DEPS,
+)
+
 _TPERF_DEPS = [
     ":tperf_client",
+    ":tperf_knobs_patcher",
     ":tperf_server",
     ":tperf_tcp",
     "//folly/init:init",
     "//folly/portability:gflags",
+    "//folly:string",
     "//quic/common:mvfst_logging",
 ] + select({
     "DEFAULT": ["//folly:memcpy-use"],
@@ -119,7 +150,10 @@ mvfst_cpp_binary(
         "fbcode//quic:use_alt_crypto-enabled",
         "fbcode//quic:force_alt_crypto-enabled",
     ],
-    deps = _TPERF_DEPS,
+    deps = _TPERF_DEPS
+    + [
+        "//xsec_crypto/cpp20/haberdashery/aead/extensions:aes128gcm_zen4_extension",
+    ],
 )
 
 mvfst_cpp_binary(
