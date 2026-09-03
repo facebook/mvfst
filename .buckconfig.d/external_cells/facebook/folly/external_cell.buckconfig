@@ -6,4 +6,4 @@ gh_facebook_folly = git
 
 [external_cell_gh_facebook_folly]
 git_origin = https://github.com/facebook/folly.git
-commit_hash = c8bde19cb06f1f7bcaf2e9fe89198182700dab78
+commit_hash = a47cf2cf47ddacd46fdd0bcfb1a62bfcb39d63f1
