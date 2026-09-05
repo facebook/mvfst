@@ -19,10 +19,9 @@ constexpr uint64_t kMaxBwFilterLen = 2; // Measured in number of ProbeBW cycles
 constexpr uint64_t kMaxExtraAckedFilterLen =
     10; // Measured in packet-timed round trips
 
-// ProbeRtt timing constants
-constexpr std::chrono::microseconds kProbeRTTInterval = 10s;
-constexpr std::chrono::microseconds kMinRttFilterLen =
-    10s + kBbr2ProbeRttDuration;
+// ProbeRtt constants
+constexpr std::chrono::microseconds kMinRttFilterLen = 10s;
+constexpr float kProbeRttCwndGain = 0.5;
 
 // Pacing margin
 // TODO: Restore this margin to a non-zero value
@@ -42,8 +41,8 @@ Bbr2Shared::Bbr2Shared(QuicConnectionStateBase& conn)
     : conn_(conn),
       cwndBytes_(
           conn_.udpSendPacketLen * conn_.transportSettings.initCwndInMss),
+      minRttTimestamp_(Clock::now()),
       maxBwFilter_(kMaxBwFilterLen - 1, Bandwidth(), 0),
-      probeRttMinTimestamp_(Clock::now()),
       maxExtraAckedFilter_(kMaxExtraAckedFilterLen, 0, 0) {}
 
 std::string bbr2StateToString(Bbr2State state) {
@@ -253,38 +252,35 @@ void Bbr2Shared::updateRound() {
 
 // ===== MinRTT & ProbeRTT Timing =====
 
-void Bbr2Shared::updateMinRtt() {
-  if (idleRestart_) {
-    probeRttMinTimestamp_ = Clock::now();
-    probeRttMinValue_ = kDefaultMinRtt;
-  }
-
-  probeRttExpired_ = probeRttMinTimestamp_
-      ? Clock::now() > (probeRttMinTimestamp_.value() + kProbeRTTInterval)
+void Bbr2Shared::updateMinRtt(const AckEvent& ackEvent) {
+  const auto timeNow = Clock::now();
+  minRttExpired_ = minRttTimestamp_
+      ? timeNow > (minRttTimestamp_.value() + kMinRttFilterLen)
       : true;
 
-  auto& lrtt = conn_.lossState.lrtt;
-  if (lrtt > 0us && (lrtt < probeRttMinValue_ || probeRttExpired_)) {
-    probeRttMinValue_ = lrtt;
-    probeRttMinTimestamp_ = Clock::now();
+  if (minRttExpired_) {
+    probeRttCwnd_.reset();
   }
 
-  auto minRttExpired = minRtt_ == kDefaultMinRtt ||
-      (probeRttMinTimestamp_ &&
-       Clock::now() > (probeRttMinTimestamp_.value() + kMinRttFilterLen));
-  if (probeRttMinValue_ < minRtt_ || minRttExpired) {
-    minRtt_ = probeRttMinValue_;
-    minRttTimestamp_ = probeRttMinTimestamp_;
+  const auto& rttSample = ackEvent.rttSample;
+  if (rttSample.has_value() && *rttSample > 0us &&
+      (*rttSample <= minRtt_ || minRttExpired_)) {
+    if (minRttExpired_) {
+      probeRttCwnd_ = getBDPWithGain(kProbeRttCwndGain);
+    }
+    minRtt_ = *rttSample;
+    minRttTimestamp_ = timeNow;
   }
 }
 
 bool Bbr2Shared::shouldEnterProbeRtt() const noexcept {
-  return probeRttExpired_ && !idleRestart_;
+  return minRttExpired_ && !idleRestart_;
 }
 
 void Bbr2Shared::resetProbeRttExpired() {
-  probeRttMinTimestamp_ = Clock::now();
-  probeRttExpired_ = false;
+  minRttTimestamp_ = Clock::now();
+  minRttExpired_ = false;
+  probeRttCwnd_.reset();
 }
 
 // ===== App-Limited & Idle State =====
@@ -625,7 +621,7 @@ void Bbr2Shared::updateModelFromDeliveryAndLoss(
 }
 
 void Bbr2Shared::finalizeMinRttAndDeliverySignals() {
-  updateMinRtt();
+  updateMinRtt(*currentAckEvent_);
   advanceLatestDeliverySignals();
 }
 

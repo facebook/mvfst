@@ -187,8 +187,11 @@ void Bbr2ProbeRtt::exitProbeRtt() {
 }
 
 uint64_t Bbr2ProbeRtt::getProbeRTTCwnd() const {
+  auto probeRttCwnd = shared_->getBDPWithGain(kProbeRttCwndGain);
+  if (shared_->probeRttCwnd_.has_value()) {
+    probeRttCwnd = std::min(probeRttCwnd, *shared_->probeRttCwnd_);
+  }
   return std::max(
-      shared_->getBDPWithGain(kProbeRttCwndGain),
-      quic::kMinCwndInMssForBbr * conn_.udpSendPacketLen);
+      probeRttCwnd, quic::kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 }
 } // namespace quic

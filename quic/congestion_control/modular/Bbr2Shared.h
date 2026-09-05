@@ -107,7 +107,7 @@ class Bbr2Shared {
   void updateRound();
 
   // ===== MinRTT & ProbeRTT Timing =====
-  void updateMinRtt();
+  void updateMinRtt(const AckEvent& ackEvent);
   [[nodiscard]] bool shouldEnterProbeRtt() const noexcept;
   void resetProbeRttExpired();
 
@@ -209,16 +209,13 @@ class Bbr2Shared {
   // MinRTT tracking
   std::chrono::microseconds minRtt_{kDefaultMinRtt};
   Optional<TimePoint> minRttTimestamp_;
+  Optional<uint64_t> probeRttCwnd_;
 
   // Bandwidth model
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>
       maxBwFilter_;
   Bandwidth bandwidth_;
   uint64_t cycleCount_{0};
-
-  // ProbeRTT timing
-  Optional<TimePoint> probeRttMinTimestamp_;
-  std::chrono::microseconds probeRttMinValue_{kDefaultMinRtt};
 
   // App-limited & idle state
   TimePoint appLimitedLastSendTime_;
@@ -264,7 +261,7 @@ class Bbr2Shared {
   Bbr2State state_{Bbr2State::Startup};
   RecoveryState recoveryState_{RecoveryState::NOT_RECOVERY};
   bool roundStart_{false};
-  bool probeRttExpired_{false};
+  bool minRttExpired_{false};
   bool appLimited_{false};
   bool idleRestart_{false};
   bool lossRoundStart_{false};

@@ -27,6 +27,8 @@ namespace quic {
  * controller.
  */
 class Bbr2ProbeRtt : public CongestionController {
+  friend class Bbr2ModularTestPeer;
+
  public:
   explicit Bbr2ProbeRtt(
       QuicConnectionStateBase& conn,

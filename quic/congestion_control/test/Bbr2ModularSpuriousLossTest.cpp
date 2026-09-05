@@ -80,6 +80,10 @@ class Bbr2ModularTestPeer {
     shared.returnedFromProbeRtt_ = true;
   }
 
+  static void setProbeRttCwnd(Bbr2Shared& shared, uint64_t cwnd) {
+    shared.probeRttCwnd_ = cwnd;
+  }
+
   static void setFullBwCount(Bbr2Shared& shared, uint64_t count) {
     shared.fullBwCount_ = count;
   }
@@ -673,10 +677,11 @@ TEST_F(
   Bbr2ModularTestPeer::setFullBwCount(*shared, 3);
   ASSERT_TRUE(Bbr2ModularTestPeer::hasUndoState(*shared));
 
-  Bbr2ProbeRtt probeRtt(*conn_, shared, std::move(probeBw));
   const auto probeRttCwnd = std::max<uint64_t>(
       conn_->transportSettings.initCwndInMss * kPacketSize / 2,
       kMinCwndInMssForBbr * kPacketSize);
+  Bbr2ModularTestPeer::setProbeRttCwnd(*shared, probeRttCwnd);
+  Bbr2ProbeRtt probeRtt(*conn_, shared, std::move(probeBw));
   Bbr2ModularTestPeer::setModelState(
       *shared, 8'000, kReducedBandwidth, 7'000, 9'000);
   expectRepace();
