@@ -99,6 +99,10 @@ struct CongestionControlConfig {
   // Whether BBR2 should enable reno coexistence.
   bool enableRenoCoexistence{false};
 
+  // Used by: BBR2Modular
+  // Whether BBR2 should use precautionary bandwidth probing.
+  bool enablePrecautionaryBandwidthProbing{false};
+
   // Used by: BBR2
   // Whether BBR2 paces the initial congestion window.
   bool paceInitCwnd{false};

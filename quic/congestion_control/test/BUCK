@@ -290,6 +290,23 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "Bbr2ModularProbeBwTest",
+    srcs = [
+        "Bbr2ModularProbeBwTest.cpp",
+    ],
+    network_access = network_access_utils.none(),
+    deps = [
+        ":test_utils",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control/modular:bbr2_probe_bw",
+        "//quic/congestion_control/modular:bbr2_startup",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
     name = "EcnL4sTrackerTest",
     srcs = [
         "EcnL4sTrackerTest.cpp",

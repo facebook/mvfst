@@ -81,6 +81,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
       "\"enableRecoveryInStartup\": false, "
       "\"enableRecoveryInProbeStates\": false, "
       "\"enableRenoCoexistence\": true, "
+      "\"enablePrecautionaryBandwidthProbing\": true, "
       "\"paceInitCwnd\": false, "
       "\"overrideCruisePacingGain\": 7.9, "
       "\"overrideCruiseCwndGain\": 1.5, "
@@ -103,6 +104,7 @@ TEST_F(TransportSettingsFunctionsTest, FullConfig) {
   EXPECT_EQ(config.enableRecoveryInStartup, false);
   EXPECT_EQ(config.enableRecoveryInProbeStates, false);
   EXPECT_EQ(config.enableRenoCoexistence, true);
+  EXPECT_EQ(config.enablePrecautionaryBandwidthProbing, true);
   EXPECT_EQ(config.paceInitCwnd, false);
   EXPECT_EQ(config.overrideCruisePacingGain, 7.9f);
   EXPECT_EQ(config.overrideCruiseCwndGain, 1.5f);
@@ -137,6 +139,7 @@ TEST_F(TransportSettingsFunctionsTest, UnspecifiedFieldsAreDefaulted) {
   EXPECT_EQ(config.enableRecoveryInStartup, true);
   EXPECT_EQ(config.enableRecoveryInProbeStates, true);
   EXPECT_EQ(config.enableRenoCoexistence, false);
+  EXPECT_EQ(config.enablePrecautionaryBandwidthProbing, false);
   EXPECT_EQ(config.overrideCruisePacingGain, -1.0f);
   EXPECT_EQ(config.overrideCruiseCwndGain, -1.0f);
   EXPECT_EQ(config.overrideStartupPacingGain, -1.0f);

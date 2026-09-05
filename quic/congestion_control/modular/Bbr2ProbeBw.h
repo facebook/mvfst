@@ -30,6 +30,8 @@ namespace quic {
  * and transition away when ProbeRTT is needed.
  */
 class Bbr2ProbeBw : public CongestionController {
+  friend class Bbr2ModularTestPeer;
+
  public:
   explicit Bbr2ProbeBw(
       QuicConnectionStateBase& conn,
@@ -87,10 +89,13 @@ class Bbr2ProbeBw : public CongestionController {
   void startProbeBwCruise();
   void startProbeBwRefill();
   void startProbeBwUp();
-  void updateProbeBwCyclePhase();
+  void finishProbeBwUp(bool probeTooHigh, bool precautionary);
+  void updateProbeBwCyclePhase(uint64_t inflightBeforeEvent);
   bool checkTimeToProbeBW();
   bool checkTimeToCruise();
   bool checkTimeToGoDown();
+  [[nodiscard]] bool shouldStopForPrecautionaryProbe(
+      uint64_t inflightBeforeEvent) const;
   bool hasElapsedInPhase(std::chrono::microseconds interval);
 
   // Full bandwidth detection (for ProbeBw_Up → ProbeBw_Down transition)
@@ -133,6 +138,8 @@ class Bbr2ProbeBw : public CongestionController {
   uint64_t probeUpRounds_{0};
   uint64_t probeUpAcks_{0};
   bool canUpdateLongtermLossModel_{false};
+  bool previousProbeTooHigh_{false};
+  bool previousProbePrecautionary_{false};
 
   // Cwnd gain (local to ProbeBw)
   float cwndGain_{2.0};

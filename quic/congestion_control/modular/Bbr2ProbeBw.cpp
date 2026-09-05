@@ -48,6 +48,14 @@ void Bbr2ProbeBw::onPacketSent(const OutstandingPacketWrapper& packet) {
 void Bbr2ProbeBw::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  auto inflightBeforeEvent = conn_.lossState.inflightBytes;
+  if (ackEvent) {
+    inflightBeforeEvent += ackEvent->ackedBytes;
+  }
+  if (lossEvent) {
+    inflightBeforeEvent += lossEvent->lostBytes;
+  }
+
   // Handle return from ProbeRtt before processing this event so spurious-only
   // ACKs use the ProbeBw state and model bounds.
   // TODO(jbeshay): This handover mechanism from ProbeBw is hacky. Refactor it
@@ -57,6 +65,7 @@ void Bbr2ProbeBw::onPacketAckOrLoss(
     resetShortTermModel();
     startProbeBwDown();
     startProbeBwCruise();
+    previousProbePrecautionary_ = false;
   }
 
   if (shared_->resolveSpuriousLossUndo(ackEvent, lossEvent)) {
@@ -93,7 +102,7 @@ void Bbr2ProbeBw::onPacketAckOrLoss(
 
     // Module-specific: congestion signals and state machine
     updateCongestionSignals();
-    updateProbeBwCyclePhase();
+    updateProbeBwCyclePhase(inflightBeforeEvent);
 
     shared_->finalizeMinRttAndDeliverySignals();
     if (shared_->shouldEnterProbeRtt()) {
@@ -252,8 +261,19 @@ void Bbr2ProbeBw::updatePacingAndCwndGain() {
 
 // ProbeBw cycle control
 
-void Bbr2ProbeBw::updateProbeBwCyclePhase() {
+void Bbr2ProbeBw::updateProbeBwCyclePhase(uint64_t inflightBeforeEvent) {
+  const bool precautionaryProbingEnabled =
+      conn_.transportSettings.ccaConfig.enablePrecautionaryBandwidthProbing;
+  if (!precautionaryProbingEnabled) {
+    previousProbeTooHigh_ = false;
+    previousProbePrecautionary_ = false;
+  }
+  const bool wasProbeBwUp = shared_->state_ == Bbr2State::ProbeBw_Up;
   adaptLongTermModel();
+  if (precautionaryProbingEnabled && wasProbeBwUp &&
+      shared_->state_ == Bbr2State::ProbeBw_Down) {
+    return;
+  }
   checkFullBwReached();
 
   switch (shared_->state_) {
@@ -278,9 +298,12 @@ void Bbr2ProbeBw::updateProbeBwCyclePhase() {
       }
       break;
     case Bbr2State::ProbeBw_Up:
-      if (checkTimeToGoDown()) {
+      if (shouldStopForPrecautionaryProbe(inflightBeforeEvent)) {
         canUpdateLongtermLossModel_ = false;
-        startProbeBwDown();
+        finishProbeBwUp(false, true);
+      } else if (checkTimeToGoDown()) {
+        canUpdateLongtermLossModel_ = false;
+        finishProbeBwUp(false, false);
       }
       break;
     case Bbr2State::Startup:
@@ -324,6 +347,7 @@ void Bbr2ProbeBw::startProbeBwRefill() {
   resetShortTermModel();
   probeUpRounds_ = 0;
   probeUpAcks_ = 0;
+  previousProbePrecautionary_ = false;
   shared_->state_ = Bbr2State::ProbeBw_Refill;
   updatePacingAndCwndGain();
   shared_->startRound();
@@ -338,8 +362,21 @@ void Bbr2ProbeBw::startProbeBwUp() {
   raiseInflightLongTermSlope();
 }
 
+void Bbr2ProbeBw::finishProbeBwUp(bool probeTooHigh, bool precautionary) {
+  if (conn_.transportSettings.ccaConfig.enablePrecautionaryBandwidthProbing) {
+    previousProbeTooHigh_ = probeTooHigh;
+    previousProbePrecautionary_ = precautionary;
+  }
+  startProbeBwDown();
+}
+
 bool Bbr2ProbeBw::checkTimeToProbeBW() {
-  if (hasElapsedInPhase(bwProbeWait_) || isRenoCoexistenceProbeTime()) {
+  const bool fastFollowupAfterPrecautionaryProbe =
+      conn_.transportSettings.ccaConfig.enablePrecautionaryBandwidthProbing &&
+      previousProbePrecautionary_ && !previousProbeTooHigh_ &&
+      shared_->roundStart_;
+  if (fastFollowupAfterPrecautionaryProbe || hasElapsedInPhase(bwProbeWait_) ||
+      isRenoCoexistenceProbeTime()) {
     startProbeBwRefill();
     return true;
   }
@@ -366,6 +403,14 @@ bool Bbr2ProbeBw::checkTimeToGoDown() {
     return true;
   }
   return false;
+}
+
+bool Bbr2ProbeBw::shouldStopForPrecautionaryProbe(
+    uint64_t inflightBeforeEvent) const {
+  return conn_.transportSettings.ccaConfig
+             .enablePrecautionaryBandwidthProbing &&
+      previousProbeTooHigh_ && shared_->inflightLongTerm_.has_value() &&
+      inflightBeforeEvent >= *shared_->inflightLongTerm_;
 }
 
 void Bbr2ProbeBw::resetFullBw() {
@@ -457,7 +502,7 @@ void Bbr2ProbeBw::handleInFlightTooHigh() {
             static_cast<float>(shared_->getTargetInflightWithGain()) * kBeta));
   }
   if (shared_->state_ == Bbr2State::ProbeBw_Up) {
-    startProbeBwDown();
+    finishProbeBwUp(true, false);
   }
 }
 
