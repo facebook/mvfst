@@ -168,7 +168,6 @@ QUIC_ENUM(
     INVALID_SRC_PORT,
     UNKNOWN_CID_VERSION,
     CANNOT_FORWARD_DATA,
-    EGRESS_POLICER_DROP,
     DUPLICATE_PACKET)
 
 QUIC_ENUM(
@@ -230,8 +229,7 @@ QUIC_ENUM(
     // Controls the max number of PTOs to send before closing the
     // connection
     MAX_PTO = 0x10012,
-    // Egress policer config: rate_bytes_per_sec,burst_ms,delay_ms
-    EGRESS_POLICER_CONFIG = 0x20001,
+    // DEPRECATED: 0x20001 (do not reuse value).
     // Enable SCONE and set the rate signal from a bps value
     SCONE_KNOB = 0x5C0E,
     // Controls rx packets before ack thresholds

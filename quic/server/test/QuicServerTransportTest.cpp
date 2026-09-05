@@ -4082,6 +4082,20 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   EXPECT_EQ(flag, 1);
 }
 
+TEST_F(QuicServerTransportTest, TestReservedTransportKnobIdHasNoHandler) {
+  constexpr uint64_t kReservedTransportKnobId = 0x20001;
+
+  EXPECT_CALL(
+      *quicStats_,
+      onTransportKnobError(
+          Eq(TransportKnobParamId(TransportKnobParamId::UNKNOWN))));
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(_)).Times(0);
+
+  server->handleKnobParams({
+      {.id = kReservedTransportKnobId, .val = std::string{"1,0,500"}},
+  });
+}
+
 TEST_F(
     QuicServerTransportTest,
     TestHandleTransportKnobParamWithUnexpectedValTypes) {

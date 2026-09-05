@@ -202,13 +202,6 @@ struct ServerDirectEncapConfig {
   uint8_t supportedZones;
 };
 
-struct EgressPolicerConfig {
-  bool enabled{false};
-  uint64_t rateBytesPerSec{0};
-  uint32_t burstMs{100};
-  uint32_t delayMs{1000};
-};
-
 struct TransportSettings {
   // The initial flow control window for the whole connection advertised to the
   // peer.
@@ -582,8 +575,6 @@ struct TransportSettings {
   // Emit SCONE packets when shouldSendSconePacket allows. Set by SCONE_KNOB.
   bool enableSconeSend{false};
   std::chrono::seconds sconePacketInterval{20};
-
-  EgressPolicerConfig egressPolicerConfig;
 
   // Enable path degradation / blackhole detection callbacks.
   // When enabled, the transport fires onPathDegrading() and

@@ -378,27 +378,6 @@ uint64_t writeSconePacketIfNeeded(
   return sconeSize;
 }
 
-bool shouldPolicerDropPacket(
-    QuicConnectionStateBase& connection,
-    size_t encodedSize) {
-  if (connection.nodeType != QuicNodeType::Server) {
-    return false;
-  }
-  if (!connection.egressPolicer) {
-    return false;
-  }
-  if (connection.egressPolicerActivationTime.has_value() &&
-      Clock::now() < *connection.egressPolicerActivationTime) {
-    return false;
-  }
-  auto wireBytes = static_cast<double>(encodedSize);
-  if (!connection.egressPolicer->consume(wireBytes)) {
-    QUIC_STATS(connection.statsCallback, onPacketDroppedByEgressPolicer);
-    return true;
-  }
-  return false;
-}
-
 [[nodiscard]] quic::Expected<DataPathResult, QuicError>
 continuousMemoryBuildScheduleEncrypt(
     QuicConnectionStateBase& connection,
@@ -542,12 +521,6 @@ continuousMemoryBuildScheduleEncrypt(
   if (encodedSize > connection.udpSendPacketLen) {
     MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
               << encodedSize;
-  }
-  // Egress policer: drop packet if rate exceeded (treat as network loss).
-  if (shouldPolicerDropPacket(connection, encodedSize)) {
-    connection.bufAccessor->trimEnd(encodedSize);
-    return DataPathResult::makeWriteResult(
-        true, std::move(result.value()), encodedSize, encodedBodySize);
   }
   // TODO: I think we should add an API that doesn't need a buffer.
   auto writeResult =
@@ -722,11 +695,6 @@ iobufChainBasedBuildScheduleEncrypt(
   if (encodedSize > connection.udpSendPacketLen) {
     MVVLOG(3) << "Quic sending pkt larger than limit, encodedSize="
               << encodedSize << " encodedBodySize=" << encodedBodySize;
-  }
-  // Egress policer: drop packet if rate exceeded (treat as network loss).
-  if (shouldPolicerDropPacket(connection, encodedSize)) {
-    return DataPathResult::makeWriteResult(
-        true, std::move(result.value()), encodedSize, encodedBodySize);
   }
   auto writeResult = ioBufBatch.write(std::move(packetBuf), encodedSize);
   if (!writeResult.has_value()) {

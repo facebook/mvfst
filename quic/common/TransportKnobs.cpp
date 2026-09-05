@@ -119,7 +119,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
         case TransportKnobParamId::CC_ALGORITHM_KNOB:
         case TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED:
         case TransportKnobParamId::CC_CONFIG:
-        case TransportKnobParamId::EGRESS_POLICER_CONFIG:
         case TransportKnobParamId::RX_PACKETS_BEFORE_ACK: {
           // string knobs
           if (val.type() != folly::dynamic::Type::STRING) {

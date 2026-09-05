@@ -149,7 +149,6 @@ mvfst_cpp_library(
         ":stats_callback",
         ":stream_send_buffer",
         ":transport_settings",
-        "//folly:token_bucket",
         "//folly/container:f14_hash",
         "//folly/io/async:delayed_destruction",
         "//quic:config",

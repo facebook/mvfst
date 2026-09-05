@@ -113,7 +113,6 @@ mvfst_cpp_test(
     deps = [
         ":mocks",
         "//folly:range",
-        "//folly:token_bucket",
         "//quic/api:transport_helpers",
         "//quic/client:state_and_handshake",
         "//quic/codec:pktbuilder",
