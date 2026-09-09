@@ -69,6 +69,10 @@ class TestQuicTransport
     return writeLooper_->isPacingScheduled();
   }
 
+  auto& writeLooper() {
+    return *writeLooper_;
+  }
+
   quic::Expected<void, QuicError> onReadData(
       const quic::SocketAddress& /* localAddress */,
       ReceivedUdpPacket&& /* udpPacket */) noexcept override {

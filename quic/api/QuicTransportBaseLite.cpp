@@ -207,7 +207,7 @@ void QuicTransportBaseLite::TransportLooper::run(bool thisIteration) noexcept {
   running_ = true;
   // Caller can call run() in the callback. But if we are in pacing mode, we
   // should prevent such loop.
-  if (pacingTimer_ && inLoopBody_) {
+  if ((pacingTimer_ || hasPacingCallback_) && inLoopBody_) {
     MVVLOG(4) << __func__ << ": " << type_
               << " in loop body and using pacing - not rescheduling";
     return;
@@ -1343,6 +1343,11 @@ void QuicTransportBaseLite::maybeStopWriteLooperAndArmSocketWritableEvent() {
   }
   if (conn_->transportSettings.useSockWritableEvents &&
       !socket_->isWritableCallbackSet()) {
+    // Let pacing fire the writer while a pacing delay is pending.
+    if (writeLooper_->isPacingScheduled() || getLooperPacingDelay() != 0us) {
+      return;
+    }
+
     // Check if all data has been written and we're not limited by flow
     // control/congestion control.
     bool haveDataToWrite = shouldWriteData(*conn_) != WriteDataReason::NO_WRITE;

@@ -26,6 +26,8 @@ class QuicAsyncUDPSocketMock : public QuicAsyncUDPSocket {
   MOCK_METHOD((quic::Expected<void, QuicError>), close, ());
   MOCK_METHOD((void), resumeRead, (ReadCallback*));
   MOCK_METHOD((void), pauseRead, ());
+  MOCK_METHOD((void), pauseWrite, ());
+  MOCK_METHOD((bool), isWritableCallbackSet, (), (const));
   MOCK_METHOD(
       (ssize_t),
       write,

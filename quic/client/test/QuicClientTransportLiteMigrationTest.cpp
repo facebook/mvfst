@@ -321,6 +321,39 @@ TEST_F(
   qEvb_->loopOnce();
 }
 
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    MigrateConnectionPausesOldSocketWritableEvents) {
+  auto* conn = quicClient_->getConn();
+  auto oldPathId = conn->currentPathId;
+  auto* oldSocket = sockPtr_;
+  auto probeSocket = createProbeSocketMock(quic::SocketAddress("::", 22334));
+  auto* newSocket = probeSocket.get();
+
+  auto startResult =
+      quicClient_->startPathProbe(std::move(probeSocket), nullptr);
+  ASSERT_TRUE(startResult.has_value());
+  auto pathId = startResult.value();
+  validatePath(pathId);
+
+  conn->transportSettings.useSockWritableEvents = true;
+  EXPECT_CALL(*oldSocket, isWritableCallbackSet()).WillOnce(Return(true));
+  EXPECT_CALL(*oldSocket, pauseWrite()).WillOnce(Invoke([conn, oldPathId] {
+    EXPECT_EQ(conn->pathManager->getPath(oldPathId)->socket, nullptr);
+  }));
+  EXPECT_CALL(*newSocket, pauseWrite()).Times(0);
+
+  auto migrationResult = quicClient_->migrateConnection(pathId);
+  ASSERT_TRUE(migrationResult.has_value()) << migrationResult.error();
+  sockPtr_ = newSocket;
+
+  EXPECT_EQ(conn->currentPathId, pathId);
+  EXPECT_EQ(conn->pathManager->getPath(oldPathId)->socket.get(), oldSocket);
+  EXPECT_TRUE(conn->pendingEvents.sendPing);
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(oldSocket));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(newSocket));
+}
+
 TEST_F(QuicClientTransportLiteMigrationTest, PathProbeTimeout) {
   quic::SocketAddress localAddr("::", 33445);
   auto probeSock = createProbeSocketMock(localAddr);

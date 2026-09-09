@@ -2118,6 +2118,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::migrateConnection(
   if (newSocket) {
     // The new path has an associated socket.
 
+    if (socket_ && socket_->isWritableCallbackSet()) {
+      socket_->pauseWrite();
+    }
+
     // Cache the socket for the old path in case we need to switch to it later.
     // The oldPathId is no longer the current path. So this cannot fail.
     auto addSocketResult =

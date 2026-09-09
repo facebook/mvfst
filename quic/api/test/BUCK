@@ -53,6 +53,7 @@ mvfst_cpp_test(
     srcs = [
         "QuicTransportTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
         "fbsource//third-party/googletest:gmock",
         ":mocks",

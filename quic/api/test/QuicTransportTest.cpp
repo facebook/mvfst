@@ -5204,33 +5204,18 @@ TEST_F(QuicTransportTest, PacedWriteNoDataToWrite) {
   transport_->pacedWrite();
 }
 
-TEST_F(QuicTransportTest, PacingWillBurstFirst) {
-  auto& conn = transport_->getConnectionState();
-  auto mockCongestionController =
-      std::make_unique<NiceMock<MockCongestionController>>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn.congestionController = std::move(mockCongestionController);
-  conn.transportSettings.pacingEnabled = true;
-  conn.canBePaced = true;
-  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
-  auto rawPacer = mockPacer.get();
-  conn.pacer = std::move(mockPacer);
-  EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillRepeatedly(Return(100));
+class QuicTransportPacingTest : public QuicTransportTest,
+                                public WithParamInterface<bool> {};
 
-  auto buf = buildRandomInputData(200);
-  auto streamId = transport_->createBidirectionalStream().value();
-  auto writeChain72 = transport_->writeChain(streamId, buf->clone(), false);
-  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(Return(0));
-  EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
-      .WillRepeatedly(Return(1));
-  transport_->pacedWrite();
-}
+INSTANTIATE_TEST_SUITE_P(
+    WritableEvents,
+    QuicTransportPacingTest,
+    Values(false, true));
 
-TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
-  transport_->setPacingTimer(std::make_shared<HighResQuicTimer>(&evb_, 1ms));
+TEST_P(QuicTransportPacingTest, PacingWillBurstFirst) {
   TransportSettings transportSettings;
   transportSettings.pacingEnabled = true;
+  transportSettings.useSockWritableEvents = GetParam();
   transport_->setTransportSettings(transportSettings);
 
   auto& conn = transport_->getConnectionState();
@@ -5248,20 +5233,85 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
 
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();
+  auto writeChain72 = transport_->writeChain(streamId, buf->clone(), false);
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillOnce(Invoke([](const auto&, const iovec* vec, size_t count) {
+        return getTotalIovecLen(vec, count);
+      }));
+  EXPECT_CALL(*socket_, resumeWrite(_)).Times(GetParam() ? 1 : 0);
+  EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*rawPacer, getTimeUntilNextWrite(_)).WillRepeatedly(Return(0us));
+  transport_->pacedWrite();
+  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(conn));
+  EXPECT_EQ(!GetParam(), transport_->writeLooper().isRunning());
+}
+
+TEST_P(QuicTransportPacingTest, AlreadyScheduledPacingNoWrite) {
+  TransportSettings transportSettings;
+  transportSettings.pacingEnabled = true;
+  transportSettings.useSockWritableEvents = GetParam();
+  transport_->setTransportSettings(transportSettings);
+
+  auto& conn = transport_->getConnectionState();
+  conn.udpSendPacketLen = 100;
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  conn.canBePaced = true;
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(100));
+
+  auto buf = buildRandomInputData(400);
+  auto streamId = transport_->createBidirectionalStream().value();
   auto writeChain73 = transport_->writeChain(streamId, buf->clone(), false);
-  EXPECT_CALL(*socket_, write(_, _, _)).WillOnce(Return(0));
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Invoke([](const auto&, const iovec* vec, size_t count) {
+        return getTotalIovecLen(vec, count);
+      }));
+  EXPECT_CALL(*socket_, resumeWrite(_)).Times(0);
   EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
   EXPECT_CALL(*rawPacer, getTimeUntilNextWrite(_))
       .WillRepeatedly(Return(3600000ms));
-  // This will write out 100 bytes, leave 100 bytes behind. FunctionLooper will
-  // schedule a pacing timeout.
+  EXPECT_FALSE(transport_->isPacingScheduled());
+  transport_->pacedWrite();
+  EXPECT_FALSE(transport_->isPacingScheduled());
   loopForWrites();
 
   ASSERT_NE(WriteDataReason::NO_WRITE, shouldWriteData(conn));
   EXPECT_TRUE(transport_->isPacingScheduled());
+  EXPECT_FALSE(transport_->writeLooper().isLoopCallbackScheduled());
   EXPECT_CALL(*socket_, write(_, _, _)).Times(0);
+  EXPECT_CALL(*rawPacer, getTimeUntilNextWrite(_)).WillRepeatedly(Return(0us));
+  loopForWrites();
   transport_->pacedWrite();
+  EXPECT_TRUE(transport_->isPacingScheduled());
+  EXPECT_FALSE(transport_->writeLooper().isLoopCallbackScheduled());
+
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(Invoke([](const auto&, const iovec* vec, size_t count) {
+        return getTotalIovecLen(vec, count);
+      }));
+  EXPECT_CALL(*rawPacer, getTimeUntilNextWrite(_))
+      .WillRepeatedly(Return(3600000ms));
+  transport_->writeLooper().cancelTimerCallback();
+  transport_->writeLooper().timeoutExpired();
+  EXPECT_TRUE(transport_->isPacingScheduled());
+  EXPECT_FALSE(transport_->writeLooper().isLoopCallbackScheduled());
+
+  EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
+      .WillRepeatedly(Return(10));
+  transport_->writeLooper().cancelTimerCallback();
+  transport_->writeLooper().timeoutExpired();
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
+  EXPECT_FALSE(transport_->isPacingScheduled());
+  EXPECT_FALSE(transport_->writeLooper().isRunning());
 }
 
 TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
