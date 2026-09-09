@@ -23,6 +23,33 @@ class Bbr2ModularTestPeer {
     return controller.shared_;
   }
 
+  static void
+  setStateAndPacingGain(Bbr2Shared& shared, Bbr2State state, float pacingGain) {
+    shared.state_ = state;
+    shared.pacingGain_ = pacingGain;
+  }
+
+  static Bbr2State state(const Bbr2Shared& shared) {
+    return shared.state_;
+  }
+
+  static float pacingGain(const Bbr2Shared& shared) {
+    return shared.pacingGain_;
+  }
+
+  static void setShortTermBounds(
+      Bbr2Shared& shared,
+      Bandwidth bandwidth,
+      uint64_t inflight) {
+    shared.bandwidthShortTerm_ = bandwidth;
+    shared.inflightShortTerm_ = inflight;
+  }
+
+  static bool hasShortTermBounds(const Bbr2Shared& shared) {
+    return shared.bandwidthShortTerm_.has_value() ||
+        shared.inflightShortTerm_.has_value();
+  }
+
   static void setMinRttState(
       Bbr2Shared& shared,
       std::chrono::microseconds minRtt,
@@ -140,8 +167,61 @@ class Bbr2ModularProbeRttTest : public Test {
   }
 
  protected:
+  void expectProbeRttExitRestores(
+      std::unique_ptr<Bbr2Startup> startup,
+      Bbr2State expectedState,
+      float expectedPacingGain) {
+    auto* startupPtr = startup.get();
+    auto shared = Bbr2ModularTestPeer::shared(*startup);
+    ASSERT_EQ(expectedState, Bbr2ModularTestPeer::state(*shared));
+    ASSERT_FLOAT_EQ(
+        expectedPacingGain, Bbr2ModularTestPeer::pacingGain(*shared));
+    Bbr2ModularTestPeer::setShortTermBounds(*shared, kBandwidth, kPacketSize);
+
+    auto probeRtt =
+        std::make_unique<Bbr2ProbeRtt>(*conn_, shared, std::move(startup));
+    auto* probeRttPtr = probeRtt.get();
+    conn_->congestionController = std::move(probeRtt);
+    Bbr2ModularTestPeer::setProbeRttDoneTimestamp(
+        *probeRttPtr, Clock::now() - 1us);
+
+    auto packet =
+        makeTestingWritePacket(0, kPacketSize, kPacketSize, Clock::now());
+    onPacketsSentWrapper(conn_.get(), probeRttPtr, packet);
+
+    EXPECT_EQ(startupPtr, conn_->congestionController.get());
+    EXPECT_EQ(
+        CongestionControlType::BBR2Modular,
+        conn_->congestionController->type());
+    EXPECT_EQ(expectedState, Bbr2ModularTestPeer::state(*shared));
+    EXPECT_FLOAT_EQ(
+        expectedPacingGain, Bbr2ModularTestPeer::pacingGain(*shared));
+    EXPECT_FALSE(Bbr2ModularTestPeer::returnedFromProbeRtt(*shared));
+    EXPECT_FALSE(Bbr2ModularTestPeer::hasShortTermBounds(*shared));
+  }
+
   std::unique_ptr<QuicConnectionStateBase> conn_;
 };
+
+TEST_F(Bbr2ModularProbeRttTest, ProbeRttExitRestoresStartupState) {
+  constexpr float kConfiguredPacingGain = 2.5f;
+  conn_->transportSettings.ccaConfig.overrideStartupPacingGain =
+      kConfiguredPacingGain;
+  expectProbeRttExitRestores(
+      std::make_unique<Bbr2Startup>(*conn_),
+      Bbr2State::Startup,
+      kConfiguredPacingGain);
+}
+
+TEST_F(Bbr2ModularProbeRttTest, ProbeRttExitRestoresDrainState) {
+  constexpr float kDrainPacingGain = 0.5f;
+  auto startup = std::make_unique<Bbr2Startup>(*conn_);
+  auto shared = Bbr2ModularTestPeer::shared(*startup);
+  Bbr2ModularTestPeer::setStateAndPacingGain(
+      *shared, Bbr2State::Drain, kDrainPacingGain);
+  expectProbeRttExitRestores(
+      std::move(startup), Bbr2State::Drain, kDrainPacingGain);
+}
 
 TEST_F(Bbr2ModularProbeRttTest, InitialRttSampleDoesNotTriggerProbeRtt) {
   Bbr2Startup startup(*conn_);
@@ -364,7 +444,7 @@ TEST_F(Bbr2ModularProbeRttTest, ProbeRttExitRefreshesMinRttClock) {
   EXPECT_EQ(startupPtr, conn_->congestionController.get());
   EXPECT_EQ(kPacketSize, conn_->lossState.inflightBytes);
   EXPECT_TRUE(Bbr2ModularTestPeer::roundStarted(*shared));
-  EXPECT_TRUE(Bbr2ModularTestPeer::returnedFromProbeRtt(*shared));
+  EXPECT_FALSE(Bbr2ModularTestPeer::returnedFromProbeRtt(*shared));
   EXPECT_FALSE(shared->shouldEnterProbeRtt());
   EXPECT_GE(Bbr2ModularTestPeer::minRttTimestamp(*shared), exitStart);
   EXPECT_EQ(std::nullopt, Bbr2ModularTestPeer::probeRttCwnd(*shared));

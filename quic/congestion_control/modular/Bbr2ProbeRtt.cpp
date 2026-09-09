@@ -24,6 +24,8 @@ Bbr2ProbeRtt::Bbr2ProbeRtt(
     std::unique_ptr<CongestionController> previousController)
     : conn_(conn),
       shared_(std::move(shared)),
+      stateBeforeProbeRtt_(shared_->state_),
+      pacingGainBeforeProbeRtt_(shared_->pacingGain_),
       previousController_(std::move(previousController)) {
   shared_->pacingGain_ = kProbeRttPacingGain;
   enterProbeRtt();
@@ -181,8 +183,17 @@ void Bbr2ProbeRtt::checkProbeRttDone() {
 }
 
 void Bbr2ProbeRtt::exitProbeRtt() {
-  // Signal to ProbeBw that it should restart its cycle
-  shared_->returnedFromProbeRtt_ = true;
+  if (stateBeforeProbeRtt_ == Bbr2State::Startup ||
+      stateBeforeProbeRtt_ == Bbr2State::Drain) {
+    shared_->state_ = stateBeforeProbeRtt_;
+    shared_->pacingGain_ = pacingGainBeforeProbeRtt_;
+    shared_->bandwidthShortTerm_.reset();
+    shared_->inflightShortTerm_.reset();
+    shared_->returnedFromProbeRtt_ = false;
+  } else {
+    // Signal to ProbeBw that it should restart its cycle.
+    shared_->returnedFromProbeRtt_ = true;
+  }
   completedProbeRtt_ = true;
 }
 

@@ -95,6 +95,8 @@ class Bbr2ProbeRtt : public CongestionController {
 
   QuicConnectionStateBase& conn_;
   std::shared_ptr<Bbr2Shared> shared_;
+  Bbr2State stateBeforeProbeRtt_;
+  float pacingGainBeforeProbeRtt_;
 
   // ProbeRTT execution state
   Optional<TimePoint> probeRttDoneTimestamp_;
