@@ -95,6 +95,10 @@ using DatagramTransportTypes = testing::Types<
     DatagramTransportConfig<quic::test::QuicServerTransportTestBase, false>,
     DatagramTransportConfig<quic::test::QuicServerTransportTestBase, true>>;
 
+using DatagramWithStreamsTransportTypes = testing::Types<
+    DatagramTransportConfig<quic::test::QuicClientTransportTestBase, true>,
+    DatagramTransportConfig<quic::test::QuicServerTransportTestBase, true>>;
+
 class DatagramTransportTypeNames {
  public:
   template <typename T>
@@ -6315,6 +6319,18 @@ TYPED_TEST_SUITE(
     ::DatagramTransportTypes,
     ::DatagramTransportTypeNames);
 
+template <typename T>
+class QuicTypedTransportAfterStartTestDatagramWithStreams
+    : public QuicTypedTransportAfterStartTestDatagram<T> {
+ public:
+  ~QuicTypedTransportAfterStartTestDatagramWithStreams() override = default;
+};
+
+TYPED_TEST_SUITE(
+    QuicTypedTransportAfterStartTestDatagramWithStreams,
+    ::DatagramWithStreamsTransportTypes,
+    ::DatagramTransportTypeNames);
+
 /**
  * Test DATAGRAM congestion control mode.
  *
@@ -6795,12 +6811,8 @@ TYPED_TEST(
  *                       WriteStreamFrame(lowStream)
  */
 TYPED_TEST(
-    QuicTypedTransportAfterStartTestDatagram,
+    QuicTypedTransportAfterStartTestDatagramWithStreams,
     DatagramFlowPriorityScheduledBetweenStreams) {
-  if (!TypeParam::scheduleDatagramsWithStreams) {
-    GTEST_SKIP();
-  }
-
   this->getNonConstConn().transportSettings.datagramConfig.trackingMode =
       DatagramConfig::CongestionControlMode::ConstrainedAndTracked;
   this->setWritableBytes(2000);
@@ -6944,12 +6956,8 @@ TYPED_TEST(
  * that no longer exists.
  */
 TYPED_TEST(
-    QuicTypedTransportAfterStartTestDatagram,
+    QuicTypedTransportAfterStartTestDatagramWithStreams,
     DropOldestRetiresEphemeralFlowFromWriteQueue) {
-  if (!TypeParam::scheduleDatagramsWithStreams) {
-    GTEST_SKIP();
-  }
-
   auto& conn = this->getNonConstConn();
   conn.transportSettings.datagramConfig.sendDropOldDataFirst = true;
   conn.datagramState.maxWriteBufferSize = 1;
