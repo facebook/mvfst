@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include <folly/Random.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/net/NetOps.h>
@@ -243,7 +245,14 @@ class QuicClientTransportLite
 
   uint64_t getEnobufsCount() const;
 
+  std::chrono::milliseconds getConnectionIdleDuration() const;
+
+  int64_t getNetworkReadCallbackStartTimeMs() const;
+
+  uint64_t getReceivedUdpDatagramCount() const;
+
   uint64_t getPtoCount() const;
+  uint64_t getTotalPtoCount() const;
   uint64_t getPacketsSentCount() const;
   bool canRead() const;
   std::optional<int32_t> getHandshakeStatus() const;
@@ -368,9 +377,11 @@ class QuicClientTransportLite
 
   void maybeQlogDatagram(size_t len);
 
-  void trackDatagramsReceived(uint32_t totalPackets, uint32_t totalPacketLen);
+  void trackDatagramsReceived(uint32_t totalDatagrams, uint32_t totalDataLen);
 
   void asyncClose(QuicError error);
+
+  void recordNetworkReadCallbackStart();
 
   quic::Expected<void, QuicError> maybeIssueConnectionIds();
 
@@ -415,6 +426,8 @@ class QuicClientTransportLite
   quic::Expected<void, QuicError> maybeSendTransportKnobs();
 
   bool replaySafeNotified_{false};
+  TimePoint networkReadCallbackStartTime_{};
+  uint64_t receivedUdpDatagramCount_{0};
   // Set it QuicClientTransportLite is in a self owning mode. This will be
   // cleaned up when the caller invokes a terminal call to the transport.
   std::shared_ptr<QuicClientTransportLite> selfOwning_;

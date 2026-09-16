@@ -1735,6 +1735,7 @@ void QuicClientTransportLite::onNotifyDataAvailable(
     QuicAsyncUDPSocket& sock) noexcept {
   auto self = this->shared_from_this();
   MVCHECK(conn_, "trying to receive packets without a connection");
+  recordNetworkReadCallbackStart();
   auto readBufferSize = std::max(
                             conn_->transportSettings.maxRecvPacketSize,
                             uint64_t(kDefaultUDPReadBufferSize)) *
@@ -1744,6 +1745,10 @@ void QuicClientTransportLite::onNotifyDataAvailable(
   if (!result.has_value()) {
     asyncClose(result.error());
   }
+}
+
+void QuicClientTransportLite::recordNetworkReadCallbackStart() {
+  networkReadCallbackStartTime_ = Clock::now();
 }
 
 void QuicClientTransportLite::
@@ -2173,10 +2178,13 @@ void QuicClientTransportLite::maybeQlogDatagram(size_t len) {
 }
 
 void QuicClientTransportLite::trackDatagramsReceived(
-    uint32_t totalPackets,
-    uint32_t totalPacketLen) {
-  QUIC_STATS(statsCallback_, onPacketsReceived, totalPackets);
-  QUIC_STATS(statsCallback_, onRead, totalPacketLen);
+    uint32_t totalDatagrams,
+    uint32_t totalDataLen) {
+  // NetworkData has one ReceivedUdpPacket per UDP datagram, including each
+  // datagram split from a GRO read; these are not parsed QUIC packets.
+  receivedUdpDatagramCount_ += totalDatagrams;
+  QUIC_STATS(statsCallback_, onPacketsReceived, totalDatagrams);
+  QUIC_STATS(statsCallback_, onRead, totalDataLen);
 }
 
 quic::Expected<void, QuicError>
@@ -2282,8 +2290,47 @@ uint64_t QuicClientTransportLite::getEnobufsCount() const {
   return conn_->enobufsCount;
 }
 
+std::chrono::milliseconds QuicClientTransportLite::getConnectionIdleDuration()
+    const {
+  auto lastReceivedPacketTime = conn_->connectionTime;
+  const auto updateLastReceivedPacketTime =
+      [&lastReceivedPacketTime](const AckState* ackState) {
+        if (ackState && ackState->largestRecvdPacketTime &&
+            *ackState->largestRecvdPacketTime > lastReceivedPacketTime) {
+          lastReceivedPacketTime = *ackState->largestRecvdPacketTime;
+        }
+      };
+  updateLastReceivedPacketTime(conn_->ackStates.initialAckState.get());
+  updateLastReceivedPacketTime(conn_->ackStates.handshakeAckState.get());
+  updateLastReceivedPacketTime(&conn_->ackStates.appDataAckState);
+
+  const auto now = Clock::now();
+  if (lastReceivedPacketTime >= now) {
+    return std::chrono::milliseconds::zero();
+  }
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+      now - lastReceivedPacketTime);
+}
+
+int64_t QuicClientTransportLite::getNetworkReadCallbackStartTimeMs() const {
+  if (networkReadCallbackStartTime_ == TimePoint{}) {
+    return -1;
+  }
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             networkReadCallbackStartTime_.time_since_epoch())
+      .count();
+}
+
+uint64_t QuicClientTransportLite::getReceivedUdpDatagramCount() const {
+  return receivedUdpDatagramCount_;
+}
+
 uint64_t QuicClientTransportLite::getPtoCount() const {
   return conn_->lossState.ptoCount;
+}
+
+uint64_t QuicClientTransportLite::getTotalPtoCount() const {
+  return conn_->lossState.totalPTOCount;
 }
 
 uint64_t QuicClientTransportLite::getPacketsSentCount() const {

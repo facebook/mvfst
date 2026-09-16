@@ -15,6 +15,8 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/test/QuicAsyncUDPSocketMock.h>
 
+#include <chrono>
+
 using namespace ::testing;
 
 namespace quic::test {
@@ -123,6 +125,25 @@ TEST_F(QuicClientTransportLiteTest, TestPriming) {
       mockConnectionSetupCallback_,
       onPrimingDataAvailable(_, false /* truncated */));
   evb_.loopOnce(EVLOOP_NONBLOCK);
+}
+
+TEST_F(
+    QuicClientTransportLiteTest,
+    ConnectionIdleDurationUsesLatestReceivedPacket) {
+  const auto now = Clock::now();
+  auto* conn = quicClient_->getConn();
+  conn->connectionTime = now - std::chrono::seconds(20);
+  conn->ackStates.initialAckState->largestRecvdPacketTime =
+      now - std::chrono::seconds(10);
+  conn->ackStates.handshakeAckState->largestRecvdPacketTime =
+      now - std::chrono::seconds(5);
+  conn->ackStates.appDataAckState.largestRecvdPacketTime =
+      now - std::chrono::seconds(2);
+
+  const auto idleDuration = quicClient_->getConnectionIdleDuration();
+
+  EXPECT_GE(idleDuration, std::chrono::milliseconds(1900));
+  EXPECT_LT(idleDuration, std::chrono::milliseconds(3000));
 }
 
 TEST_F(

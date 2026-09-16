@@ -232,6 +232,7 @@ TEST_F(QuicClientTransportTest, TestReadWithRecvmsgSinglePacketLoop) {
   for (const auto& networkData : quicClient_->networkDataVec_) {
     EXPECT_EQ(networkData.getPackets().size(), 1);
   }
+  EXPECT_EQ(quicClient_->getReceivedUdpDatagramCount(), numCallsExpected);
 }
 
 TEST_F(
