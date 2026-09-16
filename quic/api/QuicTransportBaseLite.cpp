@@ -1155,7 +1155,8 @@ QuicTransportBaseLite::getStreamFlowControl(StreamId id) const {
       getSendStreamFlowControlBytesAPI(*stream),
       stream->flowControlState.peerAdvertisedMaxOffset,
       getRecvStreamFlowControlBytes(*stream),
-      stream->flowControlState.advertisedMaxOffset);
+      stream->flowControlState.advertisedMaxOffset,
+      maxWritableOnStream(*stream));
 }
 
 void QuicTransportBaseLite::runOnEvbAsyncOp(AsyncOpData data) {

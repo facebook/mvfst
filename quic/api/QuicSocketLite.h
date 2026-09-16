@@ -253,15 +253,21 @@ class QuicSocketLite {
     // The max offset I have provided to the peer.
     uint64_t receiveWindowMaxOffset;
 
+    // Max number of bytes we can write; i.e. result of
+    // maxWritableOn(Stream|Conn) for get(Stream|Conn)FlowControl
+    uint64_t maxWritable;
+
     FlowControlState(
         uint64_t sendWindowAvailableIn,
         uint64_t sendWindowMaxOffsetIn,
         uint64_t receiveWindowAvailableIn,
-        uint64_t receiveWindowMaxOffsetIn)
+        uint64_t receiveWindowMaxOffsetIn,
+        uint64_t maxWritableIn)
         : sendWindowAvailable(sendWindowAvailableIn),
           sendWindowMaxOffset(sendWindowMaxOffsetIn),
           receiveWindowAvailable(receiveWindowAvailableIn),
-          receiveWindowMaxOffset(receiveWindowMaxOffsetIn) {}
+          receiveWindowMaxOffset(receiveWindowMaxOffsetIn),
+          maxWritable(maxWritableIn) {}
   };
 
   /**

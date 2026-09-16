@@ -161,7 +161,8 @@ QuicTransportBase::getConnectionFlowControl() const {
       getSendConnFlowControlBytesAPI(*conn_),
       conn_->flowControlState.peerAdvertisedMaxOffset,
       getRecvConnFlowControlBytes(*conn_),
-      conn_->flowControlState.advertisedMaxOffset);
+      conn_->flowControlState.advertisedMaxOffset,
+      maxWritableOnConn());
 }
 
 quic::Expected<uint64_t, LocalErrorCode>
