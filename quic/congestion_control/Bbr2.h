@@ -18,6 +18,8 @@
 
 namespace quic {
 class Bbr2CongestionController : public CongestionController {
+  friend class Bbr2TestPeer;
+
  public:
   enum class State : uint8_t {
     Startup = 0,
@@ -66,6 +68,7 @@ class Bbr2CongestionController : public CongestionController {
   void updateAckAggregation();
   void advanceLatestDeliverySignals();
   void boundBwForModel();
+  void boundCwndForModel();
   void adaptLongTermModel();
 
   void startRound();
@@ -116,6 +119,11 @@ class Bbr2CongestionController : public CongestionController {
 
   void updateRecoveryOnAck();
   void onPacketLoss(const LossEvent& lossEvent, uint64_t ackedBytes);
+  void resolveSpuriousLossUndo(
+      const AckEvent* FOLLY_NULLABLE ackEvent,
+      const LossEvent* FOLLY_NULLABLE lossEvent);
+  void updateSpuriousLossUndoOnLoss(const LossEvent& lossEvent);
+  void undoSpuriousLoss();
 
   [[nodiscard]] uint64_t getTargetInflightWithGain(float gain = 1.0) const;
   [[nodiscard]] uint64_t getTargetInflightWithHeadroom() const;
@@ -133,6 +141,16 @@ class Bbr2CongestionController : public CongestionController {
     NOT_RECOVERY = 0,
     CONSERVATIVE = 1,
     GROWTH = 2,
+  };
+
+  struct SpuriousLossUndoState {
+    uint64_t priorCwndBytes;
+    Optional<Bandwidth> priorBandwidthShortTerm;
+    Optional<uint64_t> priorInflightShortTerm;
+    Optional<uint64_t> priorInflightLongTerm;
+    uint64_t pendingLostPackets;
+    TimePoint episodeStartTime;
+    bool restoreStartup{false};
   };
 
   QuicConnectionStateBase& conn_;
@@ -186,6 +204,7 @@ class Bbr2CongestionController : public CongestionController {
   RecoveryState recoveryState_{RecoveryState::NOT_RECOVERY};
   uint64_t recoveryWindow_{0};
   TimePoint recoveryStartTime_;
+  Optional<SpuriousLossUndoState> spuriousLossUndoState_;
 
   // Round counting
   uint64_t nextRoundDelivered_{0};

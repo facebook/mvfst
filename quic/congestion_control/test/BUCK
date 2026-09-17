@@ -255,6 +255,23 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "Bbr2SpuriousLossTest",
+    srcs = [
+        "Bbr2SpuriousLossTest.cpp",
+    ],
+    network_access = network_access_utils.none(),
+    deps = [
+        ":test_utils",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/common/test:test_utils",
+        "//quic/congestion_control:bbr2",
+        "//quic/state:ack_handler",
+        "//quic/state/test:mocks",
+    ],
+)
+
+mvfst_cpp_test(
     name = "Bbr2ModularSpuriousLossTest",
     srcs = [
         "Bbr2ModularSpuriousLossTest.cpp",

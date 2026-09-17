@@ -45,6 +45,20 @@ constexpr float kHeadroomFactor = 0.15;
 // TODO: Restore this margin
 constexpr uint8_t kPacingMarginPercent = 0;
 
+namespace {
+
+template <typename T>
+Optional<T> restoreLessRestrictiveBound(
+    const Optional<T>& currentBound,
+    const Optional<T>& priorBound) {
+  if (!currentBound.has_value() || !priorBound.has_value()) {
+    return std::nullopt;
+  }
+  return std::max(*currentBound, *priorBound);
+}
+
+} // namespace
+
 Bbr2CongestionController::Bbr2CongestionController(
     QuicConnectionStateBase& conn)
     : conn_(conn),
@@ -81,6 +95,7 @@ void Bbr2CongestionController::onPacketSent(
 
   // Handle restart from idle
   if (wasIdle && isAppLimited()) {
+    spuriousLossUndoState_.reset();
     idleRestart_ = true;
     extraAckedStartTimestamp_ = Clock::now();
     extraAckedDelivered_ = 0;
@@ -102,6 +117,7 @@ void Bbr2CongestionController::onPacketSent(
 void Bbr2CongestionController::onPacketAckOrLoss(
     const AckEvent* FOLLY_NULLABLE ackEvent,
     const LossEvent* FOLLY_NULLABLE lossEvent) {
+  resolveSpuriousLossUndo(ackEvent, lossEvent);
   if (ackEvent && !ackEvent->largestNewlyAckedPacket && !lossEvent) {
     return;
   }
@@ -146,6 +162,7 @@ void Bbr2CongestionController::onPacketAckOrLoss(
 
   if (lossEvent && lossEvent->lostPackets > 0) {
     auto ackedBytes = ackEvent ? ackEvent->ackedBytes : 0;
+    updateSpuriousLossUndoOnLoss(*lossEvent);
     onPacketLoss(*lossEvent, ackedBytes);
   }
 
@@ -235,6 +252,120 @@ void Bbr2CongestionController::setAppLimited() noexcept {
 }
 
 // Internals
+
+void Bbr2CongestionController::resolveSpuriousLossUndo(
+    const AckEvent* FOLLY_NULLABLE ackEvent,
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
+  if (!conn_.transportSettings.ccaConfig.enableSpuriousLossRecovery) {
+    spuriousLossUndoState_.reset();
+    return;
+  }
+  if (!spuriousLossUndoState_.has_value()) {
+    return;
+  }
+
+  const uint64_t numPacketsSpuriouslyAcked =
+      ackEvent ? ackEvent->numPacketsSpuriouslyAcked : 0;
+  const uint64_t numNewLostPackets = lossEvent ? lossEvent->lostPackets : 0;
+  const auto declaredLostCount = conn_.outstandings.declaredLostCount;
+  if (numPacketsSpuriouslyAcked > spuriousLossUndoState_->pendingLostPackets ||
+      numNewLostPackets > declaredLostCount) {
+    spuriousLossUndoState_.reset();
+    return;
+  }
+
+  // ACK handling has already removed spurious ACKs from declaredLostCount,
+  // while loss detection has already added this event's new losses.
+  const auto remainingLostPackets =
+      spuriousLossUndoState_->pendingLostPackets - numPacketsSpuriouslyAcked;
+  const auto previouslyDeclaredLostPackets =
+      declaredLostCount - numNewLostPackets;
+  if (remainingLostPackets != previouslyDeclaredLostPackets) {
+    spuriousLossUndoState_.reset();
+    return;
+  }
+
+  spuriousLossUndoState_->pendingLostPackets = remainingLostPackets;
+  if (remainingLostPackets == 0) {
+    undoSpuriousLoss();
+  }
+}
+
+void Bbr2CongestionController::updateSpuriousLossUndoOnLoss(
+    const LossEvent& lossEvent) {
+  if (!conn_.transportSettings.ccaConfig.enableSpuriousLossRecovery ||
+      lossEvent.persistentCongestion) {
+    spuriousLossUndoState_.reset();
+    return;
+  }
+
+  const bool continuesCurrentEpisode = spuriousLossUndoState_.has_value() &&
+      lossEvent.largestLostSentTime.has_value() &&
+      *lossEvent.largestLostSentTime < spuriousLossUndoState_->episodeStartTime;
+  if (continuesCurrentEpisode) {
+    spuriousLossUndoState_->pendingLostPackets += lossEvent.lostPackets;
+    return;
+  }
+
+  spuriousLossUndoState_.reset();
+  // Recovery and loss-round evidence can outlive the retained lost packets.
+  if (conn_.outstandings.declaredLostCount != lossEvent.lostPackets ||
+      isInRecovery() || lossBytesInRound_ > 0 || lossPctInLastRound_ > 0) {
+    return;
+  }
+
+  spuriousLossUndoState_ = SpuriousLossUndoState{
+      .priorCwndBytes = cwndBytes_,
+      .priorBandwidthShortTerm = bandwidthShortTerm_,
+      .priorInflightShortTerm = inflightShortTerm_,
+      .priorInflightLongTerm = inflightLongTerm_,
+      .pendingLostPackets = lossEvent.lostPackets,
+      .episodeStartTime = Clock::now(),
+  };
+}
+
+void Bbr2CongestionController::undoSpuriousLoss() {
+  MVCHECK(spuriousLossUndoState_.has_value());
+  auto undoState = *spuriousLossUndoState_;
+  spuriousLossUndoState_.reset();
+
+  cwndBytes_ = std::max(cwndBytes_, undoState.priorCwndBytes);
+  bandwidthShortTerm_ = restoreLessRestrictiveBound(
+      bandwidthShortTerm_, undoState.priorBandwidthShortTerm);
+  inflightShortTerm_ = restoreLessRestrictiveBound(
+      inflightShortTerm_, undoState.priorInflightShortTerm);
+  inflightLongTerm_ = restoreLessRestrictiveBound(
+      inflightLongTerm_, undoState.priorInflightLongTerm);
+
+  recoveryState_ = RecoveryState::NOT_RECOVERY;
+  recoveryWindow_ = cwndBytes_;
+
+  // The current loss round and full-bandwidth samples may include effects of
+  // the falsely declared loss and must not trigger another loss response.
+  lossBytesInRound_ = 0;
+  lossEventsInRound_ = 0;
+  largestLostPacketNumInRound_ = 0;
+  lossRoundStart_ = false;
+  lossRoundEndBytesSent_ = conn_.lossState.totalBytesSent;
+  lossPctInLastRound_ = 0;
+  lossEventsInLastRound_ = 0;
+  resetFullBw();
+
+  if (undoState.restoreStartup && state_ != State::Startup) {
+    fullBwReached_ = false;
+    canUpdateLongtermLossModel_ = false;
+    if (state_ != State::ProbeRTT) {
+      enterStartup();
+    }
+  }
+
+  boundBwForModel();
+  setSendQuantum();
+  setPacing();
+
+  // Spurious-only ACKs reapply phase bounds without delivery-based growth.
+  boundCwndForModel();
+}
 
 void Bbr2CongestionController::onPacketLoss(
     const LossEvent& lossEvent,
@@ -389,6 +520,10 @@ void Bbr2CongestionController::setCwnd() {
     cwndBytes_ = std::min(cwndBytes_, recoveryWindow_);
   }
 
+  boundCwndForModel();
+}
+
+void Bbr2CongestionController::boundCwndForModel() {
   cwndBytes_ =
       std::max(cwndBytes_, kMinCwndInMssForBbr * conn_.udpSendPacketLen);
 
@@ -571,6 +706,9 @@ void Bbr2CongestionController::checkStartupHighLoss() {
     return; /* no need to check for a the loss exit condition now */
   }
   if (lossPctInLastRound_ > kLossThreshold && lossEventsInLastRound_ >= 6) {
+    if (spuriousLossUndoState_ && state_ == State::Startup) {
+      spuriousLossUndoState_->restoreStartup = true;
+    }
     fullBwReached_ = true;
     inflightLongTerm_ = std::max(getBDPWithGain(), inflightLatest_);
   }
@@ -745,6 +883,10 @@ void Bbr2CongestionController::handleInFlightTooHigh() {
             static_cast<float>(getTargetInflightWithGain()) * kBeta));
   }
   if (state_ == State::ProbeBw_Up) {
+    if (spuriousLossUndoState_) {
+      // A later loss-driven phase exit supersedes the Startup undo.
+      spuriousLossUndoState_->restoreStartup = false;
+    }
     startProbeBwDown();
   }
 }
