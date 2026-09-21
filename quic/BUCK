@@ -275,9 +275,9 @@ mvfst_cpp_library(
     ],
 )
 
-fb_native.export_file(
-    name = "src-tree",
-    src = ".",
-    mode = "reference",
-    visibility = ["PUBLIC"],
-)
+# @oss-disable[end= ]: fb_native.export_file(
+    # @oss-disable[end= ]: name = "src-tree",
+    # @oss-disable[end= ]: src = ".",
+    # @oss-disable[end= ]: mode = "reference",
+    # @oss-disable[end= ]: visibility = ["PUBLIC"],
+# @oss-disable[end= ]: )
