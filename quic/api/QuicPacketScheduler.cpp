@@ -1437,6 +1437,12 @@ CloningScheduler::scheduleFramesForPacket(
     }
     return result;
   }
+  // The caller has already accounted for cipher overhead and may have
+  // reserved datagram space outside the QUIC packet. Restore only the cipher
+  // overhead when recreating the builder so those reservations are preserved.
+  const uint32_t packetSizeLimit =
+      builder.remainingSpaceInPkt() + static_cast<uint32_t>(cipherOverhead_);
+  MVDCHECK_LE(packetSizeLimit, conn_.udpSendPacketLen);
   // TODO: We can avoid the copy & rebuild of the header by creating an
   // independent header builder.
   std::move(builder).releaseOutputBuffer();
@@ -1465,14 +1471,14 @@ CloningScheduler::scheduleFramesForPacket(
     std::unique_ptr<PacketBuilderInterface> internalBuilder;
     if (conn_.transportSettings.dataPathType == DataPathType::ChainedMemory) {
       internalBuilder = std::make_unique<RegularQuicPacketBuilder>(
-          conn_.udpSendPacketLen,
+          packetSizeLimit,
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     } else {
       MVCHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
       internalBuilder = std::make_unique<InplaceQuicPacketBuilder>(
           *conn_.bufAccessor,
-          conn_.udpSendPacketLen,
+          packetSizeLimit,
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     }

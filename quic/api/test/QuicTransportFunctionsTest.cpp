@@ -16,6 +16,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -6229,6 +6230,116 @@ TEST_F(QuicTransportFunctionsTest, SconeFlowIndicatorOnInitialPackets) {
   ASSERT_GE(writtenData.size(), kSconeFlowIndicatorSize);
   EXPECT_EQ(writtenData[writtenData.size() - 2], kSconeFlowIndicatorByte1);
   EXPECT_EQ(writtenData[writtenData.size() - 1], kSconeFlowIndicatorByte2);
+}
+
+TEST_F(QuicTransportFunctionsTest, SconeFlowIndicatorOnClonedInitialPackets) {
+  constexpr auto kCryptoDataSizeMultiplier = 2;
+
+  for (const auto dataPathType :
+       {DataPathType::ChainedMemory, DataPathType::ContinuousMemory}) {
+    SCOPED_TRACE(
+        dataPathType == DataPathType::ChainedMemory ? "chained" : "inplace");
+    auto conn = createClientConn();
+    FizzCryptoFactory cryptoFactory;
+    conn->initialWriteCipher =
+        cryptoFactory
+            .getClientInitialCipher(
+                *conn->serverConnectionId, getVersion(*conn))
+            .value();
+    ASSERT_GT(conn->initialWriteCipher->getCipherOverhead(), 0);
+    conn->transportSettings.dataPathType = dataPathType;
+    conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_NONE;
+    conn->transportSettings.maxBatchSize = 1;
+    conn->transportSettings.advertiseSconeSupport = true;
+
+    std::unique_ptr<BufAccessor> bufAccessor;
+    if (dataPathType == DataPathType::ContinuousMemory) {
+      bufAccessor = std::make_unique<BufAccessor>(conn->udpSendPacketLen);
+      conn->bufAccessor = bufAccessor.get();
+    }
+
+    EventBase evb;
+    auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+    quic::test::MockAsyncUDPSocket mockSock(qEvb);
+    ON_CALL(mockSock, getGSO()).WillByDefault(Return(0));
+
+    bool captureProbe = false;
+    std::vector<uint8_t> probeData;
+    EXPECT_CALL(mockSock, write(_, _, _))
+        .WillRepeatedly([&](const SocketAddress&,
+                            const struct iovec* vec,
+                            size_t iovecLen) {
+          if (captureProbe) {
+            for (size_t i = 0; i < iovecLen; ++i) {
+              auto* data = static_cast<uint8_t*>(vec[i].iov_base);
+              probeData.insert(probeData.end(), data, data + vec[i].iov_len);
+            }
+          }
+          return getTotalIovecLen(vec, iovecLen);
+        });
+
+    auto* cryptoStream = &conn->cryptoState->initialStream;
+    writeDataToQuicStream(
+        *cryptoStream,
+        buildRandomInputData(
+            conn->udpSendPacketLen * kCryptoDataSizeMultiplier));
+    auto writeResult = writeCryptoAndAckDataToSocket(
+        mockSock,
+        *conn,
+        *conn->clientConnectionId,
+        *conn->serverConnectionId,
+        LongHeader::Types::Initial,
+        *conn->initialWriteCipher,
+        *conn->initialHeaderCipher,
+        getVersion(*conn),
+        conn->transportSettings.writeConnectionDataPacketsLimit);
+    ASSERT_FALSE(writeResult.hasError());
+    ASSERT_TRUE(cryptoStream->pendingWrites.empty());
+    ASSERT_FALSE(conn->outstandings.packets.empty());
+
+    const auto outstandingPacketsBeforeProbe =
+        conn->outstandings.packets.size();
+    const auto originalPacketNum =
+        conn->outstandings.packets.front().packet.header.getPacketSequenceNum();
+    std::vector<WriteCryptoFrame> originalCryptoFrames;
+    for (const auto& frame : conn->outstandings.packets.front().packet.frames) {
+      if (const auto* cryptoFrame = frame.asWriteCryptoFrame()) {
+        originalCryptoFrames.push_back(*cryptoFrame);
+      }
+    }
+    ASSERT_FALSE(originalCryptoFrames.empty());
+
+    captureProbe = true;
+    writeCryptoDataProbesToSocketForTest(
+        mockSock,
+        *conn,
+        1,
+        *conn->initialWriteCipher,
+        *conn->initialHeaderCipher,
+        getVersion(*conn));
+
+    ASSERT_EQ(
+        conn->outstandings.packets.size(), outstandingPacketsBeforeProbe + 1);
+    const auto& clonedPacket = conn->outstandings.packets.back();
+    ASSERT_TRUE(clonedPacket.maybeClonedPacketIdentifier.has_value());
+    EXPECT_EQ(
+        originalPacketNum,
+        clonedPacket.maybeClonedPacketIdentifier->packetNumber);
+    std::vector<WriteCryptoFrame> clonedCryptoFrames;
+    for (const auto& frame : clonedPacket.packet.frames) {
+      if (const auto* cryptoFrame = frame.asWriteCryptoFrame()) {
+        clonedCryptoFrames.push_back(*cryptoFrame);
+      }
+    }
+    EXPECT_EQ(originalCryptoFrames, clonedCryptoFrames);
+
+    ASSERT_EQ(probeData.size(), conn->udpSendPacketLen);
+    EXPECT_EQ(probeData[probeData.size() - 2], kSconeFlowIndicatorByte1);
+    EXPECT_EQ(probeData[probeData.size() - 1], kSconeFlowIndicatorByte2);
+    if (bufAccessor) {
+      EXPECT_EQ(bufAccessor->length(), 0);
+    }
+  }
 }
 
 TEST_F(
