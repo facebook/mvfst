@@ -53,4 +53,20 @@ TEST(QuicExceptionFormatTest, QuicError) {
   EXPECT_EQ(fmt::format("{}", error), toString(error));
 }
 
+TEST(QuicExceptionFormatTest, CryptoErrorRange) {
+  EXPECT_FALSE(isCryptoError(static_cast<TransportErrorCode>(0x000)));
+  EXPECT_FALSE(isCryptoError(static_cast<TransportErrorCode>(0x008)));
+  EXPECT_FALSE(isCryptoError(static_cast<TransportErrorCode>(0x020)));
+  EXPECT_FALSE(isCryptoError(static_cast<TransportErrorCode>(0x050)));
+  EXPECT_FALSE(isCryptoError(static_cast<TransportErrorCode>(0x0ff)));
+  EXPECT_TRUE(isCryptoError(TransportErrorCode::CRYPTO_ERROR));
+  EXPECT_TRUE(isCryptoError(static_cast<TransportErrorCode>(0x128)));
+  EXPECT_TRUE(isCryptoError(TransportErrorCode::CRYPTO_ERROR_MAX));
+  EXPECT_FALSE(isCryptoError(static_cast<TransportErrorCode>(0x200)));
+}
+
+TEST(QuicExceptionFormatTest, UnassignedTransportErrorString) {
+  EXPECT_EQ(toString(static_cast<TransportErrorCode>(0x020)), "Unknown error");
+}
+
 } // namespace quic::test

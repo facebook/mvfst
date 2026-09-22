@@ -50,10 +50,8 @@ QuicApplicationException::QuicApplicationException(
     : std::runtime_error(msg), errorCode_(errorCode) {}
 
 bool isCryptoError(TransportErrorCode code) {
-  return (static_cast<std::underlying_type<TransportErrorCode>::type>(code) &
-          static_cast<std::underlying_type<TransportErrorCode>::type>(
-              TransportErrorCode::CRYPTO_ERROR_MAX)) ==
-      static_cast<std::underlying_type<TransportErrorCode>::type>(code);
+  return code >= TransportErrorCode::CRYPTO_ERROR &&
+      code <= TransportErrorCode::CRYPTO_ERROR_MAX;
 }
 
 std::string toString(LocalErrorCode code) {
