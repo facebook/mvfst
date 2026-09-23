@@ -5115,4 +5115,74 @@ TEST_F(QuicTransportImplTestBase, StopSendingCallbackReentrantRegistration) {
   transport->invokeProcessCallbacksAfterNetworkData();
 }
 
+TEST_F(
+    QuicTransportImplTestBase,
+    FlowControlUpdateResetReapsAnotherQueuedStream) {
+  const auto firstId = transport->createBidirectionalStream().value();
+  const auto secondId = transport->createBidirectionalStream().value();
+  const auto resetId = transport->createBidirectionalStream().value();
+
+  auto& streamManager = *transport->transportConn->streamManager;
+  streamManager.queueFlowControlUpdated(firstId);
+  streamManager.queueFlowControlUpdated(secondId);
+
+  // Match the detached snapshot's unordered iteration order.
+  const auto callbackId = *streamManager.flowControlUpdated().begin();
+  const auto reapedId = callbackId == firstId ? secondId : firstId;
+  auto* reapedStream = streamManager.getStream(reapedId).value();
+  ASSERT_NE(reapedStream, nullptr);
+  reapedStream->sendState = StreamSendState::Closed;
+  reapedStream->recvState = StreamRecvState::Closed;
+  streamManager.addClosed(reapedId);
+
+  StrictMock<MockWriteCallback> writeCallback;
+  ASSERT_FALSE(transport->notifyPendingWriteOnStream(callbackId, &writeCallback)
+                   .hasError());
+  EXPECT_CALL(writeCallback, onStreamWriteReady(_, _)).Times(0);
+
+  EXPECT_CALL(connCallback, onStreamPreReaped(reapedId));
+  EXPECT_CALL(connCallback, onFlowControlUpdate(reapedId)).Times(0);
+  EXPECT_CALL(connCallback, onFlowControlUpdate(callbackId))
+      .WillOnce([&](StreamId streamId) {
+        ASSERT_FALSE(transport->writeChain(streamId, nullptr, true).hasError());
+        ASSERT_FALSE(
+            transport
+                ->resetStream(resetId, GenericApplicationErrorCode::UNKNOWN)
+                .hasError());
+      });
+
+  transport->invokeProcessCallbacksAfterNetworkData();
+
+  EXPECT_FALSE(transport->isClosed());
+  EXPECT_FALSE(streamManager.streamExists(reapedId));
+  EXPECT_FALSE(streamManager.getStream(callbackId).value()->writable());
+}
+
+TEST_F(QuicTransportImplTestBase, FlowControlUpdateResetReapsCurrentStream) {
+  const auto callbackId = transport->createBidirectionalStream().value();
+  const auto resetId = transport->createBidirectionalStream().value();
+
+  auto& streamManager = *transport->transportConn->streamManager;
+  streamManager.queueFlowControlUpdated(callbackId);
+
+  EXPECT_CALL(connCallback, onStreamPreReaped(callbackId));
+  EXPECT_CALL(connCallback, onFlowControlUpdate(callbackId))
+      .WillOnce([&](StreamId streamId) {
+        auto* reapedStream = streamManager.getStream(streamId).value();
+        ASSERT_NE(reapedStream, nullptr);
+        reapedStream->sendState = StreamSendState::Closed;
+        reapedStream->recvState = StreamRecvState::Closed;
+        streamManager.addClosed(streamId);
+        ASSERT_FALSE(
+            transport
+                ->resetStream(resetId, GenericApplicationErrorCode::UNKNOWN)
+                .hasError());
+      });
+
+  transport->invokeProcessCallbacksAfterNetworkData();
+
+  EXPECT_FALSE(transport->isClosed());
+  EXPECT_FALSE(streamManager.streamExists(callbackId));
+}
+
 } // namespace quic::test

@@ -2284,12 +2284,12 @@ void QuicTransportBaseLite::handleStreamFlowControlUpdatedCallbacks(
   // Iterate over streams that changed their flow control window and give
   // their registered listeners their updates.
   // We don't really need flow control notifications when we are closed.
+  // The callback can synchronously reap any stream in this detached snapshot,
+  // so every stream lookup must tolerate absence.
   streamStorage = conn_->streamManager->consumeFlowControlUpdated();
-  const auto& flowControlUpdated = streamStorage;
-  for (auto streamId : flowControlUpdated) {
-    auto stream = MVCHECK_NOTNULL(
-        conn_->streamManager->getStream(streamId).value_or(nullptr));
-    if (!stream->writable()) {
+  for (const auto streamId : streamStorage) {
+    auto* stream = conn_->streamManager->getStreamIfExists(streamId);
+    if (!stream || !stream->writable()) {
       pendingWriteCallbacks_.erase(streamId);
       continue;
     }
@@ -2297,20 +2297,29 @@ void QuicTransportBaseLite::handleStreamFlowControlUpdatedCallbacks(
     if (closeState_ != CloseState::OPEN) {
       return;
     }
-    // In case the callback modified the stream map, get it again.
-    stream = MVCHECK_NOTNULL(
-        conn_->streamManager->getStream(streamId).value_or(nullptr));
-    auto maxStreamWritable = maxWritableOnStream(*stream);
-    if (maxStreamWritable != 0 && !pendingWriteCallbacks_.empty()) {
-      auto pendingWriteIt = pendingWriteCallbacks_.find(stream->id);
-      if (pendingWriteIt != pendingWriteCallbacks_.end()) {
-        auto wcb = pendingWriteIt->second;
-        pendingWriteCallbacks_.erase(stream->id);
-        wcb->onStreamWriteReady(stream->id, maxStreamWritable);
-        if (closeState_ != CloseState::OPEN) {
-          return;
-        }
-      }
+
+    auto pendingWriteIt = pendingWriteCallbacks_.find(streamId);
+    if (pendingWriteIt == pendingWriteCallbacks_.end()) {
+      continue;
+    }
+
+    // The callback can remove the stream or make it non-writable.
+    stream = conn_->streamManager->getStreamIfExists(streamId);
+    if (!stream || !stream->writable()) {
+      pendingWriteCallbacks_.erase(pendingWriteIt);
+      continue;
+    }
+
+    const auto maxStreamWritable = maxWritableOnStream(*stream);
+    if (maxStreamWritable == 0) {
+      continue;
+    }
+
+    auto wcb = pendingWriteIt->second;
+    pendingWriteCallbacks_.erase(pendingWriteIt);
+    wcb->onStreamWriteReady(streamId, maxStreamWritable);
+    if (closeState_ != CloseState::OPEN) {
+      return;
     }
   }
 
