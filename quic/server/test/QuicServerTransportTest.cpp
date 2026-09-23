@@ -13,7 +13,6 @@
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/logging/FileQLogger.h>
-#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -4280,42 +4279,6 @@ TEST_F(QuicServerTransportTest, TestAutotuneStreamFlowControlKnobHandler) {
             TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL),
         .val = uint64_t(0)}});
   EXPECT_FALSE(transportSettings.autotuneReceiveStreamFlowControl);
-}
-
-TEST_F(QuicServerTransportTest, TestDefaultStreamPriorityKnobHandler) {
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        .val = "1,1"}});
-  EXPECT_EQ(
-      HTTPPriorityQueue::Priority(
-          server->getTransportSettings().defaultPriority),
-      HTTPPriorityQueue::Priority(1, true));
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        .val = "4,0"}});
-  EXPECT_EQ(
-      HTTPPriorityQueue::Priority(
-          server->getTransportSettings().defaultPriority),
-      HTTPPriorityQueue::Priority(4, false));
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        .val = "4,0,10"}});
-  EXPECT_EQ(
-      HTTPPriorityQueue::Priority(
-          server->getTransportSettings().defaultPriority),
-      HTTPPriorityQueue::Priority(4, false));
-  // level too large, unchanged
-  server->handleKnobParams(
-      {{.id = static_cast<uint64_t>(
-            TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-        .val = "20,0"}});
-  EXPECT_EQ(
-      HTTPPriorityQueue::Priority(
-          server->getTransportSettings().defaultPriority),
-      HTTPPriorityQueue::Priority(4, false));
 }
 
 TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {

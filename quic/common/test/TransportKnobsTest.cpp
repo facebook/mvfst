@@ -109,6 +109,15 @@ TEST(QuicKnobsParsingTest, ValidCCAlgorithm) {
   run(fixture);
 }
 
+TEST(QuicKnobsParsingTest, UnknownKnobId) {
+  // 0x10003 is the removed DEFAULT_STREAM_PRIORITY knob.
+  QuicKnobsParsingTestFixture fixture = {
+      .serializedKnobs = R"({"65539" : 4})",
+      .expectError = true,
+      .expectParams = {}};
+  run(fixture);
+}
+
 TEST(QuicKnobsParsingTest, InvalidStringParam) {
   auto key = static_cast<uint64_t>(
       TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);

@@ -73,7 +73,6 @@ mvfst_cpp_library(
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/logging/oops_logger:oops_logger",
-        "//quic/priority:http_priority_queue",
         "//quic/server/handshake:app_token",
         "//quic/server/handshake:default_app_token_validator",
         "//quic/server/handshake:stateless_reset_generator",

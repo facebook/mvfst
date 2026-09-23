@@ -85,7 +85,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
         case TransportKnobParamId::MAX_PACING_RATE_KNOB:
         case TransportKnobParamId::KEEPALIVE_ENABLED:
         case TransportKnobParamId::PACING_TIMER_TICK:
-        case TransportKnobParamId::DEFAULT_STREAM_PRIORITY:
         case TransportKnobParamId::CONNECTION_MIGRATION:
         case TransportKnobParamId::KEY_UPDATE_INTERVAL:
         case TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL:

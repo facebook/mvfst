@@ -203,8 +203,7 @@ QUIC_ENUM(
     MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999,
     // Controls the timer tick used for pacing
     PACING_TIMER_TICK = 0x10002,
-    // Controls default stream priority
-    DEFAULT_STREAM_PRIORITY = 0x10003,
+    // DEPRECATED: DEFAULT_STREAM_PRIORITY = 0x10003 (do not reuse value).
     // Control connection migration
     CONNECTION_MIGRATION = 0x10006,
     // Control server-initiated key update interval

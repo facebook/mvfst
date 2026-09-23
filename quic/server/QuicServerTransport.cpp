@@ -11,7 +11,6 @@
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/oops_logger/OopsLogger.h>
-#include <quic/priority/HTTPPriorityQueue.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
@@ -1158,33 +1157,6 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverConn->transportSettings.pacingTickInterval =
             std::chrono::microseconds(val);
         MVVLOG(3) << "PACING_TIMER_TICK KnobParam received: " << val;
-        return {};
-      });
-  registerTransportKnobParamHandler(
-      static_cast<uint64_t>(TransportKnobParamId::DEFAULT_STREAM_PRIORITY),
-      [](QuicServerTransport& serverTransport,
-         TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
-        auto val = std::get<std::string>(value);
-        auto serverConn = serverTransport.serverConn_;
-        uint8_t level;
-        bool incremental;
-        bool parseSuccess = false;
-        try {
-          parseSuccess = folly::split(',', val, level, incremental);
-        } catch (std::exception&) {
-          parseSuccess = false;
-        }
-        if (!parseSuccess || level > 7) {
-          auto errMsg = fmt::format(
-              "Received invalid KnobParam for DEFAULT_STREAM_PRIORITY: {}",
-              val);
-          MVVLOG(3) << errMsg;
-          return quic::make_unexpected(
-              QuicError(TransportErrorCode::INTERNAL_ERROR, std::move(errMsg)));
-        }
-        serverConn->transportSettings.defaultPriority =
-            HTTPPriorityQueue::Priority(level, incremental);
-        MVVLOG(3) << "DEFAULT_STREAM_PRIORITY KnobParam received: " << val;
         return {};
       });
   registerTransportKnobParamHandler(
