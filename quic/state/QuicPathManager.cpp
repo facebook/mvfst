@@ -448,7 +448,11 @@ void QuicPathManager::onPathPacketReceived(PathIdType pathId) {
   if (pathInfoIt != pathIdToInfo_.end() &&
       pathInfoIt->second.status != PathStatus::Validated) {
     // We are reading from an unvalidated path. Every incoming packet gives us
-    // credit for writing more packets (as many as limitedCwndInMss)
+    // credit for writing more packets (as many as limitedCwndInMss).
+    // This is intentionally not RFC 9000's limit of three times the bytes
+    // received: it matches the pre-validation limit used at connection
+    // establishment (writableBytesLimit in ServerStateMachine.cpp), so a peer
+    // gains no more amplification here than by opening a new connection.
     if (pathInfoIt->second.writableBytes <
         kDefaultMaxCwndInMss * conn_.udpSendPacketLen) {
       pathInfoIt->second.writableBytes +=
