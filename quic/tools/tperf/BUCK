@@ -1,4 +1,5 @@
 load("@fbcode//quic:defs.bzl", "mvfst_cpp_binary", "mvfst_cpp_library")
+load("@fbcode_macros//build_defs:build_file_migration.bzl", "fbcode_target")
 load("@fbsource//tools/build_defs:cell_defs.bzl", "get_fbsource_cell")
 
 oncall("traffic_protocols")
@@ -140,8 +141,10 @@ mvfst_cpp_binary(
 # they compose with the selected platform/build mode rather than pinning one.
 # use_alt_crypto -> QUIC_DEFAULT_AEAD = XSecCryptoAead; force_alt_crypto -> the
 # bridge always uses xsec (bypasses the JK). No flag; :tperf is the OpenSSL
-# baseline. (xsec is linux-only; on other platforms this builds like :tperf.)
-mvfst_cpp_binary(
+# baseline. fbcode-cell only: the xsec sources live in fbcode/quic/facebook,
+# whose xplat mirror is a header-less shadow stub.
+fbcode_target(
+    _kind = mvfst_cpp_binary,
     name = "tperf-xsec",
     srcs = [
         "tperf.cpp",
@@ -156,7 +159,8 @@ mvfst_cpp_binary(
     ],
 )
 
-mvfst_cpp_binary(
+fbcode_target(
+    _kind = mvfst_cpp_binary,
     name = "tperf-xsec-zen4",
     srcs = [
         "tperf.cpp",
