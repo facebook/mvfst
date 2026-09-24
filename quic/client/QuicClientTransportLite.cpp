@@ -1995,6 +1995,14 @@ quic::Expected<PathIdType, QuicError> QuicClientTransportLite::startPathProbe(
         LocalErrorCode::INTERNAL_ERROR,
         "Cannot initiate probe before handshake is complete"));
   }
+  // RFC 9000 Section 9: no migration before the handshake is confirmed. The
+  // peer closes the connection if Initial or Handshake packets arrive from a
+  // new address.
+  if (hasInitialOrHandshakeCiphers(*conn_)) {
+    return quic::make_unexpected(QuicError(
+        LocalErrorCode::INTERNAL_ERROR,
+        "Cannot initiate probe before handshake is confirmed"));
+  }
 
   if (!socket_) {
     return quic::make_unexpected(QuicError(

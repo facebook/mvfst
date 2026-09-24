@@ -510,6 +510,44 @@ TEST_F(
       std::string::npos);
 }
 
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    CannotStartProbeWithHandshakeCipher) {
+  quic::SocketAddress localAddr("::", 57576);
+  auto probeSock = createProbeSocketMock(localAddr);
+
+  quicClient_->getConn()->handshakeWriteCipher = test::createNoOpAead();
+  quicClient_->getConn()->handshakeWriteHeaderCipher =
+      test::createNoOpHeaderCipher().value();
+
+  auto res = quicClient_->startPathProbe(std::move(probeSock), nullptr);
+  EXPECT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, LocalErrorCode::INTERNAL_ERROR);
+  EXPECT_TRUE(
+      res.error().message.find(
+          "Cannot initiate probe before handshake is confirmed") !=
+      std::string::npos);
+}
+
+TEST_F(
+    QuicClientTransportLiteMigrationTest,
+    CannotStartProbeWithInitialCipher) {
+  quic::SocketAddress localAddr("::", 57577);
+  auto probeSock = createProbeSocketMock(localAddr);
+
+  quicClient_->getConn()->initialWriteCipher = test::createNoOpAead();
+  quicClient_->getConn()->initialHeaderCipher =
+      test::createNoOpHeaderCipher().value();
+
+  auto res = quicClient_->startPathProbe(std::move(probeSock), nullptr);
+  EXPECT_TRUE(res.hasError());
+  EXPECT_EQ(res.error().code, LocalErrorCode::INTERNAL_ERROR);
+  EXPECT_TRUE(
+      res.error().message.find(
+          "Cannot initiate probe before handshake is confirmed") !=
+      std::string::npos);
+}
+
 TEST_F(QuicClientTransportLiteMigrationTest, CannotStartProbeWithoutSocket) {
   auto res = quicClient_->startPathProbe(nullptr, nullptr);
   EXPECT_EQ(res.error().code, LocalErrorCode::INTERNAL_ERROR);

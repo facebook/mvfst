@@ -3329,6 +3329,8 @@ TEST_F(
     QuicClientTransportAfterStartTest,
     MigrateConnectionCleansUpOldPathOnPacketReceived) {
   auto& conn = client->getNonConstConn();
+  // Path probes require a confirmed handshake.
+  handshakeConfirmed(conn);
   auto initialPathId = conn.currentPathId;
 
   // Add an extra peer connection ID for path probing.
