@@ -15,6 +15,7 @@
 #include <quic/codec/Decode.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/congestion_control/PacerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/state/QuicStateFunctions.h>
@@ -81,6 +82,18 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->bufAccessor = conn->bufAccessor;
   newConn->pendingOneRttData.reserve(
       newConn->transportSettings.maxPacketsToBuffer);
+  const auto congestionControlType = conn->congestionController
+      ? conn->congestionController->type()
+      : newConn->transportSettings.defaultCongestionController;
+  newConn->canBePaced = conn->canBePaced;
+  if (newConn->transportSettings.pacingEnabled) {
+    const bool usingBbr = congestionControlType == CongestionControlType::BBR ||
+        congestionControlType == CongestionControlType::BBR2 ||
+        congestionControlType == CongestionControlType::BBR2Modular;
+    const auto minCwnd = usingBbr ? kMinCwndInMssForBbr
+                                  : newConn->transportSettings.minCwndInMss;
+    newConn->pacer = createPacer(*newConn, minCwnd);
+  }
   if (conn->congestionControllerFactory) {
     newConn->congestionControllerFactory = conn->congestionControllerFactory;
     if (conn->congestionController) {
@@ -88,7 +101,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       // because it holds references to the old state
       newConn->congestionController =
           newConn->congestionControllerFactory->makeCongestionController(
-              *newConn, conn->congestionController->type());
+              *newConn, congestionControlType);
     }
   }
 

@@ -70,6 +70,7 @@ mvfst_add_library(mvfst_client_state_and_handshake
     mvfst_common_mvfst_logging
     mvfst_common_time_util
     mvfst_congestion_control_congestion_controller_factory
+    mvfst_congestion_control_pacer_factory
     mvfst_logging_qlogger_macros
     mvfst_loss
     mvfst_state_quic_stream_utilities

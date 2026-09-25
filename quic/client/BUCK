@@ -88,6 +88,7 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
         "//quic/common:time_util",
         "//quic/congestion_control:congestion_controller_factory",
+        "//quic/congestion_control:pacer_factory",
         "//quic/logging:qlogger_macros",
         "//quic/loss:loss",
         "//quic/state:quic_stream_utilities",

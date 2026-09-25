@@ -37,6 +37,8 @@ mvfst_cpp_test(
         "//quic/client:state_and_handshake",
         "//quic/common/events:folly_eventbase",
         "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/congestion_control:pacer_factory",
         "//quic/fizz/client/handshake:fizz_client_handshake",
         "//quic/handshake:transport_parameters",
     ],

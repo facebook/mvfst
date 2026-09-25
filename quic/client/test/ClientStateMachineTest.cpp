@@ -16,6 +16,8 @@
 #include <quic/client/test/Mocks.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
+#include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/congestion_control/PacerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/TransportParameters.h>
 
@@ -144,6 +146,33 @@ TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   auto newConn = undoAllClientStateForRetry(std::move(client_));
   EXPECT_TRUE(newConn->happyEyeballsState.finished);
   EXPECT_NE(nullptr, newConn->happyEyeballsState.secondSocket);
+}
+
+TEST_F(ClientStateMachineTest, PreservePacingStateDuringUndo) {
+  auto randomCid = ConnectionId::createRandom(8);
+  ASSERT_TRUE(randomCid.has_value());
+  client_->clientConnectionId = randomCid.value();
+  client_->transportSettings.pacingEnabled = true;
+  client_->transportSettings.defaultCongestionController =
+      CongestionControlType::BBR2Modular;
+  client_->canBePaced = true;
+  client_->pacer = createPacer(*client_, kMinCwndInMssForBbr);
+  client_->congestionControllerFactory =
+      std::make_shared<DefaultCongestionControllerFactory>();
+  client_->congestionController =
+      client_->congestionControllerFactory->makeCongestionController(
+          *client_, CongestionControlType::BBR2Modular);
+  const auto* originalPacer = client_->pacer.get();
+
+  auto newConn = undoAllClientStateForRetry(std::move(client_));
+
+  ASSERT_NE(nullptr, newConn->pacer);
+  EXPECT_NE(originalPacer, newConn->pacer.get());
+  EXPECT_TRUE(newConn->canBePaced);
+  ASSERT_NE(nullptr, newConn->congestionController);
+  EXPECT_EQ(
+      CongestionControlType::BBR2Modular,
+      newConn->congestionController->type());
 }
 
 TEST_F(ClientStateMachineTest, PreserveSconeReceiveStateDuringUndo) {
