@@ -73,7 +73,7 @@ void ChainedByteRangeHead::append(const BufPtr& buf) {
   MVCHECK(it != buf->end());
   // We know that *it is non-empty at this point because of the initial
   // check that the chain is non-empty.
-  if (head_.range_.empty()) {
+  if (head_.range_.empty() && !isChained()) {
     head_.range_ = *it;
     chainLength_ += it->size();
     it++;
@@ -107,6 +107,7 @@ void ChainedByteRangeHead::append(ChainedByteRangeHead&& chainHead) {
   chainLength_ += chainHead.chainLength_;
 
   chainHead.head_.next_ = nullptr;
+  chainHead.head_.range_.clear();
   chainHead.chainLength_ = 0;
   chainHead.tail_ = &chainHead.head_;
 }

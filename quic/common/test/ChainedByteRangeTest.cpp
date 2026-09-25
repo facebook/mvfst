@@ -17,8 +17,11 @@ using namespace quic;
 
 namespace {
 void checkConsistency(const ChainedByteRangeHead& queue) {
-  size_t len = queue.chainLength();
-  EXPECT_EQ(len, queue.chainLength());
+  size_t length = 0;
+  for (auto* range = queue.getHead(); range; range = range->getNext()) {
+    length += range->getRange().size();
+  }
+  EXPECT_EQ(length, queue.chainLength());
 }
 
 } // namespace
@@ -100,6 +103,85 @@ TEST(ChainedByteRangeHead, AppendHead4) {
   queue.append(std::move(queue2));
   checkConsistency(queue);
   EXPECT_EQ(queue.chainLength(), 7);
+}
+
+TEST(ChainedByteRangeHead, AppendBufferAfterHeadAppendPreservesOrder) {
+  auto oldBuf = IOBuf::copyBuffer("old");
+  auto newBuf = IOBuf::copyBuffer("new");
+  newBuf->appendToChain(IOBuf::copyBuffer("tail"));
+  auto reusedBuf = IOBuf::copyBuffer("reused");
+  ChainedByteRangeHead destination;
+  ChainedByteRangeHead source(oldBuf);
+
+  destination.append(std::move(source));
+
+  // `append` guarantees that its moved-from source can be reused.
+  // NOLINTNEXTLINE(bugprone-use-after-move)
+  EXPECT_TRUE(source.empty());
+  EXPECT_TRUE(source.getHead()->getRange().empty());
+  EXPECT_EQ("", source.toStr());
+  source.append(reusedBuf);
+  EXPECT_EQ("reused", source.toStr());
+  checkConsistency(source);
+
+  EXPECT_EQ("old", destination.toStr());
+  EXPECT_TRUE(destination.getHead()->getRange().empty());
+  EXPECT_TRUE(destination.isChained());
+  EXPECT_EQ(3, destination.chainLength());
+  checkConsistency(destination);
+
+  destination.append(newBuf);
+
+  EXPECT_EQ(10, destination.chainLength());
+  checkConsistency(destination);
+  EXPECT_EQ("oldnewtail", destination.toStr());
+}
+
+TEST(ChainedByteRangeHead, AppendBufferAfterSplitEmptyNodePreservesOrder) {
+  auto buf = IOBuf::copyBuffer("old");
+  buf->appendToChain(IOBuf::copyBuffer(""));
+  buf->appendToChain(IOBuf::copyBuffer("tail"));
+  auto newBuf = IOBuf::copyBuffer("new");
+  ChainedByteRangeHead destination(buf);
+
+  auto prefix = destination.splitAtMost(3);
+
+  EXPECT_EQ("old", prefix.toStr());
+  EXPECT_EQ("tail", destination.toStr());
+  EXPECT_TRUE(destination.getHead()->getRange().empty());
+  EXPECT_TRUE(destination.isChained());
+  EXPECT_EQ(4, destination.chainLength());
+  checkConsistency(destination);
+
+  destination.append(newBuf);
+
+  EXPECT_EQ(7, destination.chainLength());
+  checkConsistency(destination);
+  EXPECT_EQ("tailnew", destination.toStr());
+}
+
+TEST(ChainedByteRangeHead, AppendBufferAfterMovingEmptyHeadPreservesOrder) {
+  auto oldBuf = IOBuf::copyBuffer("old");
+  auto newBuf = IOBuf::copyBuffer("new");
+  ChainedByteRangeHead original;
+  ChainedByteRangeHead source(oldBuf);
+  original.append(std::move(source));
+  ChainedByteRangeHead moveConstructed(std::move(original));
+  ChainedByteRangeHead assigned;
+
+  assigned = std::move(moveConstructed);
+
+  EXPECT_EQ("old", assigned.toStr());
+  EXPECT_TRUE(assigned.getHead()->getRange().empty());
+  EXPECT_TRUE(assigned.isChained());
+  EXPECT_EQ(3, assigned.chainLength());
+  checkConsistency(assigned);
+
+  assigned.append(newBuf);
+
+  EXPECT_EQ(6, assigned.chainLength());
+  checkConsistency(assigned);
+  EXPECT_EQ("oldnew", assigned.toStr());
 }
 
 TEST(ChainedByteRangeHead, AppendMultipleEmpty) {
