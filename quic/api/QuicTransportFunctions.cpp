@@ -391,6 +391,12 @@ continuousMemoryBuildScheduleEncrypt(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     TimePoint sendTime) {
+  if (connection.bufAccessor->tailroom() < connection.udpSendPacketLen) {
+    return quic::make_unexpected(QuicError(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        "Insufficient ContinuousMemory buffer tailroom"));
+  }
+
   // SCONE: If needed, build the SCONE packet and write it to the buffer first.
   uint64_t sconePacketSize =
       writeSconePacketIfNeeded(connection, header, pnSpace, sendTime);

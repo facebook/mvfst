@@ -5548,6 +5548,114 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilder) {
   EXPECT_EQ(0, bufPtr->headroom());
 }
 
+TEST_F(
+    QuicTransportFunctionsTest,
+    InplaceBuilderRejectsInsufficientPhysicalTailroom) {
+  auto conn = createConn();
+  conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
+  BufAccessor bufAccessor(256);
+  ASSERT_LT(bufAccessor.tailroom(), conn->udpSendPacketLen);
+  conn->bufAccessor = &bufAccessor;
+
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket mockSock(qEvb);
+  EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
+  EXPECT_CALL(mockSock, writeGSO(_, _, _, _)).Times(0);
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(
+                   *stream, folly::IOBuf::copyBuffer("small payload"), true)
+                   .hasError());
+
+  auto result = writeQuicDataToSocket(
+      mockSock,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::INTERNAL_ERROR);
+  EXPECT_EQ(bufAccessor.length(), 0);
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    ContinuousMemorySendmmsgFillsNegotiatedMaxBatch) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = kDefaultMaxUDPPayload;
+  conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  conn->transportSettings.batchingMode =
+      QuicBatchingMode::BATCHING_MODE_SENDMMSG;
+  conn->transportSettings.maxBatchSize = kDefaultQuicMaxBatchSize;
+  conn->congestionController.reset();
+
+  constexpr size_t kBatchCapacity = static_cast<size_t>(kDefaultMaxUDPPayload) *
+      static_cast<size_t>(kDefaultQuicMaxBatchSize);
+  BufAccessor bufAccessor(kBatchCapacity);
+  auto outputBuf = bufAccessor.obtain();
+  auto* bufPtr = outputBuf.get();
+  bufAccessor.release(std::move(outputBuf));
+  conn->bufAccessor = &bufAccessor;
+
+  EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket mockSock(qEvb);
+  EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(false));
+
+  constexpr uint64_t kFlowControlLimit =
+      static_cast<uint64_t>(kBatchCapacity) * 2;
+  conn->flowControlState.peerAdvertisedMaxOffset = kFlowControlLimit;
+  conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+      kFlowControlLimit;
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  stream->flowControlState.peerAdvertisedMaxOffset = kFlowControlLimit;
+  auto input = buildRandomInputData(
+      kBatchCapacity + static_cast<size_t>(kDefaultMaxUDPPayload));
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, input->clone(), false).hasError());
+
+  size_t bytesInBatch = 0;
+  EXPECT_CALL(mockSock, writem(_, _, _, _))
+      .Times(1)
+      .WillOnce([&](folly::Range<const quic::SocketAddress*>,
+                    iovec* iovecs,
+                    size_t* messageSizes,
+                    size_t count) {
+        EXPECT_EQ(count, kDefaultQuicMaxBatchSize);
+        for (size_t i = 0; i < count; ++i) {
+          EXPECT_EQ(messageSizes[i], 1);
+          EXPECT_LE(iovecs[i].iov_len, kDefaultMaxUDPPayload);
+          bytesInBatch += iovecs[i].iov_len;
+        }
+        return static_cast<int>(count);
+      });
+
+  auto result = writeQuicDataToSocket(
+      mockSock,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      kDefaultQuicMaxBatchSize);
+
+  ASSERT_FALSE(result.hasError());
+  EXPECT_GT(
+      bytesInBatch,
+      kBatchCapacity - static_cast<size_t>(kDefaultMaxUDPPayload));
+  EXPECT_EQ(bufPtr->length(), 0);
+}
+
 TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderRollbackBuf) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;

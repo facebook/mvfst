@@ -1440,8 +1440,13 @@ CloningScheduler::scheduleFramesForPacket(
   // The caller has already accounted for cipher overhead and may have
   // reserved datagram space outside the QUIC packet. Restore only the cipher
   // overhead when recreating the builder so those reservations are preserved.
+  MVCHECK_LE(cipherOverhead_, std::numeric_limits<uint8_t>::max());
+  const auto cipherOverhead = static_cast<uint8_t>(cipherOverhead_);
+  MVCHECK_LE(
+      builder.remainingSpaceInPkt(),
+      std::numeric_limits<uint32_t>::max() - cipherOverhead);
   const uint32_t packetSizeLimit =
-      builder.remainingSpaceInPkt() + static_cast<uint32_t>(cipherOverhead_);
+      builder.remainingSpaceInPkt() + cipherOverhead;
   MVDCHECK_LE(packetSizeLimit, conn_.udpSendPacketLen);
   // TODO: We can avoid the copy & rebuild of the header by creating an
   // independent header builder.
@@ -1476,6 +1481,11 @@ CloningScheduler::scheduleFramesForPacket(
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     } else {
       MVCHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
+      if (conn_.bufAccessor->tailroom() < packetSizeLimit) {
+        return quic::make_unexpected(QuicError(
+            TransportErrorCode::INTERNAL_ERROR,
+            "Insufficient ContinuousMemory buffer tailroom"));
+      }
       internalBuilder = std::make_unique<InplaceQuicPacketBuilder>(
           *conn_.bufAccessor,
           packetSizeLimit,
@@ -1522,7 +1532,7 @@ CloningScheduler::scheduleFramesForPacket(
       continue;
     }
 
-    internalBuilder->accountForCipherOverhead(cipherOverhead_);
+    internalBuilder->accountForCipherOverhead(cipherOverhead);
     auto encodeRes = internalBuilder->encodePacketHeader();
     if (!encodeRes.has_value()) {
       return quic::make_unexpected(encodeRes.error());

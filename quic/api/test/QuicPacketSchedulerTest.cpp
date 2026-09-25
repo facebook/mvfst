@@ -1694,7 +1694,7 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
-  BufAccessor bufAccessor(2000);
+  BufAccessor bufAccessor(conn.udpSendPacketLen);
   auto buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), 0);
   bufAccessor.release(std::move(buf));
@@ -1770,6 +1770,31 @@ TEST_P(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   EXPECT_TRUE(bufAccessor.ownsBuffer());
   buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), conn.udpSendPacketLen);
+
+  constexpr uint32_t kReservedBytes = 64;
+  const auto udpSendPacketLen = static_cast<uint32_t>(conn.udpSendPacketLen);
+  buf->clear();
+  buf->append(kReservedBytes);
+  bufAccessor.release(std::move(buf));
+
+  ShortHeader boundedHeader(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  InplaceQuicPacketBuilder boundedBuilder(
+      bufAccessor,
+      udpSendPacketLen - kReservedBytes,
+      std::move(boundedHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  auto boundedCloneResult = cloningScheduler.scheduleFramesForPacket(
+      std::move(boundedBuilder), udpSendPacketLen);
+  ASSERT_FALSE(boundedCloneResult.hasError());
+  EXPECT_FALSE(boundedCloneResult->clonedPacketIdentifier.has_value());
+  EXPECT_FALSE(boundedCloneResult->packet.has_value());
+
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), kReservedBytes);
 }
 
 TEST_P(

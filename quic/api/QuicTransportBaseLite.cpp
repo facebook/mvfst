@@ -25,6 +25,7 @@
 #include <limits>
 
 #include <folly/ScopeGuard.h>
+#include <folly/lang/CheckedMath.h>
 
 #include <sstream>
 
@@ -3192,17 +3193,16 @@ void QuicTransportBaseLite::setIdleTimer() {
 
 void QuicTransportBaseLite::setTransportSettings(
     TransportSettings transportSettings) {
-  if (conn_->nodeType == QuicNodeType::Client) {
-    if (useSinglePacketInplaceBatchWriter(
-            transportSettings.maxBatchSize, transportSettings.dataPathType)) {
-      createBufAccessor(conn_->udpSendPacketLen);
-    } else if (
-        transportSettings.dataPathType ==
-        quic::DataPathType::ContinuousMemory) {
-      // Create generic buf for in-place batch writer.
-      createBufAccessor(
-          conn_->udpSendPacketLen * transportSettings.maxBatchSize);
-    }
+  if (conn_->nodeType == QuicNodeType::Client &&
+      transportSettings.dataPathType == DataPathType::ContinuousMemory) {
+    size_t capacity = 0;
+    MVCHECK(
+        folly::checked_mul(
+            &capacity,
+            static_cast<size_t>(kDefaultMaxUDPPayload),
+            static_cast<size_t>(transportSettings.maxBatchSize)),
+        "ContinuousMemory buffer capacity overflow");
+    createBufAccessor(capacity);
   }
 
   // If transport parameters are encoded, we can only update congestion

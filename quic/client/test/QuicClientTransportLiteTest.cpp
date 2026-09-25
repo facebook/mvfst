@@ -9,11 +9,13 @@
 #include <quic/api/test/ApiMocks.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/client/test/Mocks.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/events/test/QuicEventBaseMock.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/test/QuicAsyncUDPSocketMock.h>
+#include <quic/handshake/TransportParameters.h>
 
 #include <chrono>
 
@@ -43,6 +45,10 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
 
   auto& getWriteLooper() {
     return writeLooper_;
+  }
+
+  [[nodiscard]] quic::Expected<void, QuicError> invokeWriteSocketData() {
+    return writeSocketData();
   }
 };
 
@@ -159,6 +165,130 @@ TEST_F(
   EXPECT_EQ(
       conn->readCodec->getCodecParameters().peerTimestampFrameTimestampExponent,
       kPeerTimestampExponent);
+}
+
+struct ContinuousMemoryPacketSizeTestCase {
+  const char* name;
+  uint64_t initialPacketSize;
+  uint64_t peerPacketSize;
+  uint32_t maxBatchSize;
+};
+
+class ContinuousMemoryPacketSizeTest
+    : public QuicClientTransportLiteTest,
+      public WithParamInterface<ContinuousMemoryPacketSizeTestCase> {};
+
+TEST_P(
+    ContinuousMemoryPacketSizeTest,
+    BufferSupportsHandshakeNegotiatedPacketSize) {
+  const auto& testCase = GetParam();
+  auto* conn = quicClient_->getConn();
+  conn->udpSendPacketLen = testCase.initialPacketSize;
+
+  auto transportSettings = quicClient_->getTransportSettings();
+  transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  transportSettings.maxBatchSize = testCase.maxBatchSize;
+  transportSettings.canIgnorePathMTU = true;
+  quicClient_->setTransportSettings(std::move(transportSettings));
+
+  auto packetSizeParam = encodeIntegerParameter(
+      TransportParameterId::max_packet_size, testCase.peerPacketSize);
+  ASSERT_FALSE(packetSizeParam.hasError());
+  ServerTransportParameters serverParams{{packetSizeParam.value()}};
+  ASSERT_FALSE(processServerInitialParams(*conn, serverParams, 0).hasError());
+
+  EXPECT_EQ(conn->udpSendPacketLen, testCase.peerPacketSize);
+  ASSERT_NE(conn->bufAccessor, nullptr);
+  EXPECT_GE(
+      conn->bufAccessor->tailroom(),
+      static_cast<size_t>(kDefaultMaxUDPPayload) * testCase.maxBatchSize);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    NegotiatedPacketSizes,
+    ContinuousMemoryPacketSizeTest,
+    Values(
+        ContinuousMemoryPacketSizeTestCase{
+            "Ipv6Production1404Single",
+            kDefaultV6UDPSendPacketLen,
+            1404,
+            1},
+        ContinuousMemoryPacketSizeTestCase{
+            "Ipv4Production1404Batch",
+            kDefaultV4UDPSendPacketLen,
+            1404,
+            kDefaultQuicMaxBatchSize},
+        ContinuousMemoryPacketSizeTestCase{
+            "Ipv6ProtocolMax1452Batch",
+            kDefaultV6UDPSendPacketLen,
+            kDefaultMaxUDPPayload,
+            kDefaultQuicMaxBatchSize},
+        ContinuousMemoryPacketSizeTestCase{
+            "Ipv4ProtocolMax1452Single",
+            kDefaultV4UDPSendPacketLen,
+            kDefaultMaxUDPPayload,
+            1}),
+    [](const TestParamInfo<ContinuousMemoryPacketSizeTestCase>& info) {
+      return info.param.name;
+    });
+
+TEST_F(
+    QuicClientTransportLiteTest,
+    ContinuousMemoryWritesNegotiatedMaxGsoBatch) {
+  constexpr size_t kPacketSize = kDefaultMaxUDPPayload;
+  constexpr size_t kBatchCapacity =
+      kPacketSize * static_cast<size_t>(kDefaultQuicMaxBatchSize);
+  constexpr uint64_t kFlowControlLimit =
+      static_cast<uint64_t>(kBatchCapacity) * 2;
+
+  auto* conn = quicClient_->getConn();
+  conn->udpSendPacketLen = kDefaultV6UDPSendPacketLen;
+
+  auto transportSettings = quicClient_->getTransportSettings();
+  transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
+  transportSettings.maxBatchSize = kDefaultQuicMaxBatchSize;
+  transportSettings.writeConnectionDataPacketsLimit = kDefaultQuicMaxBatchSize;
+  transportSettings.canIgnorePathMTU = true;
+  quicClient_->setTransportSettings(std::move(transportSettings));
+
+  auto packetSizeParam = encodeIntegerParameter(
+      TransportParameterId::max_packet_size, kDefaultMaxUDPPayload);
+  ASSERT_FALSE(packetSizeParam.hasError());
+  ServerTransportParameters serverParams{{packetSizeParam.value()}};
+  ASSERT_FALSE(processServerInitialParams(*conn, serverParams, 0).hasError());
+  ASSERT_EQ(conn->udpSendPacketLen, kDefaultMaxUDPPayload);
+
+  ASSERT_FALSE(conn->streamManager
+                   ->setMaxLocalBidirectionalStreams(kDefaultQuicMaxBatchSize)
+                   .hasError());
+  conn->flowControlState.peerAdvertisedMaxOffset = kFlowControlLimit;
+  conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+      kFlowControlLimit;
+  conn->congestionController.reset();
+
+  const auto streamId = quicClient_->createBidirectionalStream().value();
+  auto input = buildRandomInputData(kBatchCapacity + kPacketSize);
+  ASSERT_FALSE(
+      quicClient_->writeChain(streamId, std::move(input), false).hasError());
+
+  size_t bytesInBatch = 0;
+  EXPECT_CALL(*sockPtr_, writeGSO(_, _, _, _))
+      .Times(1)
+      .WillOnce([&](const SocketAddress&,
+                    const iovec* vec,
+                    size_t iovecLen,
+                    QuicAsyncUDPSocket::WriteOptions options) {
+        EXPECT_EQ(iovecLen, 1);
+        EXPECT_EQ(options.gso, kDefaultMaxUDPPayload);
+        bytesInBatch = getTotalIovecLen(vec, iovecLen);
+        return bytesInBatch;
+      });
+
+  ASSERT_FALSE(quicClient_->invokeWriteSocketData().hasError());
+  EXPECT_EQ(bytesInBatch, kBatchCapacity);
+  ASSERT_NE(conn->bufAccessor, nullptr);
+  EXPECT_EQ(conn->bufAccessor->length(), 0);
 }
 
 TEST_F(QuicClientTransportLiteTest, TestMaybeIssueConnectionIdsZeroLengthCid) {

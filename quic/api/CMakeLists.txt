@@ -92,6 +92,7 @@ mvfst_add_library(mvfst_api_transport_lite
     mvfst_state_pacing_functions
     mvfst_state_stream
     mvfst_state_stream_functions
+    Folly::folly_lang_checked_math
     Folly::folly_scope_guard
   EXPORTED_DEPS
     mvfst_api_quic_batch_writer

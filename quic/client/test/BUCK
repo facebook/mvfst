@@ -88,15 +88,18 @@ mvfst_cpp_test(
     srcs = [
         "QuicClientTransportLiteTest.cpp",
     ],
+    supports_static_listing = False,
     deps = [
         "//quic/api/test:api_mocks",
         "//quic/api/test:mocks",
         "//quic/client:client",
+        "//quic/client:state_and_handshake",
         "//quic/client/test:mocks",
         "//quic/common/events:folly_eventbase",
         "//quic/common/events/test:QuicEventBaseMock",
         "//quic/common/test:test_utils",
         "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",
+        "//quic/handshake:transport_parameters",
     ],
 )
 
