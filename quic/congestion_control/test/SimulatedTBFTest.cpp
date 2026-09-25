@@ -15,6 +15,14 @@ namespace quic::test {
 
 class SimulatedTBFTest : public Test {};
 
+// SimulatedTBF reduces every TimePoint to a double of seconds since the Clock
+// epoch, so an origin that is not exactly representable costs the exact
+// arithmetic below its low bits, and Clock::now() never is one. Any whole
+// second >= 3s works; >= 3s so that the t - 1s case still starts full.
+// Balances that are not whole tokens stay inexact at any origin -- assert
+// those with EXPECT_NEAR, as this file already does.
+constexpr TimePoint kOrigin = TimePoint{} + 1000s;
+
 TEST_F(SimulatedTBFTest, Init) {
   SimulatedTBF::Config config;
   config.rateBytesPerSecond = 100;
@@ -66,7 +74,7 @@ TEST_F(SimulatedTBFTest, EmptyIntervalsTrackingDisabled_WithConsume) {
   config.maybeMaxDebtQueueSizeBytes = 0;
   config.trackEmptyIntervals = false;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), stbf.getBurstSizeBytes());
   EXPECT_EQ(stbf.getTokenBalance(t), stbf.getBurstSizeBytes());
 
@@ -105,7 +113,7 @@ TEST_F(SimulatedTBFTest, NoConsumeCheckNoEmptyIntervals) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_FALSE(stbf.bucketEmptyAt(t));
   EXPECT_FALSE(stbf.bucketEmptyThroughoutWindow(t, t));
@@ -123,7 +131,7 @@ TEST_F(SimulatedTBFTest, ConsumeMoreThanBurstSize) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
   EXPECT_EQ(stbf.getNumEmptyIntervalsTracked(), 0);
   EXPECT_EQ(stbf.getNumAvailableTokensInBytes(t), stbf.getBurstSizeBytes());
   EXPECT_EQ(stbf.getTokenBalance(t), stbf.getBurstSizeBytes());
@@ -147,7 +155,7 @@ TEST_F(SimulatedTBFTest, MultiConsumeWithEmptyInterval) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Consume but not drain completely: burstBytes - (burstBytes - 10) = 10
   EXPECT_EQ(
@@ -210,7 +218,7 @@ TEST_F(SimulatedTBFTest, MultiConsumeNoEmptyInterval) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Consume 100 bytes every seconds
   for (int i = 0; i < 10; i++) {
@@ -243,7 +251,7 @@ TEST_F(SimulatedTBFTest, NoEmptyIntervalAfterDrainIfTsHadTokens) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Put the bucket in debt:
   // At t = 10s, tokens = (200) - (200 * 10) = -1800
@@ -284,7 +292,7 @@ TEST_F(SimulatedTBFTest, AddAndForgetOneEmptyInterval) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Put the bucket in debt:
   // At t = 10s, tokens = (200) + (100 * 10) + (-200 * 10) = -800
@@ -347,7 +355,7 @@ TEST_F(SimulatedTBFTest, AddTwoEmptyIntervalsAndForgetOne) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Add the first interval:
   // At t = 5s, tokens = (200) + (100 * 5) + (-200 * 5) = -300
@@ -412,7 +420,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleInterval) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Consume and drain completely: tokens = -200 at t = 0
   EXPECT_EQ(
@@ -481,7 +489,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeMultipleIntervals) {
   config.rateBytesPerSecond = 100;
   config.burstSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Consume and drain completely: tokens = 0 at t
   EXPECT_EQ(
@@ -567,7 +575,7 @@ TEST_F(SimulatedTBFTest, MultipleConsumeSingleIntervalWithDebtBuffCapped) {
   config.burstSizeBytes = 200;
   config.maybeMaxDebtQueueSizeBytes = 200;
   SimulatedTBF stbf(config);
-  const TimePoint t = Clock::now();
+  const TimePoint t = kOrigin;
 
   // Consume and drain completely: tokens = 0 at t
   EXPECT_EQ(
