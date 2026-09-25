@@ -9,6 +9,8 @@
 #include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/priority/HTTPPriorityQueue.h>
 
+#include <algorithm>
+
 namespace {
 constexpr size_t kBuildIndexThreshold = 100;
 constexpr size_t kDestroyIndexThreshold = 50;
@@ -120,6 +122,7 @@ void HTTPPriorityQueue::insertOrUpdate(
   if (priority->paused && disablePausedPriority_) {
     priority = Priority(7, true);
   }
+  forgetErased(id);
   auto findResult = find(id);
   if (findResult) {
     if (updateInSequential(findResult->elem, priority)) {
@@ -143,6 +146,7 @@ void HTTPPriorityQueue::updateIfExist(
   if (!findResult) {
     return;
   }
+  forgetErased(id);
   if (!updateInSequential(findResult->elem, priority)) {
     // moving in/out of a RR/paused, just erase
     bool wasIncremental = findResult->elem.incremental;
@@ -317,6 +321,18 @@ void HTTPPriorityQueue::insert(Identifier id, const Priority& priority) {
     addIndex(id, {.incremental = false, .index = index});
     heapifyUp(index);
   }
+}
+
+void HTTPPriorityQueue::forgetErased(Identifier id) {
+  if (!hasOpenTransaction_ || erased_.empty()) {
+    return;
+  }
+  erased_.erase(
+      std::remove_if(
+          erased_.begin(),
+          erased_.end(),
+          [id](const Element& element) { return element.identifier == id; }),
+      erased_.end());
 }
 
 bool HTTPPriorityQueue::updateInSequential(

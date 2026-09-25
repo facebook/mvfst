@@ -63,9 +63,12 @@ bool RoundRobin::empty() const {
   return list_.empty();
 }
 
-// The caller needs to verify it never inserts a duplicate
 void RoundRobin::insert(quic::PriorityQueue::Identifier value) {
-  MVDCHECK(!erase(value), "Duplicate value");
+  if (useIndexMap_
+          ? indexMap_.find(value) != indexMap_.end()
+          : std::find(list_.begin(), list_.end(), value) != list_.end()) {
+    return;
+  }
   // Insert new integer at the tail of the list
   if (!useIndexMap_ && list_.size() >= kBuildIndexThreshold) {
     useIndexMap_ = true;

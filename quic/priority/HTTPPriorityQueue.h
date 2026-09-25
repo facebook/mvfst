@@ -169,7 +169,9 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   void rollbackTransaction(Transaction&&) override {
     if (hasOpenTransaction_) {
       for (auto& e : erased_) {
-        insert(e.identifier, e.priority);
+        if (!contains(e.identifier)) {
+          insert(e.identifier, e.priority);
+        }
       }
       erased_.clear();
       hasOpenTransaction_ = false;
@@ -226,6 +228,7 @@ class HTTPPriorityQueue : public quic::PriorityQueue {
   void heapifyDown(size_t index);
   void assignIndex(Element& element, size_t index);
   void insert(Identifier id, const Priority& priority);
+  void forgetErased(Identifier id);
   bool updateInSequential(IndexMapElem indexElem, Priority priority);
   void eraseImpl(Identifier id, IndexMapElem indexElem);
 

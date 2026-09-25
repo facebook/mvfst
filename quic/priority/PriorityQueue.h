@@ -224,8 +224,9 @@ class PriorityQueue {
   // become permanent.
   virtual void commitTransaction(Transaction&&) = 0;
 
-  // Rollback the current transaction  All IDs erased since beginTransaction
-  // are re-inserted at their previous priority level.
+  // Rollback the current transaction. IDs erased since beginTransaction are
+  // re-inserted at their previous priority unless a later insert or update
+  // superseded the erase.
   virtual void rollbackTransaction(Transaction&&) = 0;
 
  protected:

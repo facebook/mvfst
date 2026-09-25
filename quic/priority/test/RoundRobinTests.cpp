@@ -182,4 +182,91 @@ TEST_F(RoundRobinTest, Index) {
   }
 }
 
+TEST_F(RoundRobinTest, DuplicateInsertPreservesUniqueMembership) {
+  rr_.insert(Identifier::fromStreamID(2));
+  bool removedAll = true;
+  for (size_t i = 1; i <= 3; ++i) {
+    removedAll &= rr_.erase(Identifier::fromStreamID(i));
+  }
+  const bool emptyAfterErase = rr_.empty();
+  rr_.clear();
+
+  EXPECT_TRUE(removedAll);
+  EXPECT_TRUE(emptyAfterErase);
+}
+
+TEST_F(RoundRobinTest, DuplicateInsertPreservesIndexedMembership) {
+  for (size_t i = 4; i <= 33; ++i) {
+    rr_.insert(Identifier::fromStreamID(i));
+  }
+  rr_.insert(Identifier::fromStreamID(2));
+  bool removedAll = true;
+  for (size_t i = 1; i <= 33; ++i) {
+    removedAll &= rr_.erase(Identifier::fromStreamID(i));
+  }
+  const bool emptyAfterErase = rr_.empty();
+  rr_.clear();
+
+  EXPECT_TRUE(removedAll);
+  EXPECT_TRUE(emptyAfterErase);
+}
+
+TEST_F(RoundRobinTest, DuplicateInsertPreservesNextBudget) {
+  rr_.advanceAfterNext(3);
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  rr_.insert(Identifier::fromStreamID(1));
+  rr_.insert(Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(std::nullopt), Identifier::fromStreamID(3));
+}
+
+TEST_F(RoundRobinTest, DuplicateInsertPreservesByteBudget) {
+  rr_.advanceAfterBytes(10);
+  EXPECT_EQ(rr_.getNext(6), Identifier::fromStreamID(1));
+  rr_.insert(Identifier::fromStreamID(1));
+  rr_.insert(Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(4), Identifier::fromStreamID(1));
+  EXPECT_EQ(rr_.getNext(10), Identifier::fromStreamID(2));
+  EXPECT_EQ(rr_.getNext(10), Identifier::fromStreamID(3));
+  EXPECT_EQ(rr_.peekNext(), Identifier::fromStreamID(1));
+}
+
+TEST_F(RoundRobinTest, DuplicateInsertAfterIndexShrinks) {
+  for (size_t i = 4; i <= 33; ++i) {
+    rr_.insert(Identifier::fromStreamID(i));
+  }
+  for (size_t i = 10; i <= 33; ++i) {
+    ASSERT_TRUE(rr_.erase(Identifier::fromStreamID(i)));
+  }
+  rr_.insert(Identifier::fromStreamID(2));
+  for (size_t i = 1; i <= 9; ++i) {
+    EXPECT_TRUE(rr_.erase(Identifier::fromStreamID(i)));
+  }
+  EXPECT_TRUE(rr_.empty());
+}
+
+TEST_F(RoundRobinTest, DuplicateInsertKeepsIdentifierTypesDistinct) {
+  for (size_t streamCount : {3, 33}) {
+    rr_.clear();
+    for (size_t i = 1; i <= streamCount; ++i) {
+      rr_.insert(Identifier::fromStreamID(i));
+    }
+    const auto datagram = Identifier::fromDatagramFlowID(1);
+    rr_.insert(datagram);
+    rr_.insert(Identifier::fromStreamID(1));
+    rr_.insert(datagram);
+    for (size_t i = 1; i <= streamCount; ++i) {
+      EXPECT_TRUE(rr_.erase(Identifier::fromStreamID(i)));
+    }
+    ASSERT_FALSE(rr_.empty());
+    EXPECT_EQ(rr_.peekNext(), datagram);
+    EXPECT_TRUE(rr_.erase(datagram));
+    EXPECT_TRUE(rr_.empty());
+  }
+}
+
 } // namespace

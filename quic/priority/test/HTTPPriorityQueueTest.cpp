@@ -395,4 +395,99 @@ TEST_F(HTTPPriorityQueueTest, PriorityAssignmentOperator) {
       priority->order, HTTPPriorityQueue::Priority::kDefaultPriority.order);
 }
 
+TEST_F(HTTPPriorityQueueTest, RollbackPreservesReinsertedMembership) {
+  const auto id = Identifier::fromStreamID(1);
+  const auto priority = HTTPPriorityQueue::Priority(3, true);
+  queue_.insertOrUpdate(id, priority);
+  auto transaction = queue_.beginTransaction();
+  queue_.erase(id);
+  ASSERT_FALSE(queue_.contains(id));
+  queue_.insertOrUpdate(id, priority);
+  ASSERT_EQ(queue_.getRoundRobinElements(), 1);
+  queue_.rollbackTransaction(std::move(transaction));
+
+  const bool containsAfterRollback = queue_.contains(id);
+  const auto countAfterRollback = queue_.getRoundRobinElements();
+  queue_.erase(id);
+  const bool containsAfterErase = queue_.contains(id);
+  const bool emptyAfterErase = queue_.empty();
+  const auto countAfterErase = queue_.getRoundRobinElements();
+  queue_.clear();
+
+  EXPECT_TRUE(containsAfterRollback);
+  EXPECT_FALSE(containsAfterErase);
+  EXPECT_EQ(countAfterRollback, 1);
+  EXPECT_EQ(countAfterErase, 0);
+  EXPECT_TRUE(emptyAfterErase);
+}
+
+TEST_F(HTTPPriorityQueueTest, RollbackPreservesReinsertedUrgency) {
+  const auto id = Identifier::fromStreamID(1);
+  queue_.insertOrUpdate(id, HTTPPriorityQueue::Priority(3, true));
+  auto transaction = queue_.beginTransaction();
+  queue_.erase(id);
+  const auto replacement = HTTPPriorityQueue::Priority(1, true);
+  queue_.insertOrUpdate(id, replacement);
+  queue_.rollbackTransaction(std::move(transaction));
+
+  ASSERT_TRUE(queue_.contains(id));
+  EXPECT_EQ(queue_.getRoundRobinElements(), 1);
+  EXPECT_TRUE(queue_.headHTTPPriority() == replacement);
+  queue_.erase(id);
+  EXPECT_EQ(queue_.getRoundRobinElements(), 0);
+  EXPECT_TRUE(queue_.empty());
+}
+
+TEST_F(HTTPPriorityQueueTest, RollbackPreservesSequentialReplacement) {
+  const auto id = Identifier::fromStreamID(1);
+  queue_.insertOrUpdate(id, HTTPPriorityQueue::Priority(3, true));
+  auto transaction = queue_.beginTransaction();
+  queue_.erase(id);
+  const auto replacement = HTTPPriorityQueue::Priority(1, false);
+  queue_.insertOrUpdate(id, replacement);
+  queue_.rollbackTransaction(std::move(transaction));
+
+  ASSERT_TRUE(queue_.contains(id));
+  EXPECT_EQ(queue_.getRoundRobinElements(), 0);
+  EXPECT_TRUE(queue_.headHTTPPriority() == replacement);
+  queue_.erase(id);
+  EXPECT_TRUE(queue_.empty());
+}
+
+TEST_F(HTTPPriorityQueueTest, RollbackRestoresLatestRepeatedErase) {
+  const auto id = Identifier::fromStreamID(1);
+  queue_.insertOrUpdate(id, HTTPPriorityQueue::Priority(3, false, 9));
+  auto transaction = queue_.beginTransaction();
+  queue_.erase(id);
+  const auto replacement = HTTPPriorityQueue::Priority(1, false, 7);
+  queue_.insertOrUpdate(id, replacement);
+  queue_.erase(id);
+  ASSERT_TRUE(queue_.empty());
+  queue_.rollbackTransaction(std::move(transaction));
+
+  ASSERT_TRUE(queue_.contains(id));
+  EXPECT_EQ(queue_.getRoundRobinElements(), 0);
+  EXPECT_EQ(queue_.headHTTPPriority(), replacement);
+  queue_.erase(id);
+  EXPECT_TRUE(queue_.empty());
+}
+
+TEST_F(HTTPPriorityQueueTest, RollbackPreservesPausedReplacement) {
+  const auto id = Identifier::fromStreamID(1);
+  queue_.insertOrUpdate(id, HTTPPriorityQueue::Priority(3, true));
+  auto transaction = queue_.beginTransaction();
+  queue_.erase(id);
+  queue_.insertOrUpdate(id, HTTPPriorityQueue::Priority(1, true));
+  const auto paused =
+      HTTPPriorityQueue::Priority(HTTPPriorityQueue::Priority::PAUSED);
+  queue_.updateIfExist(id, paused);
+  ASSERT_TRUE(queue_.empty());
+
+  queue_.rollbackTransaction(std::move(transaction));
+
+  EXPECT_FALSE(queue_.contains(id));
+  EXPECT_EQ(queue_.getRoundRobinElements(), 0);
+  EXPECT_TRUE(queue_.empty());
+}
+
 } // namespace
