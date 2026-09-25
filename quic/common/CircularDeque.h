@@ -86,6 +86,9 @@ struct CircularDeque {
   }
 
   CircularDeque& operator=(const CircularDeque& other) {
+    if (this == &other) {
+      return *this;
+    }
     clear();
     resize(other.size());
     std::uninitialized_copy(other.begin(), other.end(), storage_);

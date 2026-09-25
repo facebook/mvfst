@@ -446,12 +446,11 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
 
 template <typename T>
 void CircularDeque<T>::clear() noexcept {
-  if (empty() || capacity_ == 0) {
-    return;
-  }
-  if constexpr (!std::is_trivially_destructible_v<T>) {
-    for (auto iter = begin(); iter != end(); ++iter) {
-      std::destroy_at(&*iter);
+  if (!empty()) {
+    if constexpr (!std::is_trivially_destructible_v<T>) {
+      for (auto iter = begin(); iter != end(); ++iter) {
+        std::destroy_at(&*iter);
+      }
     }
   }
   begin_ = 0;

@@ -166,6 +166,65 @@ TEST(CircularDequeTest, InitAndAssign) {
   EXPECT_TRUE(verifyStorageContent(cd, expected));
 }
 
+TEST(CircularDequeTest, CopyAssignIntoDrainedSameCapacity) {
+  CircularDeque<NoexceptString> destination;
+  destination.resize(3);
+  destination.emplace_back("discarded");
+  destination.pop_front();
+
+  CircularDeque<NoexceptString> source;
+  source.resize(3);
+  source.emplace_back("one");
+  source.emplace_back("two");
+  source.emplace_back("three");
+  source.pop_front();
+  source.pop_front();
+  source.emplace_back("four");
+  source.emplace_back("five");
+  destination = source;
+
+  const CircularDeque<NoexceptString> expected = {
+      NoexceptString("three"), NoexceptString("four"), NoexceptString("five")};
+  EXPECT_EQ(destination, expected);
+}
+
+TEST(CircularDequeTest, SelfCopyAssignmentPreservesValues) {
+  CircularDeque<int> deque = {1, 2, 3};
+  const auto capacity = deque.max_size();
+  const auto& self = deque;
+
+  deque = self;
+
+  ASSERT_EQ(deque.size(), 3);
+  EXPECT_EQ(deque.max_size(), capacity);
+  EXPECT_EQ(deque.front(), 1);
+  EXPECT_EQ(deque.back(), 3);
+  EXPECT_TRUE(verifyStorageContent(deque, std::vector<int>{1, 2, 3}));
+}
+
+TEST(CircularDequeTest, InitializerAssignIntoDrainedSameCapacity) {
+  CircularDeque<int> deque;
+  deque.resize(3);
+  deque.push_back(9);
+  deque.pop_front();
+
+  deque = {1, 2, 3};
+
+  EXPECT_TRUE(verifyStorageContent(deque, std::vector<int>{1, 2, 3}));
+}
+
+TEST(CircularDequeTest, EmptyInitializerAssignIntoDrainedSameCapacity) {
+  CircularDeque<int> deque;
+  deque.resize(3);
+  deque.push_back(9);
+  deque.pop_front();
+
+  deque = {};
+
+  EXPECT_TRUE(deque.empty());
+  EXPECT_EQ(deque.size(), 0);
+}
+
 TEST(CircularDequeTest, PushPopEmplaceAccessErase) {
   CircularDeque<int> cd;
   cd.push_back(0);
