@@ -359,21 +359,13 @@ uint64_t writeSconePacketIfNeeded(
       buildSconePacket(sconeRateSignal, sconeDstCid, sconeSrcCid);
   uint64_t sconeSize = sconePacket.computeChainDataLength();
 
-  if (connection.udpSendPacketLen <= (sconeSize + kMinInitialPacketSize)) {
+  if (connection.udpSendPacketLen <= sconeSize) {
     VLOG(3) << "SCONE: Not enough space for SCONE packet in continuous buffer";
     return 0;
   }
 
   memcpy(connection.bufAccessor->writableTail(), sconePacket.data(), sconeSize);
   connection.bufAccessor->append(sconeSize);
-  connection.scone->lastSconeSentTime = sendTime;
-  QUIC_STATS(connection.statsCallback, onSconePacketSent);
-
-  VLOG(4) << "SCONE: Wrote " << sconeSize << " bytes to continuous buffer";
-  if (connection.qLogger) {
-    connection.qLogger->addTransportStateUpdate(
-        fmt::format("scone_sent:rate={}", static_cast<int>(sconeRateSignal)));
-  }
 
   return sconeSize;
 }
@@ -397,6 +389,12 @@ continuousMemoryBuildScheduleEncrypt(
         "Insufficient ContinuousMemory buffer tailroom"));
   }
 
+  const auto rollbackSize = connection.bufAccessor->length();
+  auto rollbackBuf = [&]() {
+    connection.bufAccessor->trimEnd(
+        connection.bufAccessor->length() - rollbackSize);
+  };
+
   // SCONE: If needed, build the SCONE packet and write it to the buffer first.
   uint64_t sconePacketSize =
       writeSconePacketIfNeeded(connection, header, pnSpace, sendTime);
@@ -407,35 +405,35 @@ continuousMemoryBuildScheduleEncrypt(
 
   // Defensive check: ensure we have enough space for the regular packet
   if (connection.udpSendPacketLen < sconePacketSize + flowIndSize) {
+    rollbackBuf();
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         "Insufficient space after SCONE packet"));
   }
 
-  auto prevSize = connection.bufAccessor->length();
+  const auto packetStart = connection.bufAccessor->length();
 
-  auto rollbackBuf = [&]() {
-    connection.bufAccessor->trimEnd(
-        connection.bufAccessor->length() - prevSize);
-  };
-
-  // It's the scheduler's job to invoke encode header
-  InplaceQuicPacketBuilder pktBuilder(
-      *connection.bufAccessor,
-      connection.udpSendPacketLen - sconePacketSize - flowIndSize,
-      std::move(header),
-      getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
-  pktBuilder.accountForCipherOverhead(cipherOverhead);
-  PROTO_OOPS_LOG_BUILDER_IF(
-      connection.nodeType == QuicNodeType::Server && !scheduler.hasData(),
-      connection.oopsLogger,
-      proto_oops::makeConnectionSpecificOopsFieldsBuilder(connection),
-      "quic_transport_functions",
-      "invariant_violation: packet scheduler selected with no data");
-  MVCHECK(scheduler.hasData());
-  auto result =
-      scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
+  // The builder must return the buffer before rollback can trim it.
+  auto result = [&]() {
+    // It's the scheduler's job to invoke encode header
+    InplaceQuicPacketBuilder pktBuilder(
+        *connection.bufAccessor,
+        connection.udpSendPacketLen - sconePacketSize - flowIndSize,
+        std::move(header),
+        getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
+    pktBuilder.accountForCipherOverhead(cipherOverhead);
+    PROTO_OOPS_LOG_BUILDER_IF(
+        connection.nodeType == QuicNodeType::Server && !scheduler.hasData(),
+        connection.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(connection),
+        "quic_transport_functions",
+        "invariant_violation: packet scheduler selected with no data");
+    MVCHECK(scheduler.hasData());
+    return scheduler.scheduleFramesForPacket(
+        std::move(pktBuilder), writableBytes);
+  }();
   if (!result.has_value()) {
+    rollbackBuf();
     return quic::make_unexpected(result.error());
   }
   MVCHECK(connection.bufAccessor->ownsBuffer());
@@ -475,7 +473,7 @@ continuousMemoryBuildScheduleEncrypt(
       packet->header.tail() < connection.bufAccessor->tail());
   // Trim off everything before the current packet, and the header length, so
   // buf's data starts from the body part of buf.
-  connection.bufAccessor->trimStart(prevSize + headerLen);
+  connection.bufAccessor->trimStart(packetStart + headerLen);
   // buf and packetBuf is actually the same.
   auto buf = connection.bufAccessor->obtain();
   auto encryptResult =
@@ -484,7 +482,7 @@ continuousMemoryBuildScheduleEncrypt(
     return quic::make_unexpected(encryptResult.error());
   }
   auto packetBuf = std::move(encryptResult.value());
-  MVCHECK(packetBuf->headroom() == headerLen + prevSize);
+  MVCHECK(packetBuf->headroom() == headerLen + packetStart);
   // Include header back.
   packetBuf->prepend(headerLen);
 
@@ -505,8 +503,19 @@ continuousMemoryBuildScheduleEncrypt(
   MVCHECK(!packetBuf->isChained());
   auto encodedSize = packetBuf->length();
   auto encodedBodySize = encodedSize - headerLen;
+  encodedSize += sconePacketSize;
+  if (sconePacketSize) {
+    connection.scone->lastSconeSentTime = sendTime;
+    QUIC_STATS(connection.statsCallback, onSconePacketSent);
+    if (connection.qLogger) {
+      connection.qLogger->addTransportStateUpdate(
+          fmt::format(
+              "scone_sent:rate={}",
+              static_cast<int>(connection.scone->configuredRateSignal)));
+    }
+  }
   // Include previous packets back.
-  packetBuf->prepend(prevSize);
+  packetBuf->prepend(packetStart);
   if (connection.transportSettings.isPriming && packetBuf) {
     packetBuf->coalesce();
     connection.bufAccessor->release(BufHelpers::create(packetBuf->capacity()));
