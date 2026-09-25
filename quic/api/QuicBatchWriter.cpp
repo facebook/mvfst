@@ -166,18 +166,11 @@ void SendmmsgPacketBatchWriter::fillIovecAndMessageSizes(
   }
 }
 
-bool useSinglePacketInplaceBatchWriter(
-    uint32_t maxBatchSize,
-    quic::DataPathType dataPathType) {
-  return maxBatchSize == 1 &&
-      dataPathType == quic::DataPathType::ContinuousMemory;
-}
-
 SendmmsgInplacePacketBatchWriter::SendmmsgInplacePacketBatchWriter(
     QuicConnectionStateBase& conn,
     size_t maxBufs)
     : conn_(conn), maxBufs_(maxBufs) {
-  MVCHECK_LT(maxBufs, kMaxIovecs, "maxBufs must be less than " << kMaxIovecs);
+  MVCHECK_LE(maxBufs, kMaxIovecs, "maxBufs must be at most " << kMaxIovecs);
 }
 
 bool SendmmsgInplacePacketBatchWriter::empty() const {

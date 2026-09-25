@@ -57,7 +57,7 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
     default:
-      if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
+      if (dataPathType == DataPathType::ContinuousMemory) {
         return BatchWriterPtr(new SinglePacketInplaceBatchWriter(conn));
       }
       return BatchWriterPtr(new SinglePacketBatchWriter());

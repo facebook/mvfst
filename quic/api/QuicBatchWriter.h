@@ -173,8 +173,4 @@ class SendmmsgInplacePacketBatchWriter : public BatchWriter {
 };
 
 using BatchWriterPtr = std::unique_ptr<BatchWriter, BatchWriterDeleter>;
-
-bool useSinglePacketInplaceBatchWriter(
-    uint32_t maxBatchSize,
-    quic::DataPathType dataPathType);
 } // namespace quic

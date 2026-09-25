@@ -65,7 +65,7 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
 
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
-      if (useSinglePacketInplaceBatchWriter(batchSize, dataPathType)) {
+      if (dataPathType == DataPathType::ContinuousMemory) {
         return BatchWriterPtr(new SinglePacketInplaceBatchWriter(conn));
       }
       return BatchWriterPtr(new SinglePacketBatchWriter());
@@ -96,6 +96,10 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
         }
       }
 
+      if (dataPathType == DataPathType::ContinuousMemory) {
+        return BatchWriterPtr(
+            new SendmmsgInplacePacketBatchWriter(conn, batchSize));
+      }
       return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
     }
       // no default so we can catch missing case at compile time

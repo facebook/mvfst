@@ -5730,6 +5730,49 @@ TEST_F(QuicTransportFunctionsTest, WriteWithInplaceBuilderGSOMultiplePackets) {
   EXPECT_EQ(0, bufPtr->headroom());
 }
 
+TEST_F(QuicTransportFunctionsTest, WriteWithInplaceSinglePacketWriter) {
+  for (uint32_t maxBatchSize : {1u, 16u}) {
+    SCOPED_TRACE(maxBatchSize);
+    auto conn = createConn();
+    conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
+    conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_NONE;
+    conn->transportSettings.maxBatchSize = maxBatchSize;
+    BufAccessor accessor(conn->udpSendPacketLen * maxBatchSize);
+    conn->bufAccessor = &accessor;
+    EventBase evb;
+    auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+    NiceMock<quic::test::MockAsyncUDPSocket> sock(qEvb);
+    ON_CALL(sock, getGSO()).WillByDefault(Return(0));
+    auto stream = conn->streamManager->createNextBidirectionalStream().value();
+    auto buf = buildRandomInputData(conn->udpSendPacketLen * 4);
+    ASSERT_FALSE(writeDataToQuicStream(*stream, buf->clone(), true).hasError());
+    size_t writes = 0;
+    EXPECT_CALL(sock, write(_, _, _))
+        .WillRepeatedly(Invoke([&](const quic::SocketAddress&,
+                                   const struct iovec* vec,
+                                   size_t iovec_len) {
+          ++writes;
+          auto len = getTotalIovecLen(vec, iovec_len);
+          EXPECT_LE(len, conn->udpSendPacketLen);
+          return static_cast<ssize_t>(len);
+        }));
+    auto result = writeQuicDataToSocket(
+        sock,
+        *conn,
+        *conn->clientConnectionId,
+        *conn->serverConnectionId,
+        *aead,
+        *headerCipher,
+        getVersion(*conn),
+        conn->transportSettings.writeConnectionDataPacketsLimit);
+    ASSERT_FALSE(result.hasError());
+    EXPECT_GT(result->packetsWritten, 1u);
+    EXPECT_EQ(writes, result->packetsWritten);
+    EXPECT_EQ(0, accessor.length());
+    EXPECT_EQ(0, accessor.headroom());
+  }
+}
+
 TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;

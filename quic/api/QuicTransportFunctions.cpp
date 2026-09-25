@@ -2240,20 +2240,6 @@ quic::Expected<WriteQuicDataResult, QuicError> writeConnectionDataToSocket(
       }
       return WriteQuicDataResult{ioBufBatch.getPktSent(), 0, bytesWritten};
     }
-
-    if ((connection.transportSettings.batchingMode ==
-         QuicBatchingMode::BATCHING_MODE_NONE) &&
-        useSinglePacketInplaceBatchWriter(
-            connection.transportSettings.maxBatchSize,
-            connection.transportSettings.dataPathType)) {
-      // With SinglePacketInplaceBatchWriter we always write one packet, and so
-      // ioBufBatch needs a flush.
-      auto flushResult = ioBufBatch.flush();
-      if (!flushResult.has_value()) {
-        return quic::make_unexpected(flushResult.error());
-      }
-      updateErrnoCount(connection, ioBufBatch);
-    }
   }
 
   // Ensure that the buffer is flushed before returning
