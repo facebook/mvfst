@@ -78,7 +78,7 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
   /**
    * If we flush the batch due to the next packet being larger than current GSO
    * size, we use the following value to keep track of that next packet, and
-   * checks against buffer residue after writes. The reason we cannot just check
+   * check the buffer residue against it in reset(). The reason we cannot check
    * the buffer residue against the Quic packet limit is that there may be some
    * retranmission packets slightly larger than the limit.
    */
@@ -163,8 +163,7 @@ class SendmmsgGSOInplacePacketBatchWriter : public BatchWriter {
 
   // The point at which the last packet written by this BatchWriter ended.
   // The reason we need this is so that we can shift any data that was later
-  // written to the buffer to the beginning of the buffer once we perform a
-  // write.
+  // written to the buffer to the beginning of the buffer in reset().
   const uint8_t* lastPacketEnd_{nullptr};
 
   // max number of buffer chains we can accumulate before we need to flush

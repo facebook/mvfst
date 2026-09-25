@@ -276,6 +276,10 @@ TperfInplaceZcWriteCallback& threadLocalInplaceZcWriteCallback() {
 // persistent slab state lives in the thread_local pool. This writer's
 // only per-instance state is `originalBuf_` (the buf displaced from the
 // accessor) — restored to the accessor in the destructor.
+//
+// Unlike the mvfst inplace writers, write() consumes the batch (it may hand
+// the slab to the kernel), so it cannot be written to a second socket. That is
+// only safe on servers, which never use Happy Eyeballs.
 class UdpGsoZerocopyInplaceBatchWriter : public quic::BatchWriter {
  public:
   UdpGsoZerocopyInplaceBatchWriter(const UdpGsoZerocopyInplaceBatchWriter&) =
@@ -296,6 +300,7 @@ class UdpGsoZerocopyInplaceBatchWriter : public quic::BatchWriter {
         config_(config),
         writeStats_(std::move(writeStats)),
         pool_(threadLocalInplaceZcSlabPool()) {
+    MVCHECK(conn_.nodeType == quic::QuicNodeType::Server);
     pool_.setStats(writeStats_);
     pool_.setMaxSlabs(static_cast<size_t>(config_.poolBuffers));
     auto& accessor = *conn_.bufAccessor;

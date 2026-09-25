@@ -90,6 +90,35 @@ GSOInplacePacketBatchWriter::GSOInplacePacketBatchWriter(
     : conn_(conn), maxPackets_(maxPackets) {}
 
 void GSOInplacePacketBatchWriter::reset() {
+  if (lastPacketEnd_) {
+    auto& buf = conn_.bufAccessor->buf();
+    MVCHECK(
+        lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail(),
+        "lastPacketEnd_=" << (uintptr_t)lastPacketEnd_
+                          << " data=" << (uintptr_t)buf->data()
+                          << " tail=" << (uintptr_t)buf->tail());
+    // Bytes past lastPacketEnd_ are a packet that needsFlush() deferred to the
+    // next batch.
+    const auto remaining = static_cast<size_t>(buf->tail() - lastPacketEnd_);
+    MVCHECK(
+        remaining <= conn_.udpSendPacketLen ||
+            (nextPacketSize_ && remaining == nextPacketSize_),
+        "remaining=" << remaining << ", pktLimit=" << conn_.udpSendPacketLen
+                     << ", nextPacketSize_=" << nextPacketSize_);
+    if (remaining >= conn_.udpSendPacketLen + kPacketSizeViolationTolerance) {
+      MVLOG_ERROR
+          << "Remaining buffer contents larger than udpSendPacketLen by "
+          << (remaining - conn_.udpSendPacketLen);
+    }
+    if (remaining) {
+      const auto consumed = lastPacketEnd_ - buf->data();
+      buf->trimStart(consumed);
+      buf->retreat(consumed);
+      MVCHECK_EQ(buf->headroom(), 0, "headroom=" << buf->headroom());
+    } else {
+      buf->clear();
+    }
+  }
   lastPacketEnd_ = nullptr;
   prevSize_ = 0;
   numPackets_ = 0;
@@ -132,73 +161,18 @@ bool GSOInplacePacketBatchWriter::append(
   return false;
 }
 
-/**
- * Write the buffer owned by conn_.bufAccessor to the sock, until
- * lastPacketEnd_. After write, everything in the buffer after lastPacketEnd_
- * will be moved to the beginning of the buffer, and buffer will be returned to
- * conn_.bufAccessor.
- */
 ssize_t GSOInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const quic::SocketAddress& address) {
   MVCHECK(lastPacketEnd_);
   auto& buf = conn_.bufAccessor->buf();
   MVCHECK(!buf->isChained());
-  MVCHECK(
-      lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail(),
-      "lastPacketEnd_=" << (uintptr_t)lastPacketEnd_
-                        << " data=" << (uintptr_t)buf->data()
-                        << " tail=" << (uintptr_t)buf->tail());
-  uint64_t diffToEnd = buf->tail() - lastPacketEnd_;
-  MVCHECK(
-      diffToEnd <= conn_.udpSendPacketLen ||
-          (nextPacketSize_ && diffToEnd == nextPacketSize_),
-      "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
-                   << ", nextPacketSize_=" << nextPacketSize_);
-  if (diffToEnd >= conn_.udpSendPacketLen + kPacketSizeViolationTolerance) {
-    MVLOG_ERROR << "Remaining buffer contents larger than udpSendPacketLen by "
-                << (diffToEnd - conn_.udpSendPacketLen);
-  }
-  uint64_t diffToStart = lastPacketEnd_ - buf->data();
-  buf->trimEnd(diffToEnd);
-  // Even though it's called writeGSO, it can handle individual writes by
-  // setting gsoVal = 0.
-  int gsoVal = numPackets_ > 1 ? static_cast<int>(prevSize_) : 0;
+  const int gsoVal = numPackets_ > 1 ? static_cast<int>(prevSize_) : 0;
   auto options =
       QuicAsyncUDPSocket::WriteOptions(gsoVal, false /*zerocopyVal*/);
   options.txTime = txTime_;
-  iovec vec[kNumIovecBufferChains];
-  size_t iovec_len = fillIovec(buf, vec);
-  auto bytesWritten = sock.writeGSO(address, vec, iovec_len, options);
-  /**
-   * If there is one more bytes after lastPacketEnd_, that means there is a
-   * packet we choose not to write in this batch (e.g., it has a size larger
-   * than all existing packets in this batch). So after the socket write, we
-   * need to move that packet from the middle of the buffer to the beginning of
-   * the buffer so make sure we maximize the buffer space. An alternative here
-   * is to writem to write everything out in the previous sock write call. But
-   * that needs a much bigger change in the IoBufQuicBatch API.
-   */
-  if (diffToEnd) {
-    buf->trimStart(diffToStart);
-    buf->append(diffToEnd);
-    buf->retreat(diffToStart);
-    auto bufLength = buf->length();
-    MVCHECK_EQ(
-        diffToEnd,
-        bufLength,
-        "diffToEnd=" << diffToEnd << ", bufLength=" << bufLength);
-    MVCHECK(
-        bufLength <= conn_.udpSendPacketLen ||
-            (nextPacketSize_ && bufLength == nextPacketSize_),
-        "bufLength=" << bufLength << ", pktLimit=" << conn_.udpSendPacketLen
-                     << ", nextPacketSize_=" << nextPacketSize_);
-    MVCHECK(0 == buf->headroom(), "headroom=" << buf->headroom());
-  } else {
-    buf->clear();
-  }
-  reset();
-  return bytesWritten;
+  iovec vec{buf->writableData(), size()};
+  return sock.writeGSO(address, &vec, 1, options);
 }
 
 bool GSOInplacePacketBatchWriter::empty() const {
@@ -335,6 +309,18 @@ size_t SendmmsgGSOInplacePacketBatchWriter::size() const {
 }
 
 void SendmmsgGSOInplacePacketBatchWriter::reset() {
+  if (lastPacketEnd_) {
+    auto& buf = conn_.bufAccessor->buf();
+    MVCHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail());
+    if (lastPacketEnd_ == buf->tail()) {
+      buf->clear();
+    } else {
+      const auto consumed = lastPacketEnd_ - buf->data();
+      buf->trimStart(consumed);
+      buf->retreat(consumed);
+    }
+  }
+  lastPacketEnd_ = nullptr;
   buffers_.clear();
   indexToOptions_.clear();
   indexToAddr_.clear();
@@ -443,21 +429,6 @@ ssize_t SendmmsgGSOInplacePacketBatchWriter::write(
         ret = 0;
       }
     }
-  }
-
-  uint32_t diffToStart = lastPacketEnd_ - conn_.bufAccessor->data();
-  // diffToEnd is non-zero when some entity other than this BatchWriter
-  // wrote some data to the shared buffer.
-  uint32_t diffToEnd = conn_.bufAccessor->tail() - lastPacketEnd_;
-
-  auto& buf = conn_.bufAccessor->buf();
-  if (diffToEnd == 0) {
-    buf->clear();
-  } else {
-    // We need to shift the data in the buffer that is after the data that
-    // this BatchWriter wrote to the beginning of the buffer.
-    buf->trimStart(diffToStart);
-    buf->retreat(diffToStart);
   }
 
   return ret;

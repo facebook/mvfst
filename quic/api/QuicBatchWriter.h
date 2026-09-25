@@ -27,7 +27,8 @@ class BatchWriter {
   // returns the size in bytes of the batched buffers
   [[nodiscard]] virtual size_t size() const = 0;
 
-  // reset the internal state after a flush
+  // Drop the batch after a flush. Inplace writers also remove its bytes from
+  // conn.bufAccessor, keeping any bytes written after it.
   virtual void reset() = 0;
 
   // returns true if we need to flush before adding a new packet
@@ -46,6 +47,7 @@ class BatchWriter {
       size_t bufSize,
       const quic::SocketAddress& addr,
       QuicAsyncUDPSocket* sock) = 0;
+  // Keep the batch valid until reset(), including across multiple sockets.
   virtual ssize_t write(
       QuicAsyncUDPSocket& sock,
       const quic::SocketAddress& address) = 0;

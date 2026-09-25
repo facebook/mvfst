@@ -60,9 +60,7 @@ ssize_t SinglePacketInplaceBatchWriter::write(
 
   iovec vec[kNumIovecBufferChains];
   size_t iovec_len = fillIovec(buf, vec);
-  auto ret = sock.write(address, vec, iovec_len);
-  conn_.bufAccessor->clear();
-  return ret;
+  return sock.write(address, vec, iovec_len);
 }
 
 bool SinglePacketInplaceBatchWriter::empty() const {
@@ -183,6 +181,9 @@ size_t SendmmsgInplacePacketBatchWriter::size() const {
 }
 
 void SendmmsgInplacePacketBatchWriter::reset() {
+  if (numPacketsBuffered_) {
+    conn_.bufAccessor->clear();
+  }
   currSize_ = 0;
   numPacketsBuffered_ = 0;
 }
@@ -215,9 +216,6 @@ ssize_t SendmmsgInplacePacketBatchWriter::write(
     QuicAsyncUDPSocket& sock,
     const quic::SocketAddress& address) {
   MVCHECK_GT(numPacketsBuffered_, 0);
-
-  auto& buf = conn_.bufAccessor->buf();
-  buf->clear();
 
   if (numPacketsBuffered_ == 1) {
     return sock.write(address, &iovecs_[0], 1);

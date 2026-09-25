@@ -6,6 +6,7 @@
  */
 
 #include <quic/api/IoBufQuicBatch.h>
+#include <quic/api/QuicBatchWriterFactory.h>
 
 #include <gtest/gtest.h>
 #include <quic/client/state/ClientStateMachine.h>
@@ -113,4 +114,145 @@ TEST(QuicBatch, SendmmsgPropagatesSocketErrors) {
     }
   }
 }
+
+class HappyEyeballsBatchTest
+    : public ::testing::TestWithParam<
+          std::tuple<DataPathType, QuicBatchingMode, int>> {};
+
+TEST_P(HappyEyeballsBatchTest, PreservesPacketsAcrossSocketAttempts) {
+  using namespace ::testing;
+  const auto [path, mode, firstError] = GetParam();
+  folly::EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  quic::test::MockAsyncUDPSocket firstSocket(qEvb);
+  auto secondSocket = std::make_unique<quic::test::MockAsyncUDPSocket>(qEvb);
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  BufAccessor accessor(4096);
+  conn.bufAccessor = &accessor;
+  auto& happy = conn.happyEyeballsState;
+  happy.shouldWriteToFirstSocket = true;
+  happy.shouldWriteToSecondSocket = true;
+  happy.secondPeerAddress = SocketAddress("127.0.0.1", 2345);
+  const SocketAddress firstAddress("::1", 2345);
+  std::vector<std::string> firstPackets;
+  std::vector<std::string> secondPackets;
+  auto firstWrite = [&](const SocketAddress& address,
+                        const iovec* vec,
+                        size_t count) -> ssize_t {
+    EXPECT_EQ(address, firstAddress);
+    firstPackets.push_back(folly::IOBuf::wrapIov(vec, count)->toString());
+    errno = firstError;
+    return firstError
+        ? -1
+        : static_cast<ssize_t>(test::getTotalIovecLen(vec, count));
+  };
+  auto secondWrite = [&](const SocketAddress& address,
+                         const iovec* vec,
+                         size_t count) -> ssize_t {
+    EXPECT_EQ(address, happy.secondPeerAddress);
+    secondPackets.push_back(folly::IOBuf::wrapIov(vec, count)->toString());
+    return test::getTotalIovecLen(vec, count);
+  };
+  EXPECT_CALL(firstSocket, write(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(firstWrite));
+  EXPECT_CALL(firstSocket, writeGSO(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly([&](const SocketAddress& addr,
+                          const iovec* vec,
+                          size_t count,
+                          QuicAsyncUDPSocket::WriteOptions) {
+        return firstWrite(addr, vec, count);
+      });
+  auto writeMessages = [](auto& writeOne,
+                          AddressRange addrs,
+                          iovec* vec,
+                          size_t* messageSizes,
+                          size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+      writeOne(addrs[0], vec, messageSizes[i]);
+      vec += messageSizes[i];
+    }
+  };
+  EXPECT_CALL(firstSocket, writem(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly([&](AddressRange addrs,
+                          iovec* vec,
+                          size_t* messageSizes,
+                          size_t count) {
+        writeMessages(firstWrite, addrs, vec, messageSizes, count);
+        return firstError ? -1 : static_cast<int>(count);
+      });
+  EXPECT_CALL(firstSocket, pauseRead()).Times(firstError == EIO ? 1 : 0);
+  EXPECT_CALL(*secondSocket, write(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(secondWrite));
+  EXPECT_CALL(*secondSocket, writeGSO(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly([&](const SocketAddress& addr,
+                          const iovec* vec,
+                          size_t count,
+                          QuicAsyncUDPSocket::WriteOptions) {
+        return secondWrite(addr, vec, count);
+      });
+  EXPECT_CALL(*secondSocket, writem(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly([&](AddressRange addrs,
+                          iovec* vec,
+                          size_t* messageSizes,
+                          size_t count) {
+        writeMessages(secondWrite, addrs, vec, messageSizes, count);
+        return static_cast<int>(count);
+      });
+  happy.secondSocket = std::move(secondSocket);
+  auto writer = BatchWriterFactory::makeBatchWriter(mode, 2, path, conn, true);
+  IOBufQuicBatch batch(
+      std::move(writer), firstSocket, firstAddress, nullptr, &happy);
+  const std::vector<std::string> packets{"first", "a larger second packet"};
+  for (const auto& packet : packets) {
+    auto buf = folly::IOBuf::copyBuffer(packet);
+    if (path == DataPathType::ContinuousMemory) {
+      memcpy(accessor.writableTail(), packet.data(), packet.size());
+      accessor.append(packet.size());
+      buf.reset();
+    }
+    auto result = batch.write(std::move(buf), packet.size());
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result.value());
+  }
+  auto result = batch.flush();
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(result.value());
+  EXPECT_EQ(secondPackets, packets);
+  // After EIO the first socket only sees the first flush. sendmmsg batches both
+  // packets into it. The other writers flush the second packet on its own.
+  const size_t firstFlushPackets =
+      mode == QuicBatchingMode::BATCHING_MODE_SENDMMSG ? packets.size() : 1;
+  EXPECT_EQ(
+      firstPackets,
+      firstError == EIO
+          ? std::vector<std::string>(
+                packets.begin(), packets.begin() + firstFlushPackets)
+          : packets);
+  EXPECT_EQ(accessor.length(), 0);
+  EXPECT_EQ(accessor.headroom(), 0);
+  EXPECT_EQ(happy.shouldWriteToFirstSocket, firstError != EIO);
+  EXPECT_TRUE(happy.shouldWriteToSecondSocket);
+  ASSERT_TRUE(batch.flush().has_value());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MemoryPaths,
+    HappyEyeballsBatchTest,
+    ::testing::Combine(
+        ::testing::Values(
+            DataPathType::ChainedMemory,
+            DataPathType::ContinuousMemory),
+        ::testing::Values(
+            QuicBatchingMode::BATCHING_MODE_NONE,
+            QuicBatchingMode::BATCHING_MODE_GSO,
+            QuicBatchingMode::BATCHING_MODE_SENDMMSG),
+        ::testing::Values(0, EAGAIN, EIO)));
+
 } // namespace quic::testing
