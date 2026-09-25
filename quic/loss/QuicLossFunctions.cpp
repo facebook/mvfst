@@ -40,7 +40,7 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn) {
     return 2 * conn.transportSettings.initialRtt;
   }
   return conn.lossState.srtt + 4 * conn.lossState.rttvar +
-      conn.lossState.maxAckDelay;
+      std::min(conn.lossState.maxAckDelay, conn.peerMaxAckDelay);
 }
 
 bool isPersistentCongestion(

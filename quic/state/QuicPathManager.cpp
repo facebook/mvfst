@@ -194,7 +194,7 @@ QuicPathManager::prepareChallengeForSending(PathIdType pathId) {
       path.status != PathStatus::Validated) {
     auto pto = conn_.lossState.srtt +
         std::max(4 * conn_.lossState.rttvar, kGranularity) +
-        conn_.lossState.maxAckDelay;
+        std::min(conn_.lossState.maxAckDelay, conn_.peerMaxAckDelay);
     auto validationTimeout =
         std::max(3 * pto, 6 * conn_.transportSettings.initialRtt);
     auto timeoutMs =

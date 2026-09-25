@@ -201,6 +201,13 @@ quic::Expected<void, QuicError> processServerInitialParams(
   }
   auto ackDelayExponent = ackDelayExponentResult.value();
 
+  auto maxAckDelayResult = getIntegerParameter(
+      TransportParameterId::max_ack_delay, serverParams.parameters);
+  if (maxAckDelayResult.hasError()) {
+    return quic::make_unexpected(maxAckDelayResult.error());
+  }
+  auto maxAckDelay = maxAckDelayResult.value();
+
   auto packetSizeResult = getIntegerParameter(
       TransportParameterId::max_packet_size, serverParams.parameters);
   if (packetSizeResult.hasError()) {
@@ -437,8 +444,17 @@ quic::Expected<void, QuicError> processServerInitialParams(
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
         "ack_delay_exponent too large"));
   }
+  if (maxAckDelay && *maxAckDelay >= kMaxAckDelay) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        "Max Ack Delay is greater than or equal to 2^14"));
+  }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
+  conn.peerMaxAckDelay = maxAckDelay.has_value()
+      ? std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::milliseconds(*maxAckDelay))
+      : kMaxAckTimeout;
   if (minAckDelay.has_value()) {
     conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
   }

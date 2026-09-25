@@ -483,6 +483,10 @@ quic::Expected<void, QuicError> processClientInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
+  conn.peerMaxAckDelay = maxAckDelay.has_value()
+      ? std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::milliseconds(*maxAckDelay))
+      : kMaxAckTimeout;
   if (minAckDelay.has_value()) {
     conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
   }

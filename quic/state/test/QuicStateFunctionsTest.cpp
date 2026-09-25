@@ -13,6 +13,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/QuicAckFrequencyFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
@@ -1258,6 +1259,32 @@ TEST_F(QuicStateFunctionsTest, UpdateMaxAckDelay) {
   // smaller ackDelay
   updateRtt(conn, rttSample, 3us);
   EXPECT_EQ(30us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, AckFrequencyDelayIsBounded) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.peerMinAckDelay = 1ms;
+
+  requestPeerAckFrequencyChange(conn, 10, 1000s, 3);
+
+  const auto expectedDelay = std::chrono::milliseconds(kMaxAckDelay - 1);
+  EXPECT_EQ(expectedDelay, conn.peerMaxAckDelay);
+  ASSERT_EQ(1, conn.pendingEvents.frames.size());
+  auto frame = conn.pendingEvents.frames.front().asAckFrequencyFrame();
+  ASSERT_NE(nullptr, frame);
+  EXPECT_EQ(expectedDelay.count() * 1000, frame->updateMaxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, AckFrequencyRejectsUnsupportedMinimum) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.peerMinAckDelay = 20s;
+
+  requestPeerAckFrequencyChange(conn, 10, 30s, 3);
+
+  EXPECT_TRUE(conn.pendingEvents.frames.empty());
+  EXPECT_EQ(25ms, conn.peerMaxAckDelay);
 }
 
 TEST_F(QuicStateFunctionsTest, IsConnectionPaced) {

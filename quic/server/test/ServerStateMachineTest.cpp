@@ -330,6 +330,21 @@ TEST(ServerStateMachineTest, TestProcessMinAckDelaySet) {
       serverConn.peerMinAckDelay.value(), std::chrono::microseconds(1000));
 }
 
+TEST(ServerStateMachineTest, TestProcessMaxAckDelayBoundary) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto encoded = encodeIntegerParameter(
+      TransportParameterId::max_ack_delay, kMaxAckDelay - 1);
+  ASSERT_FALSE(encoded.hasError());
+  ClientTransportParameters clientTransportParams = {
+      {std::move(encoded.value())}};
+
+  ASSERT_FALSE(
+      processClientInitialParams(serverConn, clientTransportParams).hasError());
+  EXPECT_EQ(
+      std::chrono::milliseconds(kMaxAckDelay - 1), serverConn.peerMaxAckDelay);
+}
+
 TEST(ServerStateMachineTest, TestEncodeMinAckDelayParamSet) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());

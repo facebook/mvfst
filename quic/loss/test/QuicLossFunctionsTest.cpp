@@ -2102,11 +2102,12 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   }
 }
 
-TEST_F(QuicLossFunctionsTest, PTOLargerThanMaxDelay) {
+TEST_F(QuicLossFunctionsTest, PTOBoundsObservedAckDelay) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.lossState.srtt = 1ms;
   conn.lossState.maxAckDelay = 20s;
-  EXPECT_GE(calculatePTO(conn), 20s);
+  conn.peerMaxAckDelay = 20ms;
+  EXPECT_EQ(21ms, calculatePTO(conn));
 }
 
 TEST_F(QuicLossFunctionsTest, InitialPTOs) {
@@ -2251,6 +2252,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
 
   conn->lossState.rttvar = 2s;
   conn->lossState.maxAckDelay = 5s;
+  conn->peerMaxAckDelay = 5s;
   EXPECT_TRUE(isPersistentCongestion(
       calculatePTO(*conn), currentTime - 42s, currentTime, ack));
   EXPECT_TRUE(isPersistentCongestion(

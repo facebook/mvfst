@@ -39,6 +39,7 @@ class MockQuicConnectionStateBase : public QuicConnectionStateBase {
     lossState.rttvar = std::chrono::milliseconds(50);
     lossState.mrtt = std::chrono::milliseconds(10);
     lossState.maxAckDelay = std::chrono::milliseconds(25);
+    peerMaxAckDelay = std::chrono::milliseconds(25);
   }
 
   // Note: Using inherited currentPathId, lossState, and pendingEvents fields
@@ -288,6 +289,21 @@ TEST_F(QuicPathManagerTest, PrepareChallengeForSending) {
   // The minted payload is routable back to the path.
   EXPECT_EQ(
       manager_->getPathByChallengeData(challengeRes.value().pathData)->id, id);
+}
+
+TEST_F(QuicPathManagerTest, PathDeadlineIgnoresObservedPeerAckDelay) {
+  connState_->lossState.maxAckDelay = 1000s;
+  connState_->peerMaxAckDelay = 25ms;
+  auto result = manager_->addPath(localAddr1_, peerAddr1_);
+  ASSERT_TRUE(result.has_value());
+  auto startTime = Clock::now();
+
+  ASSERT_TRUE(manager_->prepareChallengeForSending(result.value()).has_value());
+
+  auto path = manager_->getPath(result.value());
+  ASSERT_NE(path, nullptr);
+  ASSERT_TRUE(path->pathResponseDeadline.has_value());
+  EXPECT_LT(*path->pathResponseDeadline, startTime + 2s);
 }
 
 TEST_F(QuicPathManagerTest, PrepareChallengeForSendingNonExistentPath) {

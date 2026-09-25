@@ -113,6 +113,7 @@ mvfst_cpp_test(
         "//quic/common/test:test_utils",
         "//quic/fizz/server/handshake:fizz_server_handshake",
         "//quic/server/state:server",
+        "//quic/state:ack_frequency_functions",
         "//quic/state:outstanding_packet",
         "//quic/state:state_functions",
         "//quic/state/stream:stream",

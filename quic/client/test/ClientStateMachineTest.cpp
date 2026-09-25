@@ -272,6 +272,36 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
       kMaxDatagramPacketOverhead + 1);
 }
 
+TEST_F(ClientStateMachineTest, TestProcessMaxAckDelayBoundary) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto encoded = encodeIntegerParameter(
+      TransportParameterId::max_ack_delay, kMaxAckDelay - 1);
+  ASSERT_FALSE(encoded.hasError());
+  ServerTransportParameters serverTransportParams = {
+      {std::move(encoded.value())}};
+
+  ASSERT_FALSE(processServerInitialParams(clientConn, serverTransportParams, 0)
+                   .hasError());
+  EXPECT_EQ(
+      std::chrono::milliseconds(kMaxAckDelay - 1), clientConn.peerMaxAckDelay);
+}
+
+TEST_F(ClientStateMachineTest, TestProcessMaxAckDelayRejectsProtocolLimit) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto encoded =
+      encodeIntegerParameter(TransportParameterId::max_ack_delay, kMaxAckDelay);
+  ASSERT_FALSE(encoded.hasError());
+  ServerTransportParameters serverTransportParams = {
+      {std::move(encoded.value())}};
+
+  auto result =
+      processServerInitialParams(clientConn, serverTransportParams, 0);
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(TransportErrorCode::TRANSPORT_PARAMETER_ERROR, result.error().code);
+}
+
 TEST_F(ClientStateMachineTest, TestProcessKnobFramesSupportedParamEnabled) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
