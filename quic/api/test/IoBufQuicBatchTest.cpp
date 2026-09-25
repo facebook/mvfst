@@ -11,6 +11,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
@@ -59,5 +60,57 @@ TEST(QuicBatch, TestBatchingNoFlush) {
 
 TEST(QuicBatch, TestBatching) {
   RunTest(kMaxBufs);
+}
+
+TEST(QuicBatch, SendmmsgPropagatesSocketErrors) {
+  for (const auto path :
+       {DataPathType::ChainedMemory, DataPathType::ContinuousMemory}) {
+    for (const int socketError : {EAGAIN, EWOULDBLOCK, ENOBUFS, EIO}) {
+      SCOPED_TRACE(static_cast<int>(path));
+      SCOPED_TRACE(socketError);
+      folly::EventBase evb;
+      auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+      quic::test::MockAsyncUDPSocket sock(qEvb);
+      QuicClientConnectionState conn(
+          FizzClientQuicHandshakeContext::Builder().build());
+      BufAccessor accessor(4096);
+      conn.bufAccessor = &accessor;
+      BatchWriterPtr writer;
+      if (path == DataPathType::ContinuousMemory) {
+        writer.reset(new SendmmsgInplacePacketBatchWriter(conn, 2));
+      } else {
+        writer.reset(new SendmmsgPacketBatchWriter(2));
+      }
+      SocketAddress peerAddress("127.0.0.1", 1234);
+      IOBufQuicBatch batch(
+          std::move(writer), sock, peerAddress, nullptr, nullptr);
+      EXPECT_CALL(sock, writem(::testing::_, ::testing::_, ::testing::_, 2))
+          .WillOnce(::testing::InvokeWithoutArgs([&]() {
+            errno = socketError;
+            return -1;
+          }));
+      for (size_t i = 0; i < 2; ++i) {
+        auto buf = folly::IOBuf::copyBuffer("packet");
+        const auto size = buf->length();
+        if (path == DataPathType::ContinuousMemory) {
+          memcpy(accessor.writableTail(), buf->data(), size);
+          accessor.append(size);
+          buf.reset();
+        }
+        auto result = batch.write(std::move(buf), size);
+        if (i == 0) {
+          ASSERT_TRUE(result.has_value());
+          EXPECT_TRUE(result.value());
+        } else if (socketError == EIO) {
+          EXPECT_TRUE(result.hasError());
+        } else {
+          ASSERT_TRUE(result.has_value());
+          EXPECT_FALSE(result.value());
+        }
+      }
+      EXPECT_EQ(batch.getLastRetryableErrno(), socketError);
+      EXPECT_EQ(accessor.length(), 0);
+    }
+  }
 }
 } // namespace quic::testing

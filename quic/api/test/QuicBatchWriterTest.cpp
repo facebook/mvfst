@@ -413,6 +413,58 @@ TEST_F(QuicBatchWriterTest, TestBatchingSendmmsg) {
   }
 }
 
+TEST_F(QuicBatchWriterTest, SendmmsgPreservesSocketResult) {
+  for (const auto path :
+       {DataPathType::ChainedMemory, DataPathType::ContinuousMemory}) {
+    for (const bool heapIovecs : {false, true}) {
+      if (path == DataPathType::ContinuousMemory && heapIovecs) {
+        continue;
+      }
+      for (const int socketResult : {3, 1, 0, -EAGAIN, -ENOBUFS, -EIO}) {
+        SCOPED_TRACE(static_cast<int>(path));
+        SCOPED_TRACE(heapIovecs);
+        SCOPED_TRACE(socketResult);
+        BufAccessor accessor(conn_.udpSendPacketLen * 3);
+        conn_.bufAccessor = &accessor;
+        auto writer = BatchWriterFactory::makeBatchWriter(
+            QuicBatchingMode::BATCHING_MODE_SENDMMSG, 3, path, conn_, false);
+        size_t bytes = 0;
+        for (size_t i = 0; i < 3; ++i) {
+          auto buf = folly::IOBuf::copyBuffer("packet");
+          if (heapIovecs) {
+            for (size_t j = 0; j < kNumIovecBufferChains; ++j) {
+              buf->appendToChain(folly::IOBuf::copyBuffer("fragment"));
+            }
+          }
+          const auto size = buf->computeChainDataLength();
+          bytes += size;
+          if (path == DataPathType::ContinuousMemory) {
+            memcpy(accessor.writableTail(), buf->data(), size);
+            accessor.append(size);
+            buf.reset();
+          }
+          writer->append(std::move(buf), size, SocketAddress(), nullptr);
+        }
+        folly::EventBase evb;
+        auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+        quic::test::MockAsyncUDPSocket sock(qEvb);
+        EXPECT_CALL(sock, writem(_, _, _, 3)).WillOnce(InvokeWithoutArgs([&]() {
+          errno = socketResult < 0 ? -socketResult : 0;
+          return socketResult < 0 ? -1 : socketResult;
+        }));
+        const ssize_t expected = socketResult == 3
+            ? static_cast<ssize_t>(bytes)
+            : (socketResult < 0 ? -1 : 0);
+        EXPECT_EQ(writer->write(sock, SocketAddress()), expected);
+        EXPECT_EQ(errno, socketResult < 0 ? -socketResult : 0);
+        writer->reset();
+        EXPECT_TRUE(writer->empty());
+        EXPECT_EQ(accessor.length(), 0);
+      }
+    }
+  }
+}
+
 TEST_F(QuicBatchWriterTest, TestBatchingSendmmsgInplaceIovecMatches) {
   // In this test case, we don't surpass the kNumIovecBufferChains limit
   // (i.e. the number of contiguous buffers we are sending)

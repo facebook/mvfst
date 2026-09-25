@@ -128,13 +128,14 @@ ssize_t SendmmsgPacketBatchWriter::write(
     iovec vec[kNumIovecBufferChains];
     size_t messageSizes[kNumIovecBufferChains];
     fillIovecAndMessageSizes(vec, messageSizes, kNumIovecBufferChains);
-    sock.writem(AddressRange(&address, 1), vec, messageSizes, bufs_.size());
+    ret =
+        sock.writem(AddressRange(&address, 1), vec, messageSizes, bufs_.size());
   } else {
     // We allocate the arrays on the heap
     std::unique_ptr<iovec[]> vec(new iovec[numChainedBuffers]);
     std::unique_ptr<size_t[]> messageSizes(new size_t[bufs_.size()]);
     fillIovecAndMessageSizes(vec.get(), messageSizes.get(), numChainedBuffers);
-    sock.writem(
+    ret = sock.writem(
         AddressRange(&address, 1), vec.get(), messageSizes.get(), bufs_.size());
   }
 
@@ -229,7 +230,7 @@ ssize_t SendmmsgInplacePacketBatchWriter::write(
     messageSizes[i] = 1;
   }
 
-  sock.writem(
+  ret = sock.writem(
       AddressRange(&address, 1),
       &iovecs_[0],
       &messageSizes[0],
