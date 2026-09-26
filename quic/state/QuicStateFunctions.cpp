@@ -366,9 +366,11 @@ bool hasReceivedUdpPackets(const QuicConnectionStateBase& conn) noexcept {
   const auto* handshakeAckState = conn.ackStates.handshakeAckState.get();
   const auto& appDataAckState = conn.ackStates.appDataAckState;
 
-  return (initialAckState ? initialAckState->largestRecvdPacketNum : true) ||
-      (handshakeAckState ? handshakeAckState->largestRecvdPacketNum : true) ||
-      appDataAckState.largestRecvdPacketNum;
+  return (initialAckState ? initialAckState->largestRecvdPacketNum.has_value()
+                          : true) ||
+      (handshakeAckState ? handshakeAckState->largestRecvdPacketNum.has_value()
+                         : true) ||
+      appDataAckState.largestRecvdPacketNum.has_value();
 }
 
 Optional<TimePoint>& getLossTime(
