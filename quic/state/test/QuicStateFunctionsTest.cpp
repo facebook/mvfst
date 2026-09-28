@@ -56,6 +56,23 @@ RegularQuicWritePacket makeTestLongPacket(LongHeader::Types type) {
   return packet;
 }
 
+OutstandingPacketWrapper& appendOutstandingPacketForLookupTest(
+    QuicConnectionStateBase& conn,
+    RegularQuicWritePacket packet) {
+  conn.outstandings.packets.emplace_back(
+      std::move(packet),
+      Clock::now(),
+      0,
+      1,
+      0,
+      1,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  return conn.outstandings.packets.back();
+}
+
 class AddPacketToAckStateTest : public TestWithParam<PacketNumberSpace> {
  public:
   /**
@@ -1543,6 +1560,125 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       6000,
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)
           ->metadata.encodedBodySize);
+}
+
+TEST_F(
+    QuicStateFunctionsTest,
+    GetFirstOutstandingPacketSkipsAllCountedLostPackets) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  EXPECT_EQ(
+      conn.outstandings.packets.end(),
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData));
+
+  for (size_t i = 0; i < 2; ++i) {
+    auto& packet =
+        appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+    packet.declaredLost = true;
+    ++conn.outstandings.declaredLostCount;
+  }
+  ASSERT_EQ(0, conn.outstandings.numOutstanding());
+
+  EXPECT_EQ(
+      conn.outstandings.packets.end(),
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData));
+}
+
+TEST_F(
+    QuicStateFunctionsTest,
+    GetFirstOutstandingPacketFindsLiveTailAfterLostPrefix) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  for (size_t i = 0; i < 2; ++i) {
+    auto& packet =
+        appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+    packet.declaredLost = true;
+    ++conn.outstandings.declaredLostCount;
+  }
+  auto& live =
+      appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+  ++conn.outstandings.packetCount[PacketNumberSpace::AppData];
+
+  auto found = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
+  ASSERT_NE(conn.outstandings.packets.end(), found);
+  EXPECT_EQ(&live, &*found);
+}
+
+TEST_F(
+    QuicStateFunctionsTest,
+    GetFirstOutstandingPacketFindsProcessedCloneWithoutPacketCount) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& clone =
+      appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+  clone.maybeClonedPacketIdentifier.emplace(PacketNumberSpace::AppData, 2);
+  ++conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData];
+  ASSERT_EQ(0, conn.outstandings.packetCount[PacketNumberSpace::AppData]);
+  ASSERT_TRUE(conn.outstandings.clonedPacketIdentifiers.empty());
+
+  auto found = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
+  ASSERT_NE(conn.outstandings.packets.end(), found);
+  EXPECT_EQ(&clone, &*found);
+}
+
+TEST_F(
+    QuicStateFunctionsTest,
+    GetFirstOutstandingPacketFiltersOtherPacketNumberSpace) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& appData =
+      appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+  appData.declaredLost = true;
+  ++conn.outstandings.declaredLostCount;
+  auto& handshake = appendOutstandingPacketForLookupTest(
+      conn, makeTestLongPacket(LongHeader::Types::Handshake));
+  ++conn.outstandings.packetCount[PacketNumberSpace::Handshake];
+
+  EXPECT_EQ(
+      conn.outstandings.packets.end(),
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData));
+  auto found = getFirstOutstandingPacket(conn, PacketNumberSpace::Handshake);
+  ASSERT_NE(conn.outstandings.packets.end(), found);
+  EXPECT_EQ(&handshake, &*found);
+}
+
+TEST_F(
+    QuicStateFunctionsTest,
+    GetFirstOutstandingPacketPreservesScheduledAndMixedFiltering) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& scheduled =
+      appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+  scheduled.metadata.scheduledForDestruction = true;
+  ++conn.outstandings.scheduledForDestructionCount;
+  EXPECT_EQ(
+      conn.outstandings.packets.end(),
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData));
+
+  auto& lost =
+      appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+  lost.declaredLost = true;
+  ++conn.outstandings.declaredLostCount;
+  auto& live =
+      appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+  ++conn.outstandings.packetCount[PacketNumberSpace::AppData];
+  ASSERT_EQ(1, conn.outstandings.numOutstanding());
+
+  auto found = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
+  ASSERT_NE(conn.outstandings.packets.end(), found);
+  EXPECT_EQ(&live, &*found);
+}
+
+TEST_F(
+    QuicStateFunctionsTest,
+    GetFirstOutstandingPacketKeepsSpuriousLostCountAdjustmentConservative) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  for (size_t i = 0; i < 2; ++i) {
+    auto& packet =
+        appendOutstandingPacketForLookupTest(conn, makeTestShortPacket());
+    packet.declaredLost = true;
+  }
+  conn.outstandings.declaredLostCount = 1;
+  ASSERT_EQ(1, conn.outstandings.numOutstanding());
+
+  EXPECT_EQ(
+      conn.outstandings.packets.end(),
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData));
 }
 
 TEST_F(QuicStateFunctionsTest, UpdateLargestReceivePacketsAtLatCloseSent) {

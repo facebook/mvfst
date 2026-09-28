@@ -289,6 +289,9 @@ void increaseNextPacketNum(
 std::deque<OutstandingPacketWrapper>::iterator getFirstOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace) {
+  if (conn.outstandings.packets.size() == conn.outstandings.declaredLostCount) {
+    return conn.outstandings.packets.end();
+  }
   return getNextOutstandingPacket(
       conn, packetNumberSpace, conn.outstandings.packets.begin());
 }

@@ -71,7 +71,134 @@ class QuicServerTransportTest : public QuicServerTransportAfterStartTestBase {
     // test class.
     return 0;
   }
+
+  void verifyRedundantAckFramesWalkAllRetainedLosses(
+      size_t retainedPacketTarget) {
+    auto& conn = server->getNonConstConn();
+    conn.outstandings.reset();
+    serverWrites.clear();
+    conn.lossState.reorderingThreshold = 0;
+
+    const auto streamId = server->createBidirectionalStream().value();
+    for (size_t i = 0; i <= retainedPacketTarget; ++i) {
+      ASSERT_FALSE(server->writeChain(streamId, IOBuf::copyBuffer("x"), false)
+                       .hasError());
+      loopForWrites();
+    }
+
+    std::vector<PacketNum> sentPacketNumbers;
+    for (const auto& packet : conn.outstandings.packets) {
+      ASSERT_EQ(
+          PacketNumberSpace::AppData,
+          packet.packet.header.getPacketNumberSpace());
+      ASSERT_FALSE(packet.declaredLost);
+      ASSERT_FALSE(packet.metadata.scheduledForDestruction);
+      sentPacketNumbers.push_back(packet.getPacketSequenceNum());
+    }
+    ASSERT_EQ(retainedPacketTarget + 1, sentPacketNumbers.size());
+
+    AckBlocks newestPacketAck = {
+        {sentPacketNumbers.back(), sentPacketNumbers.back()}};
+    deliverData(
+        packetToBuf(createAckPacket(
+            conn,
+            clientNextAppDataPacketNum++,
+            newestPacketAck,
+            PacketNumberSpace::AppData)),
+        false);
+
+    const auto retainedPacketCount = conn.outstandings.packets.size();
+    ASSERT_EQ(retainedPacketTarget, retainedPacketCount);
+    ASSERT_GT(retainedPacketCount, 0);
+    ASSERT_EQ(retainedPacketCount, conn.outstandings.declaredLostCount);
+    ASSERT_EQ(0, conn.outstandings.scheduledForDestructionCount);
+    ASSERT_EQ(0, conn.outstandings.numOutstanding());
+    ASSERT_EQ(0, conn.outstandings.packetCount[PacketNumberSpace::AppData]);
+    ASSERT_EQ(
+        sentPacketNumbers.back(),
+        getAckState(conn, PacketNumberSpace::AppData).largestAckedByPeer);
+
+    std::vector<PacketNum> retainedPacketNumbers;
+    for (const auto& packet : conn.outstandings.packets) {
+      ASSERT_TRUE(packet.declaredLost);
+      ASSERT_FALSE(packet.metadata.scheduledForDestruction);
+      retainedPacketNumbers.push_back(packet.getPacketSequenceNum());
+    }
+
+    for (const size_t ackFrameCount : {1, 4, 16}) {
+      const auto bytesAckedBefore = conn.lossState.totalBytesAcked;
+      const auto markedLostBefore = conn.lossState.totalPacketsMarkedLost;
+      const auto spuriouslyLostBefore =
+          conn.lossState.totalPacketsSpuriouslyMarkedLost;
+      const auto ptoCountBefore = conn.lossState.ptoCount;
+      const auto lossTimeBefore =
+          conn.lossState.lossTimes[PacketNumberSpace::AppData];
+      const auto lossAlarmBefore = conn.pendingEvents.setLossDetectionAlarm;
+      const auto largestAckedBefore =
+          getAckState(conn, PacketNumberSpace::AppData).largestAckedByPeer;
+
+      const auto incomingPacketNumber = clientNextAppDataPacketNum++;
+      ShortHeader header(
+          ProtectionType::KeyPhaseZero,
+          *conn.serverConnectionId,
+          incomingPacketNumber);
+      RegularQuicPacketBuilder builder(
+          conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+      ASSERT_FALSE(builder.encodePacketHeader().hasError());
+      for (size_t i = 0; i < ackFrameCount; ++i) {
+        WriteAckFrameState writeAckState = {.acks = newestPacketAck};
+        WriteAckFrameMetaData ackData = {
+            .ackState = writeAckState,
+            .ackDelay = 0us,
+            .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent)};
+        ASSERT_FALSE(writeAckFrame(ackData, builder).hasError());
+      }
+      deliverData(packetToBuf(std::move(builder).buildPacket()), false);
+
+      EXPECT_FALSE(conn.localConnectionError.has_value());
+      EXPECT_EQ(
+          incomingPacketNumber,
+          conn.ackStates.appDataAckState.largestRecvdPacketNum);
+      EXPECT_EQ(retainedPacketCount, conn.outstandings.packets.size());
+      EXPECT_EQ(retainedPacketCount, conn.outstandings.declaredLostCount);
+      EXPECT_EQ(0, conn.outstandings.scheduledForDestructionCount);
+      EXPECT_EQ(0, conn.outstandings.numOutstanding());
+      EXPECT_EQ(0, conn.outstandings.packetCount[PacketNumberSpace::AppData]);
+      EXPECT_EQ(bytesAckedBefore, conn.lossState.totalBytesAcked);
+      EXPECT_EQ(markedLostBefore, conn.lossState.totalPacketsMarkedLost);
+      EXPECT_EQ(
+          spuriouslyLostBefore,
+          conn.lossState.totalPacketsSpuriouslyMarkedLost);
+      EXPECT_EQ(ptoCountBefore, conn.lossState.ptoCount);
+      EXPECT_EQ(
+          lossTimeBefore, conn.lossState.lossTimes[PacketNumberSpace::AppData]);
+      EXPECT_EQ(lossAlarmBefore, conn.pendingEvents.setLossDetectionAlarm);
+      EXPECT_EQ(
+          largestAckedBefore,
+          getAckState(conn, PacketNumberSpace::AppData).largestAckedByPeer);
+
+      std::vector<PacketNum> packetNumbersAfter;
+      for (const auto& packet : conn.outstandings.packets) {
+        EXPECT_TRUE(packet.declaredLost);
+        EXPECT_FALSE(packet.metadata.scheduledForDestruction);
+        packetNumbersAfter.push_back(packet.getPacketSequenceNum());
+      }
+      EXPECT_EQ(retainedPacketNumbers, packetNumbersAfter);
+    }
+  }
 };
+
+TEST_F(
+    QuicServerTransportTest,
+    RedundantAckFramesWalkEightRetainedLostPackets) {
+  verifyRedundantAckFramesWalkAllRetainedLosses(8);
+}
+
+TEST_F(
+    QuicServerTransportTest,
+    RedundantAckFramesWalkSixteenRetainedLostPackets) {
+  verifyRedundantAckFramesWalkAllRetainedLosses(16);
+}
 
 TEST_F(QuicServerTransportTest, CapturesFirstAvailablePeerTtl) {
   auto deliverPingWithTtl = [&](OptionalIntegral<uint8_t> ttl) {
