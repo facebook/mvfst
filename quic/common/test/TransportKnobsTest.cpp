@@ -8,6 +8,9 @@
 #include <quic/QuicConstants.h>
 #include <quic/common/TransportKnobs.h>
 
+#include <chrono>
+#include <limits>
+
 #include <folly/Format.h>
 #include <folly/portability/GTest.h>
 
@@ -33,6 +36,39 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
       EXPECT_EQ(actualKnob.val, expectKnob.val) << "Knob " << i;
     }
   }
+}
+
+void runDurationRepresentationBoundaryCases(
+    TransportKnobParamId knobId,
+    uint64_t maxValue) {
+  const auto key = static_cast<uint64_t>(knobId);
+  ASSERT_LT(maxValue, std::numeric_limits<uint64_t>::max());
+
+  run({
+      .serializedKnobs = fmt::format(R"({{{}: {}}})", key, maxValue),
+      .expectError = false,
+      .expectParams = {{.id = key, .val = maxValue}},
+  });
+  for (const auto value :
+       {maxValue + 1, std::numeric_limits<uint64_t>::max()}) {
+    run({
+        .serializedKnobs = fmt::format(R"({{{}: {}}})", key, value),
+        .expectError = true,
+        .expectParams = {},
+    });
+  }
+}
+
+TEST(QuicKnobsParsingTest, KeepaliveDurationRepresentationBounds) {
+  runDurationRepresentationBoundaryCases(
+      TransportKnobParamId::KEEPALIVE_ENABLED,
+      static_cast<uint64_t>(std::chrono::milliseconds::max().count()));
+}
+
+TEST(QuicKnobsParsingTest, PacingTickDurationRepresentationBounds) {
+  runDurationRepresentationBoundaryCases(
+      TransportKnobParamId::PACING_TIMER_TICK,
+      static_cast<uint64_t>(std::chrono::microseconds::max().count()));
 }
 
 TEST(QuicKnobsParsingTest, Simple) {

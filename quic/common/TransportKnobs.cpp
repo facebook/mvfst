@@ -10,6 +10,8 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/TransportKnobs.h>
 
+#include <chrono>
+
 namespace quic {
 
 namespace {
@@ -35,6 +37,15 @@ std::optional<uint64_t> parseAsUint64(const folly::dynamic& val) {
     }
   }
   return std::nullopt;
+}
+
+template <typename Duration>
+std::optional<uint64_t> parseAsDuration(const folly::dynamic& val) {
+  auto parsed = parseAsUint64(val);
+  if (!parsed || *parsed > static_cast<uint64_t>(Duration::max().count())) {
+    return std::nullopt;
+  }
+  return parsed;
 }
 
 std::optional<uint64_t> parseAsFraction(const folly::dynamic& val) {
@@ -83,8 +94,6 @@ Optional<TransportKnobParams> parseTransportKnobs(
       switch (*knobId) {
         case TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE:
         case TransportKnobParamId::MAX_PACING_RATE_KNOB:
-        case TransportKnobParamId::KEEPALIVE_ENABLED:
-        case TransportKnobParamId::PACING_TIMER_TICK:
         case TransportKnobParamId::CONNECTION_MIGRATION:
         case TransportKnobParamId::KEY_UPDATE_INTERVAL:
         case TransportKnobParamId::AUTOTUNE_RECV_STREAM_FLOW_CONTROL:
@@ -100,6 +109,26 @@ Optional<TransportKnobParams> parseTransportKnobs(
           auto parsed = parseAsUint64(val);
           if (!parsed) {
             MVLOG_ERROR << "expected uint64 value for knob " << *knobId;
+            return std::nullopt;
+          }
+          knobParams.push_back({paramId, parsed.value()});
+          break;
+        }
+        case TransportKnobParamId::KEEPALIVE_ENABLED: {
+          auto parsed = parseAsDuration<std::chrono::milliseconds>(val);
+          if (!parsed) {
+            MVLOG_ERROR << "expected representable millisecond value for knob "
+                        << *knobId;
+            return std::nullopt;
+          }
+          knobParams.push_back({paramId, parsed.value()});
+          break;
+        }
+        case TransportKnobParamId::PACING_TIMER_TICK: {
+          auto parsed = parseAsDuration<std::chrono::microseconds>(val);
+          if (!parsed) {
+            MVLOG_ERROR << "expected representable microsecond value for knob "
+                        << *knobId;
             return std::nullopt;
           }
           knobParams.push_back({paramId, parsed.value()});
