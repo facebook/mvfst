@@ -11,11 +11,16 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/IntervalSet.h>
+#include <cstddef>
 
 namespace quic {
 
 // Ack and PacketNumber states. This is per-packet number space.
 struct AckState : WriteAckFrameState {
+  static constexpr size_t kMaxAckRanges = 1024;
+
+  // Packets below this floor have been retired by the local range limit.
+  PacketNum minimumReceivedPacketNum{0};
   // Largest ack that has been written to a packet
   Optional<PacketNum> largestAckScheduled;
   // Count of outstanding packets received with only non-retransmittable data.

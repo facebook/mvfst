@@ -1521,6 +1521,40 @@ TEST_P(AckHandlersTest, PurgeAcks) {
       expectedTime, *conn.ackStates.initialAckState->largestRecvdPacketTime);
 }
 
+TEST_P(AckHandlersTest, BoundsRetainedRangesAfterAckOfAckSplit) {
+  constexpr size_t kExpectedMaxRetainedAckRanges = 1024;
+
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ackState = *conn.ackStates.initialAckState;
+  ackState.acks.insert(100, 120);
+  for (size_t index = 0; index < kExpectedMaxRetainedAckRanges - 1; ++index) {
+    const PacketNum packetNum = 200 + (2 * index);
+    ackState.acks.insert(packetNum, packetNum);
+  }
+  ASSERT_EQ(ackState.acks.size(), kExpectedMaxRetainedAckRanges);
+  ASSERT_TRUE(ackState.acks.contains(105, 105));
+  const auto newestRange = ackState.acks.back();
+
+  WriteAckFrame ackFrame;
+  ackFrame.ackBlocks.emplace_back(105, 105);
+  commonAckVisitorForAckFrame(ackState, ackFrame);
+
+  EXPECT_FALSE(ackState.acks.contains(105, 105));
+  EXPECT_TRUE(ackState.acks.contains(106, 120));
+  EXPECT_EQ(ackState.acks.back().start, newestRange.start);
+  EXPECT_EQ(ackState.acks.back().end, newestRange.end);
+  EXPECT_LE(ackState.acks.size(), kExpectedMaxRetainedAckRanges);
+  const auto pressureFloor = ackState.minimumReceivedPacketNum;
+  EXPECT_EQ(pressureFloor, 105);
+
+  WriteAckFrame clearFrame;
+  clearFrame.ackBlocks.emplace_back(105, newestRange.end);
+  commonAckVisitorForAckFrame(ackState, clearFrame);
+  EXPECT_TRUE(ackState.acks.empty());
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, pressureFloor);
+}
+
 TEST_P(AckHandlersTest, purgeAckReceiveTimestamps) {
   // Case 1: No timestamps
   {

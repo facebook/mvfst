@@ -12,6 +12,8 @@
 #include <quic/state/QuicStateFunctions.h>
 
 #include <quic/common/TimeUtil.h>
+#include <algorithm>
+#include <iterator>
 
 namespace {
 std::deque<quic::OutstandingPacketWrapper>::reverse_iterator
@@ -417,6 +419,29 @@ uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn) {
   return maximumIdsToIssue;
 }
 
+void enforceAckStateRangeLimit(AckState& ackState) {
+  if (ackState.acks.size() <= AckState::kMaxAckRanges) {
+    return;
+  }
+
+  auto lastRangeToRetire = ackState.acks.cbegin();
+  std::advance(
+      lastRangeToRetire, ackState.acks.size() - AckState::kMaxAckRanges - 1);
+  const auto lastRetiredPacketNum = lastRangeToRetire->end;
+  ackState.acks.withdraw({0, lastRetiredPacketNum});
+  ackState.minimumReceivedPacketNum =
+      std::max(ackState.minimumReceivedPacketNum, lastRetiredPacketNum + 1);
+
+  ackState.recvdPacketInfos.erase(
+      std::remove_if(
+          ackState.recvdPacketInfos.begin(),
+          ackState.recvdPacketInfos.end(),
+          [&](const auto& packetInfo) {
+            return packetInfo.pktNum < ackState.minimumReceivedPacketNum;
+          }),
+      ackState.recvdPacketInfos.end());
+}
+
 Expected<AddPacketToAckStateResult, IntervalSetError> addPacketToAckState(
     QuicConnectionStateBase& conn,
     AckState& ackState,
@@ -433,6 +458,13 @@ Expected<AddPacketToAckStateResult, IntervalSetError> addPacketToAckState(
     distanceFromExpected = (packetNum > expectedNextPacket)
         ? packetNum - expectedNextPacket
         : expectedNextPacket - packetNum;
+  }
+
+  if (packetNum < ackState.minimumReceivedPacketNum) {
+    QUIC_STATS(conn.statsCallback, onDuplicatedPacketReceived);
+    return AddPacketToAckStateResult{
+        .distanceFromExpected = distanceFromExpected,
+        /*isDuplicate=*/.isDuplicate = true};
   }
 
   auto preInsertVersion = ackState.acks.insertVersion();
@@ -483,6 +515,8 @@ Expected<AddPacketToAckStateResult, IntervalSetError> addPacketToAckState(
     default:
       break;
   }
+
+  enforceAckStateRangeLimit(ackState);
 
   return AddPacketToAckStateResult{
       .distanceFromExpected = distanceFromExpected,

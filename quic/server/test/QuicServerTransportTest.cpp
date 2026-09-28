@@ -2002,6 +2002,73 @@ TEST_F(QuicServerTransportTest, PingIsTreatedAsRetransmittable) {
   EXPECT_TRUE(server->getConn().pendingEvents.scheduleAckTimeout);
 }
 
+TEST_F(QuicServerTransportTest, BoundsRetainedRangesForGappedPingPackets) {
+  constexpr size_t kExpectedMaxRetainedAckRanges = 1024;
+  constexpr PacketNum kFirstPacketNum = 0x10000;
+  BufPtr firstPacket;
+
+  for (size_t index = 0; index <= kExpectedMaxRetainedAckRanges; ++index) {
+    const auto packetNum = kFirstPacketNum + (2 * index);
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        packetNum);
+    RegularQuicPacketBuilder builder(
+        server->getConn().udpSendPacketLen,
+        std::move(header),
+        0 /* largestAcked */);
+    ASSERT_FALSE(builder.encodePacketHeader().hasError());
+    ASSERT_FALSE(writeFrame(PingFrame(), builder).hasError());
+    auto packet = packetToBuf(std::move(builder).buildPacket());
+    if (index == 0) {
+      firstPacket = packet->clone();
+    }
+    ASSERT_NO_THROW(deliverData(std::move(packet), false));
+    if (index == 0) {
+      ASSERT_TRUE(
+          server->getConn()
+              .ackStates.appDataAckState.largestRecvdPacketNum.has_value());
+      EXPECT_EQ(
+          *server->getConn().ackStates.appDataAckState.largestRecvdPacketNum,
+          kFirstPacketNum);
+    }
+  }
+
+  auto& ackState = server->getNonConstConn().ackStates.appDataAckState;
+  const auto lastPacketNum =
+      kFirstPacketNum + (2 * kExpectedMaxRetainedAckRanges);
+  EXPECT_FALSE(server->getConn().localConnectionError.has_value());
+  ASSERT_TRUE(ackState.largestRecvdPacketNum.has_value());
+  EXPECT_EQ(*ackState.largestRecvdPacketNum, lastPacketNum);
+  EXPECT_TRUE(ackState.acks.contains(lastPacketNum, lastPacketNum));
+  EXPECT_LE(ackState.acks.size(), kExpectedMaxRetainedAckRanges);
+
+  ASSERT_NE(firstPacket, nullptr);
+  const auto retainedRangeCount = ackState.acks.size();
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  const auto lastRecvdPacketNum = ackState.lastRecvdPacketInfo->pktNum;
+  const auto lastRecvdPacketTime =
+      ackState.lastRecvdPacketInfo->timings.receiveTimePoint;
+  const auto ecnCECount = ackState.ecnCECountReceived;
+  const auto ecnECT0Count = ackState.ecnECT0CountReceived;
+  const auto ecnECT1Count = ackState.ecnECT1CountReceived;
+  EXPECT_CALL(
+      *quicStats_,
+      onPacketDropped(Eq(PacketDropReason(PacketDropReason::DUPLICATE_PACKET))))
+      .Times(1);
+  ASSERT_NO_THROW(deliverData(firstPacket->clone(), false));
+  EXPECT_EQ(ackState.acks.size(), retainedRangeCount);
+  EXPECT_EQ(*ackState.largestRecvdPacketNum, lastPacketNum);
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, lastRecvdPacketNum);
+  EXPECT_EQ(
+      ackState.lastRecvdPacketInfo->timings.receiveTimePoint,
+      lastRecvdPacketTime);
+  EXPECT_EQ(ackState.ecnCECountReceived, ecnCECount);
+  EXPECT_EQ(ackState.ecnECT0CountReceived, ecnECT0Count);
+  EXPECT_EQ(ackState.ecnECT1CountReceived, ecnECT1Count);
+}
+
 TEST_F(QuicServerTransportTest, ImmediateAckValid) {
   // Verify that an incoming IMMEDIATE_ACK frame flags all
   // packet number spaces to generate ACKs immediately.

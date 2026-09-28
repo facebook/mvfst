@@ -312,6 +312,154 @@ TEST_P(
   EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, 100);
 }
 
+TEST_P(AddPacketToAckStateTest, BoundsRetainedSparseAckRangesPerSpace) {
+  constexpr size_t kExpectedMaxRetainedAckRanges = 1024;
+  constexpr PacketNum kFirstPacketNum = 0x10000;
+
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ackState = getAckState(conn, GetParam());
+
+  for (size_t index = 0; index <= kExpectedMaxRetainedAckRanges; ++index) {
+    const auto packetNum = kFirstPacketNum + (2 * index);
+    auto packet = buildPacketMinimal();
+    packet.tosValue = kEcnECT0;
+    auto result = addPacketToAckState(conn, ackState, packetNum, packet);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result.value().isDuplicate);
+  }
+
+  const auto lastPacketNum =
+      kFirstPacketNum + (2 * kExpectedMaxRetainedAckRanges);
+  ASSERT_TRUE(ackState.largestRecvdPacketNum.has_value());
+  EXPECT_EQ(*ackState.largestRecvdPacketNum, lastPacketNum);
+  ASSERT_FALSE(ackState.acks.empty());
+  EXPECT_EQ(ackState.acks.back().start, lastPacketNum);
+  EXPECT_EQ(ackState.acks.back().end, lastPacketNum);
+  EXPECT_LE(ackState.acks.size(), kExpectedMaxRetainedAckRanges);
+
+  const auto retainedRangeCount = ackState.acks.size();
+  const auto ecnCount = ackState.ecnECT0CountReceived;
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  const auto lastRecvdPacketNum = ackState.lastRecvdPacketInfo->pktNum;
+  const auto lastRecvdPacketTime =
+      ackState.lastRecvdPacketInfo->timings.receiveTimePoint;
+  auto replay = addPacketToAckState(
+      conn, ackState, kFirstPacketNum, buildPacketMinimal());
+  ASSERT_TRUE(replay.has_value());
+  EXPECT_TRUE(replay.value().isDuplicate);
+  EXPECT_EQ(ackState.acks.size(), retainedRangeCount);
+  EXPECT_EQ(ackState.ecnECT0CountReceived, ecnCount);
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, lastRecvdPacketNum);
+  EXPECT_EQ(
+      ackState.lastRecvdPacketInfo->timings.receiveTimePoint,
+      lastRecvdPacketTime);
+}
+
+TEST_P(AddPacketToAckStateTest, RetiresOldRangesWithoutReprocessingPackets) {
+  constexpr PacketNum kFirstRetainedPacketNum = 1000;
+
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.transportSettings.maxReceiveTimestampsPerAckStored =
+      AckState::kMaxAckRanges + 2;
+  auto& ackState = getAckState(conn, GetParam());
+  for (size_t index = 0; index < AckState::kMaxAckRanges; ++index) {
+    auto result = addPacketToAckState(
+        conn,
+        ackState,
+        kFirstRetainedPacketNum + (2 * index),
+        buildPacketMinimal());
+    ASSERT_TRUE(result.has_value());
+    ASSERT_FALSE(result.value().isDuplicate);
+  }
+  ASSERT_EQ(ackState.acks.size(), AckState::kMaxAckRanges);
+
+  auto firstOldPacket = buildPacketMinimal();
+  firstOldPacket.tosValue = kEcnECT1;
+  auto firstOldResult =
+      addPacketToAckState(conn, ackState, 500, firstOldPacket);
+  ASSERT_TRUE(firstOldResult.has_value());
+  EXPECT_FALSE(firstOldResult.value().isDuplicate);
+  EXPECT_EQ(ackState.acks.size(), AckState::kMaxAckRanges);
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, 501);
+  EXPECT_EQ(ackState.ecnECT1CountReceived, 1);
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, 500);
+
+  auto replayPacket = buildPacketMinimal();
+  replayPacket.tosValue = kEcnCE;
+  const auto recvdPacketInfoCount = ackState.recvdPacketInfos.size();
+  auto replayResult = addPacketToAckState(conn, ackState, 500, replayPacket);
+  ASSERT_TRUE(replayResult.has_value());
+  EXPECT_TRUE(replayResult.value().isDuplicate);
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, 501);
+  EXPECT_EQ(ackState.recvdPacketInfos.size(), recvdPacketInfoCount);
+  EXPECT_EQ(ackState.ecnECT1CountReceived, 1);
+  EXPECT_EQ(ackState.ecnCECountReceived, 0);
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, 500);
+
+  auto floorResult =
+      addPacketToAckState(conn, ackState, 501, buildPacketMinimal());
+  ASSERT_TRUE(floorResult.has_value());
+  EXPECT_FALSE(floorResult.value().isDuplicate);
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, 502);
+  EXPECT_EQ(ackState.acks.size(), AckState::kMaxAckRanges);
+
+  auto mergeResult = addPacketToAckState(
+      conn, ackState, kFirstRetainedPacketNum + 1, buildPacketMinimal());
+  ASSERT_TRUE(mergeResult.has_value());
+  EXPECT_FALSE(mergeResult.value().isDuplicate);
+  EXPECT_TRUE(ackState.acks.contains(
+      kFirstRetainedPacketNum, kFirstRetainedPacketNum + 2));
+  EXPECT_EQ(ackState.acks.size(), AckState::kMaxAckRanges - 1);
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, 502);
+
+  const auto lastRetainedPacketNum =
+      kFirstRetainedPacketNum + (2 * (AckState::kMaxAckRanges - 1));
+  auto newGapResult = addPacketToAckState(
+      conn, ackState, lastRetainedPacketNum + 2, buildPacketMinimal());
+  ASSERT_TRUE(newGapResult.has_value());
+  EXPECT_FALSE(newGapResult.value().isDuplicate);
+  EXPECT_EQ(ackState.acks.size(), AckState::kMaxAckRanges);
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, 502);
+}
+
+TEST(QuicStateFunctionsRangeLimitTest, FiltersNonmonotonicReceiveTimestamps) {
+  AckState ackState;
+  constexpr PacketNum kFirstPacketNum = 100;
+  for (size_t index = 0; index <= AckState::kMaxAckRanges; ++index) {
+    const auto packetNum = kFirstPacketNum + (2 * index);
+    ackState.acks.insert(packetNum, packetNum);
+  }
+  ASSERT_EQ(ackState.acks.size(), AckState::kMaxAckRanges + 1);
+
+  const auto receiveTime = Clock::now();
+  const std::vector<PacketNum> receiveOrder = {200, 50, 100, 198, 102};
+  for (const auto packetNum : receiveOrder) {
+    ReceivedUdpPacket::Timings timings;
+    timings.receiveTimePoint = receiveTime;
+    ackState.recvdPacketInfos.emplace_back(
+        WriteAckFrameState::ReceivedPacket{packetNum, timings});
+  }
+  ackState.lastRecvdPacketInfo = {
+      ackState.recvdPacketInfos[1].pktNum,
+      ackState.recvdPacketInfos[1].timings};
+
+  enforceAckStateRangeLimit(ackState);
+
+  EXPECT_EQ(ackState.acks.size(), AckState::kMaxAckRanges);
+  EXPECT_EQ(ackState.minimumReceivedPacketNum, 101);
+  ASSERT_EQ(ackState.recvdPacketInfos.size(), 3);
+  EXPECT_EQ(ackState.recvdPacketInfos[0].pktNum, 200);
+  EXPECT_EQ(ackState.recvdPacketInfos[1].pktNum, 198);
+  EXPECT_EQ(ackState.recvdPacketInfos[2].pktNum, 102);
+  ASSERT_TRUE(ackState.lastRecvdPacketInfo.has_value());
+  EXPECT_EQ(ackState.lastRecvdPacketInfo->pktNum, 50);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     AddPacketToAckStateTests,
     AddPacketToAckStateTest,

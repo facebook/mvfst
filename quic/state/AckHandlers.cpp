@@ -943,6 +943,7 @@ void commonAckVisitorForAckFrame(
       ackState.acks.withdraw({0, largestAcked - kAckPurgingThresh});
     }
   }
+  enforceAckStateRangeLimit(ackState);
 }
 
 void updateRttForLargestAckedPacket(

@@ -68,13 +68,18 @@ struct AddPacketToAckStateResult {
 };
 
 /**
+ * Retire the oldest ACK ranges above the per-space limit and advance the
+ * minimum packet number that can still be processed.
+ */
+void enforceAckStateRangeLimit(AckState& ackState);
+
+/**
  * Update largestReceivedUdpPacketNum in ackState with packetNum. Return the
  * distance from the next packet number we expect to receive, plus a flag
- * indicating whether the packet was a duplicate (already present in the
- * ack interval set). Per RFC 9000 §12.3, callers MUST discard duplicates
- * without further processing; on duplicate, this function does not update
- * largestRecvdPacketNum, lastRecvdPacketInfo, recvdPacketInfos, or ECN
- * counters.
+ * indicating whether the packet was already present or is older than locally
+ * retained ACK history. Callers MUST discard either result without further
+ * processing; on discard, this function does not update largestRecvdPacketNum,
+ * lastRecvdPacketInfo, recvdPacketInfos, or ECN counters.
  */
 [[nodiscard]] Expected<AddPacketToAckStateResult, IntervalSetError>
 addPacketToAckState(
