@@ -784,6 +784,9 @@ bool validateAndUpdateSourceToken(
 void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn) {
   // When we receive a packet we increase the limit again. The reasoning this is
   // that a peer can do the same by opening a new connection.
+  // This is intentionally not RFC 9000's limit of three times the bytes
+  // received: every packet, whatever its size, grants credit for
+  // limitedCwndInMss more full-sized packets.
   if (conn.writableBytesLimit) {
     conn.writableBytesLimit = *conn.writableBytesLimit +
         conn.transportSettings.limitedCwndInMss * conn.udpSendPacketLen;
