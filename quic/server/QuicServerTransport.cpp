@@ -986,6 +986,14 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                   "Unknown congestion control algorithm: {}", *strVal)));
         }
         auto cctype = *maybeCctype;
+        if (cctype == CongestionControlType::None ||
+            cctype == CongestionControlType::StaticCwnd ||
+            cctype == CongestionControlType::Custom) {
+          return quic::make_unexpected(QuicError(
+              TransportErrorCode::INTERNAL_ERROR,
+              fmt::format(
+                  "Unsupported congestion control algorithm: {}", *strVal)));
+        }
         MVVLOG(3) << "Knob param received, set congestion control type to "
                   << congestionControlTypeToString(cctype);
         if (server_conn->congestionController &&

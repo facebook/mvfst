@@ -4305,20 +4305,49 @@ TEST_F(
   server->handleKnobParams({{.id = knobParamId, .val = uint64_t{1234}}});
 }
 
-TEST_F(QuicServerTransportTest, TestCCAlgorithmKnobNoneThenCubicCrash) {
-  auto ccKnobId =
+class QuicServerTransportUnsafePeerCCKnobTest
+    : public QuicServerTransportTest,
+      public WithParamInterface<std::string> {};
+
+TEST_P(
+    QuicServerTransportUnsafePeerCCKnobTest,
+    RejectsUnsafePeerCCAndPreservesOriginalController) {
+  const auto ccKnobId =
       static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
+  auto* originalController = server->getConn().congestionController.get();
+  ASSERT_NE(originalController, nullptr);
+  ASSERT_EQ(originalController->type(), CongestionControlType::Cubic);
 
-  // Setting CC to None via knob is valid and nulls out the controller
-  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
-  server->handleKnobParams({{.id = ccKnobId, .val = std::string("none")}});
-  EXPECT_EQ(server->getConn().congestionController.get(), nullptr);
+  EXPECT_CALL(*quicStats_, onNewCongestionController(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(ccKnobId))).Times(1);
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(0);
+  EXPECT_NO_THROW(server->handleKnobParams(
+      {{.id = ccKnobId, .val = std::string(GetParam())}}));
 
-  // A subsequent CC knob should not crash even with null controller
-  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(ccKnobId))).Times(1);
-  server->handleKnobParams({{.id = ccKnobId, .val = std::string("cubic")}});
-  EXPECT_NE(server->getConn().congestionController.get(), nullptr);
+  auto* currentController = server->getConn().congestionController.get();
+  EXPECT_EQ(currentController, originalController);
+  EXPECT_EQ(
+      currentController ? currentController->type()
+                        : CongestionControlType::None,
+      CongestionControlType::Cubic);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    UnsafePeerCCAlgorithms,
+    QuicServerTransportUnsafePeerCCKnobTest,
+    Values(
+        std::string("none"),
+        std::string("staticcwnd"),
+        std::string("custom")),
+    [](const TestParamInfo<std::string>& info) {
+      if (info.param == "none") {
+        return "None";
+      }
+      if (info.param == "staticcwnd") {
+        return "StaticCwnd";
+      }
+      return "Custom";
+    });
 
 TEST_F(QuicServerTransportTest, TestCCAlgorithmKnobString) {
   auto ccKnobId =
