@@ -1190,6 +1190,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
          TransportKnobParam::Val value) -> quic::Expected<void, QuicError> {
         auto val = std::get<uint64_t>(value);
         auto server_conn = serverTransport.serverConn_;
+        // This intentionally lets the peer enable migration even if the server
+        // disabled it: the knob exists so clients can control migration, and
+        // the setting only affects this connection.
         server_conn->transportSettings.disableMigration =
             !static_cast<bool>(val);
         MVVLOG(3) << "CONNECTION_MIGRATION KnobParam received: "
