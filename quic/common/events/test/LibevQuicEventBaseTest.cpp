@@ -35,6 +35,20 @@ struct EvLoop : public quic::LibevQuicEventBase::EvLoopHolder {
   struct ev_loop* evLoop_;
 };
 
+struct SharedEvLoop : public quic::LibevQuicEventBase::EvLoopHolder {
+  explicit SharedEvLoop(struct ev_loop* evLoop) : evLoop_(evLoop) {}
+
+  struct ev_loop* get() override {
+    return evLoop_;
+  }
+
+  std::optional<pthread_t> getEventLoopThread() override {
+    return pthread_self();
+  }
+
+  struct ev_loop* evLoop_;
+};
+
 class LibevQuicEventBaseProvider {
  public:
   static std::shared_ptr<quic::QuicEventBase> makeQuicEvb() {
@@ -79,4 +93,73 @@ TEST(
   qEvb->loop();
 
   EXPECT_TRUE(callbackRan);
+}
+
+TEST(
+    LibevQuicEventBaseTest,
+    NextIterationCallbackFromLoopCallbackDoesNotWaitForEvents) {
+  auto loop = std::make_unique<EvLoop>();
+  auto* evLoop = loop->get();
+  auto qEvb = std::make_shared<quic::LibevQuicEventBase>(std::move(loop));
+  qEvb->setWakeForNextIterationCallbacks(true);
+  ev_timer farTimer;
+  ev_timer_init(
+      &farTimer,
+      [](struct ev_loop* l, ev_timer*, int) { ev_break(l, EVBREAK_ALL); },
+      3.0,
+      0.);
+  ev_timer_start(evLoop, &farTimer);
+  bool nestedRan = false;
+  qEvb->runInLoop([&] {
+    qEvb->runInLoop(
+        [&] {
+          nestedRan = true;
+          ev_break(evLoop, EVBREAK_ALL);
+        },
+        /*thisIteration=*/false);
+  });
+
+  const auto start = std::chrono::steady_clock::now();
+  ev_run(evLoop, 0);
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  ev_timer_stop(evLoop, &farTimer);
+
+  EXPECT_TRUE(nestedRan);
+  EXPECT_LT(elapsed, std::chrono::milliseconds(500));
+}
+
+TEST(
+    LibevQuicEventBaseTest,
+    CallbackQueuedFromAnotherEventBaseOnTheLoopDoesNotWaitForEvents) {
+  auto loop = std::make_unique<EvLoop>();
+  auto* evLoop = loop->get();
+  auto first = std::make_shared<quic::LibevQuicEventBase>(std::move(loop));
+  auto second = std::make_shared<quic::LibevQuicEventBase>(
+      std::make_unique<SharedEvLoop>(evLoop));
+  first->setWakeForNextIterationCallbacks(true);
+  second->setWakeForNextIterationCallbacks(true);
+  first->runInLoop([] {});
+  first->setLoopCallbackPriority(EV_MAXPRI);
+  ev_timer farTimer;
+  ev_timer_init(
+      &farTimer,
+      [](struct ev_loop* l, ev_timer*, int) { ev_break(l, EVBREAK_ALL); },
+      3.0,
+      0.);
+  ev_timer_start(evLoop, &farTimer);
+  bool queuedRan = false;
+  second->runInLoop([&] {
+    first->runInLoop([&] {
+      queuedRan = true;
+      ev_break(evLoop, EVBREAK_ALL);
+    });
+  });
+
+  const auto start = std::chrono::steady_clock::now();
+  ev_run(evLoop, 0);
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  ev_timer_stop(evLoop, &farTimer);
+
+  EXPECT_TRUE(queuedRan);
+  EXPECT_LT(elapsed, std::chrono::milliseconds(500));
 }

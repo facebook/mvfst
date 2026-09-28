@@ -31,6 +31,10 @@ void libEvPrepareCallback(
   self->checkCallbacks();
 }
 
+void libEvIdleCallback(struct ev_loop* loop, ev_idle* w, int /* revents */) {
+  ev_idle_stop(loop, w);
+}
+
 } // namespace
 
 namespace quic {
@@ -38,12 +42,14 @@ LibevQuicEventBase::LibevQuicEventBase(std::unique_ptr<EvLoopHolder> loop)
     : ev_loop_(loop->get()), loopHolder_(std::move(loop)) {
   ev_prepare_init(&prepareWatcher_, libEvPrepareCallback);
   prepareWatcher_.data = this;
+  ev_idle_init(&idleWatcher_, libEvIdleCallback);
 }
 
 LibevQuicEventBase::~LibevQuicEventBase() {
   // If the loop has been destroyed, skip the ev loop operations.
   if (loopHolder_->get()) {
     ev_prepare_stop(ev_loop_, &prepareWatcher_);
+    ev_idle_stop(ev_loop_, &idleWatcher_);
   }
 
   struct FunctionLoopCallbackDisposer {
@@ -79,6 +85,9 @@ void LibevQuicEventBase::runInLoop(
       runOnceCallbackWrappers_->push_back(*wrapper);
     } else {
       loopCallbackWrappers_.push_back(*wrapper);
+      if (wakeForNextIterationCallbacks_) {
+        ev_idle_start(ev_loop_, &idleWatcher_);
+      }
     }
   }
 }
@@ -130,6 +139,7 @@ void LibevQuicEventBase::scheduleTimeout(
 void LibevQuicEventBase::checkCallbacks() {
   // Keep the event base alive while we are running the callbacks.
   auto self = this->shared_from_this();
+  ev_idle_stop(ev_loop_, &idleWatcher_);
 
   // Running the callbacks in the loop callback list may change the contents
   // of the list. We swap the list here to be able to differentiate between

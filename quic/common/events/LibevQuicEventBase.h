@@ -148,6 +148,10 @@ class LibevQuicEventBase
   // when several event bases share a single libev loop.
   void setLoopCallbackPriority(int priority);
 
+  void setWakeForNextIterationCallbacks(bool enabled) {
+    wakeForNextIterationCallbacks_ = enabled;
+  }
+
   // This is public so the libev callback can access it
   class TimerCallbackWrapper : public QuicTimerCallback::TimerCallbackImpl {
    public:
@@ -256,5 +260,7 @@ class LibevQuicEventBase
   // ev_prepare is supposed to run before the loop goes to sleep.
   // We're using it to execute delayed work given to us via runInLoop.
   ev_prepare prepareWatcher_;
+  ev_idle idleWatcher_{};
+  bool wakeForNextIterationCallbacks_{false};
 };
 } // namespace quic
