@@ -55,6 +55,14 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // the eventbases for workers
   void start(const quic::SocketAddress& address, size_t maxWorkers);
 
+  /**
+   * Number of workers ::start() creates for a requested worker count and a
+   * given cpu count. A requested count of 0 means one worker per cpu. The
+   * result never exceeds the worker limit ::start() enforces on a requested
+   * count, so every worker gets a worker id a connection id can carry.
+   */
+  static size_t numWorkersToCreate(size_t maxWorkers, size_t numCpu) noexcept;
+
   // Initialize quic server worker per evb.
   void initialize(
       const quic::SocketAddress& address,

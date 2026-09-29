@@ -156,6 +156,18 @@ bool QuicServer::isInitialized() const noexcept {
   return initialized_;
 }
 
+size_t QuicServer::numWorkersToCreate(
+    size_t maxWorkers,
+    size_t numCpu) noexcept {
+  if (maxWorkers == 0) {
+    maxWorkers = numCpu;
+  }
+  return std::min(
+      {numCpu,
+       maxWorkers,
+       static_cast<size_t>(std::numeric_limits<uint8_t>::max())});
+}
+
 void QuicServer::start(const quic::SocketAddress& address, size_t maxWorkers) {
   checkRunningInThread(mainThreadId_);
   MVCHECK(ctx_, "Must set a TLS context for the Quic server");
@@ -164,13 +176,15 @@ void QuicServer::start(const quic::SocketAddress& address, size_t maxWorkers) {
       std::numeric_limits<uint8_t>::max(),
       "Quic server doesn't support more than "
           << (int)std::numeric_limits<uint8_t>::max() << " workers");
-  size_t numCpu = folly::available_concurrency();
-  if (maxWorkers == 0) {
-    maxWorkers = numCpu;
-  }
   auto const backendDetails = getEventBaseBackendDetails();
   backendSupportsMultishotCallback_ = backendDetails.supportsRecvmsgMultishot;
-  auto numWorkers = std::min(numCpu, maxWorkers);
+  const size_t numCpu = folly::available_concurrency();
+  auto numWorkers = numWorkersToCreate(maxWorkers, numCpu);
+  if (maxWorkers == 0 && numWorkers < numCpu) {
+    MVLOG_WARNING << "Starting " << numWorkers
+                  << " quic workers on a host with " << numCpu
+                  << " cpus; Quic server doesn't support more workers";
+  }
 
   // ::start() is the api for QuicServer to construct and own the EventBases the
   // QuicServerWorkers are running on

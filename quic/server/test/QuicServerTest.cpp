@@ -32,6 +32,7 @@
 #include <quic/state/test/MockQuicStats.h>
 
 #include <memory>
+#include <set>
 
 using namespace testing;
 using namespace folly;
@@ -3637,6 +3638,43 @@ TEST_F(QuicServerTest, OneEVB) {
   server_->waitUntilInitialized();
   evb.runAfterDelay([this] { server_->shutdown(); }, 100);
   evb.loop();
+}
+
+TEST(QuicServerWorkerCountTest, RequestedCountIsCappedByCpuCount) {
+  EXPECT_EQ(QuicServer::numWorkersToCreate(0, 8), size_t(8));
+  EXPECT_EQ(QuicServer::numWorkersToCreate(4, 8), size_t(4));
+  EXPECT_EQ(QuicServer::numWorkersToCreate(64, 8), size_t(8));
+}
+
+TEST(QuicServerWorkerCountTest, DerivedCountIsCappedAtTheStartLimit) {
+  const size_t limit = std::numeric_limits<uint8_t>::max();
+  EXPECT_EQ(QuicServer::numWorkersToCreate(0, limit), limit);
+  EXPECT_EQ(QuicServer::numWorkersToCreate(0, limit + 1), limit);
+  // An H100 host has 384 cpus (D76638451).
+  EXPECT_EQ(QuicServer::numWorkersToCreate(0, 384), limit);
+}
+
+TEST(QuicServerWorkerCountTest, EveryWorkerIdRoundTripsThroughAConnectionId) {
+  const auto numWorkers = QuicServer::numWorkersToCreate(0, 384);
+  DefaultConnectionIdAlgo connIdAlgo;
+
+  for (auto version :
+       {ConnectionIdVersion::V1,
+        ConnectionIdVersion::V2,
+        ConnectionIdVersion::V3}) {
+    std::set<size_t> parsedWorkerIds;
+    for (size_t i = 0; i < numWorkers; ++i) {
+      // What QuicServer::initializeWorkers() hands QuicServerWorker.
+      ServerConnectionIdParams params(
+          version, /*hostIdIn=*/1, /*processIdIn=*/0, static_cast<uint8_t>(i));
+      auto connId = connIdAlgo.encodeConnectionId(params);
+      ASSERT_FALSE(connId.hasError());
+      auto parsed = connIdAlgo.parseConnectionId(connId.value());
+      ASSERT_FALSE(parsed.hasError());
+      parsedWorkerIds.insert(parsed.value().workerId);
+    }
+    EXPECT_EQ(parsedWorkerIds.size(), numWorkers);
+  }
 }
 
 } // namespace quic::test
