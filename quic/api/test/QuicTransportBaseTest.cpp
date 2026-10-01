@@ -826,124 +826,112 @@ TEST_F(QuicTransportImplTestBase, StopSendingClosesIngress) {
   transport->setTransportSettings(transportSettings);
   auto& streamManager = *transport->transportConn->streamManager;
 
-  auto unknownErrorCode = GenericApplicationErrorCode::UNKNOWN;
-  std::string ingressData = "some ingress stream data";
-  auto ingressDataLen = ingressData.size();
-
-  StreamId streamID;
-  QuicStreamState* stream;
+  constexpr auto kErrCode = GenericApplicationErrorCode::NO_ERROR;
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
 
   // create bidirectional stream
-  streamID = transport->createBidirectionalStream().value();
+  auto id = transport->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb1;
-  ASSERT_TRUE(transport->setReadCallback(streamID, &readCb1).has_value());
+  ASSERT_TRUE(transport->setReadCallback(id, &readCb1).has_value());
 
   // add ingress & egress data to stream
-  transport->addDataToStream(
-      streamID, StreamBuffer(folly::IOBuf::copyBuffer(ingressData), 0));
-  ASSERT_TRUE(transport
-                  ->writeChain(
-                      streamID,
-                      folly::IOBuf::copyBuffer("some egress stream data"),
-                      false)
-                  .has_value());
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
   transport->driveReadCallbacks();
-  stream = CHECK_NOTNULL(transport->getStream(streamID));
+  auto* stream = CHECK_NOTNULL(transport->getStream(id));
 
   // check stream has readable data and SM is open
   EXPECT_TRUE(stream->hasReadableData());
+  EXPECT_TRUE(streamManager.readableStreams().contains(id));
+  EXPECT_TRUE(streamManager.peekableStreams().contains(id));
   EXPECT_EQ(stream->sendState, StreamSendState::Open);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
+  EXPECT_EQ(stream->maxOffsetObserved, data->length());
 
   // send stop sending to peer – this and later invoking reset stream should not
   // invoke ReadCallback::readError()
-  EXPECT_CALL(readCb1, readError(streamID, _)).Times(0);
-  ASSERT_TRUE(
-      transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR)
-          .has_value());
+  EXPECT_CALL(readCb1, readError(id, _)).Times(0);
+  ASSERT_TRUE(transport->stopSending(id, GenericApplicationErrorCode::NO_ERROR)
+                  .has_value());
 
-  // check that we've discarded any ingress data and ingress SM is closed
+  // check that we've discarded any ingress data while keeping the ingress SM
+  // open to process future frames from the peer
   EXPECT_FALSE(stream->hasReadableData());
-  EXPECT_FALSE(streamManager.readableStreams().contains(streamID));
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.peekableStreams().contains(id));
   EXPECT_EQ(stream->sendState, StreamSendState::Open);
-  EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
-  // suppose we tx a rst stream (and rx its corresponding ack), expect
-  // terminal state and queued in closed streams
-  ASSERT_TRUE(
-      transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR)
-          .has_value());
+  // Receive a new contiguous range from the peer. It is not buffered for the
+  // application, but it still advances the receive offset.
+  const auto prevRxOffset = stream->maxOffsetObserved;
+  transport->addDataToStream(id, StreamBuffer(data->clone(), prevRxOffset));
+  EXPECT_EQ(stream->maxOffsetObserved, prevRxOffset + data->length());
+  EXPECT_FALSE(stream->hasReadableData());
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.peekableStreams().contains(id));
+
+  // suppose we tx a rst stream (and rx its corresponding ack); the stream is
+  // not terminal until the peer closes its send side
+  ASSERT_TRUE(transport->resetStream(id, kErrCode).has_value());
   ASSERT_FALSE(sendRstAckSMHandler(*stream, std::nullopt).hasError());
-  EXPECT_TRUE(stream->inTerminalStates());
-  EXPECT_TRUE(streamManager.closedStreams().contains(streamID));
+  EXPECT_FALSE(stream->inTerminalStates());
+  EXPECT_FALSE(streamManager.closedStreams().contains(id));
   transport->driveReadCallbacks();
 
   // now if we rx a rst_stream we should deliver ReadCallback::readError()
-  EXPECT_TRUE(streamManager.streamExists(streamID));
-  EXPECT_CALL(readCb1, readError(streamID, QuicError(unknownErrorCode)))
-      .Times(1);
+  EXPECT_TRUE(streamManager.streamExists(id));
+  EXPECT_CALL(readCb1, readError(id, QuicError(kErrCode))).Times(1);
   ASSERT_FALSE(
       receiveRstStreamSMHandler(
-          *stream, RstStreamFrame(streamID, unknownErrorCode, ingressDataLen))
+          *stream, RstStreamFrame(id, kErrCode, stream->maxOffsetObserved))
           .hasError());
   transport->readLooper()->runLoopCallback();
 
-  // same test as above, but we tx a rst stream first followed by send stop
-  // sending second to validate that .stopSending() queues stream to be closed
+  // same test as above, but tx a rst stream first followed by stop sending to
+  // validate that ingress remains open until the peer closes its send side
   NiceMock<MockReadCallback> readCb2;
-  streamID = transport->createBidirectionalStream().value();
-  ASSERT_FALSE(transport->setReadCallback(streamID, &readCb2).hasError());
+  id = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(transport->setReadCallback(id, &readCb2).hasError());
 
   // add ingress & egress data to new stream
-  transport->addDataToStream(
-      streamID, StreamBuffer(folly::IOBuf::copyBuffer(ingressData), 0));
-  ASSERT_FALSE(transport
-                   ->writeChain(
-                       streamID,
-                       folly::IOBuf::copyBuffer("some egress stream data"),
-                       false)
-                   .hasError());
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
   transport->driveReadCallbacks();
-  stream = CHECK_NOTNULL(transport->getStream(streamID));
+  stream = CHECK_NOTNULL(transport->getStream(id));
 
   // check stream has readable data and SM is open
   EXPECT_TRUE(stream->hasReadableData());
+  EXPECT_TRUE(streamManager.readableStreams().contains(id));
+  EXPECT_TRUE(streamManager.peekableStreams().contains(id));
   EXPECT_EQ(stream->sendState, StreamSendState::Open);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   // suppose we tx a rst stream (and rx its corresponding ack)
-  ASSERT_FALSE(
-      transport->resetStream(streamID, GenericApplicationErrorCode::NO_ERROR)
-          .hasError());
+  ASSERT_FALSE(transport->resetStream(id, kErrCode).hasError());
   ASSERT_FALSE(sendRstAckSMHandler(*stream, std::nullopt).hasError());
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
   transport->driveReadCallbacks();
 
-  // send stop sending to peer – does not deliver an error to the read callback
-  // even tho the stream is in terminal state and queued for closing
-  EXPECT_CALL(readCb2, readError(streamID, _)).Times(0);
-  ASSERT_FALSE(
-      transport->stopSending(streamID, GenericApplicationErrorCode::NO_ERROR)
-          .hasError());
+  // send stop sending to peer without delivering an error to the read callback
+  EXPECT_CALL(readCb2, readError(id, _)).Times(0);
+  ASSERT_FALSE(transport->stopSending(id, kErrCode).hasError());
 
-  // check that we've discarded any ingress data and ingress SM is closed,
-  // expect terminal state and queued in closed streams
+  // check that we've discarded any ingress data while keeping the ingress SM
+  // open until the peer closes its send side
   EXPECT_FALSE(stream->hasReadableData());
-  EXPECT_FALSE(streamManager.readableStreams().contains(streamID));
-  EXPECT_TRUE(stream->inTerminalStates());
-  EXPECT_TRUE(streamManager.closedStreams().contains(streamID));
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.peekableStreams().contains(id));
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
+  EXPECT_FALSE(stream->inTerminalStates());
+  EXPECT_FALSE(streamManager.closedStreams().contains(id));
 
-  // we need to rx a rst stream before queue stream to be closed to allow
-  // delivering callback to application
-  EXPECT_CALL(readCb2, readError(streamID, QuicError(unknownErrorCode)))
-      .Times(1);
-  ASSERT_FALSE(
-      receiveRstStreamSMHandler(
-          *stream, RstStreamFrame(streamID, unknownErrorCode, ingressDataLen))
-          .hasError());
+  // rx a rst stream to close ingress and deliver the callback to application
+  EXPECT_CALL(readCb2, readError(id, QuicError(kErrCode))).Times(1);
+  ASSERT_FALSE(receiveRstStreamSMHandler(
+                   *stream, RstStreamFrame(id, kErrCode, data->length()))
+                   .hasError());
   EXPECT_TRUE(stream->inTerminalStates());
-  EXPECT_TRUE(streamManager.closedStreams().contains(streamID));
+  EXPECT_TRUE(streamManager.closedStreams().contains(id));
   transport->readLooper()->runLoopCallback();
 
   transport.reset();

@@ -145,6 +145,9 @@ struct QuicStreamLike {
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};
 
+  // whether application has requested peer to stop_sending
+  bool stopSendingRequested{false};
+
   [[nodiscard]] Expected<void, IntervalSetError>
   updateAckedIntervals(uint64_t offset, uint64_t len, bool eof) {
     // When there's an EOF we count the byte of 1 past the end as having been

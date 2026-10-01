@@ -174,9 +174,8 @@ quic::Expected<void, QuicError> appendDataToReadBufferCommon(
   stream.maxOffsetObserved =
       std::max(stream.maxOffsetObserved, bufferEndOffset);
 
-  if (buffer.data.chainLength() == 0) {
-    // Nothing more to do since we already processed the EOF
-    // case.
+  if (buffer.data.chainLength() == 0 || stream.stopSendingRequested) {
+    // Nothing more to do since we already processed the EOF case.
     return {};
   }
 
@@ -654,14 +653,18 @@ quic::Expected<void, QuicError> processCryptoStreamAck(
 }
 
 void processTxStopSending(QuicStreamState& stream) {
-  // no longer interested in ingress
-  auto id = stream.id;
-  auto& streamManager = stream.conn.streamManager;
-  stream.recvState = StreamRecvState::Closed;
-  stream.readBuffer.clear();
-  streamManager->readableStreams().erase(id);
-  if (stream.inTerminalStates()) {
-    streamManager->addClosed(id);
+  /**
+   * The application is longer interested in ingress; this flag
+   * (stopSendingRequested) ensures future ingress data will no longer be
+   * buffered by the quic transport. The RecvState must still be OPEN, as we
+   * need to account for flow control.
+   */
+  if (stream.conn.transportSettings.dropIngressOnStopSending) {
+    stream.stopSendingRequested = true;
+    stream.readBuffer.clear();
+    stream.conn.streamManager->updateReadableStreams(stream);
+    stream.conn.streamManager->updatePeekableStreams(stream);
   }
 }
+
 } // namespace quic

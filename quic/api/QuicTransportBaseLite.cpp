@@ -508,10 +508,7 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::stopSending(
     // skip STOP_SENDING if ingress is already closed
     return {};
   }
-
-  if (conn_->transportSettings.dropIngressOnStopSending) {
-    processTxStopSending(*stream);
-  }
+  processTxStopSending(*stream);
   // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
