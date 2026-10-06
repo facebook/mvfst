@@ -2477,6 +2477,71 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
   }
 
+  void versionNegotiationOnFirstBeforeSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
+    setConnectionIds();
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout()
+                    .isTimerCallbackScheduled());
+
+    auto packet =
+        VersionNegotiationPacketBuilder(
+            *conn.initialDestinationConnectionId, *originalConnId, {MVFST2})
+            .buildPacket();
+    EXPECT_CALL(
+        clientConnSetupCallback,
+        onConnectionSetupError(
+            IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
+    EXPECT_THROW(
+        deliverData(firstAddress, packet.second->coalesce()),
+        std::runtime_error);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout()
+                     .isTimerCallbackScheduled());
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+  }
+
+  void versionNegotiationOnFirstAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(_, _, _)).Times(0);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
+    setConnectionIds();
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    // Both sockets write once more, so the second family has an Initial in
+    // flight when the VN arrives. Any later write oversaturates these.
+    EXPECT_CALL(*sock, write(firstAddress, _, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _, _));
+    client->lossTimeout().cancelTimerCallback();
+    client->lossTimeout().timeoutExpired();
+
+    auto packet =
+        VersionNegotiationPacketBuilder(
+            *conn.initialDestinationConnectionId, *originalConnId, {MVFST2})
+            .buildPacket();
+    EXPECT_CALL(
+        clientConnSetupCallback,
+        onConnectionSetupError(
+            IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
+    EXPECT_THROW(
+        deliverData(firstAddress, packet.second->coalesce()),
+        std::runtime_error);
+    EXPECT_FALSE(client->lossTimeout().isTimerCallbackScheduled());
+  }
+
  protected:
   quic::test::MockAsyncUDPSocket* secondSock;
   SocketAddress serverAddrV4{"127.0.0.1", 443};
@@ -2516,6 +2581,18 @@ TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V6FirstAndV6FatalErrorBeforeV4Start) {
   fatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV6VersionNegotiationBeforeV4Start) {
+  versionNegotiationOnFirstBeforeSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV6VersionNegotiationAfterV4Start) {
+  versionNegotiationOnFirstAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
