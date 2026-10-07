@@ -1631,7 +1631,8 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
         }
         case QuicFrame::Type::RstStreamFrame: {
           RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
-          if (frame.reliableSize.has_value()) {
+          if (frame.reliableSize.has_value() &&
+              !conn.transportSettings.advertisedReliableResetStreamSupport) {
             return quic::make_unexpected(QuicError(
                 TransportErrorCode::PROTOCOL_VIOLATION,
                 "Reliable resets not supported"));

@@ -4179,6 +4179,86 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveReliableRst) {
       client->getConn().localConnectionError->code);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, ReceiveReliableRstWhenAdvertised) {
+  client->getNonConstConn()
+      .transportSettings.advertisedReliableResetStreamSupport = true;
+  auto streamId =
+      client->createBidirectionalStream(false /* replaySafe */).value();
+  auto setReadCallbackResult = client->setReadCallback(streamId, &readCb);
+  ASSERT_FALSE(setReadCallbackResult.hasError());
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 5, 5);
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_TRUE(builder.canBuildPacket());
+  ASSERT_FALSE(writeFrame(rstFrame, builder).hasError());
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  deliverData(packet->coalesce());
+
+  EXPECT_FALSE(client->getConn().localConnectionError.has_value());
+
+  auto stream = client->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(stream.hasError());
+  ASSERT_TRUE(stream.value());
+  EXPECT_TRUE(stream.value()->reliableSizeFromPeer.has_value());
+  EXPECT_EQ(*stream.value()->reliableSizeFromPeer, 5);
+  EXPECT_TRUE(stream.value()->finalReadOffset.has_value());
+  EXPECT_EQ(*stream.value()->finalReadOffset, 5);
+  EXPECT_TRUE(stream.value()->streamReadError.has_value());
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReceiveReliableRstDeliversReliableDataBeforeError) {
+  client->getNonConstConn()
+      .transportSettings.advertisedReliableResetStreamSupport = true;
+  auto streamId =
+      client->createBidirectionalStream(false /* replaySafe */).value();
+  ASSERT_FALSE(client->setReadCallback(streamId, &readCb).hasError());
+  auto reliableData = IOBuf::copyBuffer("hello");
+
+  // The reset arrives before the reliable bytes, so the read error is held
+  // back until the app has read them.
+  RstStreamFrame rstFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN, 10, 5);
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_TRUE(builder.canBuildPacket());
+  ASSERT_FALSE(writeFrame(rstFrame, builder).hasError());
+  EXPECT_CALL(readCb, readError(streamId, _)).Times(0);
+  deliverData(packetToBuf(std::move(builder).buildPacket())->coalesce());
+  Mock::VerifyAndClearExpectations(&readCb);
+
+  InSequence s;
+  EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
+    auto readData = client->read(streamId, 0);
+    ASSERT_FALSE(readData.hasError());
+    EXPECT_TRUE(folly::IOBufEqualTo()(readData->first, reliableData));
+  }));
+  EXPECT_CALL(readCb, readError(streamId, _));
+  deliverData(packetToBuf(createStreamPacket(
+                              *serverChosenConnId /* src */,
+                              *originalConnId /* dest */,
+                              appDataPacketNum++,
+                              streamId,
+                              *reliableData,
+                              0 /* cipherOverhead */,
+                              0 /* largestAcked */,
+                              std::nullopt /* longHeaderOverride */,
+                              false /* eof */))
+                  ->coalesce());
+  EXPECT_FALSE(client->getConn().localConnectionError.has_value());
+}
+
 TEST_F(
     QuicClientTransportAfterStartTest,
     ReceiveRstStreamNonExistentAndOtherFrame) {

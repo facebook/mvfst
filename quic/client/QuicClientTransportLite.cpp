@@ -666,8 +666,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
         MVVLOG(10) << "Client received reset stream=" << frame.streamId << " "
                    << *this;
-        if (frame.reliableSize.has_value()) {
-          // We're not yet supporting the handling of RESET_STREAM_AT frames
+        if (frame.reliableSize.has_value() &&
+            !conn_->transportSettings.advertisedReliableResetStreamSupport) {
           return quic::make_unexpected(QuicError(
               TransportErrorCode::PROTOCOL_VIOLATION,
               "Reliable resets not supported"));

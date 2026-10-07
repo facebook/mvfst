@@ -1122,6 +1122,42 @@ TEST_F(QuicServerTransportTest, RecvReliableRstStreamFrame) {
       QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION));
 }
 
+TEST_F(QuicServerTransportTest, RecvReliableRstStreamFrameWhenAdvertised) {
+  server->getNonConstConn()
+      .transportSettings.advertisedReliableResetStreamSupport = true;
+  clientNextAppDataPacketNum = 3;
+
+  StreamId streamId = 0x00;
+  auto streamResult =
+      server->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto stream = streamResult.value();
+  ASSERT_TRUE(stream);
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 5, 5);
+  ASSERT_TRUE(builder.canBuildPacket());
+  ASSERT_FALSE(writeFrame(std::move(rstFrame), builder).hasError());
+  auto packet = std::move(builder).buildPacket();
+  deliverData(packetToBuf(packet));
+
+  EXPECT_FALSE(server->getConn().localConnectionError.has_value());
+  EXPECT_TRUE(stream->reliableSizeFromPeer.has_value());
+  EXPECT_EQ(*stream->reliableSizeFromPeer, 5);
+  EXPECT_TRUE(stream->finalReadOffset.has_value());
+  EXPECT_EQ(*stream->finalReadOffset, 5);
+  EXPECT_TRUE(stream->streamReadError.has_value());
+}
+
 TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   server->getNonConstConn().ackStates.appDataAckState.nextPacketNum = 3;
   std::array<std::string, 4> words = {
