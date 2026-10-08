@@ -450,6 +450,7 @@ void QuicServerTransport::closeTransport() {
 
 void QuicServerTransport::unbindConnection() {
   if (routingCb_) {
+    [[maybe_unused]] auto self = weak_from_this().lock();
     auto routingCb = routingCb_;
     routingCb_ = nullptr;
     // Drain CIDs removed from selfConnectionIds but still in the routing map.

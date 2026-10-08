@@ -458,6 +458,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
         : transport_(transport) {}
 
     void timeoutExpired() noexcept override {
+      [[maybe_unused]] auto self = transport_->sharedGuard();
       transport_->drainTimeoutExpired();
     }
 

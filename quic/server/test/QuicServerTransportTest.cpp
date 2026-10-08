@@ -534,6 +534,41 @@ TEST_F(QuicServerTransportTest, IdleTimeoutExpired) {
       serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
 }
 
+TEST_F(QuicServerTransportTest, DrainTimeoutKeepsTransportAliveDuringUnbind) {
+  auto firstConnId = getTestConnectionId(1);
+  auto secondConnId = getTestConnectionId(2);
+  server->getNonConstConn().connIdsRetiringSoon->push_back(firstConnId);
+  server->getNonConstConn().connIdsRetiringSoon->push_back(secondConnId);
+  server->close(std::nullopt);
+  ASSERT_TRUE(server->isDraining());
+
+  std::weak_ptr<TestingQuicServerTransport> weakServer = server;
+  auto& drainTimeout = server->drainTimeout();
+  EXPECT_CALL(routingCallback, onConnectionIdRetired(_, firstConnId))
+      .WillOnce([&](QuicServerTransport::Ref, ConnectionId) {
+        server = nullptr;
+        EXPECT_FALSE(weakServer.expired());
+      });
+  EXPECT_CALL(routingCallback, onConnectionIdRetired(_, secondConnId));
+  drainTimeout.timeoutExpired();
+  EXPECT_TRUE(weakServer.expired());
+}
+
+TEST_F(QuicServerTransportTest, UnbindKeepsTransportAliveWhileRetiringConnIds) {
+  auto retiringConnId = getTestConnectionId(1);
+  server->getNonConstConn().connIdsRetiringSoon->push_back(retiringConnId);
+
+  std::weak_ptr<TestingQuicServerTransport> weakServer = server;
+  auto* transport = server.get();
+  EXPECT_CALL(routingCallback, onConnectionIdRetired(_, retiringConnId))
+      .WillOnce([&](QuicServerTransport::Ref, ConnectionId) {
+        server = nullptr;
+        EXPECT_FALSE(weakServer.expired());
+      });
+  transport->unbindConnection();
+  EXPECT_TRUE(weakServer.expired());
+}
+
 TEST_F(QuicServerTransportTest, KeepaliveTimeoutExpired) {
   server->keepaliveTimeout().timeoutExpired();
 
