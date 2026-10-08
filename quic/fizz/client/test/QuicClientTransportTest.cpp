@@ -2770,6 +2770,30 @@ class QuicClientTransportVersionAndRetryTest
   }
 };
 
+class QuicClientTransportRetryCapacityTest
+    : public QuicClientTransportVersionAndRetryTest {
+ public:
+  void SetUpChild() override {
+    auto settings = client->getTransportSettings();
+    settings.dataPathType = DataPathType::ContinuousMemory;
+    settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
+    settings.maxRecvPacketSize = 1404;
+    client->setTransportSettings(settings);
+    ON_CALL(*sock, writeGSO(_, _, _, _))
+        .WillByDefault([&](const SocketAddress&,
+                           const struct iovec* vec,
+                           size_t iovec_len,
+                           auto) {
+          socketWrites.push_back(
+              copyChain(folly::IOBuf::wrapIov(vec, iovec_len)));
+          return getTotalIovecLen(vec, iovec_len);
+        });
+    startTransport();
+    client->getNonConstConn().readCodec->setClientConnectionId(
+        ConnectionId::createZeroLength());
+  }
+};
+
 class QuicClientVersionParamInvalidTest
     : public QuicClientTransportAfterStartTestBase {
  public:
@@ -4725,6 +4749,47 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   EXPECT_EQ(header.getDestinationConnId(), serverCid);
 
   eventbase_->loopOnce();
+  client->close(std::nullopt);
+}
+
+TEST_F(QuicClientTransportRetryCapacityTest, OversizedRetryToken) {
+  loopForWrites();
+  socketWrites.clear();
+  const std::string token(client->getConn().udpSendPacketLen, 't');
+  // Initial byte, version, both CID length bytes, the 8-byte server CID and
+  // the 16-byte integrity tag: the Retry must still fit the receive buffer.
+  constexpr size_t kRetryOverhead = 1 + 4 + 1 + 1 + 8 + 16;
+  ASSERT_LT(
+      token.size() + kRetryOverhead,
+      client->getTransportSettings().maxRecvPacketSize);
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
+  EXPECT_THROW(recvServerRetry(serverAddr, token), std::runtime_error);
+  EXPECT_EQ(client->getConn().retryToken, token);
+  EXPECT_FALSE(client->getConn().oneRttWriteCipher);
+  ASSERT_TRUE(client->getConn().localConnectionError);
+  EXPECT_EQ(
+      client->getConn().localConnectionError->code,
+      LocalErrorCode::CODEC_ERROR);
+  EXPECT_TRUE(client->isClosed());
+  EXPECT_TRUE(socketWrites.empty());
+}
+
+TEST_F(QuicClientTransportRetryCapacityTest, RetryTokenFitsInitial) {
+  loopForWrites();
+  socketWrites.clear();
+  const std::string token(64, 't');
+  auto serverCid = recvServerRetry(serverAddr, token);
+  ASSERT_FALSE(socketWrites.empty());
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(socketWrites.front()->clone());
+  auto parsed = makeEncryptedCodec(true)->parsePacket(packetQueue, ackStates);
+  ASSERT_TRUE(parsed.regularPacket());
+  const auto* header = parsed.regularPacket()->header.asLong();
+  ASSERT_TRUE(header);
+  EXPECT_EQ(header->getHeaderType(), LongHeader::Types::Initial);
+  EXPECT_EQ(header->getToken(), token);
+  EXPECT_EQ(header->getDestinationConnId(), serverCid);
+  EXPECT_FALSE(client->isClosed());
   client->close(std::nullopt);
 }
 

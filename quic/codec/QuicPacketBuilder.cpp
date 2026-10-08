@@ -38,36 +38,37 @@ encodeLongHeaderHelper(
     initialByte |= (encodedPacketNum.length - 1);
   }
 
-  bufop.template writeBE<uint8_t>(initialByte);
-  uint64_t tokenHeaderLength = 0;
   const std::string& token = longHeader.getToken();
+  uint64_t tokenLength = (isInitial || isRetry) ? token.size() : 0;
+  uint64_t tokenLengthSize = 0;
   if (isInitial) {
     // For initial packets, we write both the token length and the token itself.
-    uint64_t tokenLength = token.size();
     auto tokenLengthInt = QuicInteger(tokenLength).getSize();
     if (!tokenLengthInt.has_value()) {
       return quic::make_unexpected(tokenLengthInt.error());
     }
-    tokenHeaderLength = tokenLengthInt.value() + tokenLength;
-  } else if (isRetry) {
-    // For retry packets, we write only the token.
-    tokenHeaderLength = token.size();
+    tokenLengthSize = tokenLengthInt.value();
   }
   auto longHeaderSize = sizeof(uint8_t) /* initialByte */ +
       sizeof(QuicVersionType) + sizeof(uint8_t) +
       longHeader.getSourceConnId().size() + sizeof(uint8_t) +
-      longHeader.getDestinationConnId().size() + tokenHeaderLength;
+      longHeader.getDestinationConnId().size() + tokenLengthSize;
 
   if (!isRetry) {
     // For retry packets, we don't write the packet length or the
     // packet number.
     longHeaderSize += kMaxPacketLenSize + encodedPacketNum.length;
   }
-  if (spaceCounter < longHeaderSize) {
+  if (longHeaderSize > spaceCounter ||
+      tokenLength > spaceCounter - longHeaderSize) {
+    const char* error = longHeaderSize > spaceCounter
+        ? "Long header exceeds packet size"
+        : "Long header token exceeds packet size";
     spaceCounter = 0;
-  } else {
-    spaceCounter -= longHeaderSize;
+    return quic::make_unexpected(QuicError(LocalErrorCode::CODEC_ERROR, error));
   }
+  spaceCounter -= longHeaderSize + tokenLength;
+  bufop.template writeBE<uint8_t>(initialByte);
   bufop.template writeBE<uint32_t>(
       static_cast<uint32_t>(longHeader.getVersion()));
   bufop.template writeBE<uint8_t>(longHeader.getDestinationConnId().size());
@@ -80,7 +81,6 @@ encodeLongHeaderHelper(
 
   if (isInitial) {
     // Write the token length, followed by the token
-    uint64_t tokenLength = token.size();
     QuicInteger tokenLengthInt(tokenLength);
     tokenLengthInt.encode([&](auto val) { bufop.writeBE(val); });
     if (tokenLength > 0) {

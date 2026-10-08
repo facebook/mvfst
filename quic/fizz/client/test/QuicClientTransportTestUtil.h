@@ -14,12 +14,14 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/codec/QuicPacketBuilder.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 #include <quic/state/test/MockQuicStats.h>
 
 #include <utility>
@@ -729,26 +731,41 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     deliverData(addr, packet->coalesce());
   }
 
-  ConnectionId recvServerRetry(const quic::SocketAddress& addr) {
+  ConnectionId recvServerRetry(
+      const quic::SocketAddress& addr,
+      const std::string& retryToken = "token") {
     // Make the server send a retry packet to the client. The server chooses a
     // connection id that the client must use in all future initial packets.
     std::vector<uint8_t> serverConnIdVec = {
         0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
     ConnectionId serverCid = ConnectionId::createAndMaybeCrash(serverConnIdVec);
 
-    std::string retryToken = "token";
-    std::string integrityTag =
-        "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49";
+    // Draft-29 has no QuicVersion member; the tag generator maps every non-V1
+    // version to the draft-29 retry key.
+    constexpr QuicVersionType kRetryVersion = 0xFF00001D;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
+    const auto retryVersion = static_cast<QuicVersion>(kRetryVersion);
+    PseudoRetryPacketBuilder pseudoBuilder(
+        0xFF,
+        serverCid,
+        ConnectionId::createZeroLength(),
+        *client->getConn().originalDestinationConnectionId,
+        retryVersion,
+        folly::IOBuf::copyBuffer(retryToken));
+    auto pseudoPacket = std::move(pseudoBuilder).buildPacket();
+    FizzRetryIntegrityTagGenerator tagGenerator;
+    auto integrityTag =
+        tagGenerator.getRetryIntegrityTag(retryVersion, pseudoPacket.get());
 
     folly::IOBuf retryPacketBuf;
     BufAppender appender(&retryPacketBuf, 100);
     appender.writeBE<uint8_t>(0xFF);
-    appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(0xFF00001D));
+    appender.writeBE<QuicVersionType>(kRetryVersion);
     appender.writeBE<uint8_t>(0);
     appender.writeBE<uint8_t>(serverConnIdVec.size());
     appender.push(serverConnIdVec.data(), serverConnIdVec.size());
     appender.push((const uint8_t*)retryToken.data(), retryToken.size());
-    appender.push((const uint8_t*)integrityTag.data(), integrityTag.size());
+    appender.push(integrityTag->data(), integrityTag->length());
     deliverData(addr, retryPacketBuf.coalesce());
     return serverCid;
   }

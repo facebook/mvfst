@@ -655,6 +655,97 @@ TEST_F(QuicPacketBuilderTest, InplaceBuilderLongHeaderBytes) {
       inplaceBuilder->getHeaderBytes());
 }
 
+TEST_P(QuicPacketBuilderTest, LongHeaderCapacityBoundary) {
+  const auto srcConnId = getTestConnectionId(0);
+  const auto destConnId = getTestConnectionId(1);
+  for (const auto type :
+       {LongHeader::Types::Initial,
+        LongHeader::Types::Retry,
+        LongHeader::Types::Handshake}) {
+    for (const auto [packetNum, packetNumBytes] :
+         {std::pair<PacketNum, uint32_t>{0, 1},
+          {128, 2},
+          {32768, 3},
+          {8388608, 4}}) {
+      for (const auto [tokenSize, tokenLengthBytes] :
+           {std::pair<uint32_t, uint32_t>{63, 1}, {64, 2}, {16384, 4}}) {
+        const bool hasToken = type != LongHeader::Types::Handshake;
+        const bool isRetry = type == LongHeader::Types::Retry;
+        const uint32_t headerSize = 7 + srcConnId.size() + destConnId.size() +
+            (hasToken ? tokenSize : 0) +
+            (type == LongHeader::Types::Initial ? tokenLengthBytes : 0) +
+            (isRetry ? 0 : 2 + packetNumBytes);
+        for (const uint32_t capacity : {headerSize - 1, headerSize}) {
+          SCOPED_TRACE(
+              testing::Message()
+              << "type=" << static_cast<int>(type) << " packetNum=" << packetNum
+              << " token=" << tokenSize << " capacity=" << capacity);
+          auto builder = testBuilderProvider(
+              GetParam(),
+              capacity,
+              LongHeader(
+                  type,
+                  srcConnId,
+                  destConnId,
+                  packetNum,
+                  QuicVersion::QUIC_V1,
+                  std::string(tokenSize, 't')),
+              0,
+              capacity);
+          auto result = builder->encodePacketHeader();
+          if (capacity < headerSize) {
+            ASSERT_TRUE(result.hasError());
+            EXPECT_EQ(result.error().code, LocalErrorCode::CODEC_ERROR);
+            EXPECT_FALSE(builder->canBuildPacket());
+            EXPECT_EQ(builder->remainingSpaceInPkt(), 0);
+            builder.reset();
+            if (GetParam() == TestFlavor::Inplace) {
+              ASSERT_TRUE(BufAccessor_->ownsBuffer());
+              EXPECT_EQ(BufAccessor_->length(), 0);
+            }
+          } else {
+            ASSERT_FALSE(result.hasError());
+            EXPECT_EQ(builder->remainingSpaceInPkt(), 0);
+            auto packet = std::move(*builder).buildPacket();
+            EXPECT_LE(packet.header.computeChainDataLength(), capacity);
+            EXPECT_GT(packet.header.computeChainDataLength(), 0);
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST_F(QuicPacketBuilderTest, InplaceLongHeaderFailurePreservesOutput) {
+  constexpr size_t kCapacity = 128;
+  const std::string expected(kCapacity, 'p');
+  for (uint32_t remaining : {0, 1, 100}) {
+    auto output = folly::IOBuf::copyBuffer(expected);
+    output->trimEnd(kCapacity - 3);
+    BufAccessor accessor(std::move(output));
+    {
+      InplaceQuicPacketBuilder builder(
+          accessor,
+          remaining,
+          LongHeader(
+              LongHeader::Types::Initial,
+              getTestConnectionId(0),
+              getTestConnectionId(1),
+              0,
+              QuicVersion::QUIC_V1,
+              std::string(kCapacity, 't')),
+          0);
+      ASSERT_TRUE(builder.encodePacketHeader().hasError());
+      EXPECT_FALSE(builder.canBuildPacket());
+    }
+    ASSERT_TRUE(accessor.ownsBuffer());
+    EXPECT_EQ(accessor.length(), 3);
+    EXPECT_EQ(
+        std::string(reinterpret_cast<const char*>(accessor.data()), kCapacity),
+        expected);
+  }
+}
+
 TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   // The values used in this test case are based on Appendix-A.4 of the
   // QUIC-TLS draft v29.
