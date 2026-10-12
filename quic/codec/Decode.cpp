@@ -95,26 +95,20 @@ namespace quic {
 
 quic::Expected<PaddingFrame, QuicError> decodePaddingFrame(
     ContiguousReadCursor& cursor) {
-  // we might have multiple padding frames in sequence in the common case.
-  // Let's consume all the padding and return 1 padding frame for everything.
   static_assert(
       static_cast<int>(FrameType::PADDING) == 0, "Padding value is 0");
   ByteRange paddingBytes = cursor.peekBytes();
-  if (paddingBytes.size() == 0) {
-    return PaddingFrame();
+  size_t numPaddingBytes = 0;
+  while (numPaddingBytes < paddingBytes.size() &&
+         paddingBytes.data()[numPaddingBytes] == 0) {
+    ++numPaddingBytes;
   }
-  uint8_t firstByte = paddingBytes.data()[0];
-  // While type can be variable length, since PADDING frame is always a 0
-  // byte frame, the length of the type should be 1 byte.
-  if (static_cast<FrameType>(firstByte) != FrameType::PADDING) {
-    return PaddingFrame();
-  }
-  int ret = memcmp(
-      paddingBytes.data(), paddingBytes.data() + 1, paddingBytes.size() - 1);
-  if (ret == 0) {
-    cursor.skip(paddingBytes.size());
-  }
-  return PaddingFrame();
+  cursor.skip(numPaddingBytes);
+  PaddingFrame frame;
+  // The caller has already consumed the first PADDING frame's type.
+  frame.numFrames =
+      static_cast<uint16_t>(1 + static_cast<uint16_t>(numPaddingBytes));
+  return frame;
 }
 
 quic::Expected<PingFrame, QuicError> decodePingFrame(ContiguousReadCursor&) {
@@ -804,7 +798,7 @@ quic::Expected<NewConnectionIdFrame, QuicError> decodeNewConnectionIdFrame(
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR, "Bad connid"));
   }
-  if (connIdLen > kMaxConnectionIdSize) {
+  if (connIdLen == 0 || connIdLen > kMaxConnectionIdSize) {
     return quic::make_unexpected(QuicError(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         "ConnectionId invalid length"));
@@ -1153,7 +1147,9 @@ quic::Expected<RegularQuicPacket, QuicError> decodeRegularPacket(
       return quic::make_unexpected(fRes.error());
     }
     if (packet.frames.back().asPaddingFrame() && fRes->asPaddingFrame()) {
-      packet.frames.back().asPaddingFrame()->numFrames++;
+      auto& numFrames = packet.frames.back().asPaddingFrame()->numFrames;
+      numFrames =
+          static_cast<uint16_t>(numFrames + fRes->asPaddingFrame()->numFrames);
     } else {
       packet.frames.push_back(std::move(*fRes));
     }

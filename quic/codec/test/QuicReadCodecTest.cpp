@@ -717,6 +717,78 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
   EXPECT_FALSE(longPacketHeader->hasToken());
 }
 
+void testInitialPaddingThenPing(QuicVersion version) {
+  const auto clientConnId = getTestConnectionId(1);
+  const auto destinationConnId = getTestConnectionId(2);
+  constexpr PacketNum packetNum = 1;
+  constexpr size_t paddingCount = 1200;
+  constexpr uint16_t packetBudget = 1404;
+  FizzCryptoFactory cryptoFactory;
+  auto aead =
+      cryptoFactory.getClientInitialCipher(destinationConnId, version).value();
+  auto headerCipher =
+      cryptoFactory.makeClientInitialHeaderCipher(destinationConnId, version)
+          .value();
+  LongHeader header(
+      LongHeader::Types::Initial,
+      clientConnId,
+      destinationConnId,
+      packetNum,
+      version);
+  RegularQuicPacketBuilder builder(
+      packetBudget, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  builder.accountForCipherOverhead(aead->getCipherOverhead());
+  ASSERT_TRUE(builder.canBuildPacket());
+  for (size_t i = 0; i < paddingCount; ++i) {
+    auto written = writeFrame(PaddingFrame(), builder);
+    ASSERT_TRUE(written.has_value());
+    ASSERT_EQ(*written, 1);
+  }
+  auto written = writeFrame(PingFrame(), builder);
+  ASSERT_TRUE(written.has_value());
+  ASSERT_EQ(*written, 1);
+  auto packet = std::move(builder).buildPacket();
+  auto wire = packetToBufCleartext(packet, *aead, *headerCipher, packetNum);
+  ASSERT_GE(wire->computeChainDataLength(), 1200);
+  ASSERT_LE(wire->computeChainDataLength(), packetBudget);
+
+  QuicReadCodec codec(QuicNodeType::Server);
+  codec.setClientConnectionId(clientConnId);
+  codec.setCodecParameters(CodecParameters(kDefaultAckDelayExponent, version));
+  codec.setInitialReadCipher(
+      cryptoFactory.getClientInitialCipher(destinationConnId, version).value());
+  codec.setInitialHeaderCipher(
+      cryptoFactory.makeClientInitialHeaderCipher(destinationConnId, version)
+          .value());
+  auto queue = bufToQueue(std::move(wire));
+  AckStates ackStates;
+  auto result = codec.parsePacket(queue, ackStates);
+  auto decoded = result.regularPacket();
+  ASSERT_NE(decoded, nullptr);
+  auto decodedHeader = decoded->header.asLong();
+  ASSERT_NE(decodedHeader, nullptr);
+  EXPECT_EQ(decodedHeader->getHeaderType(), LongHeader::Types::Initial);
+  EXPECT_EQ(decodedHeader->getVersion(), version);
+  EXPECT_EQ(decodedHeader->getSourceConnId(), clientConnId);
+  EXPECT_EQ(decodedHeader->getDestinationConnId(), destinationConnId);
+  EXPECT_EQ(decodedHeader->getPacketSequenceNum(), packetNum);
+  EXPECT_FALSE(decodedHeader->hasToken());
+  ASSERT_EQ(decoded->frames.size(), 2);
+  ASSERT_NE(decoded->frames[0].asPaddingFrame(), nullptr);
+  EXPECT_EQ(decoded->frames[0].asPaddingFrame()->numFrames, paddingCount);
+  EXPECT_NE(decoded->frames[1].asPingFrame(), nullptr);
+  EXPECT_EQ(queue.chainLength(), 0);
+}
+
+TEST_F(QuicReadCodecTest, TestInitialPaddingThenPingV1) {
+  testInitialPaddingThenPing(QuicVersion::QUIC_V1);
+}
+
+TEST_F(QuicReadCodecTest, TestInitialPaddingThenPingMvfst) {
+  testInitialPaddingThenPing(QuicVersion::MVFST);
+}
+
 TEST_F(QuicReadCodecTest, TestInitialPacketExtractToken) {
   auto connId = getTestConnectionId();
 

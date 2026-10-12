@@ -2408,6 +2408,81 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
   EXPECT_EQ(conn.peerConnectionIds[1].token, newConnId.token);
 }
 
+TEST_F(QuicServerTransportTest, RecvZeroLengthNewConnectionIdRejected) {
+  auto& conn = server->getNonConstConn();
+  conn.transportSettings.selfActiveConnectionIdLimit = 2;
+  ASSERT_TRUE(conn.clientConnectionId.has_value());
+  ASSERT_GT(conn.clientConnectionId->size(), 0);
+  ASSERT_TRUE(conn.serverConnectionId.has_value());
+  ASSERT_EQ(conn.peerConnectionIds.size(), 1);
+  const auto originalPeerId = conn.peerConnectionIds.front();
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *conn.serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_TRUE(builder.canBuildPacket());
+  StatelessResetToken token;
+  token.fill(0x5a);
+  NewConnectionIdFrame frame(1, 0, ConnectionId::createZeroLength(), token);
+  auto written = writeSimpleFrame(QuicSimpleFrame(frame), builder);
+  ASSERT_TRUE(written.has_value());
+  ASSERT_EQ(*written, 20);
+  auto packet = std::move(builder).buildPacket();
+  auto body = packet.body.clone();
+  body->coalesce();
+  ASSERT_EQ(body->length(), 20);
+  const std::string expected("\x18\x01\x00\x00", 4);
+  EXPECT_EQ(
+      std::string(reinterpret_cast<const char*>(body->data()), body->length()),
+      expected + std::string(16, '\x5a'));
+
+  deliverDataWithoutErrorCheck(packetToBuf(packet), false);
+  EXPECT_TRUE(conn.localConnectionError.has_value());
+  if (conn.localConnectionError) {
+    EXPECT_EQ(
+        conn.localConnectionError->code,
+        QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR));
+  }
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+  ASSERT_FALSE(conn.peerConnectionIds.empty());
+  EXPECT_EQ(conn.peerConnectionIds.front().connId, originalPeerId.connId);
+  EXPECT_EQ(
+      conn.peerConnectionIds.front().sequenceNumber,
+      originalPeerId.sequenceNumber);
+  EXPECT_EQ(conn.peerConnectionIds.front().token, originalPeerId.token);
+}
+
+TEST_F(QuicServerTransportTest, RecvOneByteNewConnectionIdValid) {
+  auto& conn = server->getNonConstConn();
+  conn.transportSettings.selfActiveConnectionIdLimit = 2;
+  ASSERT_EQ(conn.peerConnectionIds.size(), 1);
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *conn.serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+  ASSERT_TRUE(builder.canBuildPacket());
+  StatelessResetToken token;
+  token.fill(0x5a);
+  NewConnectionIdFrame frame(
+      1, 0, ConnectionId::createAndMaybeCrash({0x42}), token);
+  auto written = writeSimpleFrame(QuicSimpleFrame(frame), builder);
+  ASSERT_TRUE(written.has_value());
+  ASSERT_EQ(*written, 21);
+  auto packet = std::move(builder).buildPacket();
+  deliverDataWithoutErrorCheck(packetToBuf(packet), false);
+  EXPECT_FALSE(conn.localConnectionError.has_value());
+  ASSERT_EQ(conn.peerConnectionIds.size(), 2);
+  EXPECT_EQ(conn.peerConnectionIds.back().connId, frame.connectionId);
+  EXPECT_EQ(conn.peerConnectionIds.back().sequenceNumber, 1);
+  EXPECT_EQ(conn.peerConnectionIds.back().token, token);
+}
+
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdTooManyReceivedIds) {
   auto& conn = server->getNonConstConn();
   conn.transportSettings.selfActiveConnectionIdLimit = 0;

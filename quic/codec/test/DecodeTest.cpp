@@ -1058,10 +1058,10 @@ TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
   memset(buf->writableData() + 10, 5, 1);
 
   ContiguousReadCursor cursor(buf->data(), buf->length());
-  ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
-  // If we encountered an interleaved frame, leave the whole thing
-  // as is
-  EXPECT_EQ(cursor.remaining(), 11);
+  auto result = decodePaddingFrame(cursor);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result->numFrames, 11);
+  EXPECT_EQ(cursor.remaining(), 1);
 }
 
 TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
@@ -1073,6 +1073,109 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
   ASSERT_FALSE(decodePaddingFrame(cursor).hasError());
   EXPECT_EQ(cursor.remaining(), 0);
 }
+
+class PaddingRunDecodeTest : public DecodeTest,
+                             public WithParamInterface<size_t> {};
+
+TEST_P(PaddingRunDecodeTest, ConsumesRunBeforePing) {
+  const auto paddingCount = GetParam();
+  std::string bytes(paddingCount, '\0');
+  bytes.push_back('\x01');
+  BufQueue queue(folly::IOBuf::copyBuffer(bytes));
+  const PacketHeader header(makeHeader());
+  const CodecParameters params(kDefaultAckDelayExponent, QuicVersion::MVFST);
+  auto result = parseFrame(queue, header, params);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_NE(result->asPaddingFrame(), nullptr);
+  EXPECT_EQ(
+      result->asPaddingFrame()->numFrames, static_cast<uint16_t>(paddingCount));
+  EXPECT_EQ(queue.chainLength(), 1);
+  EXPECT_EQ(queue.front()->data()[0], 0x01);
+
+  auto ping = parseFrame(queue, header, params);
+  ASSERT_TRUE(ping.has_value());
+  EXPECT_NE(ping->asPingFrame(), nullptr);
+  EXPECT_EQ(queue.chainLength(), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    PaddingRuns,
+    PaddingRunDecodeTest,
+    Values(1, 16, 1200, 65535, 65536));
+
+TEST_F(DecodeTest, PaddingRunCountsAcrossFrames) {
+  // A two-byte PADDING type separates byte runs that share one decoded frame.
+  const std::string bytes("\x00\x00\x40\x00\x00\x00\x01\x00\x00\x00", 10);
+  auto result = decodeRegularPacket(
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST),
+      folly::IOBuf::copyBuffer(bytes));
+  ASSERT_TRUE(result.has_value());
+  ASSERT_EQ(result->frames.size(), 3);
+  ASSERT_NE(result->frames[0].asPaddingFrame(), nullptr);
+  EXPECT_EQ(result->frames[0].asPaddingFrame()->numFrames, 5);
+  EXPECT_NE(result->frames[1].asPingFrame(), nullptr);
+  ASSERT_NE(result->frames[2].asPaddingFrame(), nullptr);
+  EXPECT_EQ(result->frames[2].asPaddingFrame()->numFrames, 3);
+}
+
+class NewConnectionIdDecodeTest : public DecodeTest,
+                                  public WithParamInterface<QuicVersion> {};
+
+TEST_P(NewConnectionIdDecodeTest, ValidatesLength) {
+  StatelessResetToken token;
+  token.fill(0x5a);
+  for (const uint8_t length : {0, 1, 20, 21}) {
+    SCOPED_TRACE(static_cast<unsigned>(length));
+    std::string bytes("\x18\x01\x00", 3);
+    bytes.push_back(static_cast<char>(length));
+    bytes.append(length, '\x42');
+    bytes.append(token.size(), '\x5a');
+    BufQueue queue(folly::IOBuf::copyBuffer(bytes));
+    auto result = parseFrame(
+        queue,
+        makeHeader(),
+        CodecParameters(kDefaultAckDelayExponent, GetParam()));
+    if (length == 0 || length > kMaxConnectionIdSize) {
+      EXPECT_TRUE(result.hasError());
+      if (result.hasError()) {
+        EXPECT_EQ(
+            result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+      }
+      continue;
+    }
+    ASSERT_TRUE(result.has_value());
+    ASSERT_NE(result->asQuicSimpleFrame(), nullptr);
+    auto frame = result->asQuicSimpleFrame()->asNewConnectionIdFrame();
+    ASSERT_NE(frame, nullptr);
+    EXPECT_EQ(frame->sequenceNumber, 1);
+    EXPECT_EQ(frame->retirePriorTo, 0);
+    EXPECT_EQ(frame->connectionId.size(), length);
+    EXPECT_EQ(frame->token, token);
+    EXPECT_EQ(queue.chainLength(), 0);
+  }
+}
+
+TEST_P(NewConnectionIdDecodeTest, RejectsTruncatedIdAndToken) {
+  for (const auto& bytes :
+       {std::string("\x18\x01\x00\x04\x42\x42", 6),
+        std::string("\x18\x01\x00\x04", 4) + std::string(4, '\x42') +
+            std::string(15, '\x5a')}) {
+    SCOPED_TRACE(bytes.size());
+    BufQueue queue(folly::IOBuf::copyBuffer(bytes));
+    auto result = parseFrame(
+        queue,
+        makeHeader(),
+        CodecParameters(kDefaultAckDelayExponent, GetParam()));
+    ASSERT_TRUE(result.hasError());
+    EXPECT_EQ(result.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Versions,
+    NewConnectionIdDecodeTest,
+    Values(QuicVersion::QUIC_V1, QuicVersion::MVFST));
 
 std::unique_ptr<folly::IOBuf> createNewTokenFrame(
     Optional<QuicInteger> tokenLength = std::nullopt,
