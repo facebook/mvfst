@@ -184,7 +184,7 @@ QuicPathManager::prepareChallengeForSending(PathIdType pathId) {
   // upper bits is what lets a returning PATH_RESPONSE be routed back to the
   // right path before we even scan the in-flight list.
   uint64_t challengeData =
-      (static_cast<uint64_t>(pathId) << 32) + folly::Random::rand32();
+      (static_cast<uint64_t>(pathId) << 32) + folly::Random::secureRand32();
 
   auto sentTimestamp = Clock::now();
 
