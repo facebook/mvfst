@@ -32,6 +32,7 @@
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 #include <quic/server/QuicServer.h>
+#include <algorithm>
 
 using namespace testing;
 using namespace folly;
@@ -702,6 +703,266 @@ TEST_F(
 
   ASSERT_EQ(conn.scone->pendingRateSignals.size(), 1);
   EXPECT_EQ(conn.scone->pendingRateSignals.front().rate, testRate);
+}
+
+class QuicClientTransportSconeWrongDcidTest
+    : public QuicClientTransportAfterStartTestBase {
+ protected:
+  ConnectionId makeUnknownSelfConnectionId() const {
+    const auto unknown = ConnectionId::createAndMaybeCrash({0xa5});
+    const auto& selfConnectionIds = client->getConn().selfConnectionIds;
+    EXPECT_EQ(
+        std::find_if(
+            selfConnectionIds.begin(),
+            selfConnectionIds.end(),
+            [&](const auto& cidData) { return cidData.connId == unknown; }),
+        selfConnectionIds.end());
+    return unknown;
+  }
+
+  void enableSconeState() {
+    auto& conn = client->getNonConstConn();
+    conn.transportSettings.advertiseSconeSupport = true;
+    conn.transportSettings.enableSconeSend = true;
+    conn.scone.emplace();
+    conn.peerAdvertisedSconeSupport = true;
+  }
+
+  void expectClientOpenWithoutError() const {
+    const auto& conn = client->getConn();
+    EXPECT_FALSE(conn.localConnectionError.has_value())
+        << "unexpected local error: "
+        << (conn.localConnectionError
+                ? fmt::format("{}", *conn.localConnectionError)
+                : std::string());
+    EXPECT_FALSE(client->isClosed());
+  }
+
+  void expectUnknownDcidSconeDoesNotClose(uint8_t rate, bool enableScone) {
+    auto& conn = client->getNonConstConn();
+    ASSERT_FALSE(conn.transportSettings.advertiseSconeSupport);
+    ASSERT_FALSE(conn.transportSettings.enableSconeSend);
+    ASSERT_FALSE(conn.scone.has_value());
+    expectClientOpenWithoutError();
+
+    if (enableScone) {
+      enableSconeState();
+    }
+
+    auto packet = buildSconePacket(
+        rate, makeUnknownSelfConnectionId(), ConnectionId::createZeroLength());
+    ASSERT_EQ(packet.computeChainDataLength(), 8);
+
+    EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+    deliverDataWithoutErrorCheck(packet.coalesce());
+
+    expectClientOpenWithoutError();
+    if (conn.scone) {
+      EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
+    }
+  }
+};
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    UnknownDcidSconeV1WithFeatureDisabledDoesNotClose) {
+  expectUnknownDcidSconeDoesNotClose(42, false);
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    UnknownDcidSconeV2WithFeatureDisabledDoesNotClose) {
+  expectUnknownDcidSconeDoesNotClose(43, false);
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    UnknownDcidSconeV1WithFeatureEnabledDoesNotClose) {
+  expectUnknownDcidSconeDoesNotClose(42, true);
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    UnknownDcidSconeV2WithFeatureEnabledDoesNotClose) {
+  expectUnknownDcidSconeDoesNotClose(43, true);
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    ValidThenUnknownDcidSconeDoesNotClose) {
+  auto& conn = client->getNonConstConn();
+  enableSconeState();
+  ASSERT_TRUE(conn.scone->pendingRateSignals.empty());
+  expectClientOpenWithoutError();
+
+  auto validScone = buildSconePacket(42, *originalConnId, *serverChosenConnId);
+  auto unknownDcidScone = buildSconePacket(
+      43, makeUnknownSelfConnectionId(), ConnectionId::createZeroLength());
+  const auto validLength = validScone.computeChainDataLength();
+  const auto unknownLength = unknownDcidScone.computeChainDataLength();
+  ASSERT_EQ(
+      validLength, 7 + originalConnId->size() + serverChosenConnId->size());
+  ASSERT_EQ(unknownLength, 8);
+
+  auto datagram = folly::IOBuf::copyBuffer(validScone.coalesce());
+  datagram->appendChain(folly::IOBuf::copyBuffer(unknownDcidScone.coalesce()));
+  ASSERT_EQ(datagram->computeChainDataLength(), validLength + unknownLength);
+
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  deliverDataWithoutErrorCheck(datagram->coalesce());
+
+  expectClientOpenWithoutError();
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    UnknownDcidThenValidSconeDoesNotClose) {
+  auto& conn = client->getNonConstConn();
+  enableSconeState();
+  ASSERT_TRUE(conn.scone->pendingRateSignals.empty());
+  expectClientOpenWithoutError();
+
+  auto unknownDcidScone = buildSconePacket(
+      42, makeUnknownSelfConnectionId(), ConnectionId::createZeroLength());
+  auto validScone = buildSconePacket(43, *originalConnId, *serverChosenConnId);
+  const auto unknownLength = unknownDcidScone.computeChainDataLength();
+  const auto validLength = validScone.computeChainDataLength();
+  ASSERT_EQ(unknownLength, 8);
+  ASSERT_EQ(
+      validLength, 7 + originalConnId->size() + serverChosenConnId->size());
+
+  auto datagram = folly::IOBuf::copyBuffer(unknownDcidScone.coalesce());
+  datagram->appendChain(folly::IOBuf::copyBuffer(validScone.coalesce()));
+  ASSERT_EQ(datagram->computeChainDataLength(), unknownLength + validLength);
+
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  deliverDataWithoutErrorCheck(datagram->coalesce());
+
+  expectClientOpenWithoutError();
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    UnknownDcidSconeThenStreamProcessesTailOnce) {
+  auto& conn = client->getNonConstConn();
+  enableSconeState();
+  ASSERT_TRUE(conn.scone->pendingRateSignals.empty());
+  expectClientOpenWithoutError();
+
+  const auto streamId = client->createBidirectionalStream().value();
+  auto setReadCallbackResult = client->setReadCallback(streamId, &readCb);
+  ASSERT_FALSE(setReadCallbackResult.hasError());
+  auto expected = folly::IOBuf::copyBuffer("scone tail");
+  size_t readAvailableCalls = 0;
+  EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce([&](auto) {
+    auto readData = client->read(streamId, 0);
+    ASSERT_TRUE(readData.has_value());
+    ASSERT_TRUE(readData->first);
+    EXPECT_TRUE(folly::IOBufEqualTo()(readData->first, expected));
+    ++readAvailableCalls;
+  });
+
+  auto unknownDcidScone = buildSconePacket(
+      42, makeUnknownSelfConnectionId(), ConnectionId::createZeroLength());
+  auto streamPacket = packetToBuf(createStreamPacket(
+      *serverChosenConnId,
+      *originalConnId,
+      appDataPacketNum++,
+      streamId,
+      *expected,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  const auto unknownLength = unknownDcidScone.computeChainDataLength();
+  const auto streamLength = streamPacket->computeChainDataLength();
+  ASSERT_EQ(unknownLength, 8);
+  ASSERT_GT(streamLength, 0);
+
+  auto datagram = folly::IOBuf::copyBuffer(unknownDcidScone.coalesce());
+  datagram->appendChain(std::move(streamPacket));
+  ASSERT_EQ(datagram->computeChainDataLength(), unknownLength + streamLength);
+
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  deliverDataWithoutErrorCheck(datagram->coalesce());
+
+  expectClientOpenWithoutError();
+  EXPECT_EQ(readAvailableCalls, 1);
+  EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    KnownDcidUnknownScidSconeRemainsSoftDrop) {
+  auto& conn = client->getNonConstConn();
+  enableSconeState();
+  ASSERT_TRUE(conn.scone->pendingRateSignals.empty());
+  expectClientOpenWithoutError();
+
+  auto unknownPeerConnectionId = ConnectionId::createAndMaybeCrash({0x5a});
+  ASSERT_EQ(
+      std::find_if(
+          conn.peerConnectionIds.begin(),
+          conn.peerConnectionIds.end(),
+          [&](const auto& cidData) {
+            return cidData.connId == unknownPeerConnectionId;
+          }),
+      conn.peerConnectionIds.end());
+  auto packet = buildSconePacket(42, *originalConnId, unknownPeerConnectionId);
+  ASSERT_EQ(
+      packet.computeChainDataLength(),
+      7 + originalConnId->size() + unknownPeerConnectionId.size());
+
+  expectQuicStatsPacketDrop(PacketDropReason::PARSE_ERROR_CLIENT);
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  deliverDataWithoutErrorCheck(packet.coalesce());
+
+  expectClientOpenWithoutError();
+  EXPECT_TRUE(conn.scone->pendingRateSignals.empty());
+}
+
+TEST_F(
+    QuicClientTransportSconeWrongDcidTest,
+    RegularPacketUnknownDcidRemainsConnectionError) {
+  auto& conn = client->getNonConstConn();
+  expectClientOpenWithoutError();
+
+  const auto knownDcid = ConnectionId::createAndMaybeCrash(
+      {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80});
+  conn.clientConnectionId = knownDcid;
+  conn.readCodec->setClientConnectionId(knownDcid);
+  conn.selfConnectionIds.emplace_back(knownDcid, 1);
+  originalConnId = knownDcid;
+
+  auto unknownDcid = knownDcid;
+  unknownDcid.data()[0] ^= 0xff;
+  ASSERT_EQ(unknownDcid.size(), knownDcid.size());
+  ASSERT_EQ(
+      std::find_if(
+          conn.selfConnectionIds.begin(),
+          conn.selfConnectionIds.end(),
+          [&](const auto& cidData) { return cidData.connId == unknownDcid; }),
+      conn.selfConnectionIds.end());
+
+  const auto streamId = client->createBidirectionalStream().value();
+  auto data = folly::IOBuf::copyBuffer("regular packet");
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId,
+      unknownDcid,
+      appDataPacketNum++,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  ASSERT_GT(packet->computeChainDataLength(), 0);
+
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(1);
+  deliverDataWithoutErrorCheck(packet->coalesce());
+
+  ASSERT_TRUE(conn.localConnectionError.has_value());
+  EXPECT_EQ(
+      conn.localConnectionError->code,
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION));
+  EXPECT_EQ(conn.localConnectionError->message, "Invalid connection id");
+  EXPECT_TRUE(client->isClosed());
 }
 
 TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {

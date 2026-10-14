@@ -240,6 +240,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
   }
   auto parsedPacket = conn_->readCodec->parsePacket(
       udpPacket.buf, conn_->ackStates, conn_->clientConnectionId->size());
+  auto* sconePacket = parsedPacket.sconePacket();
   StatelessReset* statelessReset = parsedPacket.statelessReset();
   if (statelessReset) {
     const auto& token = clientConn_->statelessResetToken;
@@ -357,8 +358,8 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     } else if (auto* sh = regularOptional->header.asShort()) {
       packetDstCid = &sh->getConnectionId();
     }
-  } else if (auto* sp = parsedPacket.sconePacket()) {
-    packetDstCid = &sp->dstCid;
+  } else if (sconePacket) {
+    packetDstCid = &sconePacket->dstCid;
   }
 
   // Validate DCID if we extracted one. CipherUnavailable and Nothing packets
@@ -372,11 +373,14 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
           }) == conn_->selfConnectionIds.end()) {
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_CLIENT);
+    if (sconePacket) {
+      return {};
+    }
     return quic::make_unexpected(QuicError(
         TransportErrorCode::PROTOCOL_VIOLATION, "Invalid connection id"));
   }
 
-  if (auto* sp = parsedPacket.sconePacket()) {
+  if (sconePacket) {
     // Validate SCID matches the server's connection ID.
     // SCONE packets are unencrypted so we need explicit validation.
     // A zero-length SCID is also invalid since the server must identify itself.
@@ -384,9 +388,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
             conn_->peerConnectionIds.begin(),
             conn_->peerConnectionIds.end(),
             [&](const auto& cidData) {
-              return cidData.connId == sp->srcCid;
+              return cidData.connId == sconePacket->srcCid;
             }) == conn_->peerConnectionIds.end()) {
-      VLOG(4) << "Dropping SCONE packet: SCID " << sp->srcCid.hex()
+      VLOG(4) << "Dropping SCONE packet: SCID " << sconePacket->srcCid.hex()
               << " does not match any peer connection ID";
       QUIC_STATS(
           statsCallback_,
@@ -397,12 +401,14 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(
-          fmt::format("scone_received:rate={}", static_cast<int>(sp->rate)));
+          fmt::format(
+              "scone_received:rate={}", static_cast<int>(sconePacket->rate)));
     }
 
     if (conn_->scone) {
       pendingSconeRateSignal_ = QuicConnectionStateBase::SconeRateSignal{
-          .rate = sp->rate, .version = static_cast<QuicVersion>(sp->version)};
+          .rate = sconePacket->rate,
+          .version = static_cast<QuicVersion>(sconePacket->version)};
     }
     return {};
   }
