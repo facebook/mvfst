@@ -186,19 +186,6 @@ class QuicSocket : virtual public QuicSocketLite {
     virtual void onPing() noexcept = 0;
   };
 
-  /**
-   * Callback class for datagrams
-   */
-  class DatagramCallback {
-   public:
-    virtual ~DatagramCallback() = default;
-
-    /**
-     * Notifies the DatagramCallback that datagrams are available for read.
-     */
-    virtual void onDatagramsAvailable() noexcept = 0;
-  };
-
   virtual quic::Expected<void, LocalErrorCode> setPeekCallback(
       StreamId id,
       PeekCallback* cb) = 0;
@@ -361,30 +348,12 @@ class QuicSocket : virtual public QuicSocketLite {
   virtual bool isDetachable() = 0;
 
   /**
-   * ===== Datagram API =====
+   * ===== Datagram flow API =====
    *
-   * Datagram support is experimental. Currently there isn't delivery callback
-   * or loss notification support for Datagram.
+   * Flows and priorities on top of QuicSocketLite's datagram API.
    */
 
-  /**
-   * Set the read callback for Datagrams
-   */
-  virtual quic::Expected<void, LocalErrorCode> setDatagramCallback(
-      DatagramCallback* cb) = 0;
-
-  /**
-   * Returns the maximum allowed Datagram payload size.
-   * 0 means Datagram is not supported
-   */
-  [[nodiscard]] virtual uint16_t getDatagramSizeLimit() const = 0;
-
-  /**
-   * Writes a Datagram frame. If buf is larger than the size limit returned by
-   * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
-   * dropped, and a LocalErrorCode will be returned to caller.
-   */
-  virtual WriteResult writeDatagram(BufPtr buf) = 0;
+  using QuicSocketLite::writeDatagram;
 
   /**
    * Writes a Datagram frame with a specific priority. Creates an ephemeral
@@ -459,20 +428,6 @@ class QuicSocket : virtual public QuicSocketLite {
    */
   virtual quic::Expected<void, LocalErrorCode> closeDatagramFlowNow(
       uint32_t flowId) = 0;
-
-  /**
-   * Returns the currently available received Datagrams.
-   * Returns all datagrams if atMost is 0.
-   */
-  virtual quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>
-  readDatagrams(size_t atMost = 0) = 0;
-
-  /**
-   * Returns the currently available received Datagram IOBufs.
-   * Returns all datagrams if atMost is 0.
-   */
-  virtual quic::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
-      size_t atMost = 0) = 0;
 
   /**
    * Sets whether retransmissions are disabled for a specific stream.

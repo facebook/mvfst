@@ -108,6 +108,44 @@ class QuicClientTransportLiteTest : public Test {
   QuicAsyncUDPSocketMock* sockPtr_{nullptr};
 };
 
+TEST_F(QuicClientTransportLiteTest, DatagramsReachTheCallback) {
+  quicClient_->getConn()->datagramState.readBuffer.emplace_back(
+      Clock::now(), BufQueue(folly::IOBuf::copyBuffer("datagram")));
+  NiceMock<MockDatagramCallback> datagramCb;
+  ASSERT_FALSE(quicClient_->setDatagramCallback(&datagramCb).hasError());
+  EXPECT_CALL(datagramCb, onDatagramsAvailable());
+  evb_.loopOnce(EVLOOP_NONBLOCK);
+
+  auto datagrams = quicClient_->readDatagramBufs();
+  ASSERT_FALSE(datagrams.hasError());
+  ASSERT_EQ(datagrams->size(), 1);
+  EXPECT_EQ(datagrams->front()->moveToFbString(), "datagram");
+  EXPECT_TRUE(quicClient_->getConn()->datagramState.readBuffer.empty());
+}
+
+TEST_F(QuicClientTransportLiteTest, WriteDatagramQueuesItForThePeer) {
+  auto* conn = quicClient_->getConn();
+  conn->datagramState.maxWriteFrameSize = kMaxDatagramFrameSize;
+  conn->datagramState.maxWriteBufferSize = 1;
+
+  ASSERT_FALSE(quicClient_->writeDatagram(folly::IOBuf::copyBuffer("datagram"))
+                   .hasError());
+  EXPECT_TRUE(conn->datagramState.flowManager.hasDatagramsToSend());
+
+  auto full = quicClient_->writeDatagram(folly::IOBuf::copyBuffer("datagram"));
+  ASSERT_TRUE(full.hasError());
+  EXPECT_EQ(full.error(), LocalErrorCode::INVALID_WRITE_DATA);
+}
+
+TEST_F(QuicClientTransportLiteTest, WriteDatagramFailsWhenThePeerTakesNone) {
+  auto result =
+      quicClient_->writeDatagram(folly::IOBuf::copyBuffer("datagram"));
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error(), LocalErrorCode::INVALID_WRITE_DATA);
+  EXPECT_FALSE(
+      quicClient_->getConn()->datagramState.flowManager.hasDatagramsToSend());
+}
+
 TEST_F(QuicClientTransportLiteTest, TestPriming) {
   auto transportSettings = quicClient_->getTransportSettings();
   transportSettings.isPriming = true;

@@ -150,24 +150,7 @@ class QuicTransportBase : public QuicSocket,
     conn_->loopDetectorCallback = std::move(callback);
   }
 
-  /**
-   * Set the read callback for Datagrams
-   */
-  quic::Expected<void, LocalErrorCode> setDatagramCallback(
-      DatagramCallback* cb) override;
-
-  /**
-   * Returns the maximum allowed Datagram payload size.
-   * 0 means Datagram is not supported
-   */
-  [[nodiscard]] uint16_t getDatagramSizeLimit() const override;
-
-  /**
-   * Writes a Datagram frame. If buf is larger than the size limit returned by
-   * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
-   * dropped, and a LocalErrorCode will be returned to caller.
-   */
-  quic::Expected<void, LocalErrorCode> writeDatagram(BufPtr buf) override;
+  using QuicTransportBaseLite::writeDatagram;
 
   quic::Expected<void, LocalErrorCode> writeDatagram(
       PriorityQueue::Priority priority,
@@ -195,20 +178,6 @@ class QuicTransportBase : public QuicSocket,
 
   quic::Expected<void, LocalErrorCode> closeDatagramFlowNow(
       uint32_t flowId) override;
-
-  /**
-   * Returns the currently available received Datagrams.
-   * Returns all datagrams if atMost is 0.
-   */
-  quic::Expected<std::vector<ReadDatagram>, LocalErrorCode> readDatagrams(
-      size_t atMost = 0) override;
-
-  /**
-   * Returns the currently available received Datagram IOBufs.
-   * Returns all datagrams if atMost is 0.
-   */
-  quic::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
-      size_t atMost = 0) override;
 
   /**
    * This is used in conjunction with reliable resets. When we send data on a
@@ -266,7 +235,6 @@ class QuicTransportBase : public QuicSocket,
   void cleanupPeekPingDatagramResources() override;
   void cancelPeekPingDatagramCallbacks(const QuicError& err) override;
   bool hasPeekCallback(StreamId id) override;
-  void invokeDatagramCallbackIfSet() override;
   void pingTimeoutExpired() noexcept;
 
   class PingTimeout : public QuicTimerCallback {
@@ -298,7 +266,6 @@ class QuicTransportBase : public QuicSocket,
 
   PingCallback* pingCallback_{nullptr};
   PingTimeout pingTimeout_;
-  DatagramCallback* datagramCallback_{nullptr};
   UnorderedMap<StreamId, PeekCallbackData> peekCallbacks_;
   TransportLooper::Ptr peekLooper_;
 
@@ -307,20 +274,6 @@ class QuicTransportBase : public QuicSocket,
   // Next datagram flow ID to allocate (counts up from kDefaultDatagramFlowId +
   // 1)
   uint32_t nextDatagramFlowId_{kDefaultDatagramFlowId + 1};
-
- private:
-  /**
-   * Internal helper for writing datagrams with common validation logic.
-   */
-  quic::Expected<void, LocalErrorCode> writeDatagramInternal(
-      BufPtr buf,
-      uint32_t flowId,
-      std::optional<PriorityQueue::Priority> priority,
-      bool ephemeralFlow,
-      std::optional<std::chrono::milliseconds> maxQueueTime,
-      uint64_t intraFlowPriority = 0);
-
-  void maybeEraseDatagramFlowFromWriteQueue(uint32_t flowId);
 };
 
 } // namespace quic

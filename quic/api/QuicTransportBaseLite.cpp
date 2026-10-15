@@ -894,6 +894,158 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resumeRead(
   return pauseOrResumeRead(id, true);
 }
 
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::setDatagramCallback(
+    DatagramCallback* cb) {
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  MVVLOG(4) << "Setting datagram callback " << " cb=" << cb << " " << *this;
+
+  datagramCallback_ = cb;
+  updateReadLooper();
+  return {};
+}
+
+uint16_t QuicTransportBaseLite::getDatagramSizeLimit() const {
+  MVCHECK(conn_);
+  auto maxDatagramPacketSize = std::min<decltype(conn_->udpSendPacketLen)>(
+      conn_->datagramState.maxWriteFrameSize, conn_->udpSendPacketLen);
+  return std::max<decltype(maxDatagramPacketSize)>(
+      0, maxDatagramPacketSize - kMaxDatagramPacketOverhead);
+}
+
+quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::writeDatagram(
+    BufPtr buf) {
+  return writeDatagramInternal(
+      std::move(buf),
+      kDefaultDatagramFlowId,
+      std::nullopt,
+      false,
+      std::nullopt);
+}
+
+quic::Expected<void, LocalErrorCode>
+QuicTransportBaseLite::writeDatagramInternal(
+    BufPtr buf,
+    uint32_t flowId,
+    std::optional<PriorityQueue::Priority> priority,
+    bool ephemeralFlow,
+    std::optional<std::chrono::milliseconds> maxQueueTime,
+    uint64_t intraFlowPriority) {
+  // TODO(lniccolini) update max datagram frame size
+  // https://github.com/quicwg/datagram/issues/3
+  // For now, max_datagram_size > 0 means the peer supports datagram frames
+  if (conn_->datagramState.maxWriteFrameSize == 0) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
+    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
+  }
+
+  // Check if datagram is too large to ever fit
+  auto datagramLen = buf ? buf->computeChainDataLength() : 0;
+  if (datagramLen == 0 ||
+      datagramLen > conn_->datagramState.maxWriteFrameSize) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
+    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
+  }
+
+  if (conn_->datagramState.flowManager.getDatagramCount() >=
+      conn_->datagramState.maxWriteBufferSize) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
+    // A zero-sized write buffer leaves nothing queued to drop.
+    if (!conn_->transportSettings.datagramConfig.sendDropOldDataFirst ||
+        !conn_->datagramState.flowManager.hasDatagramsToSend()) {
+      // TODO(lniccolini) use different return codes to signal the application
+      // exactly why the datagram got dropped
+      return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
+    } else {
+      // Drop oldest datagram from any flow
+      auto retiredFlowId = conn_->datagramState.flowManager.popDatagram();
+      if (retiredFlowId) {
+        maybeEraseDatagramFlowFromWriteQueue(*retiredFlowId);
+      }
+    }
+  }
+
+  auto flowPriorityResult = conn_->datagramState.flowManager.addDatagram(
+      std::move(buf),
+      flowId,
+      priority,
+      ephemeralFlow,
+      maxQueueTime,
+      intraFlowPriority);
+  if (flowPriorityResult.hasError()) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
+    return quic::make_unexpected(flowPriorityResult.error());
+  }
+
+  // Add to PriorityQueue if scheduling with streams is enabled
+  if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
+      conn_->streamManager) {
+    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
+    conn_->streamManager->writeQueue().insertOrUpdate(id, *flowPriorityResult);
+  }
+
+  updateWriteLooper(true);
+  return {};
+}
+
+void QuicTransportBaseLite::maybeEraseDatagramFlowFromWriteQueue(
+    uint32_t flowId) {
+  if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
+      conn_->streamManager) {
+    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
+    conn_->streamManager->writeQueue().erase(id);
+  }
+}
+
+quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>
+QuicTransportBaseLite::readDatagrams(size_t atMost) {
+  MVCHECK(conn_);
+  auto datagrams = &conn_->datagramState.readBuffer;
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (atMost == 0) {
+    atMost = datagrams->size();
+  } else {
+    atMost = std::min(atMost, datagrams->size());
+  }
+  std::vector<ReadDatagram> retDatagrams;
+  retDatagrams.reserve(atMost);
+  const auto end = datagrams->begin() + static_cast<std::ptrdiff_t>(atMost);
+  std::transform(
+      datagrams->begin(),
+      end,
+      std::back_inserter(retDatagrams),
+      [](ReadDatagram& dg) { return std::move(dg); });
+  datagrams->erase(datagrams->begin(), end);
+  return retDatagrams;
+}
+
+quic::Expected<std::vector<BufPtr>, LocalErrorCode>
+QuicTransportBaseLite::readDatagramBufs(size_t atMost) {
+  MVCHECK(conn_);
+  auto datagrams = &conn_->datagramState.readBuffer;
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (atMost == 0) {
+    atMost = datagrams->size();
+  } else {
+    atMost = std::min(atMost, datagrams->size());
+  }
+  std::vector<BufPtr> retDatagrams;
+  retDatagrams.reserve(atMost);
+  const auto end = datagrams->begin() + static_cast<std::ptrdiff_t>(atMost);
+  std::transform(
+      datagrams->begin(),
+      end,
+      std::back_inserter(retDatagrams),
+      [](ReadDatagram& dg) { return dg.bufQueue().move(); });
+  datagrams->erase(datagrams->begin(), end);
+  return retDatagrams;
+}
+
 quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::pauseOrResumeRead(
     StreamId id,
     bool resume) {
@@ -2652,7 +2804,11 @@ bool QuicTransportBaseLite::hasPeekCallback(StreamId /* id */) {
   return false;
 }
 
-void QuicTransportBaseLite::invokeDatagramCallbackIfSet() {}
+void QuicTransportBaseLite::invokeDatagramCallbackIfSet() {
+  if (datagramCallback_ && !conn_->datagramState.readBuffer.empty()) {
+    datagramCallback_->onDatagramsAvailable();
+  }
+}
 
 bool QuicTransportBaseLite::processCancelCode(const QuicError& cancelCode) {
   bool noError = false;
@@ -2738,6 +2894,7 @@ void QuicTransportBaseLite::cancelAllAppCallbacks(
 
   // Cancel peek/ping/datagram callbacks (virtual method overridden in Base)
   cancelPeekPingDatagramCallbacks(err);
+  datagramCallback_ = nullptr;
 
   stopSendingCallbacks_.clear();
 }

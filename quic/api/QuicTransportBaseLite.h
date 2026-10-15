@@ -206,6 +206,19 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   quic::Expected<void, LocalErrorCode> pauseRead(StreamId id) override;
   quic::Expected<void, LocalErrorCode> resumeRead(StreamId id) override;
 
+  quic::Expected<void, LocalErrorCode> setDatagramCallback(
+      DatagramCallback* cb) override;
+
+  [[nodiscard]] uint16_t getDatagramSizeLimit() const override;
+
+  quic::Expected<void, LocalErrorCode> writeDatagram(BufPtr buf) override;
+
+  quic::Expected<std::vector<ReadDatagram>, LocalErrorCode> readDatagrams(
+      size_t atMost = 0) override;
+
+  quic::Expected<std::vector<BufPtr>, LocalErrorCode> readDatagramBufs(
+      size_t atMost = 0) override;
+
   quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,
       size_t maxLen) override;
@@ -792,6 +805,19 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       bool resume);
 
   /**
+   * Internal helper for writing datagrams with common validation logic.
+   */
+  quic::Expected<void, LocalErrorCode> writeDatagramInternal(
+      BufPtr buf,
+      uint32_t flowId,
+      std::optional<PriorityQueue::Priority> priority,
+      bool ephemeralFlow,
+      std::optional<std::chrono::milliseconds> maxQueueTime,
+      uint64_t intraFlowPriority = 0);
+
+  void maybeEraseDatagramFlowFromWriteQueue(uint32_t flowId);
+
+  /**
    * The callback function for AsyncUDPSocket to provide the additional cmsgs
    * required by this QuicSocket's packet processors.
    */
@@ -900,6 +926,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   UnorderedMap<StreamId, ReadCallbackData> readCallbacks_;
 
   ConnectionWriteCallback* connWriteCallback_{nullptr};
+  DatagramCallback* datagramCallback_{nullptr};
   UnorderedMap<StreamId, StreamWriteCallback*> pendingWriteCallbacks_;
   UnorderedMap<StreamId, StopSendingCallback*> stopSendingCallbacks_;
 

@@ -497,36 +497,6 @@ void QuicTransportBase::resetNonControlStreams(
   }
 }
 
-quic::Expected<void, LocalErrorCode> QuicTransportBase::setDatagramCallback(
-    DatagramCallback* cb) {
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  MVVLOG(4) << "Setting datagram callback " << " cb=" << cb << " " << *this;
-
-  datagramCallback_ = cb;
-  updateReadLooper();
-  return {};
-}
-
-uint16_t QuicTransportBase::getDatagramSizeLimit() const {
-  MVCHECK(conn_);
-  auto maxDatagramPacketSize = std::min<decltype(conn_->udpSendPacketLen)>(
-      conn_->datagramState.maxWriteFrameSize, conn_->udpSendPacketLen);
-  return std::max<decltype(maxDatagramPacketSize)>(
-      0, maxDatagramPacketSize - kMaxDatagramPacketOverhead);
-}
-
-quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
-    BufPtr buf) {
-  return writeDatagramInternal(
-      std::move(buf),
-      kDefaultDatagramFlowId,
-      std::nullopt,
-      false,
-      std::nullopt);
-}
-
 quic::Expected<uint32_t, LocalErrorCode>
 QuicTransportBase::createDatagramFlowId() {
   auto flowId = nextDatagramFlowId_++;
@@ -560,70 +530,6 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagram(
       false,
       std::nullopt,
       intraFlowPriority);
-}
-
-quic::Expected<void, LocalErrorCode> QuicTransportBase::writeDatagramInternal(
-    BufPtr buf,
-    uint32_t flowId,
-    std::optional<PriorityQueue::Priority> priority,
-    bool ephemeralFlow,
-    std::optional<std::chrono::milliseconds> maxQueueTime,
-    uint64_t intraFlowPriority) {
-  // TODO(lniccolini) update max datagram frame size
-  // https://github.com/quicwg/datagram/issues/3
-  // For now, max_datagram_size > 0 means the peer supports datagram frames
-  if (conn_->datagramState.maxWriteFrameSize == 0) {
-    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
-    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
-  }
-
-  // Check if datagram is too large to ever fit
-  auto datagramLen = buf->computeChainDataLength();
-  if (datagramLen == 0 ||
-      datagramLen > conn_->datagramState.maxWriteFrameSize) {
-    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
-    return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
-  }
-
-  if (conn_->datagramState.flowManager.getDatagramCount() >=
-      conn_->datagramState.maxWriteBufferSize) {
-    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
-    // A zero-sized write buffer leaves nothing queued to drop.
-    if (!conn_->transportSettings.datagramConfig.sendDropOldDataFirst ||
-        !conn_->datagramState.flowManager.hasDatagramsToSend()) {
-      // TODO(lniccolini) use different return codes to signal the application
-      // exactly why the datagram got dropped
-      return quic::make_unexpected(LocalErrorCode::INVALID_WRITE_DATA);
-    } else {
-      // Drop oldest datagram from any flow
-      auto retiredFlowId = conn_->datagramState.flowManager.popDatagram();
-      if (retiredFlowId) {
-        maybeEraseDatagramFlowFromWriteQueue(*retiredFlowId);
-      }
-    }
-  }
-
-  auto flowPriorityResult = conn_->datagramState.flowManager.addDatagram(
-      std::move(buf),
-      flowId,
-      priority,
-      ephemeralFlow,
-      maxQueueTime,
-      intraFlowPriority);
-  if (flowPriorityResult.hasError()) {
-    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
-    return quic::make_unexpected(flowPriorityResult.error());
-  }
-
-  // Add to PriorityQueue if scheduling with streams is enabled
-  if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
-      conn_->streamManager) {
-    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
-    conn_->streamManager->writeQueue().insertOrUpdate(id, *flowPriorityResult);
-  }
-
-  updateWriteLooper(true);
-  return {};
 }
 
 quic::Expected<void, LocalErrorCode> QuicTransportBase::setDatagramFlowPriority(
@@ -690,60 +596,6 @@ quic::Expected<void, LocalErrorCode> QuicTransportBase::closeDatagramFlowNow(
 
   maybeEraseDatagramFlowFromWriteQueue(flowId);
   return {};
-}
-
-void QuicTransportBase::maybeEraseDatagramFlowFromWriteQueue(uint32_t flowId) {
-  if (conn_->transportSettings.datagramConfig.scheduleDatagramsWithStreams &&
-      conn_->streamManager) {
-    auto id = PriorityQueue::Identifier::fromDatagramFlowID(flowId);
-    conn_->streamManager->writeQueue().erase(id);
-  }
-}
-
-quic::Expected<std::vector<ReadDatagram>, LocalErrorCode>
-QuicTransportBase::readDatagrams(size_t atMost) {
-  MVCHECK(conn_);
-  auto datagrams = &conn_->datagramState.readBuffer;
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (atMost == 0) {
-    atMost = datagrams->size();
-  } else {
-    atMost = std::min(atMost, datagrams->size());
-  }
-  std::vector<ReadDatagram> retDatagrams;
-  retDatagrams.reserve(atMost);
-  std::transform(
-      datagrams->begin(),
-      datagrams->begin() + atMost,
-      std::back_inserter(retDatagrams),
-      [](ReadDatagram& dg) { return std::move(dg); });
-  datagrams->erase(datagrams->begin(), datagrams->begin() + atMost);
-  return retDatagrams;
-}
-
-quic::Expected<std::vector<BufPtr>, LocalErrorCode>
-QuicTransportBase::readDatagramBufs(size_t atMost) {
-  MVCHECK(conn_);
-  auto datagrams = &conn_->datagramState.readBuffer;
-  if (closeState_ != CloseState::OPEN) {
-    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (atMost == 0) {
-    atMost = datagrams->size();
-  } else {
-    atMost = std::min(atMost, datagrams->size());
-  }
-  std::vector<BufPtr> retDatagrams;
-  retDatagrams.reserve(atMost);
-  std::transform(
-      datagrams->begin(),
-      datagrams->begin() + atMost,
-      std::back_inserter(retDatagrams),
-      [](ReadDatagram& dg) { return dg.bufQueue().move(); });
-  datagrams->erase(datagrams->begin(), datagrams->begin() + atMost);
-  return retDatagrams;
 }
 
 quic::Expected<PriorityQueue::Priority, LocalErrorCode>
@@ -1041,20 +893,12 @@ void QuicTransportBase::cancelPeekPingDatagramCallbacks(const QuicError& err) {
   }
   peekCallbacks_.clear();
 
-  // Clear datagram and ping callbacks
-  datagramCallback_ = nullptr;
   pingCallback_ = nullptr;
 }
 
 bool QuicTransportBase::hasPeekCallback(StreamId id) {
   auto peekCb = peekCallbacks_.find(id);
   return peekCb != peekCallbacks_.end() && peekCb->second.peekCb != nullptr;
-}
-
-void QuicTransportBase::invokeDatagramCallbackIfSet() {
-  if (datagramCallback_ && !conn_->datagramState.readBuffer.empty()) {
-    datagramCallback_->onDatagramsAvailable();
-  }
 }
 
 } // namespace quic
