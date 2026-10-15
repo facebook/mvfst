@@ -9,6 +9,7 @@
 #include <quic/common/MvfstLogging.h>
 
 #include <folly/portability/Sockets.h>
+#include <algorithm>
 
 #include <quic/QuicConstants.h>
 #include <quic/api/LoopDetectorCallback.h>
@@ -132,17 +133,34 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
   {
     BufQueue& udpData = udpPacket.buf;
 
-    // Track subsequent packet processing for conditional SCONE rate signal
-    // usage (spec requirement)
-    bool subsequentPacketProcessedSuccessfully = false;
-    pendingSconeRateSignal_.reset();
-
     if (!conn_->version) {
       // We only check for version negotiation packets before the version
       // is negotiated.
       auto versionNegotiation =
           conn_->readCodec->tryParsingVersionNegotiation(udpData);
       if (versionNegotiation) {
+        const auto& happyEyeballsState = clientConn_->happyEyeballsState;
+        const bool fromExpectedPeer =
+            *udpPacket.peerAddress == conn_->peerAddress ||
+            (!happyEyeballsState.finished &&
+             happyEyeballsState.secondPeerAddress.isInitialized() &&
+             *udpPacket.peerAddress == happyEyeballsState.secondPeerAddress);
+        const bool includesOriginalVersion =
+            std::find(
+                versionNegotiation->versions.begin(),
+                versionNegotiation->versions.end(),
+                *conn_->originalVersion) != versionNegotiation->versions.end();
+        const bool isValidVersionNegotiation =
+            clientConn_->retryToken.empty() &&
+            versionNegotiation->destinationConnectionId ==
+                *conn_->clientConnectionId &&
+            versionNegotiation->sourceConnectionId ==
+                *clientConn_->originalDestinationConnectionId &&
+            !includesOriginalVersion && fromExpectedPeer;
+        if (!isValidVersionNegotiation) {
+          return {};
+        }
+
         MVVLOG(4) << "Got version negotiation packet from peer="
                   << *udpPacket.peerAddress << " versions=" << std::hex
                   << versionNegotiation->versions << " " << *this;
@@ -152,6 +170,11 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacket(
             "Received version negotiation packet"));
       }
     }
+
+    // Track subsequent packet processing for conditional SCONE rate signal
+    // usage (spec requirement)
+    bool subsequentPacketProcessedSuccessfully = false;
+    pendingSconeRateSignal_.reset();
 
     for (uint16_t processedPackets = 0;
          !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;

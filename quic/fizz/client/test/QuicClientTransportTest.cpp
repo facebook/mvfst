@@ -3029,6 +3029,275 @@ class QuicClientTransportVersionAndRetryTest
     client->getNonConstConn().flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionFlowControlWindow;
   }
+
+ protected:
+  struct BuiltVersionNegotiationPacket {
+    BufPtr data;
+    bool parsedAsExpected{false};
+  };
+
+  BuiltVersionNegotiationPacket buildVersionNegotiationPacket(
+      const ConnectionId& sourceConnectionId,
+      const ConnectionId& destinationConnectionId,
+      std::vector<QuicVersion> versions) {
+    const auto expectedVersions = versions;
+    auto packet =
+        VersionNegotiationPacketBuilder(
+            sourceConnectionId, destinationConnectionId, std::move(versions))
+            .buildPacket();
+    auto queue = bufToQueue(packet.second->clone());
+    const auto parsed =
+        client->getConn().readCodec->tryParsingVersionNegotiation(queue);
+    const bool parsedAsExpected = parsed.has_value() &&
+        parsed->sourceConnectionId == sourceConnectionId &&
+        parsed->destinationConnectionId == destinationConnectionId &&
+        parsed->versions == expectedVersions;
+    return {std::move(packet.second), parsedAsExpected};
+  }
+
+  void expectVersionNegotiationDropped(
+      BuiltVersionNegotiationPacket packet,
+      const quic::SocketAddress& peerAddress) {
+    ASSERT_TRUE(packet.parsedAsExpected);
+    ASSERT_TRUE(packet.data);
+    auto& conn = client->getNonConstConn();
+    if (!conn.scone) {
+      conn.scone.emplace();
+    }
+
+    const auto streamId = client->createBidirectionalStream().value();
+    auto setReadCallbackResult = client->setReadCallback(streamId, &readCb);
+    auto write = IOBuf::copyBuffer("pending");
+    auto writeResult =
+        client->writeChain(streamId, write->clone(), true, &deliveryCallback);
+    ASSERT_TRUE(setReadCallbackResult.has_value());
+    ASSERT_TRUE(writeResult.has_value());
+    loopForWrites();
+
+    auto sconeTail =
+        buildSconePacket(42, *conn.clientConnectionId, *serverChosenConnId);
+    auto streamData = IOBuf::copyBuffer("version negotiation tail");
+    auto streamTail = packetToBuf(createStreamPacket(
+        *serverChosenConnId,
+        *conn.clientConnectionId,
+        appDataPacketNum++,
+        streamId,
+        *streamData,
+        0 /* cipherOverhead */,
+        0 /* largestAcked */));
+    packet.data->appendChain(std::make_unique<Buf>(std::move(sconeTail)));
+    packet.data->appendChain(std::move(streamTail));
+
+    const auto version = conn.version;
+    const auto originalDestinationConnectionId =
+        conn.originalDestinationConnectionId;
+    const auto initialDestinationConnectionId =
+        conn.initialDestinationConnectionId;
+    const auto clientConnectionId = conn.clientConnectionId;
+    const auto retryToken = conn.retryToken;
+    const auto peer = conn.peerAddress;
+    const auto originalPeer = conn.originalPeerAddress;
+    const auto v4Peer = conn.happyEyeballsState.v4PeerAddress;
+    const auto v6Peer = conn.happyEyeballsState.v6PeerAddress;
+    const auto secondPeer = conn.happyEyeballsState.secondPeerAddress;
+    const auto happyEyeballsFinished = conn.happyEyeballsState.finished;
+    const auto shouldWriteToFirstSocket =
+        conn.happyEyeballsState.shouldWriteToFirstSocket;
+    const auto shouldWriteToSecondSocket =
+        conn.happyEyeballsState.shouldWriteToSecondSocket;
+    const auto pendingRateSignals = conn.scone->pendingRateSignals.size();
+
+    EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
+    EXPECT_CALL(readCb, readError(streamId, _)).Times(0);
+    EXPECT_CALL(deliveryCallback, onCanceled(streamId, _)).Times(0);
+    EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_)).Times(0);
+    EXPECT_CALL(clientConnSetupCallback, onTransportReady()).Times(0);
+    EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
+    EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+
+    auto networkData = NetworkData(std::move(packet.data), Clock::now(), 0);
+    networkData.setPeerAddressForAllPackets(peerAddress);
+    client->onNetworkData(client->getLocalAddress(), std::move(networkData));
+    loopForWrites();
+
+    EXPECT_EQ(conn.version, version);
+    EXPECT_FALSE(conn.localConnectionError.has_value());
+    EXPECT_FALSE(client->isClosed());
+    EXPECT_EQ(
+        conn.originalDestinationConnectionId, originalDestinationConnectionId);
+    EXPECT_EQ(
+        conn.initialDestinationConnectionId, initialDestinationConnectionId);
+    EXPECT_EQ(conn.clientConnectionId, clientConnectionId);
+    EXPECT_EQ(conn.retryToken, retryToken);
+    EXPECT_EQ(conn.peerAddress, peer);
+    EXPECT_EQ(conn.originalPeerAddress, originalPeer);
+    EXPECT_EQ(conn.happyEyeballsState.v4PeerAddress, v4Peer);
+    EXPECT_EQ(conn.happyEyeballsState.v6PeerAddress, v6Peer);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondPeer);
+    EXPECT_EQ(conn.happyEyeballsState.finished, happyEyeballsFinished);
+    EXPECT_EQ(
+        conn.happyEyeballsState.shouldWriteToFirstSocket,
+        shouldWriteToFirstSocket);
+    EXPECT_EQ(
+        conn.happyEyeballsState.shouldWriteToSecondSocket,
+        shouldWriteToSecondSocket);
+    EXPECT_EQ(conn.scone->pendingRateSignals.size(), pendingRateSignals);
+    auto readResult = client->read(streamId, 0);
+    EXPECT_TRUE(readResult.has_value());
+    if (readResult) {
+      EXPECT_EQ(readResult->first, nullptr);
+    }
+
+    Mock::VerifyAndClearExpectations(&readCb);
+    Mock::VerifyAndClearExpectations(&deliveryCallback);
+    Mock::VerifyAndClearExpectations(&clientConnSetupCallback);
+    Mock::VerifyAndClearExpectations(&clientConnCallback);
+    if (!client->isClosed()) {
+      EXPECT_TRUE(client->setReadCallback(streamId, nullptr).has_value());
+      client->cancelDeliveryCallbacksForStream(streamId);
+      Mock::VerifyAndClearExpectations(&deliveryCallback);
+    }
+  }
+
+  void expectVersionNegotiationDropped(BuiltVersionNegotiationPacket packet) {
+    expectVersionNegotiationDropped(std::move(packet), serverAddr);
+  }
+
+  void expectVersionNegotiationFatal(
+      BuiltVersionNegotiationPacket packet,
+      const quic::SocketAddress& peerAddress) {
+    ASSERT_TRUE(packet.parsedAsExpected);
+    ASSERT_TRUE(packet.data);
+    const auto streamId = client->createBidirectionalStream().value();
+    auto setReadCallbackResult = client->setReadCallback(streamId, &readCb);
+    auto write = IOBuf::copyBuffer("pending");
+    auto writeResult =
+        client->writeChain(streamId, write->clone(), true, &deliveryCallback);
+    ASSERT_TRUE(setReadCallbackResult.has_value());
+    ASSERT_TRUE(writeResult.has_value());
+    loopForWrites();
+
+    EXPECT_CALL(
+        readCb,
+        readError(streamId, IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
+    EXPECT_CALL(deliveryCallback, onCanceled(streamId, write->length()));
+    EXPECT_CALL(clientConnSetupCallback, onTransportReady()).Times(0);
+    EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
+
+    deliverDataWithoutErrorCheck(peerAddress, packet.data->coalesce());
+
+    ASSERT_TRUE(client->getConn().localConnectionError.has_value());
+    EXPECT_EQ(
+        client->getConn().localConnectionError->code,
+        QuicErrorCode(LocalErrorCode::NEW_VERSION_NEGOTIATED));
+    EXPECT_TRUE(client->isClosed());
+    EXPECT_EQ(client->getConn().oneRttWriteCipher.get(), nullptr);
+
+    Mock::VerifyAndClearExpectations(&readCb);
+    Mock::VerifyAndClearExpectations(&deliveryCallback);
+    Mock::VerifyAndClearExpectations(&clientConnSetupCallback);
+  }
+
+  void expectVersionNegotiationFatal(BuiltVersionNegotiationPacket packet) {
+    expectVersionNegotiationFatal(std::move(packet), serverAddr);
+  }
+
+  void receiveVerifiedRetry() {
+    const auto retrySourceConnectionId = ConnectionId::createAndMaybeCrash(
+        {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
+    const std::string retryToken = "version-negotiation-retry";
+    const auto retryVersion = static_cast<QuicVersion>(0xFF00001D);
+    PseudoRetryPacketBuilder pseudoBuilder(
+        0xFF,
+        retrySourceConnectionId,
+        ConnectionId::createZeroLength(),
+        *client->getConn().originalDestinationConnectionId,
+        retryVersion,
+        folly::IOBuf::copyBuffer(retryToken));
+    auto pseudoPacket = std::move(pseudoBuilder).buildPacket();
+    FizzRetryIntegrityTagGenerator tagGenerator;
+    auto integrityTag =
+        tagGenerator.getRetryIntegrityTag(retryVersion, pseudoPacket.get());
+    ASSERT_TRUE(integrityTag);
+
+    folly::IOBuf retryPacket;
+    BufAppender appender(&retryPacket, 100);
+    appender.writeBE<uint8_t>(0xFF);
+    appender.writeBE<QuicVersionType>(
+        static_cast<QuicVersionType>(retryVersion));
+    appender.writeBE<uint8_t>(0);
+    appender.writeBE<uint8_t>(retrySourceConnectionId.size());
+    appender.push(
+        retrySourceConnectionId.data(), retrySourceConnectionId.size());
+    appender.push(
+        reinterpret_cast<const uint8_t*>(retryToken.data()), retryToken.size());
+    appender.push(integrityTag->data(), integrityTag->length());
+
+    QuicReadCodec retryCodec(QuicNodeType::Client);
+    retryCodec.setClientConnectionId(*client->getConn().clientConnectionId);
+    AckStates ackStates;
+    auto queue = bufToQueue(retryPacket.clone());
+    auto parsed = retryCodec.parsePacket(queue, ackStates);
+    ASSERT_NE(parsed.retryPacket(), nullptr);
+    const auto verified =
+        client->getNonConstConn().clientHandshakeLayer->verifyRetryIntegrityTag(
+            *client->getConn().originalDestinationConnectionId,
+            *parsed.retryPacket());
+    ASSERT_TRUE(verified.has_value());
+    ASSERT_TRUE(verified.value());
+
+    deliverData(serverAddr, retryPacket.coalesce());
+
+    ASSERT_EQ(client->getConn().retryToken, retryToken);
+    ASSERT_FALSE(client->getConn().retryToken.empty());
+    ASSERT_EQ(
+        client->getConn().initialDestinationConnectionId,
+        retrySourceConnectionId);
+    ASSERT_FALSE(client->getConn().version.has_value());
+    ASSERT_FALSE(client->isClosed());
+  }
+};
+
+class QuicClientTransportVersionAndRetryZeroLengthCidTest
+    : public QuicClientTransportVersionAndRetryTest {
+ public:
+  void SetUpChild() override {
+    auto& conn = client->getNonConstConn();
+    const auto zeroLengthConnectionId = ConnectionId::createZeroLength();
+    conn.clientConnectionId = zeroLengthConnectionId;
+    conn.readCodec->setClientConnectionId(zeroLengthConnectionId);
+    conn.selfConnectionIds.front().connId = zeroLengthConnectionId;
+    startTransport();
+    ASSERT_EQ(client->getConn().clientConnectionId->size(), 0);
+    ASSERT_EQ(originalConnId->size(), 0);
+  }
+};
+
+class QuicClientTransportVersionNegotiationHappyEyeballsTest
+    : public QuicClientTransportVersionAndRetryTest {
+ public:
+  void SetUpChild() override {
+    auto secondSocket = getMockSocketWithExpectations(qEvb_);
+    secondSock_ = secondSocket.get();
+    ON_CALL(*secondSock_, address()).WillByDefault(Return(serverAddr));
+    ON_CALL(*secondSock_, getGSO()).WillByDefault(Return(0));
+    ON_CALL(*secondSock_, getGRO()).WillByDefault(Return(0));
+
+    client->setHappyEyeballsEnabled(true);
+    client->addNewPeerAddress(alternatePeer_);
+    client->addNewSocket(std::move(secondSocket));
+    client->setHappyEyeballsCachedFamily(AF_INET);
+    startTransport();
+
+    const auto& conn = client->getConn();
+    ASSERT_EQ(conn.peerAddress, serverAddr);
+    ASSERT_EQ(conn.happyEyeballsState.secondPeerAddress, alternatePeer_);
+    ASSERT_FALSE(conn.happyEyeballsState.finished);
+  }
+
+ protected:
+  quic::test::MockAsyncUDPSocket* secondSock_{nullptr};
+  const quic::SocketAddress alternatePeer_{"::1", 443};
 };
 
 class QuicClientTransportRetryCapacityTest
@@ -5054,53 +5323,118 @@ TEST_F(QuicClientTransportRetryCapacityTest, RetryTokenFitsInitial) {
   client->close(std::nullopt);
 }
 
-TEST_F(
-    QuicClientTransportVersionAndRetryTest,
-    VersionNegotiationPacketNotSupported) {
-  StreamId streamId = *client->createBidirectionalStream();
+TEST_F(QuicClientTransportVersionAndRetryTest, ValidUnsupportedCurrentPeer) {
+  expectVersionNegotiationFatal(buildVersionNegotiationPacket(
+      *client->getConn().originalDestinationConnectionId,
+      *client->getConn().clientConnectionId,
+      {MVFST2}));
+}
 
-  auto fizzClientSetReadCallback23 = client->setReadCallback(streamId, &readCb);
+TEST_F(QuicClientTransportVersionAndRetryTest, OriginalVersionOnly) {
+  expectVersionNegotiationDropped(buildVersionNegotiationPacket(
+      *client->getConn().originalDestinationConnectionId,
+      *client->getConn().clientConnectionId,
+      {*client->getConn().originalVersion}));
+}
 
-  auto write = IOBuf::copyBuffer("no");
-  auto fizzClientWriteChain17 =
-      client->writeChain(streamId, write->clone(), true, &deliveryCallback);
-  loopForWrites();
-  auto packet = VersionNegotiationPacketBuilder(
-                    *client->getConn().initialDestinationConnectionId,
-                    *originalConnId,
-                    {MVFST2})
-                    .buildPacket();
-  EXPECT_CALL(
-      readCb,
-      readError(streamId, IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-  EXPECT_CALL(deliveryCallback, onCanceled(streamId, write->length()));
-  EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
+TEST_F(QuicClientTransportVersionAndRetryTest, OriginalVersionMixedList) {
+  expectVersionNegotiationDropped(buildVersionNegotiationPacket(
+      *client->getConn().originalDestinationConnectionId,
+      *client->getConn().clientConnectionId,
+      {MVFST2, *client->getConn().originalVersion}));
+}
 
-  EXPECT_EQ(client->getConn().oneRttWriteCipher.get(), nullptr);
-  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).Times(0);
-  EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
-  client->close(std::nullopt);
+TEST_F(QuicClientTransportVersionAndRetryTest, WrongDestinationCid) {
+  const auto wrongDestinationConnectionId =
+      ConnectionId::createAndMaybeCrash({0xde, 0xad, 0xbe, 0xef});
+  ASSERT_NE(
+      wrongDestinationConnectionId, *client->getConn().clientConnectionId);
+  expectVersionNegotiationDropped(buildVersionNegotiationPacket(
+      *client->getConn().originalDestinationConnectionId,
+      wrongDestinationConnectionId,
+      {MVFST2}));
+}
+
+TEST_F(QuicClientTransportVersionAndRetryTest, WrongSourceCid) {
+  const auto wrongSourceConnectionId =
+      ConnectionId::createAndMaybeCrash({0xba, 0xad, 0xf0, 0x0d});
+  ASSERT_NE(
+      wrongSourceConnectionId,
+      *client->getConn().originalDestinationConnectionId);
+  expectVersionNegotiationDropped(buildVersionNegotiationPacket(
+      wrongSourceConnectionId,
+      *client->getConn().clientConnectionId,
+      {MVFST2}));
+}
+
+TEST_F(QuicClientTransportVersionAndRetryTest, ForeignPeer) {
+  const quic::SocketAddress foreignPeer{"127.0.0.2", 443};
+  ASSERT_NE(foreignPeer, client->getConn().peerAddress);
+  expectVersionNegotiationDropped(
+      buildVersionNegotiationPacket(
+          *client->getConn().originalDestinationConnectionId,
+          *client->getConn().clientConnectionId,
+          {MVFST2}),
+      foreignPeer);
+}
+
+TEST_F(QuicClientTransportVersionAndRetryTest, AfterAcceptedRetry) {
+  receiveVerifiedRetry();
+  expectVersionNegotiationDropped(buildVersionNegotiationPacket(
+      *client->getConn().originalDestinationConnectionId,
+      *client->getConn().clientConnectionId,
+      {MVFST2}));
 }
 
 TEST_F(
-    QuicClientTransportVersionAndRetryTest,
-    VersionNegotiationPacketCurrentVersion) {
-  StreamId streamId = *client->createBidirectionalStream();
+    QuicClientTransportVersionAndRetryZeroLengthCidTest,
+    ValidUnsupportedZeroLengthClientCid) {
+  ASSERT_EQ(client->getConn().clientConnectionId->size(), 0);
+  expectVersionNegotiationFatal(buildVersionNegotiationPacket(
+      *client->getConn().originalDestinationConnectionId,
+      *client->getConn().clientConnectionId,
+      {MVFST2}));
+}
 
-  auto fizzClientSetReadCallback24 = client->setReadCallback(streamId, &readCb);
+TEST_F(
+    QuicClientTransportVersionNegotiationHappyEyeballsTest,
+    ValidUnsupportedHappyEyeballsAlternate) {
+  expectVersionNegotiationFatal(
+      buildVersionNegotiationPacket(
+          *client->getConn().originalDestinationConnectionId,
+          *client->getConn().clientConnectionId,
+          {MVFST2}),
+      alternatePeer_);
+}
 
-  auto write = IOBuf::copyBuffer("no");
-  auto fizzClientWriteChain18 =
-      client->writeChain(streamId, write->clone(), true, &deliveryCallback);
-  loopForWrites();
+TEST_F(
+    QuicClientTransportVersionNegotiationHappyEyeballsTest,
+    FinishedHappyEyeballsOldAlternate) {
+  auto& conn = client->getNonConstConn();
+  client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
+  conn.happyEyeballsState.finished = true;
+  conn.happyEyeballsState.shouldWriteToFirstSocket = true;
+  conn.happyEyeballsState.shouldWriteToSecondSocket = false;
+  ASSERT_EQ(conn.peerAddress, serverAddr);
+  ASSERT_EQ(conn.happyEyeballsState.secondPeerAddress, alternatePeer_);
+  ASSERT_FALSE(conn.version.has_value());
+  ASSERT_TRUE(conn.retryToken.empty());
 
-  auto packet = VersionNegotiationPacketBuilder(
-                    *client->getConn().initialDestinationConnectionId,
-                    *originalConnId,
-                    {QuicVersion::MVFST})
-                    .buildPacket();
-  EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
-  client->close(std::nullopt);
+  expectVersionNegotiationDropped(
+      buildVersionNegotiationPacket(
+          *conn.originalDestinationConnectionId,
+          *conn.clientConnectionId,
+          {MVFST2}),
+      alternatePeer_);
+}
+
+TEST_F(QuicClientTransportVersionAndRetryTest, MalformedAndNonVnSyntax) {
+  for (const auto byte : {uint8_t{0x80}, uint8_t{0x40}}) {
+    auto packet = folly::IOBuf::copyBuffer(&byte, sizeof(byte));
+    auto queue = bufToQueue(std::move(packet));
+    EXPECT_FALSE(
+        client->getConn().readCodec->tryParsingVersionNegotiation(queue));
+  }
 }
 
 TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedStreamData) {
