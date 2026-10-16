@@ -2607,6 +2607,16 @@ TEST_F(QuicUnencryptedServerTransportTest, FirstPacketProcessedCallback) {
       clientNextInitialPacketNum));
 }
 
+TEST_F(QuicUnencryptedServerTransportTest, QLogOriginalDstConnIdAfterRetry) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  server->getNonConstConn().qLogger = qLogger;
+  auto originalDstConnId = getTestConnectionId(1);
+  server->setRetryOriginalDstConnId(originalDstConnId);
+
+  recvClientHello();
+  EXPECT_EQ(qLogger->dcid, originalDstConnId);
+}
+
 TEST_F(QuicUnencryptedServerTransportTest, InitialWithTrailingRandomPadding) {
   // Simulate picoquic-style datagram padding: a valid Initial packet followed
   // by garbage bytes outside the QUIC packet but inside the UDP datagram.

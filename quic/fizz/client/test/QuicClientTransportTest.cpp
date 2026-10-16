@@ -60,6 +60,20 @@ class TestEarlyDataAppParamsHandler : public EarlyDataAppParamsHandler {
 namespace {
 std::vector<uint8_t> kInitialDstConnIdVecForRetryTest =
     {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
+
+class RetryPacketCapture : public PacketProcessor {
+ public:
+  void onPacketRead(const ReceivedUdpPacket& packet) override {
+    auto data = packet.buf.front()->cloneCoalesced();
+    if (data->length() > 0 &&
+        getHeaderForm(data->data()[0]) == HeaderForm::Long &&
+        parseLongHeaderType(data->data()[0]) == LongHeader::Types::Retry) {
+      retryPackets.push_back(std::move(data));
+    }
+  }
+
+  std::vector<BufPtr> retryPackets;
+};
 } // namespace
 
 MATCHER_P(BufMatches, buf, "") {
@@ -1233,6 +1247,68 @@ TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
 
   EXPECT_FALSE(client->getConn().retryToken.empty());
   EXPECT_NE(*newToken, client->getConn().retryToken);
+}
+
+// Connects through a server that always sends a Retry, then checks the Retry
+// the way a client that enforces its integrity tag does.
+TEST_P(QuicClientTransportIntegrationTest, RetryPassesIntegrityCheck) {
+  auto retryServer = createServer(ProcessId::ONE, /*withRetryPacket=*/true);
+  SCOPE_EXIT {
+    retryServer->shutdown();
+    retryServer = nullptr;
+  };
+  client->getNonConstConn().peerAddress = retryServer->getAddress();
+  auto retryCapture = std::make_shared<RetryPacketCapture>();
+  client->addPacketProcessor(retryCapture);
+
+  bool setupError = false;
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
+      .Times(AtMost(1))
+      .WillRepeatedly([&](const auto&) {
+        setupError = true;
+        eventbase_.terminateLoopSoon();
+      });
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce([&] {
+    eventbase_.terminateLoopSoon();
+  });
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+  eventbase_.loopForever();
+  ASSERT_FALSE(setupError);
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->appendToChain(data->clone());
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  ASSERT_EQ(retryCapture->retryPackets.size(), 1);
+  QuicReadCodec codec(QuicNodeType::Client);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(retryCapture->retryPackets.front()->clone());
+  auto parsedPacket = codec.parsePacket(packetQueue, ackStates);
+  auto* retryPacket = parsedPacket.retryPacket();
+  ASSERT_NE(retryPacket, nullptr);
+  const auto& retrySrcConnId = retryPacket->header.getSourceConnId();
+  const auto& conn = client->getConn();
+  EXPECT_EQ(retryPacket->header.getVersion(), getVersion());
+  auto integrityTagValid = conn.clientHandshakeLayer->verifyRetryIntegrityTag(
+      *conn.originalDestinationConnectionId, *retryPacket);
+  ASSERT_TRUE(integrityTagValid.has_value());
+  EXPECT_TRUE(integrityTagValid.value());
+  EXPECT_EQ(retrySrcConnId, conn.initialDestinationConnectionId);
+  EXPECT_NE(retrySrcConnId, conn.originalDestinationConnectionId);
+
+  auto serverParams = conn.clientHandshakeLayer->getServerTransportParams();
+  ASSERT_TRUE(serverParams.has_value());
+  auto retrySrcConnIdParam = getConnIdParameter(
+      TransportParameterId::retry_source_connection_id,
+      serverParams->parameters);
+  ASSERT_TRUE(retrySrcConnIdParam.has_value());
+  if (getVersion() == QuicVersion::MVFST) {
+    EXPECT_FALSE(retrySrcConnIdParam->has_value());
+  } else {
+    EXPECT_EQ(*retrySrcConnIdParam, retrySrcConnId);
+  }
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {

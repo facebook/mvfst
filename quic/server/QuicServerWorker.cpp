@@ -47,6 +47,15 @@ bool isValidConnIdLength(const quic::ConnectionId& connId) {
   return quic::kMinInitialDestinationConnIdLength <= connId.size() &&
       connId.size() <= quic::kMaxConnectionIdSize;
 }
+
+// Versions whose transport parameters carry the connection ids that clients
+// validate.
+bool hasConnIdTransportParams(quic::QuicVersion version) {
+  return version == quic::QuicVersion::QUIC_V1 ||
+      version == quic::QuicVersion::QUIC_V1_ALIAS ||
+      version == quic::QuicVersion::QUIC_V1_ALIAS2 ||
+      version == quic::QuicVersion::MVFST_PRIMING;
+}
 } // namespace
 
 namespace quic {
@@ -760,7 +769,8 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     const quic::SocketAddress& client,
     const Optional<ConnectionId>& srcConnId,
     const ConnectionId& dstConnId,
-    bool validNewToken) {
+    bool validNewToken,
+    const Optional<ConnectionId>& retryOriginalDstConnId) {
   // create 'accepting' transport
   auto* evb = getEventBase();
   auto sock = zeroCopyEnabled_ ? makeAlias() : makeSocket(evb);
@@ -822,6 +832,9 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
       trans->setClientConnectionId(*srcConnId);
     }
     trans->setClientChosenDestConnectionId(dstConnId);
+    if (retryOriginalDstConnId) {
+      trans->setRetryOriginalDstConnId(*retryOriginalDstConnId);
+    }
     // parameters to create server chosen connection id
     trans->setServerConnectionIdParams(ServerConnectionIdParams(
         cidVersion_, hostId_, static_cast<uint8_t>(processId_), workerId_));
@@ -1084,11 +1097,16 @@ void QuicServerWorker::dispatchPacketData(
   auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
   bool hasTokenSecret = transportSettings_.retryTokenSecret.has_value();
 
+  Optional<ConnectionId> retryOriginalDstConnId;
+  if (hasTokenSecret && maybeEncryptedToken) {
+    retryOriginalDstConnId = validateRetryToken(
+        *maybeEncryptedToken, dstConnId, client.getIPAddress());
+  }
+
   // If the retryTokenSecret is not set, just skip evaluating validity of
   // token and assume true
-  bool isValidRetryToken = !hasTokenSecret ||
-      (maybeEncryptedToken &&
-       validRetryToken(*maybeEncryptedToken, dstConnId, client.getIPAddress()));
+  bool isValidRetryToken =
+      !hasTokenSecret || retryOriginalDstConnId.has_value();
 
   bool isValidNewToken = !hasTokenSecret ||
       (maybeEncryptedToken &&
@@ -1111,13 +1129,31 @@ void QuicServerWorker::dispatchPacketData(
     QUIC_STATS(statsCallback_, onConnectionRateLimited);
     sendRetryPacket(
         client,
+        quicVersion.value(),
         dstConnId,
         maybeSrcConnId.value_or(ConnectionId::createZeroLength()));
     return;
   }
 
+  // An Initial sent to one of our Retry source connection ids needs the
+  // original destination connection id from its token. Without it, QUIC v1
+  // clients would reject the handshake's transport parameters.
+  if (maybeEncryptedToken && !isValidRetryToken && !isValidNewToken &&
+      hasConnIdTransportParams(quicVersion.value())) {
+    auto dstConnIdParams = connIdAlgo_->parseConnectionId(dstConnId);
+    if (dstConnIdParams.has_value() && dstConnIdParams->hostId == hostId_) {
+      packetDropReason = PacketDropReason::INVALID_RETRY_TOKEN;
+      return;
+    }
+  }
+
   auto transport = makeTransport(
-      quicVersion.value(), client, maybeSrcConnId, dstConnId, isValidNewToken);
+      quicVersion.value(),
+      client,
+      maybeSrcConnId,
+      dstConnId,
+      isValidNewToken,
+      retryOriginalDstConnId);
   if (!transport) {
     // Act as though we received a junk Initial – don't forward packet.
     MVCHECK(maybeSrcConnId.has_value());
@@ -1207,7 +1243,7 @@ static bool checkTokenAge(uint64_t tokenIssuedMs, uint64_t kTokenValidMs) {
   return tokenAgeMs <= kTokenValidMs;
 }
 
-bool QuicServerWorker::validRetryToken(
+Optional<ConnectionId> QuicServerWorker::validateRetryToken(
     std::string& encryptedToken,
     const ConnectionId& dstConnId,
     const folly::IPAddress& clientIp) {
@@ -1215,14 +1251,12 @@ bool QuicServerWorker::validRetryToken(
 
   TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
 
-  // Create a pseudo token to generate the assoc data.
-  RetryToken token(dstConnId, clientIp, 0);
-
-  auto maybeDecryptedRetryTokenMs = tokenGenerator.decryptToken(
-      BufHelpers::copyBuffer(encryptedToken), token.genAeadAssocData());
-
-  return maybeDecryptedRetryTokenMs &&
-      checkTokenAge(maybeDecryptedRetryTokenMs, kMaxRetryTokenValidMs);
+  auto token = tokenGenerator.decryptRetryToken(
+      BufHelpers::copyBuffer(encryptedToken), dstConnId, clientIp);
+  if (!token || !checkTokenAge(token->timestampInMs, kMaxRetryTokenValidMs)) {
+    return std::nullopt;
+  }
+  return token->originalDstConnId;
 }
 
 bool QuicServerWorker::validNewToken(
@@ -1244,6 +1278,7 @@ bool QuicServerWorker::validNewToken(
 
 void QuicServerWorker::sendRetryPacket(
     const quic::SocketAddress& client,
+    QuicVersion version,
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
   if (!transportSettings_.retryTokenSecret.has_value()) {
@@ -1254,8 +1289,10 @@ void QuicServerWorker::sendRetryPacket(
   // Create the encrypted retry token
   TokenGenerator generator(transportSettings_.retryTokenSecret.value());
 
+  const auto retrySrcConnId = makeRetrySourceConnId(dstConnId);
   // RetryToken defaults to currentTimeInMs
   RetryToken retryToken(dstConnId, client.getIPAddress(), client.getPort());
+  retryToken.retrySrcConnId = retrySrcConnId;
   auto encryptedToken = generator.encryptToken(retryToken);
 
   MVCHECK(encryptedToken.has_value());
@@ -1268,19 +1305,19 @@ void QuicServerWorker::sendRetryPacket(
       (static_cast<uint8_t>(LongHeader::Types::Retry)
        << LongHeader::kTypeShift);
 
-  // Flip the src conn ID and dst conn ID as per section 7.3 of QUIC draft
-  // for both pseudo retry builder and the actual retry packet builder
+  // Clients choose the integrity tag key from the Retry's version, so it must
+  // be the version of the client's Initial.
   PseudoRetryPacketBuilder pseudoBuilder(
       initialByte,
-      dstConnId, /* src conn id */
+      retrySrcConnId, /* src conn id */
       srcConnId, /* dst conn id */
       dstConnId, /* original dst conn id */
-      QuicVersion::MVFST_INVALID,
+      version,
       BufHelpers::copyBuffer(encryptedTokenStr));
   BufPtr pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTagBuf = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
-      QuicVersion::MVFST_INVALID, pseudoRetryPacketBuf.get());
+      version, pseudoRetryPacketBuf.get());
   integrityTagBuf->coalesce();
   ContiguousReadCursor cursor(
       integrityTagBuf->data(), integrityTagBuf->length());
@@ -1294,9 +1331,9 @@ void QuicServerWorker::sendRetryPacket(
 
   // Create the actual retry packet
   RetryPacketBuilder builder(
-      dstConnId, /* src conn id */
+      retrySrcConnId, /* src conn id */
       srcConnId, /* dst conn id */
-      QuicVersion::MVFST_INVALID,
+      version,
       std::move(encryptedTokenStr),
       integrityTag);
 
@@ -1306,6 +1343,28 @@ void QuicServerWorker::sendRetryPacket(
   socket_->write(client, retryData);
   QUIC_STATS(statsCallback_, onWrite, retryDataLen);
   QUIC_STATS(statsCallback_, onPacketSent);
+}
+
+ConnectionId QuicServerWorker::makeRetrySourceConnId(
+    const ConnectionId& clientDstConnId) {
+  constexpr size_t kMaxEncodingAttempts = 32;
+  ServerConnectionIdParams params(
+      cidVersion_, hostId_, static_cast<uint8_t>(processId_), workerId_);
+  for (size_t attempt = 0; attempt < kMaxEncodingAttempts; ++attempt) {
+    auto connId = connIdAlgo_->encodeConnectionId(params);
+    if (connId.hasError()) {
+      break;
+    }
+    // The client's next Initial must pass this server's DCID length checks,
+    // and RFC 9000 forbids reusing the client's destination connection id.
+    if (isValidConnIdLength(*connId) && *connId != clientDstConnId &&
+        !rejectConnectionId(*connId)) {
+      return connId.value();
+    }
+  }
+  MVVLOG(3) << "Failed to encode a Retry source connection id, using a "
+            << "random one";
+  return ConnectionId::createRandom(kDefaultConnectionIdSize).value();
 }
 
 void QuicServerWorker::allowBeingTakenOver(

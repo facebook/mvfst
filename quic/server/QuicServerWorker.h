@@ -532,7 +532,11 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   Optional<std::string> maybeGetEncryptedToken(ContiguousReadCursor& cursor);
 
-  bool validRetryToken(
+  /**
+   * Returns the original destination connection id if encryptedToken is a
+   * valid retry token for an Initial from clientIp to dstConnId.
+   */
+  Optional<ConnectionId> validateRetryToken(
       std::string& encryptedToken,
       const ConnectionId& dstConnId,
       const folly::IPAddress& clientIp);
@@ -543,8 +547,16 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   void sendRetryPacket(
       const quic::SocketAddress& client,
+      QuicVersion version,
       const ConnectionId& dstConnId,
       const ConnectionId& srcConnId);
+
+  /**
+   * Returns a Retry source connection id, encoded with this worker's routing
+   * params when possible so the client's next Initial is routed back to this
+   * worker.
+   */
+  ConnectionId makeRetrySourceConnId(const ConnectionId& clientDstConnId);
 
   void sendResetPacket(
       const HeaderForm& headerForm,
@@ -591,7 +603,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       const quic::SocketAddress& client,
       const Optional<ConnectionId>& srcConnId,
       const ConnectionId& dstConnId,
-      bool validNewToken);
+      bool validNewToken,
+      const Optional<ConnectionId>& retryOriginalDstConnId);
 
   // Parses the dst conn id to determine if packet was incorrectly routed to
   // this host/process.

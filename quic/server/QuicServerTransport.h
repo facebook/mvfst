@@ -136,6 +136,10 @@ class QuicServerTransport
 
   void setClientChosenDestConnectionId(const ConnectionId& serverCid);
 
+  // Original destination connection id recovered from the retry token in the
+  // client's Initial. Must be set before the transport processes that Initial.
+  void setRetryOriginalDstConnId(const ConnectionId& originalDstConnId);
+
   /*
    * Set a callback to validate whether a specific transport knob parameter
    * is allowed to be registered.

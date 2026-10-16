@@ -26,6 +26,16 @@ class TokenGenerator {
 
   uint64_t decryptToken(BufPtr encryptedToken, BufPtr aeadAssocData);
 
+  /**
+   * Decrypts a retry token from a client Initial with the given destination
+   * connection id. Accepts tokens with or without a server-chosen Retry source
+   * connection id.
+   */
+  Optional<RetryToken> decryptRetryToken(
+      BufPtr encryptedToken,
+      const ConnectionId& dstConnId,
+      const folly::IPAddress& clientIp);
+
  private:
   fizz::server::Aead128GCMTokenCipher cipher_;
 };

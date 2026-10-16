@@ -270,4 +270,56 @@ TEST(ServerTransportParametersTest, TestMvfstFields) {
   EXPECT_FALSE(hasOriginalDestCid);
 }
 
+static Optional<ConnectionId> getEncodedRetrySourceCid(
+    QuicVersion version,
+    const Optional<ConnectionId>& retrySourceCid) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  ServerTransportParametersExtension ext(
+      version,
+      kDefaultConnectionFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      kDefaultStreamFlowControlWindow,
+      std::numeric_limits<uint32_t>::max(),
+      std::numeric_limits<uint32_t>::max(),
+      /*disableMigration=*/true,
+      kDefaultIdleTimeout,
+      kDefaultAckDelayExponent,
+      kDefaultUDPSendPacketLen,
+      kDefaultActiveConnectionIdLimit,
+      generateStatelessResetToken(),
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId::createAndMaybeCrash(
+          std::vector<uint8_t>{0xfb, 0xfa, 0xf9, 0xf8}),
+      conn,
+      /*customTransportParameters=*/{},
+      retrySourceCid);
+  std::vector<Extension> extensions;
+  Error err;
+  CHECK(
+      ext.getExtensions(extensions, err, getClientHello(version)) ==
+      Status::Success);
+  auto serverParams = getServerExtension(extensions, version);
+  CHECK(serverParams.has_value());
+  auto encodedRetrySourceCid = getConnIdParameter(
+      TransportParameterId::retry_source_connection_id,
+      serverParams->parameters);
+  CHECK(encodedRetrySourceCid.has_value());
+  return encodedRetrySourceCid.value();
+}
+
+TEST(ServerTransportParametersTest, TestRetrySourceCid) {
+  auto retrySourceCid = ConnectionId::createAndMaybeCrash(
+      std::vector<uint8_t>{0x40, 0x00, 0x07, 0xd6, 0xa1, 0x89, 0x50, 0x41});
+  EXPECT_EQ(
+      getEncodedRetrySourceCid(QuicVersion::QUIC_V1, retrySourceCid),
+      retrySourceCid);
+  EXPECT_FALSE(
+      getEncodedRetrySourceCid(QuicVersion::QUIC_V1, std::nullopt).has_value());
+  EXPECT_FALSE(
+      getEncodedRetrySourceCid(QuicVersion::MVFST, retrySourceCid).has_value());
+}
+
 } // namespace quic::test

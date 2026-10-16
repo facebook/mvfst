@@ -42,6 +42,68 @@ TEST_F(RetryTokenGeneratorTest, EncryptDecryptRetryToken) {
   EXPECT_LE(maybeDecryptedTokenMs, now);
 }
 
+TEST_F(RetryTokenGeneratorTest, DecryptRetryTokenWithoutServerChosenSrcConnId) {
+  TokenSecret secret;
+  folly::Random::secureRandom(secret.data(), secret.size());
+  auto connId = ConnectionId::createAndMaybeCrash(
+      {0x14, 0x35, 0x22, 0x11, 0x63, 0x51, 0x08, 0x9a});
+  folly::IPAddress clientIp("109.115.3.49");
+
+  TokenGenerator tokenGenerator(secret);
+  RetryToken token(connId, clientIp, 42069);
+  auto maybeEncryptedToken = tokenGenerator.encryptToken(token);
+  ASSERT_TRUE(maybeEncryptedToken.has_value());
+
+  TokenGenerator tokenGenerator1(secret);
+  auto decryptedToken = tokenGenerator1.decryptRetryToken(
+      std::move(maybeEncryptedToken.value()), connId, clientIp);
+  ASSERT_TRUE(decryptedToken.has_value());
+  EXPECT_EQ(decryptedToken->originalDstConnId, connId);
+  EXPECT_FALSE(decryptedToken->retrySrcConnId.has_value());
+  EXPECT_EQ(decryptedToken->timestampInMs, token.timestampInMs);
+}
+
+TEST_F(
+    RetryTokenGeneratorTest,
+    EncryptDecryptRetryTokenWithServerChosenSrcConnId) {
+  TokenSecret secret;
+  folly::Random::secureRandom(secret.data(), secret.size());
+  auto originalDstConnId = ConnectionId::createAndMaybeCrash(
+      {0x14, 0x35, 0x22, 0x11, 0x63, 0x51, 0x08, 0x9a});
+  auto retrySrcConnId = ConnectionId::createAndMaybeCrash(
+      {0x40, 0x00, 0x07, 0xd6, 0xa1, 0x89, 0x50, 0x41});
+  folly::IPAddress clientIp("109.115.3.49");
+
+  TokenGenerator tokenGenerator(secret);
+  RetryToken token(originalDstConnId, clientIp, 42069);
+  token.retrySrcConnId = retrySrcConnId;
+  auto maybeEncryptedToken = tokenGenerator.encryptToken(token);
+  ASSERT_TRUE(maybeEncryptedToken.has_value());
+  auto encryptedToken = maybeEncryptedToken.value()->toString();
+
+  // The client sends its next Initial to the Retry source connection id.
+  TokenGenerator tokenGenerator1(secret);
+  auto decryptedToken = tokenGenerator1.decryptRetryToken(
+      folly::IOBuf::copyBuffer(encryptedToken), retrySrcConnId, clientIp);
+  ASSERT_TRUE(decryptedToken.has_value());
+  EXPECT_EQ(decryptedToken->originalDstConnId, originalDstConnId);
+  EXPECT_EQ(decryptedToken->retrySrcConnId, retrySrcConnId);
+  EXPECT_EQ(decryptedToken->timestampInMs, token.timestampInMs);
+
+  EXPECT_FALSE(tokenGenerator1
+                   .decryptRetryToken(
+                       folly::IOBuf::copyBuffer(encryptedToken),
+                       originalDstConnId,
+                       clientIp)
+                   .has_value());
+  EXPECT_FALSE(tokenGenerator1
+                   .decryptRetryToken(
+                       folly::IOBuf::copyBuffer(encryptedToken),
+                       retrySrcConnId,
+                       folly::IPAddress("109.115.3.50"))
+                   .has_value());
+}
+
 TEST_F(RetryTokenGeneratorTest, EncryptDecryptNewToken) {
   TokenSecret secret;
   folly::Random::secureRandom(secret.data(), secret.size());

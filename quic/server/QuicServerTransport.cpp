@@ -505,6 +505,13 @@ void QuicServerTransport::setClientChosenDestConnectionId(
   conn_->clientChosenDestConnectionId = clientChosenDestConnectionId;
 }
 
+void QuicServerTransport::setRetryOriginalDstConnId(
+    const ConnectionId& originalDstConnId) {
+  if (serverConn_) {
+    serverConn_->retryOriginalDstConnId = originalDstConnId;
+  }
+}
+
 void QuicServerTransport::onCryptoEventAvailable() noexcept {
   try {
     MVVLOG(10) << "onCryptoEventAvailable " << *this;

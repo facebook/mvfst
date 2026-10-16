@@ -327,12 +327,25 @@ BufPtr QuicAddrValidationToken::getPlaintextToken() const {
   return BufHelpers::copyBuffer(&ts, sizeof(ts));
 }
 
+BufPtr RetryToken::getPlaintextToken() const {
+  if (!retrySrcConnId) {
+    return QuicAddrValidationToken::getPlaintextToken();
+  }
+  auto plaintext = BufHelpers::create(
+      sizeof(timestampInMs) + sizeof(uint8_t) + originalDstConnId.size());
+  BufAppender appender(plaintext.get(), 0);
+  appender.writeBE(timestampInMs);
+  appender.writeBE<uint8_t>(originalDstConnId.size());
+  appender.push(originalDstConnId.data(), originalDstConnId.size());
+  return plaintext;
+}
+
 BufPtr RetryToken::genAeadAssocData() const {
   return BufHelpers::copyBuffer(
       fmt::format(
           "{}{}{}",
           toString(tokenType),
-          originalDstConnId.hex(),
+          retrySrcConnId.value_or(originalDstConnId).hex(),
           clientIp.str()));
 }
 

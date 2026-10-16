@@ -72,7 +72,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       ConnectionId originalDestinationCid,
       const QuicConnectionStateBase& conn,
       std::vector<TransportParameter> customTransportParameters =
-          std::vector<TransportParameter>())
+          std::vector<TransportParameter>(),
+      Optional<ConnectionId> retrySourceCid = std::nullopt)
       : encodingVersion_(encodingVersion),
         initialMaxData_(initialMaxData),
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
@@ -88,6 +89,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         token_(token),
         initialSourceCid_(initialSourceCid),
         originalDestinationCid_(originalDestinationCid),
+        retrySourceCid_(std::move(retrySourceCid)),
         customTransportParameters_(std::move(customTransportParameters)),
         conn_(conn) {}
 
@@ -237,6 +239,11 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::initial_source_connection_id,
           initialSourceCid_));
+      if (retrySourceCid_) {
+        params.parameters.push_back(encodeConnIdParameter(
+            TransportParameterId::retry_source_connection_id,
+            *retrySourceCid_));
+      }
     }
 
     for (const auto& customParameter : customTransportParameters_) {
@@ -278,6 +285,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   StatelessResetToken token_;
   ConnectionId initialSourceCid_;
   ConnectionId originalDestinationCid_;
+  Optional<ConnectionId> retrySourceCid_;
   std::vector<TransportParameter> customTransportParameters_;
   const QuicConnectionStateBase& conn_;
 };

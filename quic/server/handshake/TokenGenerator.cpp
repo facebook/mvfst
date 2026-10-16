@@ -68,4 +68,44 @@ uint64_t TokenGenerator::decryptToken(
   return parseResult.value();
 }
 
+Optional<RetryToken> TokenGenerator::decryptRetryToken(
+    BufPtr encryptedToken,
+    const ConnectionId& dstConnId,
+    const folly::IPAddress& clientIp) {
+  // Both token forms are bound to the destination connection id of the
+  // client's Initial, which is the Retry's source connection id.
+  RetryToken token(dstConnId, clientIp, 0);
+  auto maybeDecryptedToken = cipher_.decrypt(
+      std::move(encryptedToken), token.genAeadAssocData().get());
+  if (!maybeDecryptedToken) {
+    return std::nullopt;
+  }
+
+  auto decryptedToken = (*maybeDecryptedToken).get();
+  ContiguousReadCursor cursor(decryptedToken->data(), decryptedToken->length());
+  auto timestampResult = parsePlaintextRetryOrNewToken(cursor);
+  if (timestampResult.hasError()) {
+    MVLOG_ERROR << "Failed to parse decrypted retry token";
+    return std::nullopt;
+  }
+  token.timestampInMs = timestampResult.value();
+  if (cursor.isAtEnd()) {
+    return token;
+  }
+
+  uint8_t originalDstConnIdLen = 0;
+  if (!cursor.tryReadBE(originalDstConnIdLen)) {
+    return std::nullopt;
+  }
+  auto originalDstConnId = ConnectionId::create(cursor, originalDstConnIdLen);
+  if (originalDstConnId.hasError()) {
+    MVLOG_ERROR << "Failed to parse original destination connection id in "
+                << "retry token";
+    return std::nullopt;
+  }
+  token.originalDstConnId = originalDstConnId.value();
+  token.retrySrcConnId = dstConnId;
+  return token;
+}
+
 } // namespace quic

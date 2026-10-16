@@ -783,6 +783,27 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   EXPECT_TRUE(folly::IOBufEqualTo()(*expectedIntegrityTag, *integrityTag));
 }
 
+TEST_F(QuicPacketBuilderTest, PseudoRetryPacketQuicV1) {
+  // The values used in this test case are based on Appendix A.4 of RFC 9001.
+  PseudoRetryPacketBuilder builder(
+      0xff,
+      ConnectionId::createAndMaybeCrash(
+          {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5}),
+      ConnectionId::createZeroLength(),
+      ConnectionId::createAndMaybeCrash(
+          {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08}),
+      QuicVersion::QUIC_V1,
+      folly::IOBuf::copyBuffer(R"(token)"));
+
+  BufPtr pseudoRetryPacketBuf = std::move(builder).buildPacket();
+  auto integrityTag = FizzRetryIntegrityTagGenerator().getRetryIntegrityTag(
+      QuicVersion::QUIC_V1, pseudoRetryPacketBuf.get());
+  BufPtr expectedIntegrityTag = folly::IOBuf::copyBuffer(
+      "\x04\xa2\x65\xba\x2e\xff\x4d\x82\x90\x58\xfb\x3f\x0f\x24\x96\xba");
+
+  EXPECT_TRUE(folly::IOBufEqualTo()(*expectedIntegrityTag, *integrityTag));
+}
+
 TEST_F(QuicPacketBuilderTest, PseudoRetryPacketLarge) {
   uint8_t initialByte = 0xff;
   ConnectionId sourceConnectionId = ConnectionId::createAndMaybeCrash(

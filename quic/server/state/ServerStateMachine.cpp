@@ -1144,6 +1144,15 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
 
     auto customTransportParams = getSupportedExtTransportParams(conn);
 
+    // After a Retry, the client's Initial is addressed to the Retry's source
+    // connection id.
+    Optional<ConnectionId> retrySourceConnectionId;
+    if (conn.retryOriginalDstConnId) {
+      retrySourceConnectionId = initialDestinationConnectionId;
+    }
+    const auto originalDestinationConnectionId =
+        conn.retryOriginalDstConnId.value_or(initialDestinationConnectionId);
+
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
             version,
@@ -1162,9 +1171,10 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
             conn.transportSettings.selfActiveConnectionIdLimit,
             *newServerConnIdData->token,
             conn.serverConnectionId.value(),
-            initialDestinationConnectionId,
+            originalDestinationConnectionId,
             conn,
-            customTransportParams));
+            customTransportParams,
+            retrySourceConnectionId));
     conn.transportParametersEncoded = true;
     const CryptoFactory& cryptoFactory =
         conn.serverHandshakeLayer->getCryptoFactory();
@@ -1180,7 +1190,7 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
     conn.readCodec->setClientConnectionId(clientConnectionId);
     conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     QLOG(conn, setScid, conn.serverConnectionId);
-    QLOG(conn, setDcid, initialDestinationConnectionId);
+    QLOG(conn, setDcid, originalDestinationConnectionId);
     CodecParameters codecParams(
         conn.peerAckDelayExponent,
         version,

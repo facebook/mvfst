@@ -813,7 +813,7 @@ struct QuicAddrValidationToken {
   QuicAddrValidationToken& operator=(const QuicAddrValidationToken& other) =
       default;
 
-  [[nodiscard]] BufPtr getPlaintextToken() const;
+  [[nodiscard]] virtual BufPtr getPlaintextToken() const;
   [[nodiscard]] virtual TokenType getTokenType() const = 0;
   [[nodiscard]] virtual BufPtr genAeadAssocData() const = 0;
   virtual ~QuicAddrValidationToken() = default;
@@ -843,10 +843,16 @@ struct RetryToken : QuicAddrValidationToken {
     return tokenType;
   }
 
+  [[nodiscard]] BufPtr getPlaintextToken() const override;
+
   [[nodiscard]] BufPtr genAeadAssocData() const override;
 
   ConnectionId originalDstConnId;
   uint16_t clientPort;
+  // Source connection id of the Retry, set when it differs from
+  // originalDstConnId. The token is then bound to this id instead, and carries
+  // originalDstConnId in its plaintext.
+  Optional<ConnectionId> retrySrcConnId;
 
   static constexpr TokenType tokenType = TokenType::RetryToken;
 };

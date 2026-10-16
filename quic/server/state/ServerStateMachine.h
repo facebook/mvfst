@@ -101,6 +101,10 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // ServerConnectionIdRejector can reject a ConnectionId from ConnectionIdAlgo
   ServerConnectionIdRejector* connIdRejector{nullptr};
 
+  // Original destination connection id from the retry token in the client's
+  // Initial. Unset if the client did not respond to a Retry.
+  Optional<ConnectionId> retryOriginalDstConnId;
+
   // Source address token that can be saved to client via PSK.
   // Address with higher index is more recently used.
   std::vector<folly::IPAddress> tokenSourceAddresses;
