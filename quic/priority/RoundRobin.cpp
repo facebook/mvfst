@@ -65,7 +65,7 @@ bool RoundRobin::empty() const {
 
 void RoundRobin::insert(quic::PriorityQueue::Identifier value) {
   if (useIndexMap_
-          ? indexMap_.find(value) != indexMap_.end()
+          ? indexMap_.contains(value)
           : std::find(list_.begin(), list_.end(), value) != list_.end()) {
     return;
   }
