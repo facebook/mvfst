@@ -6231,8 +6231,83 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndDiscard) {
       datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
   ASSERT_FALSE(writeFrame(datagramFrame, builder).hasError());
   auto packet = packetToBuf(std::move(builder).buildPacket());
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
   deliverData(packet->coalesce());
   ASSERT_EQ(client->getConn().datagramState.readBuffer.size(), 0);
+  EXPECT_FALSE(client->getConn().localConnectionError.has_value());
+  EXPECT_FALSE(client->isClosed());
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReceiveDatagramFrameBelowAdvertisedSize) {
+  constexpr uint64_t kReadLimit = 256;
+  const auto payloadSize = kReadLimit - kMaxDatagramPacketOverhead;
+  auto& conn = client->getNonConstConn();
+  conn.datagramState.maxReadFrameSize = kReadLimit;
+  conn.datagramState.maxReadBufferSize = 1;
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  const std::string datagramPayload(payloadSize, 'd');
+  DatagramFrame datagramFrame(
+      datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+  ASSERT_FALSE(writeFrame(datagramFrame, builder).hasError());
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+
+  EXPECT_CALL(*quicStats_, onDatagramRead(payloadSize)).Times(1);
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(0);
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  deliverData(packet->coalesce());
+
+  ASSERT_EQ(conn.datagramState.readBuffer.size(), 1);
+  EXPECT_EQ(
+      conn.datagramState.readBuffer.front()
+          .bufQueue()
+          .front()
+          ->computeChainDataLength(),
+      payloadSize);
+  EXPECT_FALSE(conn.localConnectionError.has_value());
+  EXPECT_FALSE(client->isClosed());
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReceiveDatagramFrameAboveAdvertisedSizeCloses) {
+  constexpr uint64_t kReadLimit = 256;
+  auto& conn = client->getNonConstConn();
+  conn.datagramState.maxReadFrameSize = kReadLimit;
+  conn.datagramState.maxReadBufferSize = 1;
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_FALSE(builder.encodePacketHeader().hasError());
+
+  const std::string datagramPayload(kReadLimit + 1, 'd');
+  DatagramFrame datagramFrame(
+      datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+  ASSERT_FALSE(writeFrame(datagramFrame, builder).hasError());
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+
+  EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(0);
+  EXPECT_CALL(
+      clientConnCallback,
+      onConnectionError(IsError(TransportErrorCode::PROTOCOL_VIOLATION)));
+  deliverDataWithoutErrorCheck(packet->coalesce());
+
+  EXPECT_TRUE(conn.datagramState.readBuffer.empty());
+  ASSERT_TRUE(conn.localConnectionError.has_value());
+  EXPECT_EQ(
+      conn.localConnectionError->code,
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION));
+  EXPECT_TRUE(client->isClosed());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndStore) {

@@ -9,7 +9,7 @@
 
 namespace quic {
 
-void handleDatagram(
+quic::Expected<void, QuicError> handleDatagram(
     QuicConnectionStateBase& conn,
     DatagramFrame& frame,
     TimePoint recvTimePoint) {
@@ -19,14 +19,19 @@ void handleDatagram(
   if (conn.datagramState.maxReadFrameSize == 0) {
     frame.data.move();
     QUIC_STATS(conn.statsCallback, onDatagramDroppedOnRead);
-    return;
+    return {};
+  }
+  if (frame.length >= conn.datagramState.maxReadFrameSize) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::PROTOCOL_VIOLATION,
+        "DATAGRAM frame exceeds max_datagram_frame_size"));
   }
   if (conn.datagramState.readBuffer.size() >=
       conn.datagramState.maxReadBufferSize) {
     QUIC_STATS(conn.statsCallback, onDatagramDroppedOnRead);
     if (!conn.transportSettings.datagramConfig.recvDropOldDataFirst) {
       frame.data.move();
-      return;
+      return {};
     } else {
       conn.datagramState.readBuffer.pop_front();
     }
@@ -34,6 +39,7 @@ void handleDatagram(
   QUIC_STATS(conn.statsCallback, onDatagramRead, frame.data.chainLength());
   conn.datagramState.readBuffer.emplace_back(
       recvTimePoint, std::move(frame.data));
+  return {};
 }
 
 } // namespace quic

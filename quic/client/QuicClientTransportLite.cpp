@@ -882,7 +882,11 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
         // Datagram isn't retransmittable. But we would like to ack them early.
         // So, make Datagram frames count towards ack policy
         pktHasRetransmittableData = true;
-        handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
+        auto datagramResult =
+            handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
+        if (datagramResult.hasError()) {
+          return quic::make_unexpected(datagramResult.error());
+        }
         break;
       }
       case QuicFrame::Type::ImmediateAckFrame: {

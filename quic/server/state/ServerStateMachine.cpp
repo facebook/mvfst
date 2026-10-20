@@ -1837,8 +1837,11 @@ quic::Expected<void, QuicError> onServerReadDataFromOpen(
           // Datagram isn't retransmittable. But we would like to ack them
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;
-          handleDatagram(
+          auto datagramResult = handleDatagram(
               conn, frame, readData.udpPacket.timings.receiveTimePoint);
+          if (datagramResult.hasError()) {
+            return quic::make_unexpected(datagramResult.error());
+          }
           break;
         }
         case QuicFrame::Type::ImmediateAckFrame: {

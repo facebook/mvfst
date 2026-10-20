@@ -318,7 +318,11 @@ class TestQuicTransport
       } else if (type == TestFrameType::DATAGRAM) {
         auto buffer = decodeDatagramFrame(cursor);
         auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
-        handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
+        auto datagramResult =
+            handleDatagram(*conn_, frame, udpPacket.timings.receiveTimePoint);
+        if (datagramResult.hasError()) {
+          return quic::make_unexpected(datagramResult.error());
+        }
       } else {
         auto buffer = decodeStreamBuffer(cursor);
         auto streamResult = conn_->streamManager->getStream(buffer.first);
@@ -4573,6 +4577,70 @@ TEST_F(QuicTransportImplTestBase, DatagramCallbackDatagramAvailable) {
   transport->addDatagram(folly::IOBuf::copyBuffer("datagram payload"));
   EXPECT_CALL(datagramCb, onDatagramsAvailable());
   transport->driveReadCallbacks();
+}
+
+TEST_F(QuicTransportImplTestBase, DatagramDisabledRemainsSoftDrop) {
+  NiceMock<MockDatagramCallback> datagramCb;
+  ASSERT_FALSE(transport->setDatagramCallback(&datagramCb).hasError());
+  EXPECT_CALL(datagramCb, onDatagramsAvailable()).Times(0);
+
+  transport->addDatagram(folly::IOBuf::copyBuffer("disabled datagram"));
+  transport->driveReadCallbacks();
+
+  EXPECT_TRUE(transport->getConnectionState().datagramState.readBuffer.empty());
+  EXPECT_FALSE(
+      transport->getConnectionState().localConnectionError.has_value());
+  EXPECT_FALSE(transport->isClosed());
+}
+
+TEST_F(QuicTransportImplTestBase, DatagramBelowAdvertisedSizeIsReadable) {
+  constexpr uint64_t kReadLimit = 256;
+  const auto payloadSize = kReadLimit - kMaxDatagramPacketOverhead;
+  auto& conn = transport->getConnectionState();
+  conn.datagramState.maxReadFrameSize = kReadLimit;
+  conn.datagramState.maxReadBufferSize = 1;
+
+  NiceMock<MockDatagramCallback> datagramCb;
+  ASSERT_FALSE(transport->setDatagramCallback(&datagramCb).hasError());
+  EXPECT_CALL(datagramCb, onDatagramsAvailable());
+
+  transport->addDatagram(
+      folly::IOBuf::copyBuffer(std::string(payloadSize, 'd')));
+  transport->driveReadCallbacks();
+
+  auto datagrams = transport->readDatagramBufs();
+  ASSERT_FALSE(datagrams.hasError());
+  ASSERT_EQ(datagrams->size(), 1);
+  EXPECT_EQ(datagrams->front()->computeChainDataLength(), payloadSize);
+  EXPECT_FALSE(conn.localConnectionError.has_value());
+  EXPECT_FALSE(transport->isClosed());
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    DatagramAboveAdvertisedSizeIsProtocolViolation) {
+  constexpr uint64_t kReadLimit = 256;
+  auto& conn = transport->getConnectionState();
+  conn.datagramState.maxReadFrameSize = kReadLimit;
+  conn.datagramState.maxReadBufferSize = 1;
+
+  NiceMock<MockDatagramCallback> datagramCb;
+  ASSERT_FALSE(transport->setDatagramCallback(&datagramCb).hasError());
+  EXPECT_CALL(datagramCb, onDatagramsAvailable()).Times(0);
+  EXPECT_CALL(
+      connSetupCallback,
+      onConnectionSetupError(IsError(TransportErrorCode::PROTOCOL_VIOLATION)));
+
+  transport->addDatagram(
+      folly::IOBuf::copyBuffer(std::string(kReadLimit + 1, 'd')));
+  transport->driveReadCallbacks();
+
+  EXPECT_TRUE(conn.datagramState.readBuffer.empty());
+  ASSERT_TRUE(conn.localConnectionError.has_value());
+  EXPECT_EQ(
+      conn.localConnectionError->code,
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION));
+  EXPECT_TRUE(transport->isClosed());
 }
 
 TEST_F(QuicTransportImplTestBase, ZeroLengthDatagram) {

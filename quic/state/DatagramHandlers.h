@@ -15,7 +15,7 @@ namespace quic {
 /**
  * Processes a Datagram frame
  */
-void handleDatagram(
+[[nodiscard]] quic::Expected<void, QuicError> handleDatagram(
     QuicConnectionStateBase& conn,
     DatagramFrame& frame,
     TimePoint recvTimePoint);
