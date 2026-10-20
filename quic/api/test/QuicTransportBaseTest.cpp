@@ -937,6 +937,64 @@ TEST_F(QuicTransportImplTestBase, StopSendingClosesIngress) {
   transport.reset();
 }
 
+// With dropIngressOnStopSending, the reliable bytes of a RESET_STREAM_AT are
+// never delivered. In either order the reset must close the receive side and
+// release connection credit up to the final size.
+TEST_F(QuicTransportImplTestBase, StopSendingDropsIngressThenReliableReset) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.dropIngressOnStopSending = true;
+  transport->setTransportSettings(transportSettings);
+  auto& conn = *transport->transportConn;
+  constexpr auto kErrCode = GenericApplicationErrorCode::NO_ERROR;
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
+  const auto len = data->computeChainDataLength();
+
+  auto id = transport->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  ASSERT_FALSE(transport->setReadCallback(id, &readCb).hasError());
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
+  auto* stream = transport->getStream(id);
+  const auto sumBefore = conn.flowControlState.sumCurReadOffset;
+
+  ASSERT_FALSE(transport->stopSending(id, kErrCode).hasError());
+  ASSERT_FALSE(receiveRstStreamSMHandler(
+                   *stream, RstStreamFrame(id, kErrCode, 2 * len, len + 5))
+                   .hasError());
+  EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, sumBefore + 2 * len);
+  transport.reset();
+}
+
+TEST_F(QuicTransportImplTestBase, ReliableResetThenStopSendingDropsIngress) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.dropIngressOnStopSending = true;
+  transport->setTransportSettings(transportSettings);
+  auto& conn = *transport->transportConn;
+  constexpr auto kErrCode = GenericApplicationErrorCode::NO_ERROR;
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
+  const auto len = data->computeChainDataLength();
+
+  auto id = transport->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  ASSERT_FALSE(transport->setReadCallback(id, &readCb).hasError());
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
+  auto* stream = transport->getStream(id);
+  const auto sumBefore = conn.flowControlState.sumCurReadOffset;
+
+  // The reset waits for reliable bytes that haven't arrived.
+  ASSERT_FALSE(receiveRstStreamSMHandler(
+                   *stream, RstStreamFrame(id, kErrCode, 2 * len, len + 5))
+                   .hasError());
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, sumBefore);
+
+  // Dropping ingress means they never will, so the reset completes.
+  ASSERT_FALSE(transport->stopSending(id, kErrCode).hasError());
+  EXPECT_EQ(stream->recvState, StreamRecvState::Closed);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, sumBefore + 2 * len);
+  transport.reset();
+}
+
 TEST_F(QuicTransportImplTestBase, NoopStopSendingIngressClosed) {
   // create bidi stream
   auto streamID = transport->createBidirectionalStream().value();

@@ -83,6 +83,12 @@ quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
 quic::Expected<void, QuicError> receiveRstStreamSMHandler(
     QuicStreamState& stream,
     const RstStreamFrame& rst) {
+  if (stream.stopSendingRequested && rst.reliableSize.value_or(0) > 0) {
+    // Ingress was dropped on STOP_SENDING, so the reliable bytes will never be
+    // delivered. Handle the frame as a plain RESET_STREAM.
+    RstStreamFrame plainRst(rst.streamId, rst.errorCode, rst.finalSize);
+    return receiveRstStreamSMHandler(stream, plainRst);
+  }
   switch (stream.recvState) {
     case StreamRecvState::Closed: {
       // This will check whether the reset is still consistent with the
