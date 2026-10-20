@@ -814,13 +814,13 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     if (transportSettingsOverrideFn_) {
       transportSettingsOverrideFn_(transportSettingsCopy);
     }
+    // Transports only use the worker's buffer with ContinuousMemory, so falling
+    // back to ChainedMemory per connection is fine, but not the reverse.
     LOG_IF(
         ERROR,
-        transportSettingsCopy.dataPathType != transportSettings_.dataPathType)
-        << "Overriding DataPathType isn't supported. Requested datapath="
-        << (transportSettingsCopy.dataPathType == DataPathType::ContinuousMemory
-                ? "ContinuousMemory"
-                : "ChainedMemory");
+        transportSettingsCopy.dataPathType == DataPathType::ContinuousMemory &&
+            transportSettings_.dataPathType != DataPathType::ContinuousMemory)
+        << "Overriding DataPathType to ContinuousMemory isn't supported";
 
     trans->setTransportSettings(transportSettingsCopy);
     trans->setConnectionIdAlgo(connIdAlgo_.get());
