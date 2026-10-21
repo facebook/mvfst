@@ -27,6 +27,17 @@ namespace quic {
 class ClientHandshakeFactory;
 class QuicTokenCache;
 
+struct ConnectionLifecycleDebugState {
+  std::chrono::milliseconds connectionAge{0};
+  std::chrono::milliseconds lastRxAge{0};
+  std::chrono::milliseconds lastTxAge{0};
+  Optional<std::chrono::milliseconds> idleDeadlineDelta;
+  Optional<std::chrono::milliseconds> lastIdleDeadlineOverdue;
+  uint64_t idleTimeoutFiredCount{0};
+  uint64_t keepaliveTimeoutFiredCount{0};
+  uint64_t keepaliveExpiredIdleDeadlineCount{0};
+};
+
 class QuicClientTransportLite
     : virtual public QuicTransportBaseLite,
       public QuicAsyncUDPSocket::ReadCallback,
@@ -246,6 +257,8 @@ class QuicClientTransportLite
   uint64_t getEnobufsCount() const;
 
   std::chrono::milliseconds getConnectionIdleDuration() const;
+
+  ConnectionLifecycleDebugState getConnectionLifecycleDebugState() const;
 
   int64_t getNetworkReadCallbackStartTimeMs() const;
 

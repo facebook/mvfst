@@ -382,6 +382,7 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
         : transport_(transport) {}
 
     void timeoutExpired() noexcept override {
+      ++transport_->idleTimeoutFiredCount_;
       transport_->idleTimeoutExpired(true /* drain */);
     }
 
@@ -950,6 +951,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   ExcessWriteTimeout excessWriteTimeout_;
   IdleTimeout idleTimeout_;
   KeepaliveTimeout keepaliveTimeout_;
+  Optional<TimePoint> idleTimeoutDeadline_;
+  uint64_t idleTimeoutFiredCount_{0};
+  uint64_t keepaliveTimeoutFiredCount_{0};
+  uint64_t keepaliveExpiredIdleDeadlineCount_{0};
+  Optional<std::chrono::milliseconds> lastIdleDeadlineOverdue_;
   AckTimeout ackTimeout_;
   PathValidationTimeout pathValidationTimeout_;
   DrainTimeout drainTimeout_;

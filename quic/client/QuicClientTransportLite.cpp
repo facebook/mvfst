@@ -2353,6 +2353,35 @@ std::chrono::milliseconds QuicClientTransportLite::getConnectionIdleDuration()
       now - lastReceivedPacketTime);
 }
 
+ConnectionLifecycleDebugState
+QuicClientTransportLite::getConnectionLifecycleDebugState() const {
+  const auto now = Clock::now();
+  const auto ageSince = [now](TimePoint time) {
+    return time >= now
+        ? std::chrono::milliseconds::zero()
+        : std::chrono::duration_cast<std::chrono::milliseconds>(now - time);
+  };
+  const auto lastTxTime =
+      conn_->lossState.maybeLastPacketSentTime.value_or(conn_->connectionTime);
+
+  ConnectionLifecycleDebugState state{
+      .connectionAge = ageSince(conn_->connectionTime),
+      .lastRxAge = getConnectionIdleDuration(),
+      .lastTxAge = ageSince(lastTxTime),
+      .idleDeadlineDelta = std::nullopt,
+      .lastIdleDeadlineOverdue = lastIdleDeadlineOverdue_,
+      .idleTimeoutFiredCount = idleTimeoutFiredCount_,
+      .keepaliveTimeoutFiredCount = keepaliveTimeoutFiredCount_,
+      .keepaliveExpiredIdleDeadlineCount = keepaliveExpiredIdleDeadlineCount_,
+  };
+  if (idleTimeoutDeadline_.has_value()) {
+    state.idleDeadlineDelta =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            *idleTimeoutDeadline_ - now);
+  }
+  return state;
+}
+
 int64_t QuicClientTransportLite::getNetworkReadCallbackStartTimeMs() const {
   if (networkReadCallbackStartTime_ == TimePoint{}) {
     return -1;

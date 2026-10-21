@@ -50,6 +50,14 @@ class QuicClientTransportLiteMock : public QuicClientTransportLite {
   [[nodiscard]] quic::Expected<void, QuicError> invokeWriteSocketData() {
     return writeSocketData();
   }
+
+  void setIdleTimeoutDeadlineForTest(TimePoint deadline) {
+    idleTimeoutDeadline_ = deadline;
+  }
+
+  void invokeKeepaliveTimeoutExpiredForTest() {
+    keepaliveTimeoutExpired();
+  }
 };
 
 class QuicClientTransportLiteTest : public Test {
@@ -188,6 +196,33 @@ TEST_F(
 
   EXPECT_GE(idleDuration, std::chrono::milliseconds(1900));
   EXPECT_LT(idleDuration, std::chrono::milliseconds(3000));
+}
+
+TEST_F(
+    QuicClientTransportLiteTest,
+    ConnectionLifecycleDebugStateTracksIdleDeadlineAndTimer) {
+  const auto now = Clock::now();
+  auto* conn = quicClient_->getConn();
+  conn->connectionTime = now - std::chrono::seconds(20);
+  conn->ackStates.appDataAckState.largestRecvdPacketTime =
+      now - std::chrono::seconds(2);
+  conn->lossState.maybeLastPacketSentTime = now - std::chrono::seconds(3);
+  quicClient_->setIdleTimeoutDeadlineForTest(
+      now - std::chrono::milliseconds(500));
+
+  quicClient_->invokeKeepaliveTimeoutExpiredForTest();
+  const auto state = quicClient_->getConnectionLifecycleDebugState();
+
+  EXPECT_GE(state.connectionAge, std::chrono::milliseconds(19'900));
+  EXPECT_GE(state.lastRxAge, std::chrono::milliseconds(1'900));
+  EXPECT_GE(state.lastTxAge, std::chrono::milliseconds(2'900));
+  ASSERT_TRUE(state.idleDeadlineDelta.has_value());
+  EXPECT_LE(*state.idleDeadlineDelta, std::chrono::milliseconds(-500));
+  ASSERT_TRUE(state.lastIdleDeadlineOverdue.has_value());
+  EXPECT_GE(*state.lastIdleDeadlineOverdue, std::chrono::milliseconds(500));
+  EXPECT_EQ(state.idleTimeoutFiredCount, 0);
+  EXPECT_EQ(state.keepaliveTimeoutFiredCount, 1);
+  EXPECT_EQ(state.keepaliveExpiredIdleDeadlineCount, 1);
 }
 
 TEST_F(

@@ -2723,6 +2723,12 @@ void QuicTransportBaseLite::lossTimeoutExpired() noexcept {
 void QuicTransportBaseLite::idleTimeoutExpired(bool drain) noexcept {
   MVVLOG(4) << __func__ << " " << *this;
   [[maybe_unused]] auto self = sharedGuard();
+  const auto now = Clock::now();
+  if (idleTimeoutDeadline_.has_value() && now >= *idleTimeoutDeadline_) {
+    lastIdleDeadlineOverdue_ =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - *idleTimeoutDeadline_);
+  }
   // idle timeout is expired, just close the connection and drain or
   // send connection close immediately depending on 'drain'
   MVDCHECK_NE(closeState_, CloseState::CLOSED);
@@ -2759,6 +2765,16 @@ void QuicTransportBaseLite::sendPing(
 
 void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {
   [[maybe_unused]] auto self = sharedGuard();
+  ++keepaliveTimeoutFiredCount_;
+  const auto now = Clock::now();
+  const bool idleDeadlineExpired =
+      idleTimeoutDeadline_.has_value() && now >= *idleTimeoutDeadline_;
+  if (idleDeadlineExpired) {
+    ++keepaliveExpiredIdleDeadlineCount_;
+    lastIdleDeadlineOverdue_ =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - *idleTimeoutDeadline_);
+  }
   conn_->pendingEvents.sendPing = true;
   updateWriteLooper(true);
 }
@@ -3323,6 +3339,7 @@ void QuicTransportBaseLite::setIdleTimer() {
   }
   cancelTimeout(&idleTimeout_);
   cancelTimeout(&keepaliveTimeout_);
+  idleTimeoutDeadline_.reset();
   auto localIdleTimeout = conn_->transportSettings.idleTimeout;
   // The local idle timeout being zero means it is disabled.
   if (localIdleTimeout == 0ms) {
@@ -3332,6 +3349,7 @@ void QuicTransportBaseLite::setIdleTimer() {
       conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
   auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
 
+  idleTimeoutDeadline_ = Clock::now() + idleTimeout;
   scheduleTimeout(&idleTimeout_, idleTimeout);
   auto idleTimeoutCount = idleTimeout.count();
   if (conn_->transportSettings.enableKeepalive) {
