@@ -20,6 +20,7 @@
 #include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <cmath>
 #include <limits>
@@ -509,6 +510,23 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::stopSending(
     return {};
   }
   processTxStopSending(*stream);
+  if (stream->stopSendingRequested && stream->reliableSizeFromPeer) {
+    // A reliable reset was waiting for bytes that are now dropped. Finish it as
+    // a plain reset so the stream closes and releases its credit.
+    auto rstResult = receiveRstStreamSMHandler(
+        *stream,
+        RstStreamFrame(
+            id,
+            *stream->streamReadError->asApplicationErrorCode(),
+            *stream->finalReadOffset));
+    if (!rstResult.has_value()) {
+      closeImpl(QuicError(
+          QuicErrorCode(rstResult.error().code),
+          std::string("stopSending() error")));
+      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
+    }
+    updateReadLooper();
+  }
   // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
