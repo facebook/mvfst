@@ -149,6 +149,8 @@ std::string toString(TransportErrorCode code) {
       return "Frame format error";
     case TransportErrorCode::TRANSPORT_PARAMETER_ERROR:
       return "Transport parameter error";
+    case TransportErrorCode::CONNECTION_ID_LIMIT_ERROR:
+      return "Connection id limit error";
     case TransportErrorCode::PROTOCOL_VIOLATION:
       return "Protocol violation";
     case TransportErrorCode::INVALID_MIGRATION:
@@ -184,6 +186,7 @@ std::vector<TransportErrorCode> getAllTransportErrorCodes() {
       TransportErrorCode::FINAL_SIZE_ERROR,
       TransportErrorCode::FRAME_ENCODING_ERROR,
       TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+      TransportErrorCode::CONNECTION_ID_LIMIT_ERROR,
       TransportErrorCode::PROTOCOL_VIOLATION,
       TransportErrorCode::INVALID_MIGRATION,
       TransportErrorCode::CRYPTO_ERROR,
