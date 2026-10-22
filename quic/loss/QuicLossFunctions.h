@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <folly/Chrono.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/Expected.h>
@@ -24,6 +23,7 @@
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
+#include <chrono>
 
 namespace quic {
 
@@ -95,7 +95,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
   auto [deadline, method] = computeLossTimerDeadline(conn);
   auto now = ClockType::now();
   auto remaining = deadline > now
-      ? folly::chrono::ceil<std::chrono::milliseconds>(deadline - now)
+      ? std::chrono::ceil<std::chrono::milliseconds>(deadline - now)
       : std::chrono::milliseconds(0);
   return {remaining, method};
 }

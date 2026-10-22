@@ -2906,7 +2906,7 @@ TYPED_TEST(
                       ->getBackingEventBase();
   follyEvb->timer().scheduleTimeoutFn(
       [&] { transport->getEventBase()->terminateLoopSoon(); },
-      folly::chrono::ceil<std::chrono::milliseconds>(
+      std::chrono::ceil<std::chrono::milliseconds>(
           1ms + kDrainFactor * calculatePTO(this->getConn())));
   transport->getEventBase()->loop();
   Mock::VerifyAndClearExpectations(observer.get());

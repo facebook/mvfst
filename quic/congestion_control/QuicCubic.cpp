@@ -16,7 +16,7 @@
 #include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 
-#include <folly/Chrono.h>
+#include <chrono>
 
 namespace quic {
 
@@ -353,7 +353,7 @@ void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
   if (!idle && currentAppIdle && *quiescenceStart_ <= eventTime &&
       steadyState_.lastReductionTime) {
     *steadyState_.lastReductionTime +=
-        folly::chrono::ceil<std::chrono::milliseconds>(
+        std::chrono::ceil<std::chrono::milliseconds>(
             eventTime - *quiescenceStart_);
   }
   if (!idle) {
@@ -418,7 +418,7 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
     MVLOG_WARNING << "Cubic ackTime earlier than reduction time";
     return 0;
   }
-  auto timeElapsed = folly::chrono::ceil<std::chrono::milliseconds>(
+  auto timeElapsed = std::chrono::ceil<std::chrono::milliseconds>(
       ackTime - *steadyState_.lastReductionTime);
   int64_t delta = 0;
   auto timeElapsedCount = static_cast<double>(timeElapsed.count());

@@ -29,7 +29,6 @@ mvfst_add_library(mvfst_loss
     mvfst_state_quic_state_machine
     mvfst_state_simple_frame_functions
     mvfst_state_state_functions
-    Folly::folly_chrono
 )
 
 add_subdirectory(test)

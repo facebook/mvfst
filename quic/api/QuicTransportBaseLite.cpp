@@ -21,6 +21,7 @@
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <chrono>
 #include <cmath>
 #include <limits>
 
@@ -2026,7 +2027,7 @@ void QuicTransportBaseLite::closeImpl(
     MVDCHECK(!isTimeoutScheduled(&drainTimeout_));
     scheduleTimeout(
         &drainTimeout_,
-        folly::chrono::ceil<std::chrono::milliseconds>(
+        std::chrono::ceil<std::chrono::milliseconds>(
             kDrainFactor * calculatePTO(*conn_)));
   } else {
     drainTimeoutExpired();
@@ -3671,7 +3672,7 @@ void QuicTransportBaseLite::scheduleAckTimeout() {
           std::chrono::duration_cast<std::chrono::microseconds>(
               evb_->getTimerTickInterval()),
           timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
-      auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
+      auto timeoutMs = std::chrono::ceil<std::chrono::milliseconds>(timeout);
       MVVLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
                  << " factoredRtt=" << factoredRtt.count() << "us" << " "
                  << *this;

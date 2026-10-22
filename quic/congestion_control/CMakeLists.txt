@@ -88,7 +88,6 @@ mvfst_add_library(mvfst_congestion_control_cubic
     mvfst_logging_qlogger_macros
     mvfst_state_connection_oops_fields
     mvfst_state_state_functions
-    Folly::folly_chrono
   EXPORTED_DEPS
     mvfst_congestion_control_congestion_control_functions
     mvfst_congestion_control_congestion_controller

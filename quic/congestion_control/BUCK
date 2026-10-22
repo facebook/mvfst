@@ -137,7 +137,6 @@ mvfst_cpp_library(
     ],
     deps = [
         ":ecn_l4s_tracker",
-        "//folly:chrono",
         "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
         "//quic/logging:qlogger_macros",

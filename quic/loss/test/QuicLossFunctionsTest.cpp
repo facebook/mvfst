@@ -23,10 +23,12 @@
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/loss/QuicLossFunctions.h>
+
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
+#include <chrono>
 
 using namespace folly::test;
 using namespace testing;
@@ -1426,7 +1428,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   MockClock::mockNow = [=]() { return sendTime; };
   auto alarm = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(
-      folly::chrono::ceil<std::chrono::milliseconds>(expectedDelayUntilLost),
+      std::chrono::ceil<std::chrono::milliseconds>(expectedDelayUntilLost),
       alarm.first);
   EXPECT_EQ(LossState::AlarmMethod::EarlyRetransmitOrReordering, alarm.second);
   // Manual set lossState. Calling setLossDetectionAlarm requires a Timeout
