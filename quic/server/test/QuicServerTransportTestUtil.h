@@ -92,6 +92,10 @@ class TestingQuicServerTransport : public QuicServerTransport {
     return keepaliveTimeout_;
   }
 
+  void setIdleTimeoutDeadline(TimePoint deadline) {
+    idleTimeoutDeadline_ = deadline;
+  }
+
   auto& drainTimeout() {
     return drainTimeout_;
   }

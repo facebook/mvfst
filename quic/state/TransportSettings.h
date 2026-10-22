@@ -393,6 +393,9 @@ struct TransportSettings {
   // before an idle timeout. To work effectively this means the idle timer
   // has to be set to something >> the RTT of the connection.
   bool enableKeepalive{false};
+  // Close the connection instead of sending a keepalive when event-loop
+  // delay has allowed the idle deadline to pass first.
+  bool prioritizeExpiredIdleTimeout{false};
   // Whether or not to enable WritableBytes limit (server only)
   bool enableWritableBytesLimit{false};
   // (server only) When true, onTransportReady() is driven by the Fizz handshake

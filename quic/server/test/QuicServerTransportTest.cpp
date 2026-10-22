@@ -587,6 +587,49 @@ TEST_F(QuicServerTransportTest, KeepaliveTimeoutExpired) {
       serverWrites, *serverReadCodec, QuicFrame::Type::PingFrame));
 }
 
+TEST_F(QuicServerTransportTest, KeepalivePreservesExpiredIdleByDefault) {
+  server->setIdleTimeoutDeadline(Clock::now() - 1ms);
+
+  server->keepaliveTimeout().timeoutExpired();
+
+  EXPECT_FALSE(server->isDraining());
+  EXPECT_FALSE(server->isClosed());
+  loopForWrites();
+  auto serverReadCodec = makeClientEncryptedCodec();
+  EXPECT_TRUE(verifyFramePresent(
+      serverWrites, *serverReadCodec, QuicFrame::Type::PingFrame));
+}
+
+TEST_F(QuicServerTransportTest, KeepaliveClosesExpiredIdleWhenPrioritized) {
+  server->getNonConstConn().transportSettings.prioritizeExpiredIdleTimeout =
+      true;
+  server->setIdleTimeoutDeadline(Clock::now() - 1ms);
+
+  server->keepaliveTimeout().timeoutExpired();
+
+  EXPECT_TRUE(server->isDraining());
+  EXPECT_TRUE(server->isClosed());
+  loopForWrites();
+  auto serverReadCodec = makeClientEncryptedCodec();
+  EXPECT_FALSE(verifyFramePresent(
+      serverWrites, *serverReadCodec, QuicFrame::Type::PingFrame));
+}
+
+TEST_F(QuicServerTransportTest, KeepaliveRunsBeforeFutureIdleDeadline) {
+  server->getNonConstConn().transportSettings.prioritizeExpiredIdleTimeout =
+      true;
+  server->setIdleTimeoutDeadline(Clock::now() + 1h);
+
+  server->keepaliveTimeout().timeoutExpired();
+
+  EXPECT_FALSE(server->isDraining());
+  EXPECT_FALSE(server->isClosed());
+  loopForWrites();
+  auto serverReadCodec = makeClientEncryptedCodec();
+  EXPECT_TRUE(verifyFramePresent(
+      serverWrites, *serverReadCodec, QuicFrame::Type::PingFrame));
+}
+
 TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
   server->idleTimeout().timeoutExpired();
 

@@ -2774,6 +2774,10 @@ void QuicTransportBaseLite::keepaliveTimeoutExpired() noexcept {
     lastIdleDeadlineOverdue_ =
         std::chrono::duration_cast<std::chrono::milliseconds>(
             now - *idleTimeoutDeadline_);
+    if (conn_->transportSettings.prioritizeExpiredIdleTimeout) {
+      idleTimeoutExpired(true /* drain */);
+      return;
+    }
   }
   conn_->pendingEvents.sendPing = true;
   updateWriteLooper(true);
