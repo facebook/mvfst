@@ -8,7 +8,7 @@ mvfst_cpp_test(
         "StreamSendBufferTest.cpp",
     ],
     deps = [
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/state:stream_send_buffer",
     ],
 )
@@ -20,7 +20,7 @@ mvfst_cpp_library(
         "Mocks.h",
     ],
     exported_deps = [
-        "//folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gmock",
         "//quic:constants",
         "//quic:exception",
         "//quic/congestion_control:congestion_controller_factory",
@@ -126,7 +126,7 @@ mvfst_cpp_test(
         "QuicPacingFunctionsTest.cpp",
     ],
     deps = [
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/state:pacing_functions",
     ],
 )
@@ -149,7 +149,7 @@ mvfst_cpp_test(
         "TransportSettingsFunctionsTest.cpp",
     ],
     deps = [
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/state:transport_settings_functions",
     ],
 )
@@ -177,7 +177,7 @@ mvfst_cpp_test(
         "ClonedPacketIdentifierTest.cpp",
     ],
     deps = [
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/state:cloned_packet_identifier",
     ],
 )
@@ -249,8 +249,8 @@ mvfst_cpp_test(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
+        "fbsource//xplat/folly:network_address",
         ":mocks",
-        "//folly:network_address",
         "//quic:constants",
         "//quic/codec:types",
         "//quic/common/udpsocket/test:QuicAsyncUDPSocketMock",

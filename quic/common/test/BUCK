@@ -41,7 +41,7 @@ mvfst_cpp_test(
     ],
     deps = [
         "fbsource//third-party/fmt:fmt",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic:exception",
     ],
 )
@@ -52,7 +52,7 @@ mvfst_cpp_test(
         "BufAccessorTest.cpp",
     ],
     deps = [
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/common:buf_accessor",
     ],
 )
@@ -63,7 +63,7 @@ mvfst_cpp_test(
         "BufUtilTest.cpp",
     ],
     deps = [
-        "//folly/io:iobuf",
+        "fbsource//xplat/folly/io:iobuf",
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
         "//quic/common:string_utils",
@@ -124,7 +124,7 @@ mvfst_cpp_library(
         "//quic/flowcontrol:flow_control",
     ],
     exported_deps = [
-        "//folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gmock",
         "//quic/common:buf_util",
         "//quic/common:expected",
         "//quic/common:mvfst_logging",
@@ -215,8 +215,8 @@ mvfst_cpp_test(
         "TransportKnobsTest.cpp",
     ],
     deps = [
-        "//folly:format",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly:format",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic:constants",
         "//quic/common:transport_knobs",
     ],
@@ -228,8 +228,8 @@ mvfst_cpp_test(
         "CircularDequeTest.cpp",
     ],
     deps = [
+        "fbsource//xplat/folly:random",
         ":test_utils",
-        "//folly:random",
         "//quic/common:circular_deque",
         "//quic/common:mvfst_logging",
     ],
@@ -242,7 +242,7 @@ mvfst_cpp_benchmark(
     ],
     headers = [],
     deps = [
-        "//folly:benchmark",
+        "fbsource//xplat/folly:benchmark",
         "//quic/common:circular_deque",
         "//quic/common/test:test_utils",
     ],
@@ -255,7 +255,7 @@ mvfst_cpp_test(
     ],
     deps = [
         "fbsource//third-party/googletest:gmock",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/common:socket_util",
         "//quic/common/events:folly_eventbase",
         "//quic/common/udpsocket:folly_async_udp_socket",

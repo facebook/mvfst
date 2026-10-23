@@ -11,9 +11,9 @@ mvfst_cpp_test(
     network_access = network_access_utils.none(),
     supports_static_listing = False,
     deps = [
-        "//folly/io/async/test:mocks",
-        "//folly/portability:gmock",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/io/async/test:mocks",
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/api:transport_helpers",
         "//quic/api/test:api_mocks",
         "//quic/api/test:mocks",

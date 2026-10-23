@@ -6,8 +6,8 @@ mvfst_cpp_library(
     name = "socket_observer_container",
     headers = ["SocketObserverContainer.h"],
     exported_deps = [
+        "fbsource//xplat/folly:observer_container",
         ":socket_observer_interface",
-        "//folly:observer_container",
         "//quic/common:mvfst_logging",
     ],
 )

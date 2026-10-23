@@ -34,10 +34,10 @@ constraint_with_aliases(
 # header the `headers` select picks. Keep these on the same select axes as
 # `headers` so ARVR Android can keep the server address aliases.
 _CONFIG_SERVER_DEPS = [
-    "//folly:network_address",  # @manual
-    "//folly:small_vector",  # @manual
-    "//folly/container:f14_hash",  # @manual
-    "//folly/container:heap_vector_types",  # @manual
+    "fbsource//xplat/folly:network_address",  # @manual
+    "fbsource//xplat/folly:small_vector",  # @manual
+    "fbsource//xplat/folly/container:f14_hash",  # @manual
+    "fbsource//xplat/folly/container:heap_vector_types",  # @manual
     "//quic/common/third-party:tiny_optional",  # @manual
 ]
 
@@ -67,13 +67,13 @@ mvfst_cpp_library(
     }),
     exported_deps = select({
         "DEFAULT": [
-            "//folly/lang:assume",
+            "fbsource//xplat/folly/lang:assume",
             "//quic/common/third-party:better_enums",
         ],
         "ovr_config//os/constraints:android": select({
             "DEFAULT": [],
             "ovr_config//build_mode:arvr_mode[enabled]": [
-                "//folly/lang:assume",
+                "fbsource//xplat/folly/lang:assume",
                 "//quic/common/third-party:better_enums",
             ],
         }),
@@ -145,21 +145,21 @@ _CONSTANTS_TYPEALIASES_MOBILE_HEADERS = {
 
 _CONSTANTS_SERVER_DEPS = [
     ":enum",
-    "//folly/chrono:clock",
-    "//folly/io:iobuf",
+    "fbsource//xplat/folly/chrono:clock",
+    "fbsource//xplat/folly/io:iobuf",
 ]
 
 _CONSTANTS_SOCKET_ADDRESS_MOBILE_DEPS = [
     ":config",
     ":enum",
-    "//folly/chrono:clock",
-    "//folly/io:iobuf",
+    "fbsource//xplat/folly/chrono:clock",
+    "fbsource//xplat/folly/io:iobuf",
 ]
 
 _CONSTANTS_TYPEALIASES_MOBILE_DEPS = [
     ":config",
     ":enum",
-    "//folly/chrono:clock",
+    "fbsource//xplat/folly/chrono:clock",
     "//quic/common:quic_buffer",
     "//quic/common:quic_iobuf_queue",
 ]
@@ -191,7 +191,7 @@ mvfst_cpp_library(
         "fbsource//tools/build_defs/config/apps/shared:constraint-value-quic-typealiases-mobile": _CONSTANTS_TYPEALIASES_MOBILE_HEADERS,
     }),
     deps = [
-        "//folly/lang:assume",
+        "fbsource//xplat/folly/lang:assume",
     ],
     exported_deps = select({
         "DEFAULT": select({
@@ -232,9 +232,9 @@ mvfst_cpp_library(
     + [],
     exported_deps = [
         "fbsource//third-party/fmt:fmt",
+        "fbsource//xplat/folly:range",
         ":constants",
         ":tls_exception",
-        "//folly:range",
         "//quic/common:optional",
         "//quic/common:variant",
     ],

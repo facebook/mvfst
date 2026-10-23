@@ -11,7 +11,7 @@ mvfst_cpp_library(
         "QuicClientTransport.h",
     ],
     deps = [
-        "//folly:string",
+        "fbsource//xplat/folly:string",
         "//quic/common:mvfst_logging",
         "//quic/happyeyeballs:happyeyeballs",
         "//quic/loss:loss",
@@ -32,8 +32,8 @@ mvfst_cpp_library(
         "QuicClientTransportLite.h",
     ],
     deps = [
+        "fbsource//xplat/folly/portability:sockets",
         ":client_extension",
-        "//folly/portability:sockets",
         "//quic:constants",
         "//quic/api:loop_detector_callback",
         "//quic/api:transport_helpers",
@@ -54,10 +54,10 @@ mvfst_cpp_library(
         "//quic/state/stream:stream",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:random",
+        "fbsource//xplat/folly/io:socket_option_map",
+        "fbsource//xplat/folly/net:net_ops",
         ":state_and_handshake",
-        "//folly:random",
-        "//folly/io:socket_option_map",
-        "//folly/net:net_ops",
         "//quic/api:transport_lite",
         "//quic/common:buf_accessor",
         "//quic/common:buf_util",
@@ -95,9 +95,9 @@ mvfst_cpp_library(
         "//quic/state:stream_functions",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:exception_wrapper",
+        "fbsource//xplat/folly/io/async:delayed_destruction",
         "//fizz/protocol:certificate_base",
-        "//folly:exception_wrapper",
-        "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic:exception",
         "//quic/common:expected",
@@ -148,9 +148,9 @@ mvfst_cpp_library(
         "//fizz/util:status",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:range",
+        "fbsource//xplat/folly/io:iobuf",
         ":cached_server_tp",
-        "//folly:range",
-        "//folly/io:iobuf",
     ],
 )
 
@@ -163,7 +163,7 @@ mvfst_cpp_library(
         "QuicClientAsyncTransport.h",
     ],
     deps = [
-        "//folly/debugging/symbolizer:symbolizer",
+        "fbsource//xplat/folly/debugging/symbolizer:symbolizer",
         "//quic/common:mvfst_logging",
     ],
     exported_deps = [

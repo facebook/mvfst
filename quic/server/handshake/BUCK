@@ -19,13 +19,13 @@ mvfst_cpp_library(
         "//quic/state:stream_functions",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:optional",
+        "fbsource//xplat/folly/io/async:delayed_destruction",
         ":app_token",
         ":server_extension",
         "//fizz/protocol:default_certificate_verifier",
         "//fizz/server:fizz_server",
         "//fizz/server:fizz_server_context",
-        "//folly:optional",
-        "//folly/io/async:delayed_destruction",
         "//quic:constants",
         "//quic:exception",
         "//quic/handshake:handshake",
@@ -71,8 +71,8 @@ mvfst_cpp_library(
         "DefaultAppTokenValidator.h",
     ],
     deps = [
+        "fbsource//xplat/folly:network_address",
         "//fizz/server:resumption_state",
-        "//folly:network_address",
         "//quic:constants",
         "//quic/api:transport",
         "//quic/api:transport_helpers",
@@ -82,8 +82,8 @@ mvfst_cpp_library(
         "//quic/server/state:server",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/io:iobuf",
         "//fizz/server:protocol",
-        "//folly/io:iobuf",
         "//quic/common:optional",
     ],
 )
@@ -97,9 +97,9 @@ mvfst_cpp_library(
         "StatelessResetGenerator.h",
     ],
     deps = [
+        "fbsource//xplat/folly:range",
         "//fizz/backend:openssl",
         "//fizz/util:status",
-        "//folly:range",
     ],
     exported_deps = [
         "//fizz/crypto:crypto",
@@ -117,13 +117,13 @@ mvfst_cpp_library(
         "TokenGenerator.h",
     ],
     deps = [
-        "//folly:range",
+        "fbsource//xplat/folly:range",
         "//quic/codec:decode",
         "//quic/common:mvfst_logging",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/io:iobuf",
         "//fizz/server:aead_token_cipher",
-        "//folly/io:iobuf",
         "//quic/codec:types",
     ],
 )

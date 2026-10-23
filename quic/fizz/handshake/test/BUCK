@@ -10,9 +10,9 @@ mvfst_cpp_test(
     ],
     network_access = network_access_utils.none(),
     deps = [
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
         "//fizz/record/test:extension_tests_base",
-        "//folly/portability:gmock",
-        "//folly/portability:gtest",
         "//quic:constants",
         "//quic/common/test:test_utils",
         "//quic/fizz/handshake:fizz_handshake",
@@ -26,9 +26,9 @@ mvfst_cpp_test(
     ],
     network_access = network_access_utils.none(),
     deps = [
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
         "//fizz/crypto/aead/test:mocks",
-        "//folly/portability:gmock",
-        "//folly/portability:gtest",
         "//quic/common:string_utils",
         "//quic/common/test:test_utils",
         "//quic/fizz/handshake:fizz_handshake",
@@ -44,8 +44,8 @@ mvfst_cpp_test(
     network_access = network_access_utils.none(),
     supports_static_listing = False,
     deps = [
+        "fbsource//xplat/folly/portability:gtest",
         "//fizz/record:record",
-        "//folly/portability:gtest",
         "//quic/common:string_utils",
         "//quic/fizz/handshake:fizz_handshake",
         "//quic/fizz/handshake:fizz_packet_number_cipher",

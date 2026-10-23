@@ -63,7 +63,7 @@ mvfst_cpp_library(
         "RetryIntegrityTagGenerator.h",
     ],
     exported_deps = [
-        "//folly/io:iobuf",
+        "fbsource//xplat/folly/io:iobuf",
         "//quic:constants",
     ],
 )

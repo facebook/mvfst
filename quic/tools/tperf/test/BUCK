@@ -20,7 +20,7 @@ mvfst_cpp_test(
         "TperfWriteStatsTest.cpp",
     ],
     deps = [
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/tools/tperf:tperf_server",
     ],
 )

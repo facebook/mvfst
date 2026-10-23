@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <folly/json/json.h> // @manual=//folly:dynamic
+#include <folly/json/json.h> // @manual=fbsource//xplat/folly:dynamic
 #include <quic/QuicConstants.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/TransportKnobs.h>

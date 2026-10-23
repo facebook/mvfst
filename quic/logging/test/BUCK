@@ -9,7 +9,7 @@ mvfst_cpp_library(
         "Mocks.h",
     ],
     exported_deps = [
-        "//folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gmock",
         "//quic/logging:qlogger",
     ],
 )
@@ -21,10 +21,10 @@ mvfst_cpp_test(
     ],
     network_access = network_access_utils.none(),
     deps = [
-        "//folly:dynamic",
-        "//folly:file_util",
-        "//folly:random",
-        "//folly/portability:filesystem",
+        "fbsource//xplat/folly:dynamic",
+        "fbsource//xplat/folly:file_util",
+        "fbsource//xplat/folly:random",
+        "fbsource//xplat/folly/portability:filesystem",
         "//quic/common:mvfst_logging",
         "//quic/common/test:test_utils",
         "//quic/congestion_control:bbr",

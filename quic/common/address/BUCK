@@ -12,8 +12,8 @@ mvfst_cpp_library(
     ],
     deps = ["fbsource//third-party/fmt:fmt"],
     exported_deps = [
-        "//folly:network_address",
-        "//folly/portability:sockets",
+        "fbsource//xplat/folly:network_address",
+        "fbsource//xplat/folly/portability:sockets",
     ],
 )
 
@@ -23,8 +23,8 @@ mvfst_cpp_library(
         "QuicSocketAddressBridge.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:network_address",
         ":quic_socket_address",
-        "//folly:network_address",
     ],
 )
 
@@ -37,7 +37,7 @@ mvfst_cpp_library(
         "QuicAddressUtil.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/portability:sockets",
         ":quic_socket_address",
-        "//folly/portability:sockets",
     ],
 )

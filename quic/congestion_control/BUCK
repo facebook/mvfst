@@ -12,7 +12,7 @@ mvfst_cpp_library(
     ],
     deps = [
         "fbsource//third-party/fmt:fmt",
-        "//folly/lang:assume",
+        "fbsource//xplat/folly/lang:assume",
     ],
 )
 
@@ -136,6 +136,7 @@ mvfst_cpp_library(
         "QuicCubic.h",
     ],
     deps = [
+        "fbsource//xplat/folly:chrono",
         ":ecn_l4s_tracker",
         "//quic/common:mvfst_logging",
         "//quic/logging:qlogger_constants",
@@ -213,8 +214,8 @@ mvfst_cpp_library(
         "Bbr.h",
     ],
     deps = [
+        "fbsource//xplat/folly:random",
         ":congestion_control_functions",
-        "//folly:random",
         "//quic:constants",
         "//quic/common:mvfst_logging",
         "//quic/common:time_util",
@@ -351,7 +352,7 @@ mvfst_cpp_library(
         "PacketProcessor.h",
     ],
     exported_deps = [
-        "//folly/io:socket_option_map",
+        "fbsource//xplat/folly/io:socket_option_map",
         "//quic/common:network_data",
         "//quic/common:optional",
         "//quic/state:cloned_packet_identifier",
@@ -373,7 +374,7 @@ mvfst_cpp_library(
     ],
     exported_deps = [
         "fbsource//third-party/glog:glog",
-        "//folly:token_bucket",
+        "fbsource//xplat/folly:token_bucket",
         "//quic:constants",
     ],
 )

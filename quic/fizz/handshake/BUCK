@@ -40,7 +40,7 @@ mvfst_cpp_library(
     exported_deps = [
         "//quic/codec:packet_number_cipher",
     ] + select({
-        "DEFAULT": ["//folly/ssl:openssl_ptr_types"],
+        "DEFAULT": ["fbsource//xplat/folly/ssl:openssl_ptr_types"],
         "fbsource//xplat/fizz/constraints:profile[mnscrypto-only]": ["//quic/facebook/mbed:mbed_packetnum_cipher"],  # @fb-only
     }),
 )

@@ -8,8 +8,8 @@ mvfst_cpp_library(
     headers = ["DatagramFlowManager.h"],
     deps = [],
     exported_deps = [
-        "//folly/container:f14_hash",
-        "//folly/io:iobuf",
+        "fbsource//xplat/folly/container:f14_hash",
+        "fbsource//xplat/folly/io:iobuf",
         "//quic:constants",
         "//quic/common:buf_util",
         "//quic/common:circular_deque",

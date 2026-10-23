@@ -22,8 +22,8 @@ mvfst_cpp_library(
     deps = [],
     exported_deps = [
         "fbsource//third-party/fmt:fmt",
+        "fbsource//xplat/folly/debugging/symbolizer:symbolizer",
         ":oops_logger",
-        "//folly/debugging/symbolizer:symbolizer",
         "//quic/common:mvfst_logging",
     ],
 )

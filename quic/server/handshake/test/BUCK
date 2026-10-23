@@ -12,12 +12,12 @@ fb_dirsync_cpp_unittest(
     deps = [
         "fbsource//third-party/googletest:gmock",
         "fbsource//third-party/googletest:gtest",
+        "fbsource//xplat/folly/io/async:scoped_event_base_thread",
+        "fbsource//xplat/folly/io/async:ssl_context",
         "//fizz/client/test:mocks",
         "//fizz/crypto/test:TestUtil",
         "//fizz/protocol/test:mocks",
         "//fizz/server/test:mocks",
-        "//folly/io/async:scoped_event_base_thread",
-        "//folly/io/async:ssl_context",
         "//quic:constants",
         "//quic/common:mvfst_logging",
         "//quic/common:string_utils",
@@ -89,9 +89,9 @@ fb_dirsync_cpp_unittest(
         "StatelessResetGeneratorTest.cpp",
     ],
     deps = [
-        "//folly:network_address",
-        "//folly:random",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly:network_address",
+        "fbsource//xplat/folly:random",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/server/handshake:stateless_reset_generator",
     ],
 )
@@ -103,8 +103,8 @@ fb_dirsync_cpp_unittest(
     ],
     network_access = network_access_utils.none(),
     deps = [
-        "//folly:random",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly:random",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/server/handshake:token_generator",
     ],
 )

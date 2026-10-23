@@ -13,12 +13,12 @@ mvfst_cpp_library(
         "xsk_lib.h",
     ],
     deps = [
-        "//folly:benchmark",
-        "//folly/net:net_ops",
+        "fbsource//xplat/folly:benchmark",
+        "fbsource//xplat/folly/net:net_ops",
     ],
     exported_deps = [
-        "//folly:cpp_attributes",
-        "//folly:network_address",
+        "fbsource//xplat/folly:cpp_attributes",
+        "fbsource//xplat/folly:network_address",
     ],
     external_deps = [
         ("glibc", None, "rt"),
@@ -41,9 +41,9 @@ mvfst_cpp_library(
         "//quic/common:mvfst_logging",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:thread_local",
+        "fbsource//xplat/folly/container:f14_hash",
         ":xsk_sender",
-        "//folly:thread_local",
-        "//folly/container:f14_hash",
     ],
 )
 
@@ -54,16 +54,16 @@ mvfst_cpp_library(
         "XskSender.h",
     ],
     deps = [
-        "//folly:benchmark",
-        "//folly/net:net_ops",
+        "fbsource//xplat/folly:benchmark",
+        "fbsource//xplat/folly/net:net_ops",
         "//quic/common:linux_kernel_version",
         "//quic/common:string_utils",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:network_address",
+        "fbsource//xplat/folly/container:f14_hash",
+        "fbsource//xplat/folly/io:iobuf",
         ":xsk_lib",
-        "//folly:network_address",
-        "//folly/container:f14_hash",
-        "//folly/io:iobuf",
         "//quic/common:expected",
         "//quic/common:mvfst_logging",
         "//quic/common:optional",

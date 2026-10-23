@@ -11,8 +11,8 @@ mvfst_cpp_test(
     headers = [],
     network_access = network_access_utils.none(),
     deps = [
-        "//folly/portability:gmock",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/priority:priority_queue",
     ],
 )
@@ -23,8 +23,8 @@ mvfst_cpp_test(
     headers = [],
     network_access = network_access_utils.none(),
     deps = [
-        "//folly/portability:gmock",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/priority:round_robin",
     ],
 )
@@ -35,8 +35,8 @@ mvfst_cpp_test(
     headers = [],
     network_access = network_access_utils.none(),
     deps = [
-        "//folly/portability:gmock",
-        "//folly/portability:gtest",
+        "fbsource//xplat/folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gtest",
         "//quic/priority:http_priority_queue",
     ],
 )
@@ -46,8 +46,8 @@ mvfst_cpp_benchmark(
     srcs = ["QuicPriorityQueueBenchmark.cpp"],
     compatible_with = ["config//os:linux"],
     deps = [
+        "fbsource//xplat/folly:benchmark",
         "//common/init:init",
-        "//folly:benchmark",
         "//quic/priority:http_priority_queue",
     ],
 )

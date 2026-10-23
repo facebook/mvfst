@@ -9,7 +9,7 @@ mvfst_cpp_library(
         "QuicAsyncUDPSocketMock.h",
     ],
     exported_deps = [
-        "//folly/portability:gmock",
+        "fbsource//xplat/folly/portability:gmock",
         "//quic/common/udpsocket:quic_async_udp_socket",
     ],
 )
@@ -20,8 +20,8 @@ mvfst_cpp_library(
         "QuicAsyncUDPSocketTestBase.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/portability:gtest",
         ":QuicAsyncUDPSocketMock",
-        "//folly/portability:gtest",
     ],
 )
 
@@ -32,8 +32,8 @@ mvfst_cpp_test(
     ],
     supports_static_listing = False,
     deps = [
+        "fbsource//xplat/folly/portability:gtest",
         ":QuicAsyncUDPSocketTestBase",
-        "//folly/portability:gtest",
         "//quic/common/udpsocket:folly_async_udp_socket",
     ],
 )
@@ -46,8 +46,8 @@ mvfst_cpp_test(
     labels = ci.labels(ci.remove(ci.windows())),
     supports_static_listing = False,
     deps = [
+        "fbsource//xplat/folly/portability:gtest",
         ":QuicAsyncUDPSocketTestBase",
-        "//folly/portability:gtest",
         "//quic/common/udpsocket:libev_async_udp_socket",
     ],
     external_deps = [

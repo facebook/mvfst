@@ -11,7 +11,7 @@
 #include <fstream>
 #include <vector>
 
-#include <folly/json/json.h> // @manual=//folly:dynamic
+#include <folly/json/json.h> // @manual=fbsource//xplat/folly:dynamic
 
 namespace quic {
 

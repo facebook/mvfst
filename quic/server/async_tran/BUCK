@@ -15,12 +15,12 @@ mvfst_cpp_library(
         "QuicServerAsyncTransport.h",
     ],
     deps = [
-        "//folly/system:hardware_concurrency",
+        "fbsource//xplat/folly/system:hardware_concurrency",
         "//quic/common:mvfst_logging",
     ],
     exported_deps = [
-        "//folly/io/async:async_transport",
-        "//folly/io/async:scoped_event_base_thread",
+        "fbsource//xplat/folly/io/async:async_transport",
+        "fbsource//xplat/folly/io/async:scoped_event_base_thread",
         "//quic/api:stream_async_transport",
         "//quic/server:server",
     ],

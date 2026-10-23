@@ -9,7 +9,7 @@ mvfst_cpp_library(
         "QuicEventBase.h",
     ],
     exported_deps = [
-        "//folly:glog",
+        "fbsource//xplat/folly:glog",
         "//quic/common:mvfst_logging",
     ],
 )
@@ -20,8 +20,8 @@ mvfst_cpp_library(
         "QuicExecutor.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly:executor",
         ":eventbase",
-        "//folly:executor",
     ],
 )
 
@@ -32,8 +32,8 @@ mvfst_cpp_library(
         "QuicTimer.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/io/async:delayed_destruction",
         ":eventbase",
-        "//folly/io/async:delayed_destruction",
     ],
 )
 
@@ -46,9 +46,9 @@ mvfst_cpp_library(
         "FollyQuicEventBase.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/io/async:async_base",
+        "fbsource//xplat/folly/io/async:async_base_fwd",
         ":eventbase",
-        "//folly/io/async:async_base",
-        "//folly/io/async:async_base_fwd",
     ],
 )
 
@@ -61,9 +61,9 @@ mvfst_cpp_library(
         "QuicFollyExecutorImpl.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/io/async:async_base",
         ":folly_eventbase",
         ":quic_executor",
-        "//folly/io/async:async_base",
     ],
 )
 
@@ -76,9 +76,9 @@ mvfst_cpp_library(
         "HighResQuicTimer.h",
     ],
     exported_deps = [
+        "fbsource//xplat/folly/io/async:async_base",
+        "fbsource//xplat/folly/io/async:timerfd",
         ":quic_timer",
-        "//folly/io/async:async_base",
-        "//folly/io/async:timerfd",
     ],
 )
 
@@ -92,10 +92,10 @@ mvfst_cpp_library(
     ],
     labels = ci.labels(ci.remove(ci.windows())),
     exported_deps = [
+        "fbsource//xplat/folly:glog",
+        "fbsource//xplat/folly:intrusive_list",
         ":eventbase",
         ":quic_timer",
-        "//folly:glog",
-        "//folly:intrusive_list",
         "//quic/common:mvfst_logging",
     ],
     exported_external_deps = [
@@ -113,9 +113,9 @@ mvfst_cpp_library(
     ],
     labels = ci.labels(ci.remove(ci.windows())),
     exported_deps = [
+        "fbsource//xplat/folly:intrusive_list",
         ":libev_eventbase",
         ":quic_executor",
-        "//folly:intrusive_list",
     ],
     exported_external_deps = [
         "libev",
