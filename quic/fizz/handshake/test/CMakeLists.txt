@@ -16,6 +16,17 @@ quic_add_test(TARGET FizzTransportParametersTest
   mvfst_test_utils
 )
 
+quic_add_test(TARGET ContiguousAeadTest
+  SOURCES
+  ContiguousAeadTest.cpp
+  DEPENDS
+  Folly::folly
+  fizz::fizz
+  mvfst_fizz_handshake
+  mvfst_fizz_handshake_contiguous_aead
+  mvfst_fizz_handshake_fizz_bridge
+)
+
 quic_add_test(TARGET FizzCryptoFactoryTest
   SOURCES
   FizzCryptoFactoryTest.cpp

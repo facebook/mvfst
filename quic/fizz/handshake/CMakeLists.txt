@@ -14,6 +14,17 @@ mvfst_add_library(mvfst_fizz_handshake_fizz_bridge
     fizz::fizz
 )
 
+mvfst_add_library(mvfst_fizz_handshake_contiguous_aead
+  SRCS
+    ContiguousAead.cpp
+  DEPS
+    mvfst_common_mvfst_logging
+    fizz::fizz
+  EXPORTED_DEPS
+    mvfst_handshake_aead
+    fizz::fizz
+)
+
 mvfst_add_library(mvfst_fizz_handshake_fizz_packet_number_cipher
   SRCS
     FizzOpenSSLPacketNumberCipher.cpp

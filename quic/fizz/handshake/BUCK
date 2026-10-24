@@ -19,6 +19,24 @@ mvfst_cpp_library(
 )
 
 mvfst_cpp_library(
+    name = "contiguous_aead",
+    srcs = [
+        "ContiguousAead.cpp",
+    ],
+    headers = [
+        "ContiguousAead.h",
+    ],
+    deps = [
+        "//fizz/crypto/aead:cryptoutil",
+        "//quic/common:mvfst_logging",
+    ],
+    exported_deps = [
+        "//fizz/crypto/aead:aead",
+        "//quic/handshake:aead",
+    ],
+)
+
+mvfst_cpp_library(
     name = "fizz_packet_number_cipher",
     srcs = select({
         "DEFAULT": ["FizzOpenSSLPacketNumberCipher.cpp"],

@@ -20,6 +20,22 @@ mvfst_cpp_test(
 )
 
 mvfst_cpp_test(
+    name = "ContiguousAeadTest",
+    srcs = [
+        "ContiguousAeadTest.cpp",
+    ],
+    network_access = network_access_utils.none(),
+    deps = [
+        "//fizz/protocol:types",
+        "//folly/portability:gtest",
+        "//folly/ssl:openssl_ptr_types",
+        "//quic/fizz/handshake:contiguous_aead",
+        "//quic/fizz/handshake:fizz_bridge",
+        "//quic/fizz/handshake:fizz_handshake",
+    ],
+)
+
+mvfst_cpp_test(
     name = "FizzCryptoFactoryTest",
     srcs = [
         "FizzCryptoFactoryTest.cpp",
