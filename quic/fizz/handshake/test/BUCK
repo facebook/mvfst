@@ -1,4 +1,4 @@
-load("@fbcode//quic:defs.bzl", "mvfst_cpp_test")
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_test", "mvfst_fbcode_only")
 load("@fbsource//tools/build_defs/testinfra:network_access_utils.bzl", "network_access_utils")
 
 oncall("traffic_protocols")
@@ -32,6 +32,27 @@ mvfst_cpp_test(
         "//quic/fizz/handshake:contiguous_aead",
         "//quic/fizz/handshake:fizz_bridge",
         "//quic/fizz/handshake:fizz_handshake",
+    ],
+)
+
+mvfst_fbcode_only(
+    mvfst_cpp_test,
+    name = "HaberdasheryAeadTest",
+    srcs = [
+        "HaberdasheryAeadTest.cpp",
+    ],
+    compatible_with = [
+        "ovr_config//os:linux-arm64",
+        "ovr_config//os:linux-x86_64",
+    ],
+    network_access = network_access_utils.none(),
+    deps = [
+        "fbsource//third-party/fmt:fmt",
+        "//fizz/protocol:types",
+        "//folly/portability:gtest",
+        "//quic/fizz/handshake:fizz_bridge",
+        "//quic/fizz/handshake:fizz_handshake",
+        "//quic/fizz/handshake:haberdashery_aead",
     ],
 )
 

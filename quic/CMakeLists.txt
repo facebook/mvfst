@@ -145,6 +145,33 @@ add_subdirectory(client)
 add_subdirectory(server)
 add_subdirectory(fizz)
 
+# AES-128-GCM packet protection from haberdashery's assembly. The target is
+# left out of the generated fizz/handshake/CMakeLists.txt because the
+# dependency is optional. MVFST_USE_HABERDASHERY switches QUIC_DEFAULT_AEAD in
+# mvfst-config.h for the two targets that use it.
+if(MVFST_USE_HABERDASHERY)
+  mvfst_add_library(mvfst_fizz_handshake_haberdashery_aead
+    SRCS
+      fizz/handshake/HaberdasheryAead.cpp
+    DEPS
+      mvfst_fizz_handshake_contiguous_aead
+      mvfst_fizz_handshake_fizz_bridge
+    EXPORTED_DEPS
+      mvfst_handshake_aead
+      fizz::fizz
+      haberdashery::haberdashery
+  )
+  foreach(_target mvfst_fizz_handshake mvfst_fizz_server_handshake)
+    target_compile_definitions(${_target}_obj PRIVATE MVFST_USE_HABERDASHERY)
+    # Shared builds link every granular target through the monolithic library.
+    if(NOT BUILD_SHARED_LIBS)
+      set_property(GLOBAL APPEND PROPERTY MVFST_DEFERRED_DEPS
+        "${_target}_obj|PRIVATE|mvfst_fizz_handshake_haberdashery_aead"
+        "${_target}|PRIVATE|mvfst_fizz_handshake_haberdashery_aead")
+    endif()
+  endforeach()
+endif()
+
 if(BUILD_SAMPLES)
   add_subdirectory(samples)
 endif()

@@ -48,6 +48,8 @@ class FizzCryptoFactoryTest : public Test {
         .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));
     EXPECT_CALL(*mockAead, ivLength())
         .WillRepeatedly(Return(fizz::AESGCM128::kIVLength));
+    // QUIC_DEFAULT_AEAD may read the key to pick an implementation.
+    EXPECT_CALL(*mockAead, getKey()).Times(AnyNumber());
     return mockAead;
   }
 

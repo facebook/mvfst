@@ -1,4 +1,4 @@
-load("@fbcode//quic:defs.bzl", "mvfst_cpp_library")
+load("@fbcode//quic:defs.bzl", "mvfst_cpp_library", "mvfst_fbcode_only")
 
 oncall("traffic_protocols")
 
@@ -30,6 +30,41 @@ mvfst_cpp_library(
         "//fizz/crypto/aead:cryptoutil",
         "//quic/common:mvfst_logging",
     ],
+    exported_deps = [
+        "//fizz/crypto/aead:aead",
+        "//quic/handshake:aead",
+    ],
+)
+
+mvfst_fbcode_only(
+    mvfst_cpp_library,
+    name = "haberdashery_aead",
+    srcs = [
+        "HaberdasheryAead.cpp",
+    ],
+    headers = [
+        "HaberdasheryAead.h",
+    ],
+    compatible_with = [
+        "ovr_config//os:linux-arm64",
+        "ovr_config//os:linux-x86_64",
+    ],
+    deps = [
+        ":contiguous_aead",
+        ":fizz_bridge",
+        "//folly:c_portability",
+    ] + select({
+        "ovr_config//cpu:arm64": [
+            "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_neoversev2",
+        ],
+        "ovr_config//cpu:x86_64": [
+            "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_broadwell",
+            "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_sapphirerapids",
+            "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_skylakex",
+            "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_tigerlake",
+            "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_zen4",
+        ],
+    }),
     exported_deps = [
         "//fizz/crypto/aead:aead",
         "//quic/handshake:aead",

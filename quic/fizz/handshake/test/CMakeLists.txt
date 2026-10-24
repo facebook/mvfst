@@ -27,6 +27,19 @@ quic_add_test(TARGET ContiguousAeadTest
   mvfst_fizz_handshake_fizz_bridge
 )
 
+if(MVFST_USE_HABERDASHERY)
+  quic_add_test(TARGET HaberdasheryAeadTest
+    SOURCES
+    HaberdasheryAeadTest.cpp
+    DEPENDS
+    Folly::folly
+    fizz::fizz
+    mvfst_fizz_handshake
+    mvfst_fizz_handshake_fizz_bridge
+    mvfst_fizz_handshake_haberdashery_aead
+  )
+endif()
+
 quic_add_test(TARGET FizzCryptoFactoryTest
   SOURCES
   FizzCryptoFactoryTest.cpp

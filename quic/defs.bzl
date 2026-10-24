@@ -216,6 +216,11 @@ def mvfst_cpp_benchmark(name, deps = (), external_deps = (), header_namespace = 
         # Don't generate xplat benchmark targets
         pass
 
+def mvfst_fbcode_only(rule, **kwargs):
+    """Declares a target only in fbcode, for deps that have no xplat mirror."""
+    if get_fbsource_cell() == "fbcode":
+        rule(**kwargs)
+
 def mu_cxx_library(
     name,
     srcs = (),

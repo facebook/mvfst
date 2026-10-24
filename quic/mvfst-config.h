@@ -19,8 +19,13 @@
 
 namespace quic {
 
+#if defined(MVFST_USE_HABERDASHERY)
+#define QUIC_DEFAULT_AEAD_HEADER <quic/fizz/handshake/HaberdasheryAead.h>
+#define QUIC_DEFAULT_AEAD ::quic::HaberdasheryAead
+#else
 #define QUIC_DEFAULT_AEAD_HEADER <quic/fizz/handshake/FizzBridge.h>
 #define QUIC_DEFAULT_AEAD ::quic::FizzAead
+#endif
 
 #define QUIC_DEFAULT_PACKET_NUM_HEADER \
 <quic/fizz/handshake/FizzPacketNumberCipher.h>

@@ -62,6 +62,12 @@ add_compile_definitions(GLOG_USE_GLOG_EXPORT)
 find_package(Threads)
 find_package(OpenSSL REQUIRED)
 
+option(MVFST_USE_HABERDASHERY
+  "Use haberdashery for AES-128-GCM packet protection" OFF)
+if(MVFST_USE_HABERDASHERY AND NOT TARGET haberdashery::haberdashery)
+  find_package(haberdashery CONFIG REQUIRED)
+endif()
+
 SET(GFLAG_DEPENDENCIES "")
 SET(QUIC_EXTRA_LINK_LIBRARIES "")
 SET(QUIC_EXTRA_INCLUDE_DIRECTORIES "")
@@ -136,6 +142,9 @@ add_subdirectory(quic)
 
 # Create the monolithic mvfst library for backward compatibility
 mvfst_create_monolithic_library()
+if(MVFST_USE_HABERDASHERY)
+  target_link_libraries(mvfst PRIVATE haberdashery::haberdashery)
+endif()
 
 # Resolve deferred dependencies between mvfst targets
 mvfst_resolve_deferred_dependencies()
