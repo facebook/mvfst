@@ -301,8 +301,10 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
     const ConnectionId* originalDstConnId =
         &(*clientConn_->originalDestinationConnectionId);
 
-    if (!clientConn_->clientHandshakeLayer->verifyRetryIntegrityTag(
-            *originalDstConnId, *retryPacket)) {
+    auto integrityResult =
+        clientConn_->clientHandshakeLayer->verifyRetryIntegrityTag(
+            *originalDstConnId, *retryPacket);
+    if (!integrityResult.has_value() || !*integrityResult) {
       MVVLOG(4) << "The integrity tag in the retry packet was invalid. "
                 << "Dropping bad retry packet. " << *this;
       // Not a fatal error, just ignore the packet.

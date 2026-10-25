@@ -3014,6 +3014,46 @@ TEST_P(QuicClientTransportHappyEyeballsTest, V4FirstAndV6BindFailure) {
   secondBindFailure(serverAddrV4, serverAddrV6);
 }
 
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    RetryInvalidIntegrityTagFromUnknownAddress) {
+  auto& conn = client->getConn();
+  client->getNonConstConn().originalDestinationConnectionId =
+      ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
+  const SocketAddress attackerAddr{"192.0.2.1", 443};
+  std::vector<SocketAddress> writeDestinations;
+  auto recordWrite = [&](const SocketAddress& addr,
+                         const struct iovec* vec,
+                         size_t iovec_len) {
+    writeDestinations.push_back(addr);
+    return getTotalIovecLen(vec, iovec_len);
+  };
+  EXPECT_CALL(*sock, write(_, _, _)).WillRepeatedly(Invoke(recordWrite));
+  EXPECT_CALL(*secondSock, write(_, _, _)).WillRepeatedly(Invoke(recordWrite));
+
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+  setConnectionIds();
+  client->happyEyeballsConnAttemptDelayTimeout().cancelTimerCallback();
+  client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+  client->lossTimeout().cancelTimerCallback();
+  client->lossTimeout().timeoutExpired();
+  ASSERT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+  const auto initialDstConnId = conn.initialDestinationConnectionId;
+  writeDestinations.clear();
+
+  recvServerRetry(attackerAddr, "token", /*corruptIntegrityTag=*/true);
+
+  EXPECT_FALSE(client->isClosed());
+  EXPECT_EQ(client->getConn().peerAddress, serverAddrV6);
+  EXPECT_FALSE(client->getConn().happyEyeballsState.finished);
+  EXPECT_TRUE(client->getConn().happyEyeballsState.shouldWriteToSecondSocket);
+  EXPECT_TRUE(client->getConn().retryToken.empty());
+  EXPECT_EQ(client->getConn().initialDestinationConnectionId, initialDstConnId);
+  EXPECT_THAT(writeDestinations, IsEmpty());
+
+  client->close(std::nullopt);
+}
+
 TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4NonFatalErrorBeforeV6Start) {
@@ -5291,6 +5331,120 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
   EXPECT_FALSE(destructionCallback->isDestroyed());
 }
 
+struct RetryIntegrityTestParams {
+  bool validTag;
+  bool mismatchedDcid;
+};
+
+class QuicClientRetryIntegrityTest
+    : public QuicClientTransportTestBase,
+      public WithParamInterface<RetryIntegrityTestParams> {};
+
+TEST_P(QuicClientRetryIntegrityTest, RetryIntegrityTag) {
+  const bool validTag = GetParam().validTag;
+  const auto originalDcid =
+      ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
+  const auto retryScid = ConnectionId::createAndMaybeCrash(
+      {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
+  const auto clientScid = GetParam().mismatchedDcid
+      ? ConnectionId::createAndMaybeCrash({1, 2, 3, 4, 5, 6, 7, 8})
+      : ConnectionId::createZeroLength();
+  client->getNonConstConn().clientConnectionId = clientScid;
+  client->getNonConstConn().readCodec->setClientConnectionId(clientScid);
+  client->getNonConstConn().selfConnectionIds.front().connId = clientScid;
+  client->setSupportedVersions({QuicVersion::QUIC_V1});
+  client->getNonConstConn().initialDestinationConnectionId = originalDcid;
+  client->getNonConstConn().originalDestinationConnectionId = originalDcid;
+  client->getNonConstConn().clientChosenDestConnectionId = originalDcid;
+  client->addNewPeerAddress(serverAddr);
+  client->setHostname(hostname_);
+  ON_CALL(*sock, write(_, _, _))
+      .WillByDefault(Invoke(
+          [&](const SocketAddress&, const struct iovec* vec, size_t len) {
+            socketWrites.push_back(copyChain(folly::IOBuf::wrapIov(vec, len)));
+            return getTotalIovecLen(vec, len);
+          }));
+
+  // Use the real Fizz handshake, including Retry integrity verification.
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+  loopForWrites();
+  ASSERT_EQ(client->getConn().originalDestinationConnectionId, originalDcid);
+  ASSERT_EQ(*client->getConn().clientConnectionId, clientScid);
+  ASSERT_FALSE(socketWrites.empty());
+  socketWrites.clear();
+
+  // RFC 9001 Appendix A.4. Flipping one tag bit leaves a syntactically valid
+  // Retry packet. One negative case also mismatches this empty DCID against
+  // a nonempty client SCID, as an attacker who does not know the SCID could.
+  constexpr char retryBytes[] =
+      "\xff\x00\x00\x00\x01\x00\x08\xf0\x67\xa5\x50\x2a\x42\x62\xb5"
+      "token\x04\xa2\x65\xba\x2e\xff\x4d\x82\x90\x58\xfb\x3f\x0f\x24\x96\xba";
+  auto retryBuf = IOBuf::copyBuffer(retryBytes, sizeof(retryBytes) - 1);
+  if (!validTag) {
+    retryBuf->writableData()[retryBuf->length() - 1] ^= 0x01;
+  }
+
+  // Establish that the verifier returns a value containing false for the
+  // corrupted tag, rather than an error in the Expected wrapper.
+  auto retryQueue = bufToQueue(retryBuf->clone());
+  AckStates ackStates;
+  auto parsedRetry =
+      client->getNonConstConn().readCodec->parsePacket(retryQueue, ackStates);
+  ASSERT_NE(parsedRetry.retryPacket(), nullptr);
+  auto verification =
+      client->getNonConstConn().clientHandshakeLayer->verifyRetryIntegrityTag(
+          originalDcid, *parsedRetry.retryPacket());
+  ASSERT_TRUE(verification.has_value());
+  ASSERT_EQ(*verification, validTag);
+
+  deliverData(serverAddr, retryBuf->coalesce());
+  EXPECT_FALSE(client->isClosed());
+  EXPECT_EQ(client->getConn().retryToken, validTag ? "token" : "");
+  EXPECT_EQ(
+      client->getConn().initialDestinationConnectionId,
+      validTag ? retryScid : originalDcid);
+  EXPECT_EQ(socketWrites.empty(), !validTag);
+
+  // Decode any emitted Initial to verify the externally visible token and
+  // destination connection ID, as well as the client's internal state.
+  FizzCryptoFactory cryptoFactory;
+  QuicReadCodec serverCodec(QuicNodeType::Server);
+  serverCodec.setInitialReadCipher(
+      cryptoFactory.getClientInitialCipher(retryScid, QuicVersion::QUIC_V1)
+          .value());
+  serverCodec.setInitialHeaderCipher(
+      cryptoFactory
+          .makeClientInitialHeaderCipher(retryScid, QuicVersion::QUIC_V1)
+          .value());
+  for (const auto& write : socketWrites) {
+    auto queue = bufToQueue(write->clone());
+    auto packet = serverCodec.parsePacket(queue, ackStates);
+    ASSERT_NE(packet.regularPacket(), nullptr);
+    const auto* header = packet.regularPacket()->header.asLong();
+    ASSERT_NE(header, nullptr);
+    EXPECT_EQ(header->getHeaderType(), LongHeader::Types::Initial);
+    EXPECT_EQ(header->getToken(), validTag ? "token" : "");
+    EXPECT_EQ(
+        header->getDestinationConnId(), validTag ? retryScid : originalDcid);
+  }
+  client->closeNow(std::nullopt);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RetryIntegrity,
+    QuicClientRetryIntegrityTest,
+    Values(
+        RetryIntegrityTestParams{true, false},
+        RetryIntegrityTestParams{false, false},
+        RetryIntegrityTestParams{false, true}),
+    [](const TestParamInfo<RetryIntegrityTestParams>& info) {
+      if (info.param.validTag) {
+        return "ValidTag";
+      }
+      return info.param.mismatchedDcid ? "InvalidTagMismatchedDcid"
+                                       : "InvalidTag";
+    });
+
 TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   std::vector<uint8_t> clientConnIdVec = {};
   ConnectionId clientConnId =
@@ -5355,6 +5509,29 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   EXPECT_EQ(header.getDestinationConnId(), serverCid);
 
   eventbase_->loopOnce();
+  client->close(std::nullopt);
+}
+
+TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacketInvalidIntegrityTag) {
+  ConnectionId initialDstConnId =
+      ConnectionId::createAndMaybeCrash(kInitialDstConnIdVecForRetryTest);
+  client->getNonConstConn().readCodec->setClientConnectionId(
+      ConnectionId::createAndMaybeCrash(std::vector<uint8_t>{}));
+  client->getNonConstConn().initialDestinationConnectionId = initialDstConnId;
+  client->getNonConstConn().originalDestinationConnectionId = initialDstConnId;
+
+  StreamId streamId = *client->createBidirectionalStream();
+  client->writeChain(streamId, IOBuf::copyBuffer("ice cream"), true, nullptr);
+  loopForWrites();
+
+  EXPECT_CALL(*sock, write(_, _, _)).Times(0);
+
+  recvServerRetry(serverAddr, "token", /*corruptIntegrityTag=*/true);
+
+  EXPECT_TRUE(client->getConn().retryToken.empty());
+  EXPECT_EQ(
+      *client->getConn().initialDestinationConnectionId, initialDstConnId);
+
   client->close(std::nullopt);
 }
 

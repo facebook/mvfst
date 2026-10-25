@@ -413,7 +413,14 @@ TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
       0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
   ConnectionId odcid = ConnectionId::createAndMaybeCrash(odcidVec);
 
-  EXPECT_TRUE(handshake->verifyRetryIntegrityTag(odcid, retryPacket));
+  auto result = handshake->verifyRetryIntegrityTag(odcid, retryPacket);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_TRUE(*result);
+
+  retryPacket.integrityTag[0] ^= 0x01;
+  result = handshake->verifyRetryIntegrityTag(odcid, retryPacket);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_FALSE(*result);
 }
 
 TEST_F(ClientHandshakeTest, TestNoErrorAfterAppClose) {

@@ -733,7 +733,8 @@ class QuicClientTransportTestBase : public virtual testing::Test {
 
   ConnectionId recvServerRetry(
       const quic::SocketAddress& addr,
-      const std::string& retryToken = "token") {
+      const std::string& retryToken = "token",
+      bool corruptIntegrityTag = false) {
     // Make the server send a retry packet to the client. The server chooses a
     // connection id that the client must use in all future initial packets.
     std::vector<uint8_t> serverConnIdVec = {
@@ -756,6 +757,9 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     FizzRetryIntegrityTagGenerator tagGenerator;
     auto integrityTag =
         tagGenerator.getRetryIntegrityTag(retryVersion, pseudoPacket.get());
+    if (corruptIntegrityTag) {
+      integrityTag->writableData()[0] ^= 0x01;
+    }
 
     folly::IOBuf retryPacketBuf;
     BufAppender appender(&retryPacketBuf, 100);
