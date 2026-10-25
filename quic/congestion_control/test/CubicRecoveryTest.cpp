@@ -379,7 +379,7 @@ TEST_F(CubicRecoveryTest, AckNotLargestNotChangeCwnd) {
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   auto cwndAfterLoss = cubic.getWritableBytes() + 4000; // 4k are in flight
 
-  // the the rest are acked:
+  // the rest are acked:
   quic::test::onPacketAckOrLossWrapper(
       &conn,
       &cubic,
