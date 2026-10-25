@@ -422,8 +422,13 @@ TEST_F(DatagramFlowManagerTest, NonEphemeralFlowNotCleanedUpWhenEmpty) {
 }
 
 TEST_F(DatagramFlowManagerTest, MixedEphemeralAndNonEphemeralFlows) {
+  // Create ephemeral flow
   (void)manager_->addDatagram(makeBuf("ephemeral1"), 100, std::nullopt, true);
+
+  // Create non-ephemeral flow
   (void)manager_->addDatagram(makeBuf("persistent1"), 200, std::nullopt, false);
+
+  // Create another ephemeral flow
   (void)manager_->addDatagram(makeBuf("ephemeral2"), 300, std::nullopt, true);
 
   EXPECT_EQ(3, manager_->getFlowCount());
