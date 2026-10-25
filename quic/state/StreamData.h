@@ -313,6 +313,16 @@ enum class StreamSendState : uint8_t { Open, ResetSent, Closed, Invalid };
 
 enum class StreamRecvState : uint8_t { Open, Closed, Invalid };
 
+// How a stream releases receive flow control credit.
+enum class ManualRead : uint8_t {
+  // read() and consume() release credit.
+  Off,
+  // The app releases credit with releaseManualReadFlowControl().
+  On,
+  // Was On until a reset or STOP_SENDING released everything.
+  Ended,
+};
+
 inline folly::StringPiece streamStateToString(StreamSendState state) {
   switch (state) {
     case StreamSendState::Open:
@@ -396,7 +406,23 @@ struct QuicStreamState : public QuicStreamLike {
     // received yet). Set when we write a blocked data frame on the stream;
     // cleared when we receive a flow control update for the stream.
     bool pendingBlockedFrame{false};
+    // See QuicSocketLite::setStreamManualRead().
+    ManualRead manualRead{ManualRead::Off};
+    // Offset up to which receive credit has been released. Never exceeds
+    // deliveredReadOffset().
+    uint64_t releasedReadOffset{0};
   };
+
+  // Offset of the data delivered to the app, excluding the FIN byte.
+  [[nodiscard]] uint64_t deliveredReadOffset() const noexcept {
+    return finalReadOffset ? std::min(currentReadOffset, *finalReadOffset)
+                           : currentReadOffset;
+  }
+
+  // Bytes delivered to the app but not yet released for flow control.
+  [[nodiscard]] uint64_t unreleasedReadBytes() const noexcept {
+    return deliveredReadOffset() - flowControlState.releasedReadOffset;
+  }
 
   StreamFlowControlState flowControlState;
 

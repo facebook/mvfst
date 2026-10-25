@@ -114,6 +114,11 @@ quic::Expected<void, QuicError> onResetQuicStream(
     if (!result) {
       return quic::make_unexpected(result.error());
     }
+  } else if (appReadAllBytes) {
+    auto result = endManualReadFlowControl(stream, Clock::now());
+    if (!result) {
+      return quic::make_unexpected(result.error());
+    }
   }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);

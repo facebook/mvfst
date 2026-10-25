@@ -213,6 +213,7 @@ QuicStreamManager::QuicStreamManager(
   stopSendingStreams_ = std::move(other.stopSendingStreams_);
   windowUpdates_ = std::move(other.windowUpdates_);
   flowControlUpdated_ = std::move(other.flowControlUpdated_);
+  removedUnreleasedReadBytes_ = std::move(other.removedUnreleasedReadBytes_);
   numStreamsWithLoss_ = other.numStreamsWithLoss_;
   other.numStreamsWithLoss_ = 0;
   readableStreams_ = std::move(other.readableStreams_);
@@ -1052,6 +1053,10 @@ quic::Expected<void, QuicError> QuicStreamManager::removeClosedStream(
         "control stream count underflow");
     MVDCHECK_GT(numControlStreams_, 0);
     numControlStreams_--;
+  }
+
+  if (auto unreleased = it->second.unreleasedReadBytes(); unreleased > 0) {
+    removedUnreleasedReadBytes_[streamId] = unreleased;
   }
 
   // Erase the main stream state
