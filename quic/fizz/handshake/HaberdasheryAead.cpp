@@ -12,13 +12,13 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 
 #if defined(__x86_64__)
-#include <xsec_crypto/haberdashery/bindings/c89/aead/aes128gcm_broadwell.h>
-#include <xsec_crypto/haberdashery/bindings/c89/aead/aes128gcm_sapphirerapids.h>
-#include <xsec_crypto/haberdashery/bindings/c89/aead/aes128gcm_skylakex.h>
-#include <xsec_crypto/haberdashery/bindings/c89/aead/aes128gcm_tigerlake.h>
-#include <xsec_crypto/haberdashery/bindings/c89/aead/aes128gcm_zen4.h>
+#include <haberdashery/aead/aes128gcm_broadwell.h>
+#include <haberdashery/aead/aes128gcm_sapphirerapids.h>
+#include <haberdashery/aead/aes128gcm_skylakex.h>
+#include <haberdashery/aead/aes128gcm_tigerlake.h>
+#include <haberdashery/aead/aes128gcm_zen4.h>
 #elif defined(__aarch64__)
-#include <xsec_crypto/haberdashery/bindings/c89/aead/aes128gcm_neoversev2.h>
+#include <haberdashery/aead/aes128gcm_neoversev2.h>
 #else
 #error "haberdashery has no assembly for this architecture"
 #endif
