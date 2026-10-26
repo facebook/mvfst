@@ -506,14 +506,11 @@ void QuicServerTransport::unbindConnection() {
   MVCHECK(conn_->clientChosenDestConnectionId);
   auto source = std::make_pair(
       getOriginalPeerAddress(), *conn_->clientChosenDestConnectionId);
-  const bool hasServerConnectionId = conn_->serverConnectionId.has_value();
   auto connectionIds = conn_->selfConnectionIds;
   for (const auto& connId : retiringConnIds) {
     routingCb->onConnectionIdRetired(*this, connId);
   }
-  if (hasServerConnectionId) {
-    routingCb->onConnectionUnbound(this, source, connectionIds);
-  }
+  routingCb->onConnectionUnbound(this, source, connectionIds);
 }
 
 bool QuicServerTransport::hasWriteCipher() const {

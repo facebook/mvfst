@@ -56,47 +56,17 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       (noexcept));
 };
 
-class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
- public:
-  ~MockWorkerCallback() override = default;
-  MOCK_METHOD(void, handleWorkerError, (LocalErrorCode));
+inline std::unique_ptr<RunState> makeSingleWorkerRunState(
+    folly::EventBase* evb) {
+  auto runState = std::make_unique<RunState>();
+  runState->peers.push_back(
+      WorkerEndpoint{.evb = evb, .target = std::make_shared<DispatchTarget>()});
+  return runState;
+}
 
-  MOCK_METHOD(
-      void,
-      routeDataToWorkerLong,
-      (const quic::SocketAddress&,
-       std::unique_ptr<RoutingData>&,
-       std::unique_ptr<NetworkData>&,
-       Optional<QuicVersion>,
-       bool isForwardedData));
-
-  MOCK_METHOD(
-      void,
-      routeDataToWorkerShort,
-      (const quic::SocketAddress&,
-       std::unique_ptr<RoutingData>&,
-       std::unique_ptr<NetworkData>&,
-       Optional<QuicVersion>,
-       bool isForwardedData));
-
-  void routeDataToWorker(
-      const quic::SocketAddress& client,
-      RoutingData&& routingDataIn,
-      NetworkData&& networkDataIn,
-      Optional<QuicVersion> quicVersion,
-      folly::EventBase*,
-      bool isForwardedData = false) override {
-    auto routingData = std::make_unique<RoutingData>(std::move(routingDataIn));
-    auto networkData = std::make_unique<NetworkData>(std::move(networkDataIn));
-    if (routingData->headerForm == HeaderForm::Long) {
-      routeDataToWorkerLong(
-          client, routingData, networkData, quicVersion, isForwardedData);
-    } else {
-      routeDataToWorkerShort(
-          client, routingData, networkData, quicVersion, isForwardedData);
-    }
-  }
-};
+inline void publishSingleWorker(RunState& runState, QuicServerWorker* worker) {
+  runState.peers[0].target->worker = worker;
+}
 
 class MockQuicUDPSocketFactory : public QuicUDPSocketFactory {
  public:

@@ -12,6 +12,7 @@
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/MvfstLogging.h>
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -66,10 +67,25 @@ int QuicServerWorker::getUnfinishedHandshakeCount() {
   return globalUnfinishedHandshakes.load(std::memory_order_relaxed);
 }
 
+void RunState::requestStop(LocalErrorCode reason) {
+  if (!latchStop(reason)) {
+    return;
+  }
+  for (auto& peer : peers) {
+    peer.evb->runInEventBaseThreadAlwaysEnqueue([target = peer.target, reason] {
+      if (auto* worker = target->worker) {
+        worker->stopLocal(reason);
+      }
+    });
+  }
+}
+
 QuicServerWorker::QuicServerWorker(
-    std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
+    RunState* runState,
+    size_t workerIndex,
     TransportSettings transportSettings)
-    : callback_(std::move(callback)),
+    : runState_(runState),
+      workerIndex_(workerIndex),
       transportSettings_(std::move(transportSettings)),
       takeoverPktHandler_(this),
       observerList_(this) {
@@ -88,12 +104,13 @@ QuicServerWorker::QuicServerWorker(
 }
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
-  return evb_.get();
+  return eventBase_ ? eventBase_ : evb_.get();
 }
 
 void QuicServerWorker::setSocket(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket) {
   socket_ = std::move(socket);
+  eventBase_ = socket_->getEventBase();
   evb_ = folly::ExecutorKeepAlive(socket_->getEventBase());
 }
 
@@ -598,9 +615,8 @@ void QuicServerWorker::handleNetworkData(
       MVVLOG(4) << "Dropping packet with blocklisted src port: "
                 << client.getPort();
       packetDropReason = PacketDropReason::INVALID_SRC_PORT;
-    } else if (!callback_) {
-      MVVLOG(0) << "Worker callback is null.  Dropping packet.";
-      packetDropReason = PacketDropReason::WORKER_NOT_INITIALIZED;
+    } else if (stopping_) {
+      packetDropReason = PacketDropReason::SERVER_SHUTDOWN;
     } else if (!cursor.canAdvance(sizeof(uint8_t))) {
       MVVLOG(4) << "Dropping packet too small";
       packetDropReason = PacketDropReason::INVALID_PACKET_INITIAL_BYTE;
@@ -724,7 +740,7 @@ void QuicServerWorker::forwardNetworkData(
     const quic::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
-    Optional<QuicVersion> quicVersion,
+    const Optional<QuicVersion>& quicVersion,
     bool isForwardedData) {
   // if it's not Client initial or ZeroRtt, AND if the connectionId version
   // mismatches: forward if pktForwarding is enabled else dropPacket
@@ -750,13 +766,59 @@ void QuicServerWorker::forwardNetworkData(
     }
     return;
   }
-  callback_->routeDataToWorker(
+  routeOrDispatch(
       client,
       std::move(routingData),
       std::move(networkData),
-      std::move(quicVersion),
-      getEventBase(),
+      quicVersion,
       isForwardedData);
+}
+
+void QuicServerWorker::routeOrDispatch(
+    const quic::SocketAddress& client,
+    RoutingData&& routingData,
+    NetworkData&& networkData,
+    const Optional<QuicVersion>& quicVersion,
+    bool isForwardedData) {
+  if (stopping_) {
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::SERVER_SHUTDOWN);
+    return;
+  }
+  size_t dest = workerIndex_;
+  if (runState_ && !runState_->peers.empty()) {
+    auto parsed = connIdAlgo_->parseConnectionId(routingData.destinationConnId);
+    if (parsed.has_value() &&
+        (!routingData.clientChosenDcid || parsed->hostId == hostId_ ||
+         parsed->hostId == prevHostId_)) {
+      dest = static_cast<size_t>(parsed->workerId) % runState_->peers.size();
+    }
+  }
+  if (dest == workerIndex_) {
+    dispatchPacketData(
+        client,
+        std::move(routingData),
+        std::move(networkData),
+        quicVersion,
+        isForwardedData);
+    return;
+  }
+  auto& peer = runState_->peers[dest];
+  peer.evb->runInEventBaseThread([target = peer.target,
+                                  client = client,
+                                  routingData = std::move(routingData),
+                                  networkData = std::move(networkData),
+                                  quicVersion = quicVersion,
+                                  isForwardedData]() mutable {
+    if (auto* worker = target->worker) {
+      worker->dispatchPacketData(
+          client,
+          std::move(routingData),
+          std::move(networkData),
+          quicVersion,
+          isForwardedData);
+    }
+  });
 }
 
 void QuicServerWorker::setPacingTimer(
@@ -840,7 +902,6 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
     if (retryOriginalDstConnId) {
       trans->setRetryOriginalDstConnId(*retryOriginalDstConnId);
     }
-    trans->accept(quicVersion);
     auto result = sourceAddressMap_.emplace(
         std::make_pair(std::make_pair(client, dstConnId), trans));
     PROTO_OOPS_LOG_BUILDER_IF(
@@ -852,7 +913,13 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
         "invariant_violation: source address map already contains new "
         "connection");
     MVCHECK(result.second);
-    for (const auto& observer : observerList_.getAll()) {
+    trans->accept(quicVersion);
+    auto observers = observerList_.getAll();
+    for (const auto& observer : observers) {
+      const auto& current = observerList_.getAll();
+      if (std::ranges::find(current, observer) == current.end()) {
+        continue;
+      }
       observer->accept(trans.get());
     }
   }
@@ -996,7 +1063,9 @@ void QuicServerWorker::dispatchPacketData(
     if (routingData.isInitial && !pending0RttData_.empty()) {
       auto itr = pending0RttData_.find(dstConnId);
       if (itr != pending0RttData_.end()) {
-        for (auto& data : itr->second) {
+        auto buffered = std::move(itr->second);
+        pending0RttData_.erase(itr);
+        for (auto& data : buffered) {
           // Drop 0-RTT replays whose source peer differs from the
           // current Initial: address change during handshake is not
           // allowed
@@ -1017,7 +1086,6 @@ void QuicServerWorker::dispatchPacketData(
           }
           transport->onNetworkData(socket_->address(), std::move(data));
         }
-        pending0RttData_.erase(itr);
       }
     }
   };
@@ -1402,15 +1470,15 @@ void QuicServerWorker::stopPacketForwarding() {
 void QuicServerWorker::onReadError(
     const folly::AsyncSocketException& ex) noexcept {
   MVVLOG(4) << "QuicServer readerr: " << ex.what();
-  if (!callback_) {
-    MVVLOG(0) << "Worker callback is null.  Ignoring worker error.";
-    return;
+  if (runState_) {
+    runState_->requestStop(LocalErrorCode::INTERNAL_ERROR);
+  } else {
+    stopLocal(LocalErrorCode::INTERNAL_ERROR);
   }
-  callback_->handleWorkerError(LocalErrorCode::INTERNAL_ERROR);
 }
 
 void QuicServerWorker::onReadClosed() noexcept {
-  shutdownAllConnections(LocalErrorCode::SHUTTING_DOWN);
+  stopLocal(LocalErrorCode::SHUTTING_DOWN);
 }
 
 int QuicServerWorker::getTakeoverHandlerSocketFD() {
@@ -1666,6 +1734,17 @@ void QuicServerWorker::onHandshakeUnfinished() noexcept {
   MVCHECK_GE(--globalUnfinishedHandshakes, 0);
 }
 
+void QuicServerWorker::stopLocal(LocalErrorCode error) {
+  if (stopping_) {
+    return;
+  }
+  stopping_ = true;
+  if (runState_ && workerIndex_ < runState_->peers.size()) {
+    runState_->peers[workerIndex_].target->worker = nullptr;
+  }
+  shutdownAllConnections(error);
+}
+
 void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   MVVLOG(4) << "QuicServer shutdown all connections."
             << " addressMap=" << sourceAddressMap_.size()
@@ -1674,6 +1753,10 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     return;
   }
   shutdown_ = true;
+  stopping_ = true;
+  if (runState_ && workerIndex_ < runState_->peers.size()) {
+    runState_->peers[workerIndex_].target->worker = nullptr;
+  }
   if (quicSocket_) {
     quicSocket_->pauseRead();
   } else if (socket_) {
@@ -1682,28 +1765,36 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   if (takeoverCB_) {
     takeoverCB_->pause();
   }
-  callback_ = nullptr;
 
-  // Shut down all transports without bound connection ids.
+  folly::F14FastSet<QuicServerTransport*> seen;
+  std::vector<QuicServerTransport::Ptr> transports;
   for (auto& it : sourceAddressMap_) {
-    auto transport = it.second;
+    if (it.second && seen.insert(it.second.get()).second) {
+      transports.push_back(it.second);
+    }
+  }
+  for (auto& it : connectionIdMap_) {
+    if (it.second && seen.insert(it.second.get()).second) {
+      transports.push_back(it.second);
+    }
+  }
+  for (auto& it : boundServerTransports_) {
+    if (auto t = it.second.lock()) {
+      if (seen.insert(t.get()).second) {
+        transports.push_back(std::move(t));
+      }
+    }
+  }
+  for (auto& transport : transports) {
     transport->setRoutingCallback(nullptr);
     transport->setTransportStatsCallback(nullptr);
     transport->setHandshakeFinishedCallback(nullptr);
+  }
+  for (auto& transport : transports) {
     transport->closeNow(
         QuicError(QuicErrorCode(error), std::string("shutting down")));
   }
-
-  // Shut down all transports with bound connection ids.
-  for (auto transport : boundServerTransports_) {
-    if (auto t = transport.second.lock()) {
-      t->setRoutingCallback(nullptr);
-      t->setTransportStatsCallback(nullptr);
-      t->setHandshakeFinishedCallback(nullptr);
-      t->closeNow(
-          QuicError(QuicErrorCode(error), std::string("shutting down")));
-    }
-  }
+  transports.clear();
   if (unfinishedHandshakes_ != 0) {
     MVCHECK_GE(
         globalUnfinishedHandshakes.fetch_sub(
@@ -1716,6 +1807,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   boundServerTransports_.clear();
   sourceAddressMap_.clear();
   connectionIdMap_.clear();
+  pending0RttData_.clear();
   takeoverPktHandler_.stop();
   if (statsCallback_) {
     statsCallback_.reset();
@@ -1729,7 +1821,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
 }
 
 QuicServerWorker::~QuicServerWorker() {
-  shutdownAllConnections(LocalErrorCode::SHUTTING_DOWN);
+  stopLocal(LocalErrorCode::SHUTTING_DOWN);
 }
 
 bool QuicServerWorker::rejectConnectionId(

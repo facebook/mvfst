@@ -31,6 +31,11 @@ FOLLY_GFLAGS_DECLARE_int32(qs_conn_id_version);
 
 namespace quic {
 
+namespace test {
+class QuicServerTest;
+class QuicServerMultiWorkerRoutingTest;
+} // namespace test
+
 struct ServerOptions {
   TransportSettings transportSettings;
   std::vector<QuicVersion> supportedVersions{
@@ -71,8 +76,7 @@ struct ServerOptions {
   std::function<void(quic::TransportSettings&)> transportSettingsOverrideFn;
 };
 
-class QuicServer : public QuicServerWorker::WorkerCallback,
-                   public std::enable_shared_from_this<QuicServer> {
+class QuicServer : public std::enable_shared_from_this<QuicServer> {
  public:
   using TransportSettingsOverrideFn =
       std::function<void(quic::TransportSettings&)>;
@@ -95,7 +99,12 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   explicit QuicServer(ServerOptions options);
 
-  ~QuicServer() override;
+  ~QuicServer();
+
+  QuicServer(const QuicServer&) = delete;
+  QuicServer& operator=(const QuicServer&) = delete;
+  QuicServer(QuicServer&&) = delete;
+  QuicServer& operator=(QuicServer&&) = delete;
 
   // Initialize and start the quic server where the quic server manages
   // the eventbases for workers
@@ -303,6 +312,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   bool isInitialized() const noexcept;
 
+  void requestShutdown(LocalErrorCode error = LocalErrorCode::SHUTTING_DOWN);
+
   /**
    * Shutdown the sever (and all the workers)
    */
@@ -468,24 +479,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void getAllConnectionsStats(std::vector<QuicConnectionStats>& stats);
 
  private:
+  friend class test::QuicServerTest;
+  friend class test::QuicServerMultiWorkerRoutingTest;
+
   explicit QuicServer(TransportSettings transportSettings);
+
+  QuicServerWorker* FOLLY_NULLABLE findWorkerForEvb(folly::EventBase* evb);
 
   static TransportSettings validateTransportSettings(
       TransportSettings transportSettings);
-
-  /**
-   * Routes the given data for the given client to the correct worker that may
-   * have the state for the connection associated with the given data and client
-   */
-  void routeDataToWorker(
-      const quic::SocketAddress& client,
-      RoutingData&& routingData,
-      NetworkData&& networkData,
-      Optional<QuicVersion> quicVersion,
-      folly::EventBase* workerEvb,
-      bool isForwardedData = false) override;
-
-  void handleWorkerError(LocalErrorCode error) override;
 
   using MaybeOwnedEvbPtr =
       std::unique_ptr<folly::IOExecutor, void (*)(folly::IOExecutor*)>;
@@ -506,7 +508,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // helper function to initialize workers
   void initializeWorkers(bool useDefaultTransport);
 
-  std::unique_ptr<QuicServerWorker> newWorkerWithoutSocket();
+  std::unique_ptr<QuicServerWorker> newWorkerWithoutSocket(size_t workerIndex);
 
   // helper method to run the given function in all worker asynchronously
   void runOnAllWorkers(const std::function<void(QuicServerWorker*)>& func);
@@ -541,12 +543,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // or unowned (i.e. folly::EventBase*)
   folly::Synchronized<std::vector<MaybeOwnedEvbPtr>> workerEvbs_;
 
+  RunState runState_;
   std::vector<std::unique_ptr<QuicServerWorker>> workers_;
-  // Thread local pointer to QuicServerWorker. This is useful to avoid
-  // looking up the worker to route to.
-  // NOTE: QuicServer still maintains ownership of all the workers and manages
-  // their destruction
-  folly::ThreadLocalPtr<QuicServerWorker> workerPtr_;
   folly::F14FastMap<folly::EventBase*, QuicServerWorker*> evbToWorkers_;
   std::unique_ptr<QuicServerTransportFactory> transportFactory_;
   // factory used for workers to create their listening / bound sockets
@@ -572,8 +570,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::unique_ptr<QuicTransportStatsCallbackFactory> transportStatsFactory_;
   // factory to create per worker ConnectionIdAlgo
   std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory_;
-  // Impl of ConnectionIdAlgo to make routing decisions from ConnectionId
-  std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
   // Used to validate whether a transport knob parameter is allowed to be

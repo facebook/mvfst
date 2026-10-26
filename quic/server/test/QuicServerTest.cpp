@@ -76,8 +76,8 @@ MATCHER_P2(NetworkDataMatchesWithPeer, networkData, peerAddress, "") {
 class SimpleQuicServerWorkerTest : public Test {
  protected:
   folly::EventBase eventbase_;
+  std::unique_ptr<RunState> runState_;
   std::unique_ptr<QuicServerWorker> worker_;
-  std::shared_ptr<MockWorkerCallback> workerCb_;
   folly::test::MockAsyncUDPSocketT<>* rawSocket_{nullptr};
 };
 
@@ -98,8 +98,9 @@ TEST_F(SimpleQuicServerWorkerTest, RejectCid) {
       &mockConnectionSetupCallback,
       &mockConnectionCallback,
       nullptr);
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   worker_->setSocket(
       std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_));
   auto includeCid = getTestConnectionId(0);
@@ -128,8 +129,9 @@ TEST_F(SimpleQuicServerWorkerTest, TurnOffPMTU) {
   DCHECK(sock->getEventBase());
   EXPECT_CALL(*sock, getNetworkSocket())
       .WillRepeatedly(Return(folly::NetworkSocket()));
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   worker_->setSocket(std::move(sock));
   quic::SocketAddress addr("::1", 0);
   // We check versions in bind()
@@ -141,8 +143,9 @@ TEST_F(SimpleQuicServerWorkerTest, TurnOffPMTU) {
 TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopy) {
   auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
   rawSocket_ = sock.get();
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   worker_->setSocket(std::move(sock));
 
   EXPECT_CALL(*rawSocket_, setZeroCopy(true)).WillOnce(Return(true));
@@ -154,8 +157,9 @@ TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopy) {
 TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWhenSetZeroCopyFails) {
   auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
   rawSocket_ = sock.get();
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   worker_->setSocket(std::move(sock));
 
   EXPECT_CALL(*rawSocket_, setZeroCopy(true)).WillOnce(Return(false));
@@ -165,8 +169,9 @@ TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWhenSetZeroCopyFails) {
 }
 
 TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWithoutSocket) {
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   auto result = worker_->enableZeroCopy();
   ASSERT_TRUE(result.hasError());
 }
@@ -174,16 +179,18 @@ TEST_F(SimpleQuicServerWorkerTest, EnableZeroCopyFailsWithoutSocket) {
 TEST_F(
     SimpleQuicServerWorkerTest,
     GetListenerSocketReturnsNullBeforeSetSocket) {
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   EXPECT_EQ(worker_->getListenerSocket(), nullptr);
 }
 
 TEST_F(SimpleQuicServerWorkerTest, GetListenerSocketReturnsBoundSocket) {
   auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
   auto* expectedSock = sock.get();
-  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  runState_ = makeSingleWorkerRunState(&eventbase_);
+  worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0);
+  publishSingleWorker(*runState_, worker_.get());
   worker_->setSocket(std::move(sock));
   EXPECT_EQ(worker_->getListenerSocket(), expectedSock);
 }
@@ -216,9 +223,11 @@ class QuicServerWorkerTest : public Test {
     EXPECT_CALL(*sock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
     DCHECK(sock->getEventBase());
     socketPtr_ = sock.get();
-    workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+    worker_.reset();
+    runState_ = makeSingleWorkerRunState(&eventbase_);
 
-    worker_ = std::make_unique<QuicServerWorker>(workerCb_, settings);
+    worker_ = std::make_unique<QuicServerWorker>(runState_.get(), 0, settings);
+    publishSingleWorker(*runState_, worker_.get());
     worker_->setSupportedVersions({QuicVersion::MVFST});
     auto quicStats = std::make_unique<NiceMock<MockQuicStats>>();
     worker_->setTransportStatsCallback(std::move(quicStats));
@@ -230,22 +239,6 @@ class QuicServerWorkerTest : public Test {
     worker_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     quicStats_ = (MockQuicStats*)worker_->getTransportStatsCallback();
-
-    auto cb = [&](const quic::SocketAddress& addr,
-                  std::unique_ptr<RoutingData>& routingData,
-                  std::unique_ptr<NetworkData>& networkData,
-                  Optional<QuicVersion> quicVersion,
-                  bool isForwardedData) {
-      worker_->dispatchPacketData(
-          addr,
-          std::move(*routingData.get()),
-          std::move(*networkData.get()),
-          std::move(quicVersion),
-          isForwardedData);
-    };
-
-    EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _, _, _))
-        .WillRepeatedly(Invoke(cb));
 
     socketFactory_ = std::make_unique<MockQuicUDPSocketFactory>();
     EXPECT_CALL(*socketFactory_, _make(_, _)).WillRepeatedly(Return(nullptr));
@@ -293,9 +286,9 @@ class QuicServerWorkerTest : public Test {
   quic::SocketAddress fakeAddress_;
   folly::EventBase eventbase_;
   std::shared_ptr<quic::FollyQuicEventBase> qEvb_;
+  std::unique_ptr<RunState> runState_;
   std::unique_ptr<QuicServerWorker> worker_;
   MockQuicTransport::Ptr transport_;
-  std::shared_ptr<MockWorkerCallback> workerCb_;
   std::unique_ptr<MockQuicServerTransportFactory> factory_;
   std::unique_ptr<MockQuicUDPSocketFactory> listenerSocketFactory_;
   std::unique_ptr<MockQuicUDPSocketFactory> socketFactory_;
@@ -1346,11 +1339,11 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_TRUE(connIdMap.contains(getTestConnectionId(hostId_)));
 
-  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, closeNow(_)).Times(1).WillOnce([this](const auto&) {
     hasShutdown_ = true;
-  }));
+  });
   std::thread t([&] { eventbase_.loopForever(); });
   eventbase_.runInEventBaseThreadAndWait([&] { worker_.reset(); });
   eventbase_.terminateLoopSoon();
@@ -1412,12 +1405,12 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_TRUE(connIdMap.contains(getTestConnectionId(hostId_)));
 
-  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, setHandshakeFinishedCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, setHandshakeFinishedCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, closeNow(_)).Times(1).WillOnce([this](const auto&) {
     hasShutdown_ = true;
-  }));
+  });
   std::thread t([&] { eventbase_.loopForever(); });
   eventbase_.runInEventBaseThreadAndWait([&] { worker_.reset(); });
   eventbase_.terminateLoopSoon();
@@ -1550,6 +1543,104 @@ TEST_F(QuicServerWorkerTest, AcceptObserver) {
   // add third connection, no events
   const auto [sock3, transport3] = initTestSocketAndTransport();
   createQuicConnection(kClientAddr3, getTestConnectionId(hostId_), transport3);
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverDetachedDuringAcceptNotInvoked) {
+  auto cbA = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cbA, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cbA.get());
+
+  auto cbB = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cbB, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cbB.get());
+  Mock::VerifyAndClearExpectations(cbA.get());
+  Mock::VerifyAndClearExpectations(cbB.get());
+
+  NiceMock<MockConnectionSetupCallback> connSetupCb;
+  NiceMock<MockConnectionCallback> connCb;
+  auto mockSock =
+      std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
+  EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto qSock =
+      std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_, std::move(mockSock));
+  MockQuicTransport::Ptr mockTransport = std::make_shared<MockQuicTransport>(
+      qEvb_, std::move(qSock), &connSetupCb, &connCb, nullptr);
+  EXPECT_CALL(*mockTransport, setRoutingCallback(nullptr));
+  EXPECT_CALL(*mockTransport, setTransportStatsCallback(nullptr));
+  EXPECT_CALL(*mockTransport, getEventBase()).WillRepeatedly(Return(qEvb_));
+  EXPECT_CALL(*mockTransport, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(kClientAddr));
+
+  // B is detached from inside A's accept() and must not be invoked for
+  // this connection afterwards.
+  EXPECT_CALL(*cbB, observerDetach(worker_.get())).Times(1);
+  EXPECT_CALL(*cbB, accept(_)).Times(0);
+  EXPECT_CALL(*cbA, accept(mockTransport.get()))
+      .WillOnce(Invoke([&](QuicTransportBase* const) {
+        EXPECT_TRUE(worker_->removeAcceptObserver(cbB.get()));
+      }));
+  createQuicConnection(
+      kClientAddr, getTestConnectionId(hostId_), mockTransport);
+  Mock::VerifyAndClearExpectations(cbA.get());
+  Mock::VerifyAndClearExpectations(cbB.get());
+
+  EXPECT_CALL(*cbA, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cbA.get()));
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverUnbindBeforeCidClearsSourceMap) {
+  NiceMock<MockConnectionSetupCallback> connSetupCb;
+  NiceMock<MockConnectionCallback> connCb;
+  auto mockSock =
+      std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
+  EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto qSock =
+      std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_, std::move(mockSock));
+  MockQuicTransport::Ptr testTransport = std::make_shared<MockQuicTransport>(
+      qEvb_, std::move(qSock), &connSetupCb, &connCb, nullptr);
+  EXPECT_CALL(*testTransport, getEventBase()).WillRepeatedly(Return(qEvb_));
+  EXPECT_CALL(*testTransport, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(kClientAddr));
+  EXPECT_CALL(*testTransport, setTransportStatsCallback(nullptr))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(*testTransport, setRoutingCallback(nullptr))
+      .Times(testing::AnyNumber());
+
+  auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb.get());
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_CALL(*cb, accept(testTransport.get()))
+      .WillOnce(Invoke([&](QuicTransportBase* const) {
+        // Simulate a synchronous close during accept notification, before
+        // any server CID exists. The mocked setRoutingCallback() call in
+        // makeTransport() does not install the real callback, so install
+        // it directly first.
+        testTransport->QuicServerTransport::setRoutingCallback(worker_.get());
+        testTransport->unbindConnection();
+      }));
+
+  auto connId = getTestConnectionId(hostId_);
+  QuicVersion version = QuicVersion::MVFST;
+  RoutingData routingData(HeaderForm::Long, true, false, connId, connId);
+  auto data = createData(kMinInitialPacketSize + 10);
+  expectConnectionCreation(kClientAddr, testTransport);
+  EXPECT_CALL(*testTransport, setConnectionIdAlgo(nullptr))
+      .Times(testing::AnyNumber());
+  EXPECT_CALL(
+      *testTransport,
+      onNetworkData(_, NetworkDataMatchesWithPeer(*data, kClientAddr)));
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now(), 0),
+      version);
+  eventbase_.loopIgnoreKeepAlive();
+
+  EXPECT_TRUE(worker_->getSrcToTransportMap().empty());
+
+  EXPECT_CALL(*cb, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb.get()));
 }
 
 TEST_F(QuicServerWorkerTest, AcceptObserverRemove) {
@@ -1711,8 +1802,8 @@ TEST_F(QuicServerWorkerTest, PacketWithZeroHostIdFromExistingConnection) {
       std::move(routingData),
       NetworkData(data->clone(), Clock::now(), 0),
       std::nullopt);
-  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(1);
 }
 
 auto createInitialStream(
@@ -1805,16 +1896,14 @@ TEST_F(QuicServerWorkerTest, OnDataAvailableRecordsPacketTtl) {
   writeTestDataOnWorkersBuf(
       getTestConnectionId(hostId_), connId, len, worker_.get());
 
+  expectConnectionCreation(kClientAddr);
   OptionalIntegral<uint8_t> routedTtl;
-  EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _, _, _))
-      .WillOnce([&](const quic::SocketAddress&,
-                    std::unique_ptr<RoutingData>&,
-                    std::unique_ptr<NetworkData>& networkData,
-                    const Optional<QuicVersion>&,
-                    bool) {
-        ASSERT_EQ(networkData->getPackets().size(), 1);
-        routedTtl = networkData->getPackets()[0].ttlValue;
-      });
+  EXPECT_CALL(*transport_, onNetworkData(_, _))
+      .WillOnce(
+          Invoke([&](const quic::SocketAddress&, const NetworkData& data) {
+            ASSERT_EQ(data.getPackets().size(), 1);
+            routedTtl = data.getPackets()[0].ttlValue;
+          }));
 
   OnDataAvailableParams params;
   params.ttl = 64;
@@ -1822,6 +1911,10 @@ TEST_F(QuicServerWorkerTest, OnDataAvailableRecordsPacketTtl) {
 
   ASSERT_TRUE(routedTtl.has_value());
   EXPECT_EQ(*routedTtl, 64);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
+  EXPECT_CALL(*transport_, setHandshakeFinishedCallback(nullptr));
+  EXPECT_CALL(*transport_, closeNow(_));
 }
 
 class QuicServerWorkerRetryTest : public QuicServerWorkerTest {
@@ -2175,13 +2268,17 @@ TEST_F(QuicServerWorkerRetryTest, TestNewTokenIsNotRetry) {
 class QuicServerWorkerTakeoverTest : public Test {
  public:
   void SetUp() override {
+    qEvb_ = std::make_shared<FollyQuicEventBase>(&evb_);
     auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&evb_);
     DCHECK(sock->getEventBase());
     EXPECT_CALL(*sock, getNetworkSocket())
         .WillRepeatedly(Return(folly::NetworkSocket()));
     EXPECT_CALL(*sock, pauseRead());
-    takeoverWorkerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
-    takeoverWorker_ = std::make_unique<QuicServerWorker>(takeoverWorkerCb_);
+    EXPECT_CALL(*sock, address()).WillRepeatedly(ReturnRef(clientAddr));
+    takeoverRunState_ = makeSingleWorkerRunState(&evb_);
+    takeoverWorker_ =
+        std::make_unique<QuicServerWorker>(takeoverRunState_.get(), 0);
+    publishSingleWorker(*takeoverRunState_, takeoverWorker_.get());
     takeoverWorker_->setSupportedVersions(supportedVersions);
     takeoverWorker_->setSocket(std::move(sock));
     takeoverSocketFactory_ = std::make_unique<MockQuicUDPSocketFactory>();
@@ -2192,6 +2289,8 @@ class QuicServerWorkerTakeoverTest : public Test {
     auto quicStats = std::make_unique<NiceMock<MockQuicStats>>();
     takeoverWorker_->setConnectionIdAlgo(
         std::make_unique<DefaultConnectionIdAlgo>());
+    takeoverWorker_->setCongestionControllerFactory(
+        std::make_shared<ServerCongestionControllerFactory>());
     takeoverWorker_->setTransportStatsCallback(std::move(quicStats));
     quicStats_ = (MockQuicStats*)takeoverWorker_->getTransportStatsCallback();
 
@@ -2208,10 +2307,26 @@ class QuicServerWorkerTakeoverTest : public Test {
 
   void testNoPacketForwarding(BufPtr data, size_t len, ConnectionId connId);
 
+  MockQuicTransport::Ptr makeMockTransport() {
+    auto mockSock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&evb_);
+    EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(clientAddr));
+    auto qSock =
+        std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_, std::move(mockSock));
+    auto transport = std::make_shared<MockQuicTransport>(
+        qEvb_, std::move(qSock), &connSetupCb_, &connCb_, nullptr);
+    EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(qEvb_));
+    EXPECT_CALL(*transport, getOriginalPeerAddress())
+        .WillRepeatedly(ReturnRef(clientAddr));
+    return transport;
+  }
+
  protected:
-  std::shared_ptr<MockWorkerCallback> takeoverWorkerCb_;
   folly::test::MockAsyncUDPSocketT<>* takeoverSocket_;
   folly::EventBase evb_;
+  std::shared_ptr<FollyQuicEventBase> qEvb_;
+  NiceMock<MockConnectionSetupCallback> connSetupCb_;
+  NiceMock<MockConnectionCallback> connCb_;
+  std::unique_ptr<RunState> takeoverRunState_;
   std::unique_ptr<QuicServerWorker> takeoverWorker_;
   folly::IOBufEqualTo eq;
   quic::SocketAddress clientAddr{kClientAddr};
@@ -2288,25 +2403,58 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverNoForwarding) {
 }
 
 void QuicServerWorkerTakeoverTest::testNoPacketForwarding(
-    BufPtr /* data */,
+    BufPtr data,
     size_t len,
-    ConnectionId /* connId */) {
-  auto cb = [&](const quic::SocketAddress& addr,
-                std::unique_ptr<RoutingData>& /* routingData */,
-                std::unique_ptr<NetworkData>& /* networkData */,
-                Optional<QuicVersion> /* quicVersion */,
-                bool isForwardedData) {
-    EXPECT_EQ(addr.getIPAddress(), clientAddr.getIPAddress());
-    EXPECT_EQ(addr.getPort(), clientAddr.getPort());
-    EXPECT_FALSE(isForwardedData);
-  };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
-      .WillOnce(Invoke(cb));
+    ConnectionId connId) {
+  auto parsedHeader = parseHeader(*data);
+  ASSERT_TRUE(parsedHeader.has_value());
+  auto& header = parsedHeader->parsedHeader;
+  auto* longHeader = header->asLong();
+  ASSERT_NE(longHeader, nullptr);
+  const bool isInitial =
+      longHeader->getHeaderType() == LongHeader::Types::Initial;
+
+  MockQuicTransport::Ptr transport;
+  if (isInitial) {
+    // Positive delivery check: a locally-owned Initial creates a transport
+    // and is delivered with the original client address and payload intact.
+    transport = makeMockTransport();
+    EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(transport));
+    EXPECT_CALL(*transport, setSupportedVersions(_));
+    EXPECT_CALL(*transport, setOriginalPeerAddress(clientAddr));
+    EXPECT_CALL(*transport, setRoutingCallback(takeoverWorker_.get()));
+    EXPECT_CALL(*transport, setConnectionIdAlgo(_));
+    EXPECT_CALL(*transport, setServerConnectionIdParams(_));
+    EXPECT_CALL(*transport, setTransportSettings(_));
+    EXPECT_CALL(*transport, accept(_));
+    EXPECT_CALL(*transport, setTransportStatsCallback(quicStats_));
+    // Buffered 0-RTT for this DCID may be replayed right after the Initial.
+    EXPECT_CALL(*transport, onNetworkData(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(
+        *transport,
+        onNetworkData(_, NetworkDataMatchesWithPeer(*data, clientAddr)))
+        .Times(1);
+  } else {
+    EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
+  }
+  EXPECT_CALL(*takeoverSocketFactory_, _make(_, _))
+      .WillRepeatedly(Invoke([](folly::EventBase* evb, int) {
+        return new folly::test::MockAsyncUDPSocketT<>(evb);
+      }));
   EXPECT_CALL(*quicStats_, onPacketReceived());
   EXPECT_CALL(*quicStats_, onRead(len));
   EXPECT_CALL(*quicStats_, onPacketForwarded()).Times(0);
   takeoverWorker_->onDataAvailable(
       clientAddr, len, false, OnDataAvailableParams());
+
+  if (transport) {
+    // Drop the source-map entry so later calls stay independent.
+    EXPECT_CALL(*transport, setRoutingCallback(nullptr)).Times(1);
+    takeoverWorker_->onConnectionUnbound(
+        transport.get(),
+        std::make_pair(clientAddr, connId),
+        std::vector<ConnectionIdData>{});
+  }
 }
 
 TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverForwarding) {
@@ -2395,20 +2543,6 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
       }));
   takeoverWorker_->startPacketForwarding(kClientAddr);
 
-  auto cb = [&](const quic::SocketAddress& client,
-                std::unique_ptr<RoutingData>& routingData,
-                std::unique_ptr<NetworkData>& networkData,
-                Optional<QuicVersion> quicVersion,
-                bool isForwardedData) {
-    takeoverWorker_->dispatchPacketData(
-        client,
-        std::move(*routingData.get()),
-        std::move(*networkData.get()),
-        std::move(quicVersion),
-        isForwardedData);
-  };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
-      .WillOnce(Invoke(cb));
   EXPECT_CALL(*quicStats_, onPacketReceived());
   EXPECT_CALL(*quicStats_, onRead(len));
   EXPECT_CALL(*quicStats_, onPacketForwarded()).Times(1);
@@ -2459,42 +2593,20 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
             std::min(workerBufLen, writtenData->computeChainDataLength());
         memcpy(workerBuf, writtenData->buffer(), bufLen);
 
-        // test processing of the forwarded packet
-        auto cb = [&](const quic::SocketAddress& addr,
-                      std::unique_ptr<RoutingData>& /* routingData */,
-                      std::unique_ptr<NetworkData>& networkData,
-                      Optional<QuicVersion> /* quicVersion */,
-                      bool isForwardedData) {
-          // verify that it is the original client address
-          EXPECT_EQ(addr.getIPAddress(), clientAddr.getIPAddress());
-          EXPECT_EQ(addr.getPort(), clientAddr.getPort());
-          // the original data should be extracted after processing takeover
-          // protocol related information
-          EXPECT_EQ(networkData->getPackets().size(), 1);
-          EXPECT_TRUE(eq(*data, *(networkData->getPackets()[0].buf.front())));
-          EXPECT_TRUE(isForwardedData);
-        };
-        EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
-            .WillOnce(Invoke(cb));
+        // The forwarded packet must reach the owning transport with the
+        // decoded original client address and payload intact.
+        auto transport = makeMockTransport();
+        takeoverWorker_->onConnectionIdAvailable(transport, connId);
+        EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
+        EXPECT_CALL(
+            *transport,
+            onNetworkData(_, NetworkDataMatchesWithPeer(*data, clientAddr)))
+            .Times(1);
 
         takeoverCb->onDataAvailable(
             client, bufLen, false, OnDataAvailableParams());
         return bufLen;
       }));
-  auto workerCb = [&](const quic::SocketAddress& client,
-                      std::unique_ptr<RoutingData>& routingData,
-                      std::unique_ptr<NetworkData>& networkData,
-                      Optional<QuicVersion> quicVersion,
-                      bool isForwardedData) {
-    takeoverWorker_->dispatchPacketData(
-        client,
-        std::move(*routingData.get()),
-        std::move(*networkData.get()),
-        std::move(quicVersion),
-        isForwardedData);
-  };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
-      .WillOnce(Invoke(workerCb));
   EXPECT_CALL(*quicStats_, onPacketReceived());
   EXPECT_CALL(*quicStats_, onRead(len));
   EXPECT_CALL(*quicStats_, onPacketForwarded()).Times(1);
@@ -2555,6 +2667,10 @@ class QuicServerTest : public Test {
 
   void TearDown() override {
     server_->shutdown();
+  }
+
+  QuicServerWorker* workerForEvb(folly::EventBase* evb) {
+    return server_->findWorkerForEvb(evb);
   }
 
   void setUpTransportFactoryForWorkers(std::vector<folly::EventBase*> evbs) {
@@ -2808,13 +2924,12 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
         false,
         header.getDestinationConnId(),
         header.getSourceConnId());
-    static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
-        ->routeDataToWorker(
+    workerForEvb(evbThread.getEventBase())
+        ->routeOrDispatch(
             kClientAddr,
             std::move(routingData),
             std::move(networkData),
             version,
-            evbThread.getEventBase(),
             /*isForwardedData=*/false);
   }));
   std::thread t([&] { server_->shutdown(); });
@@ -2870,14 +2985,15 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
                 *networkData.getPackets()[0].buf.front(), *initialData));
       }));
 
-  static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
-      ->routeDataToWorker(
-          client->address(),
-          std::move(routingData),
-          std::move(networkData),
-          version,
-          evbThread.getEventBase(),
-          /*isForwardedData=*/false);
+  evbThread.getEventBase()->runInEventBaseThreadAndWait([&] {
+    workerForEvb(evbThread.getEventBase())
+        ->routeOrDispatch(
+            client->address(),
+            std::move(routingData),
+            std::move(networkData),
+            version,
+            /*isForwardedData=*/false);
+  });
 
   // cleanup transport
   transport->getEventBase()->runInEventBaseThreadAndWait(
@@ -2921,13 +3037,12 @@ class QuicServerMultiWorkerRoutingTest : public QuicServerTest {
 
     injectFromEvb->runInEventBaseThreadAndWait([&] {
       RoutingData routingData(HeaderForm::Long, true, false, dcid, srcConnId);
-      static_cast<QuicServerWorker::WorkerCallback*>(server_.get())
-          ->routeDataToWorker(
+      workerForEvb(injectFromEvb)
+          ->routeOrDispatch(
               kClientAddr,
               std::move(routingData),
               NetworkData(data->clone(), Clock::now(), 0),
               QuicVersion::MVFST,
-              injectFromEvb,
               /*isForwardedData=*/false);
     });
 
@@ -2976,6 +3091,27 @@ TEST_F(
       /*encodedWorkerId=*/1,
       /*injectFromEvb=*/evbThreadA.getEventBase(),
       /*expectedFactoryEvb=*/evbThreadA.getEventBase());
+}
+
+// After a host-id rotation, a retransmitted Initial bearing the previous
+// host id is still server-issued and steers to the CID-owning worker.
+TEST_F(
+    QuicServerMultiWorkerRoutingTest,
+    PrevHostIdInitialRoutedToOwningWorker) {
+  folly::ScopedEventBaseThread evbThreadA;
+  folly::ScopedEventBaseThread evbThreadB;
+  std::vector<folly::EventBase*> evbs{
+      evbThreadA.getEventBase(), evbThreadB.getEventBase()};
+  initializeServer(evbs);
+
+  const uint32_t prevHostId = serverHostId_;
+  server_->setHostId(prevHostId + 1);
+
+  runMultiWorkerRoutingTest(
+      /*encodedHostId=*/prevHostId,
+      /*encodedWorkerId=*/1,
+      /*injectFromEvb=*/evbThreadA.getEventBase(),
+      /*expectedFactoryEvb=*/evbThreadB.getEventBase());
 }
 
 TEST_F(QuicServerTest, OverrideTakeoverAddressTest) {

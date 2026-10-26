@@ -54,6 +54,25 @@ struct RunState {
 
   std::vector<WorkerEndpoint> peers;
   std::atomic<uint64_t> stopReason{kNoStopRequest};
+
+  void requestStop(LocalErrorCode reason);
+
+  [[nodiscard]] bool stopRequested() const {
+    return stopReason.load(std::memory_order_relaxed) != kNoStopRequest;
+  }
+
+  [[nodiscard]] LocalErrorCode latchedStopReason(
+      LocalErrorCode fallback = LocalErrorCode::SHUTTING_DOWN) const {
+    auto value = stopReason.load(std::memory_order_relaxed);
+    return value == kNoStopRequest ? fallback
+                                   : static_cast<LocalErrorCode>(value);
+  }
+
+  bool latchStop(LocalErrorCode reason) {
+    auto expected = kNoStopRequest;
+    return stopReason.compare_exchange_strong(
+        expected, static_cast<uint64_t>(reason), std::memory_order_relaxed);
+  }
 };
 
 class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
@@ -73,23 +92,9 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   using QuicExperimentHandlerFn =
       std::function<void(QuicConnectionStateBase&, uint16_t)>;
 
-  class WorkerCallback {
-   public:
-    virtual ~WorkerCallback() = default;
-    // Callback for when the worker has errored
-    virtual void handleWorkerError(LocalErrorCode error) = 0;
-
-    virtual void routeDataToWorker(
-        const quic::SocketAddress& client,
-        RoutingData&& routingData,
-        NetworkData&& networkData,
-        Optional<QuicVersion> quicVersion,
-        folly::EventBase* workerEvb,
-        bool isForwardedData) = 0;
-  };
-
-  explicit QuicServerWorker(
-      std::shared_ptr<WorkerCallback> callback,
+  QuicServerWorker(
+      RunState* runState,
+      size_t workerIndex,
       TransportSettings transportSettings = TransportSettings());
 
   ~QuicServerWorker() override;
@@ -445,6 +450,13 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       Optional<QuicVersion> quicVersion,
       bool isForwardedData = false) noexcept;
 
+  void routeOrDispatch(
+      const quic::SocketAddress& client,
+      RoutingData&& routingData,
+      NetworkData&& networkData,
+      const Optional<QuicVersion>& quicVersion,
+      bool isForwardedData);
+
   using ConnIdToTransportMap = folly::
       F14FastMap<ConnectionId, QuicServerTransport::Ptr, ConnectionIdHash>;
 
@@ -460,6 +472,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   [[nodiscard]] const ConnIdToTransportMap& getConnectionIdMap() const;
 
   [[nodiscard]] const SrcToTransportMap& getSrcToTransportMap() const;
+
+  void stopLocal(LocalErrorCode error);
 
   void shutdownAllConnections(LocalErrorCode error);
 
@@ -614,7 +628,7 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       const quic::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
-      Optional<QuicVersion> quicVersion,
+      const Optional<QuicVersion>& quicVersion,
       bool isForwardedData = false);
 
   // Create transport and invoke appropriate setters
@@ -640,7 +654,10 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   std::shared_ptr<FollyQuicAsyncUDPSocket> quicSocket_;
   std::unique_ptr<QuicReadCallbackAdapter> quicReadCallbackAdapter_;
   folly::SocketOptionMap* socketOptions_{nullptr};
-  std::shared_ptr<WorkerCallback> callback_;
+  RunState* runState_{nullptr};
+  size_t workerIndex_{0};
+  bool stopping_{false};
+  folly::EventBase* eventBase_{nullptr};
   folly::Executor::KeepAlive<folly::EventBase> evb_;
 
   // Set by enableZeroCopy(); selects the makeAlias() factory path in
@@ -656,7 +673,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // connection's `QuicConnectionStateBase::batchWriterFactoryOverride`.
   quic::BatchWriterFactoryOverride batchWriterFactoryOverride_;
 
-  // A server transport's membership is exclusive to only one of these maps.
   ConnIdToTransportMap connectionIdMap_;
   SrcToTransportMap sourceAddressMap_;
 

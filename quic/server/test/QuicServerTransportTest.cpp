@@ -2018,6 +2018,25 @@ TEST_F(QuicServerTransportTest, CloseTransportWontUnbound) {
   server->setRoutingCallback(nullptr);
 }
 
+class QuicServerTransportBeforeStartTest : public QuicServerTransportTestBase {
+};
+
+TEST_F(QuicServerTransportBeforeStartTest, UnboundWithoutServerConnectionId) {
+  ASSERT_FALSE(server->getConn().serverConnectionId.has_value());
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _))
+      .Times(1)
+      .WillOnce(Invoke(
+          [](QuicServerTransport*,
+             const QuicServerTransport::SourceIdentity&,
+             const std::vector<ConnectionIdData>& connectionIdData) noexcept {
+            EXPECT_TRUE(connectionIdData.empty());
+          }));
+  server->unbindConnection();
+  // Need to do this otherwise server transport destructor will still call
+  // onConnectionUnbound
+  server->setRoutingCallback(nullptr);
+}
+
 TEST_F(QuicServerTransportTest, UnboundConnection) {
   EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _)).Times(1);
   server->unbindConnection();

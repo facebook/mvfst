@@ -28,17 +28,6 @@ FOLLY_GFLAGS_DEFINE_int32(
 namespace {
 using namespace quic;
 
-// Determine which worker to route to
-// This **MUST** be kept in sync with the BPF program (if supplied)
-size_t getWorkerToRouteTo(
-    const RoutingData& routingData,
-    size_t numWorkers,
-    ConnectionIdAlgo* connIdAlgo) {
-  return connIdAlgo->parseConnectionId(routingData.destinationConnId)
-             ->workerId %
-      numWorkers;
-}
-
 [[maybe_unused]] constexpr std::string_view kQuicServerNotInitialized =
     "Quic server is not initialized. "
     "Consider calling waitUntilInitialized() prior to: ";
@@ -279,7 +268,6 @@ void QuicServer::initializeImpl(
   if (!connIdAlgoFactory_) {
     connIdAlgoFactory_ = std::make_unique<DefaultConnectionIdAlgoFactory>();
   }
-  connIdAlgo_ = connIdAlgoFactory_->make();
 
   if (!ccFactory_) {
     ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
@@ -296,8 +284,16 @@ void QuicServer::initializeWorkers(bool useDefaultTransport) {
   MVCHECK(workers_.empty());
   // iterate in the order of insertion in vector
   auto workerEvbs = workerEvbs_.rlock();
+  runState_.peers.clear();
+  runState_.peers.reserve(workerEvbs->size());
   for (size_t i = 0; i < workerEvbs->size(); ++i) {
-    auto worker = newWorkerWithoutSocket();
+    runState_.peers.push_back(
+        WorkerEndpoint{
+            .evb = (*workerEvbs)[i]->getEventBase(),
+            .target = std::make_shared<DispatchTarget>()});
+  }
+  for (size_t i = 0; i < workerEvbs->size(); ++i) {
+    auto worker = newWorkerWithoutSocket(i);
     if (useDefaultTransport) {
       MVCHECK(transportFactory_, "Transport factory is not set");
       worker->setTransportFactory(transportFactory_.get());
@@ -310,9 +306,10 @@ void QuicServer::initializeWorkers(bool useDefaultTransport) {
   }
 }
 
-std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
+std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket(
+    size_t workerIndex) {
   auto worker = std::make_unique<QuicServerWorker>(
-      this->shared_from_this(), transportSettings_);
+      &runState_, workerIndex, transportSettings_);
   worker->setNewConnectionSocketFactory(socketFactory_.get());
   worker->setSupportedVersions(supportedVersions_);
   worker->rejectNewConnections(rejectNewConnections_);
@@ -397,6 +394,7 @@ void QuicServer::bindWorkersToSocket(const quic::SocketAddress& address) {
               self->boundAddress_ = worker->getAddress();
             }
           }
+          self->runState_.peers[idx].target->worker = worker;
           if (idx == (numWorkers - 1)) {
             MVVLOG(4) << "Initialized all workers in the eventbase";
             self->initialized_ = true;
@@ -410,13 +408,6 @@ void QuicServer::bindWorkersToSocket(const quic::SocketAddress& address) {
 void QuicServer::start() {
   checkRunningInThread(mainThreadId_);
   MVCHECK(initialized_, kQuicServerNotInitialized << __func__);
-  // initialize the thread local ptr to workers
-  runOnAllWorkers([&](auto worker) mutable {
-    // pass in no-op deleter to ThreadLocalPtr since the destruction of
-    // QuicServerWorker is managed by the QuicServer
-    workerPtr_.reset(
-        worker, [](auto /* worker */, folly::TLPDestructionMode) {});
-  });
   for (auto& worker : workers_) {
     worker->getEventBase()->runInEventBaseThread(
         [&worker] { worker->start(); });
@@ -513,100 +504,18 @@ void QuicServer::pauseRead() {
   runOnAllWorkersSync([&](auto worker) mutable { worker->pauseRead(); });
 }
 
-void QuicServer::routeDataToWorker(
-    const quic::SocketAddress& client,
-    RoutingData&& routingData,
-    NetworkData&& networkData,
-    Optional<QuicVersion> quicVersion,
-    folly::EventBase*,
-    bool isForwardedData) {
-  // figure out worker idx
-  if (!initialized_) {
-    // drop the packet if we are not initialized. This is a janky memory
-    // barrier.
-    MVVLOG(4) << "Dropping data since quic-server is not initialized";
-    if (workerPtr_) {
-      QUIC_STATS(
-          workerPtr_->getTransportStatsCallback(),
-          onPacketDropped,
-          PacketDropReason::WORKER_NOT_INITIALIZED);
-    }
-    return;
-  }
-
-  if (shutdown_) {
-    MVVLOG(4) << "Dropping data since quic server is shutdown";
-    if (workerPtr_) {
-      QUIC_STATS(
-          workerPtr_->getTransportStatsCallback(),
-          onPacketDropped,
-          PacketDropReason::SERVER_SHUTDOWN);
-    }
-    return;
-  }
-
-  // Initial/0-RTT default: kernel/bpf-routed worker. Keeps userspace and
-  // kernel hashing in sync.
-  //
-  // Exception: if the DCID parses as one of our server-issued CIDs (hostId
-  // matches ours), the client retransmitted an Initial after switching to
-  // the server-chosen DCID. RFC 9000 §7.2 still derives Initial keys from
-  // the original client-chosen DCID, so the packet must reach the worker
-  // that owns the conn — route via connIdAlgo to avoid spawning a new
-  // wrong-keyed transport on the kernel-routed worker.
-  if (routingData.clientChosenDcid && workerPtr_) {
-    // parseConnectionId is self-guarding (returns an error for CIDs we can't
-    // parse), so rely on its result directly rather than a redundant canParse.
-    auto parsed = connIdAlgo_->parseConnectionId(routingData.destinationConnId);
-    bool dcidIsOurServerIssued =
-        parsed.has_value() && parsed.value().hostId == hostId_;
-    if (!dcidIsOurServerIssued) {
-      MVCHECK(workerPtr_->getEventBase()->isInEventBaseThread());
-      workerPtr_->dispatchPacketData(
-          client,
-          std::move(routingData),
-          std::move(networkData),
-          quicVersion,
-          isForwardedData);
-      return;
-    }
-  }
-
-  auto workerToRunOn =
-      getWorkerToRouteTo(routingData, workers_.size(), connIdAlgo_.get());
-  auto& worker = workers_[workerToRunOn];
-  VLOG_IF(4, !worker->getEventBase()->isInEventBaseThread())
-      << " Routing to worker in different EVB, to workerId=" << workerToRunOn;
-  folly::EventBase* workerEvb = worker->getEventBase();
-  bool isInEvb = workerEvb->isInEventBaseThread();
-  if (isInEvb) {
-    worker->dispatchPacketData(
-        client,
-        std::move(routingData),
-        std::move(networkData),
-        quicVersion,
-        isForwardedData);
-    return;
-  }
-  worker->getEventBase()->runInEventBaseThread([server =
-                                                    this->shared_from_this(),
-                                                cl = client,
-                                                routingData =
-                                                    std::move(routingData),
-                                                w = worker.get(),
-                                                buf = std::move(networkData),
-                                                isForwarded = isForwardedData,
-                                                quicVersion]() mutable {
-    if (server->shutdown_) {
-      return;
-    }
-    w->dispatchPacketData(
-        cl, std::move(routingData), std::move(buf), quicVersion, isForwarded);
-  });
+void QuicServer::requestShutdown(LocalErrorCode error) {
+  runState_.requestStop(error);
 }
 
-void QuicServer::handleWorkerError(LocalErrorCode error) {
-  shutdown(error);
+QuicServerWorker* FOLLY_NULLABLE
+QuicServer::findWorkerForEvb(folly::EventBase* evb) {
+  for (auto& worker : workers_) {
+    if (worker->getEventBase() == evb) {
+      return worker.get();
+    }
+  }
+  return nullptr;
 }
 
 void QuicServer::waitUntilInitialized() {
@@ -629,12 +538,12 @@ void QuicServer::shutdown(LocalErrorCode error) {
   if (shutdown_) {
     return;
   }
+  runState_.latchStop(error);
   shutdown_ = true;
+  auto reason = runState_.latchedStopReason(error);
   for (auto& worker : workers_) {
-    worker->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
-      worker->shutdownAllConnections(error);
-      workerPtr_.reset();
-    });
+    worker->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait(
+        [&] { worker->stopLocal(reason); });
     // protecting the erase in map with the mutex since
     // the erase could potentially affect concurrent accesses from other threads
     std::lock_guard<std::mutex> guard(startMutex_);
