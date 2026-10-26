@@ -180,6 +180,10 @@ struct AckEvent {
       // Number of stream bytes newly marked delivered by this ACKed packet.
       uint64_t streamBytesAcked{0};
 
+      // Number of newly delivered stream bytes carried by frames whose bytes
+      // had been sent before: retransmissions, clones and PTO probes.
+      uint64_t streamBytesAckedByRetrans{0};
+
       // A frame usually contributes a single interval, so reserve one inline.
       template <class T>
       using StreamIntervalSetVec = SmallVec<T, 1 /* stack size */>;
@@ -208,13 +212,18 @@ struct AckEvent {
        * marked delivered. Bytes of the frame that were not newly delivered are
        * recorded in `dupAckedStreamIntervals`.
        *
+       * `retransmission` is whether mvfst sent the frame's bytes as a
+       * retransmission, clone or PTO probe, as recorded in
+       * `WriteStreamFrame::origin` when the packet was sent.
+       *
        * Returns false if the report was not a list of increasing intervals
        * within the frame; only the frame's bytes are then recorded, each at
        * most once.
        */
       bool recordFrameDelivery(
           const WriteStreamFrame& frame,
-          const StreamFrameAckDelivery& delivery);
+          const StreamFrameAckDelivery& delivery,
+          bool retransmission);
 
       [[nodiscard]] auto at(StreamId id) const {
         return MapType::at(id);

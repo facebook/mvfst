@@ -1012,10 +1012,10 @@ quic::Expected<void, QuicError> updateConnection(
              << " bodySize: " << encodedBodySize << " " << conn;
   QLOG(conn, addPacket, packet, encodedSize);
   FOLLY_SDT(quic, update_connection_num_frames, packet.frames.size());
-  for (const auto& frame : packet.frames) {
+  for (auto& frame : packet.frames) {
     switch (frame.type()) {
       case QuicWriteFrame::Type::WriteStreamFrame: {
-        const WriteStreamFrame& writeStreamFrame = *frame.asWriteStreamFrame();
+        WriteStreamFrame& writeStreamFrame = *frame.asWriteStreamFrame();
         retransmittable = true;
         auto streamResult =
             conn.streamManager->getStream(writeStreamFrame.streamId);
@@ -1047,6 +1047,14 @@ quic::Expected<void, QuicError> updateConnection(
           return quic::make_unexpected(streamWrittenResult.error());
         }
         newStreamDataWritten = streamWrittenResult.value();
+        // Record how these bytes were sent so ACK processing can attribute
+        // them without reconstructing the send decision.
+        writeStreamFrame.origin = newStreamDataWritten
+            ? WriteStreamFrame::Origin::NewData
+            : clonedPacketIdentifier ? WriteStreamFrame::Origin::Clone
+            : isPtoRetransmission
+            ? WriteStreamFrame::Origin::PtoRetransmission
+            : WriteStreamFrame::Origin::LossRetransmission;
         if (newStreamDataWritten) {
           auto flowControlResult =
               updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);

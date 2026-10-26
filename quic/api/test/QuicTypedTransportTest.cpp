@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <map>
 #include <string_view>
 #include <utility>
@@ -48,6 +49,11 @@ class TransportTypeNames {
     }
     return str;
   }
+};
+
+enum class StreamRetransmissionTrigger : std::uint8_t {
+  PacketThreshold,
+  TimeThreshold,
 };
 
 bool hasStreamFrame(const quic::RegularQuicWritePacket::Vec& frames) {
@@ -2794,6 +2800,181 @@ class QuicTypedTransportAfterStartTestForObservers
     QuicTypedTransportTestForObservers<T>::SetUp();
     QuicTypedTransportTestForObservers<T>::startTransport();
   }
+
+  void verifyMixedNewAndRetransmittedStreamBytesAcked(
+      const StreamRetransmissionTrigger trigger) {
+    // This is an arbitrary positive RTT used to make ACK timing deterministic;
+    // the selected loss threshold is configured explicitly below.
+    constexpr auto kAckRtt = 27ms;
+
+    auto transport = this->getTransport();
+    this->ackAllOutstandingPackets();
+    ASSERT_TRUE(this->getConn().outstandings.packets.empty());
+    // Packet number skipping would make write intervals non-contiguous.
+    this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber =
+        0;
+
+    const auto streamId = transport->createBidirectionalStream().value();
+    auto retransmittedBody = IOBuf::copyBuffer("hello");
+    const auto retransmittedBodyLength =
+        retransmittedBody->computeChainDataLength();
+    auto writeResult =
+        transport->writeChain(streamId, std::move(retransmittedBody), false);
+    ASSERT_FALSE(writeResult.hasError());
+    const auto originalPackets = this->loopForWrites();
+    ASSERT_TRUE(originalPackets.has_value());
+    ASSERT_EQ(originalPackets->start, originalPackets->end);
+
+    auto& conn = this->getNonConstConn();
+    Optional<
+        typename QuicTypedTransportTestBase<T>::NewOutstandingPacketInterval>
+        mixedPackets;
+    auto newBody = IOBuf::copyBuffer("world");
+    const auto newBodyLength = newBody->computeChainDataLength();
+
+    const auto triggerStreamId = transport->createBidirectionalStream().value();
+    writeResult =
+        transport->writeChain(triggerStreamId, IOBuf::copyBuffer("a"), false);
+    ASSERT_FALSE(writeResult.hasError());
+    const auto firstTriggerPackets = this->loopForWrites();
+    ASSERT_TRUE(firstTriggerPackets.has_value());
+    ASSERT_EQ(firstTriggerPackets->start, firstTriggerPackets->end);
+
+    auto lossTriggerPackets = firstTriggerPackets;
+    bool lostByReorderThreshold = false;
+    bool lostByTimeout = false;
+    switch (trigger) {
+      case StreamRetransmissionTrigger::PacketThreshold: {
+        writeResult = transport->writeChain(
+            triggerStreamId, IOBuf::copyBuffer("b"), false);
+        ASSERT_FALSE(writeResult.hasError());
+        const auto secondTriggerPackets = this->loopForWrites();
+        ASSERT_TRUE(secondTriggerPackets.has_value());
+        ASSERT_EQ(secondTriggerPackets->start, secondTriggerPackets->end);
+        ASSERT_EQ(originalPackets->end + 1, firstTriggerPackets->start);
+        ASSERT_EQ(firstTriggerPackets->end + 1, secondTriggerPackets->start);
+        lossTriggerPackets.emplace(*secondTriggerPackets);
+
+        conn.lossState.reorderingThreshold = 1;
+        conn.transportSettings.timeReorderingThreshDividend = 1000000;
+        conn.transportSettings.timeReorderingThreshDivisor = 1;
+        lostByReorderThreshold = true;
+        break;
+      }
+      case StreamRetransmissionTrigger::TimeThreshold:
+        // The ACK below triggers QUIC's time-threshold loss detection. PTO is
+        // unsuitable here because it schedules probe clones without declaring
+        // the original packet lost or moving its data into the loss buffer.
+        conn.lossState.reorderingThreshold = 10;
+        conn.transportSettings.timeReorderingThreshDividend = 1;
+        conn.transportSettings.timeReorderingThreshDivisor = 1000000;
+        lostByTimeout = true;
+        break;
+    }
+
+    LegacyObserver::EventSet eventSet;
+    eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
+    eventSet.enable(SocketObserverInterface::Events::lossEvents);
+    auto observer = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+    EXPECT_CALL(*observer, observerAttach(transport));
+    transport->addObserver(observer.get());
+
+    const auto ackDelay = 0us;
+    const auto lossTriggerAckTime = lossTriggerPackets->sentTime + kAckRtt;
+    const auto lossTriggerAckMatcher =
+        AckEventMatcherBuilder<T>()
+            .setExpectedAckedIntervals({lossTriggerPackets})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(lossTriggerAckTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(lossTriggerPackets->end)
+            .setLargestNewlyAckedPacket(lossTriggerPackets->end)
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(kAckRtt))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    kAckRtt - ackDelay))
+            .build();
+    EXPECT_CALL(*observer, acksProcessed(transport, lossTriggerAckMatcher));
+    EXPECT_CALL(
+        *observer,
+        packetLossDetected(
+            transport,
+            testing::Field(
+                &SocketObserverInterface::LossEvent::lostPackets,
+                testing::ElementsAre(
+                    MockLegacyObserver::getLossPacketMatcher(
+                        originalPackets->end,
+                        lostByReorderThreshold,
+                        lostByTimeout)))));
+
+    this->deliverPacketNoWrites(
+        this->buildAckPacketForSentAppDataPackets(*lossTriggerPackets),
+        lossTriggerAckTime);
+
+    const auto originalPacket = std::find_if(
+        conn.outstandings.packets.begin(),
+        conn.outstandings.packets.end(),
+        [&](const auto& packet) {
+          return packet.packet.header.getPacketSequenceNum() ==
+              originalPackets->end;
+        });
+    ASSERT_NE(originalPacket, conn.outstandings.packets.end());
+    ASSERT_TRUE(originalPacket->declaredLost);
+    conn.lossState.reorderingThreshold = 10;
+
+    writeResult = transport->writeChain(streamId, std::move(newBody), false);
+    ASSERT_FALSE(writeResult.hasError());
+    const auto writtenPackets = this->loopForWrites();
+    ASSERT_TRUE(writtenPackets.has_value());
+    mixedPackets.emplace(*writtenPackets);
+
+    ASSERT_TRUE(mixedPackets.has_value());
+    ASSERT_EQ(mixedPackets->start, mixedPackets->end);
+    ASSERT_GT(mixedPackets->start, originalPackets->end);
+
+    const auto sentTime = mixedPackets->sentTime;
+    const auto ackRecvTime = sentTime + kAckRtt;
+    const auto mixedAckMatcher = testing::AllOf(
+        AckEventMatcherBuilder<T>()
+            .setExpectedAckedIntervals({mixedPackets})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(mixedPackets->end)
+            .setLargestNewlyAckedPacket(mixedPackets->end)
+            .setRtt(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build(),
+        testing::Property(
+            &SocketObserverInterface::AcksProcessedEvent::getAckEvents,
+            testing::ElementsAre(
+                testing::Field(
+                    &AckEvent::ackedPackets,
+                    testing::ElementsAre(
+                        testing::Field(
+                            &AckEvent::AckPacket::detailsPerStream,
+                            testing::UnorderedElementsAre(
+                                AckEventStreamDetailsMatcherBuilder()
+                                    .setStreamID(streamId)
+                                    .setStreamBytesAcked(
+                                        retransmittedBodyLength + newBodyLength)
+                                    .setStreamBytesAckedByRetrans(
+                                        retransmittedBodyLength)
+                                    .build())))))));
+    EXPECT_CALL(*observer, acksProcessed(transport, mixedAckMatcher));
+
+    // This observer assertion intentionally fails if mvfst starts extending a
+    // retransmitted frame with new bytes instead of emitting a separate frame.
+    this->deliverPacketNoWrites(
+        this->buildAckPacketForSentAppDataPackets(*mixedPackets, ackDelay),
+        ackRecvTime);
+    this->destroyTransport();
+  }
 };
 
 TYPED_TEST_SUITE(
@@ -4986,6 +5167,7 @@ TYPED_TEST(
                               AckEventStreamDetailsMatcherBuilder()
                                   .setStreamID(streamId)
                                   .setStreamBytesAcked(streamBodyLength)
+                                  .setStreamBytesAckedByRetrans(0)
                                   .build())))))));
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
@@ -5003,6 +5185,20 @@ TYPED_TEST(
   buf->coalesce();
   this->deliverPacket(std::move(buf), ackRecvTime);
   this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    AckEventsMixedNewAndPacketReorderingRetransmittedStreamBytesAcked) {
+  this->verifyMixedNewAndRetransmittedStreamBytesAcked(
+      StreamRetransmissionTrigger::PacketThreshold);
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTestForObservers,
+    AckEventsMixedNewAndTimeThresholdRetransmittedStreamBytesAcked) {
+  this->verifyMixedNewAndRetransmittedStreamBytesAcked(
+      StreamRetransmissionTrigger::TimeThreshold);
 }
 
 TYPED_TEST(

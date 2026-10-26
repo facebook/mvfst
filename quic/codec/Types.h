@@ -497,10 +497,24 @@ struct ReadNewTokenFrame {
  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 struct WriteStreamFrame {
+  // How mvfst sent this frame's bytes. updateConnection records it when the
+  // packet is sent; it is not part of the wire format or of frame equality.
+  enum class Origin : uint8_t {
+    // First transmission of these bytes.
+    NewData,
+    // Bytes resent from the loss buffer after they were declared lost.
+    LossRetransmission,
+    // Bytes copied into a cloned packet.
+    Clone,
+    // Outstanding bytes resent as a non-cloning PTO probe.
+    PtoRetransmission,
+  };
+
   StreamId streamId;
   uint64_t offset;
   uint64_t len;
   bool fin;
+  Origin origin{Origin::NewData};
 
   WriteStreamFrame(
       StreamId streamIdIn,
@@ -514,6 +528,21 @@ struct WriteStreamFrame {
         fin == rhs.fin;
   }
 };
+
+namespace detail {
+// WriteStreamFrame's members other than `origin`, in declaration order.
+struct WriteStreamFrameWithoutOrigin {
+  StreamId streamId;
+  uint64_t offset;
+  uint64_t len;
+  bool fin;
+};
+} // namespace detail
+
+// `origin` occupies padding after `fin`, so it does not grow the frame on any
+// target, whatever the alignment of 64-bit members.
+static_assert(
+    sizeof(WriteStreamFrame) == sizeof(detail::WriteStreamFrameWithoutOrigin));
 
 /**
  * The structure of the stream frame used for reads.

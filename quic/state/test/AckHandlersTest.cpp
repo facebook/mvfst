@@ -4751,7 +4751,8 @@ TEST(AckEventDetailsPerStreamTest, RecordFrameDeliveryClampsToFrame) {
 
   {
     AckEvent::AckPacket::DetailsPerStream details;
-    EXPECT_TRUE(details.recordFrameDelivery(frame, delivered({{15, 19}})));
+    EXPECT_TRUE(details.recordFrameDelivery(
+        frame, delivered({{15, 19}}), false /* retransmission */));
     const StreamIntervals expected{{15, 19}};
     EXPECT_EQ(expected, details.at(streamId).newlyDeliveredStreamIntervals);
     EXPECT_EQ(5, details.at(streamId).streamBytesAcked);
@@ -4759,8 +4760,8 @@ TEST(AckEventDetailsPerStreamTest, RecordFrameDeliveryClampsToFrame) {
 
   {
     AckEvent::AckPacket::DetailsPerStream details;
-    EXPECT_FALSE(
-        details.recordFrameDelivery(frame, delivered({{5, 12}, {18, 25}})));
+    EXPECT_FALSE(details.recordFrameDelivery(
+        frame, delivered({{5, 12}, {18, 25}}), false /* retransmission */));
     const StreamIntervals expected{{10, 12}, {18, 19}};
     EXPECT_EQ(expected, details.at(streamId).newlyDeliveredStreamIntervals);
     EXPECT_EQ(5, details.at(streamId).streamBytesAcked);
@@ -4768,8 +4769,8 @@ TEST(AckEventDetailsPerStreamTest, RecordFrameDeliveryClampsToFrame) {
 
   {
     AckEvent::AckPacket::DetailsPerStream details;
-    EXPECT_FALSE(
-        details.recordFrameDelivery(frame, delivered({{14, 16}, {12, 17}})));
+    EXPECT_FALSE(details.recordFrameDelivery(
+        frame, delivered({{14, 16}, {12, 17}}), false /* retransmission */));
     const StreamIntervals expected{{14, 17}};
     EXPECT_EQ(expected, details.at(streamId).newlyDeliveredStreamIntervals);
     EXPECT_EQ(4, details.at(streamId).streamBytesAcked);
@@ -5100,9 +5101,12 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
     };
     StreamFrameAckDelivery deliveredNothing;
     deliveredNothing.handled = true;
-    detailsPerStreamL.recordFrameDelivery(s1f1, deliveredNothing);
-    detailsPerStreamL.recordFrameDelivery(s1f2, deliveredWholeFrame(s1f2));
-    detailsPerStreamL.recordFrameDelivery(s1f3, deliveredWholeFrame(s1f3));
+    detailsPerStreamL.recordFrameDelivery(
+        s1f1, deliveredNothing, false /* retransmission */);
+    detailsPerStreamL.recordFrameDelivery(
+        s1f2, deliveredWholeFrame(s1f2), false /* retransmission */);
+    detailsPerStreamL.recordFrameDelivery(
+        s1f3, deliveredWholeFrame(s1f3), true /* retransmission */);
     return detailsPerStreamL;
   }();
 
@@ -5111,6 +5115,7 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
     return AckEventStreamDetailsMatcherBuilder()
         .setStreamID(s1Id)
         .setStreamBytesAcked(s1f2.len + s1f3.len)
+        .setStreamBytesAckedByRetrans(s1f3.len)
         .addDupAckedStreamInterval(s1f1.offset, s1f1.offset + s1f1.len - 1);
   };
 
@@ -5159,6 +5164,16 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
             getDefaultBuilder().setStreamBytesAcked(0).build())));
   }
 
+  // wrong stream bytes acked by retransmission
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder()
+                .setStreamBytesAckedByRetrans(s1f3.len + 1)
+                .build())));
+  }
+
   // wrong dup acked stream intervals (add f3)
   {
     EXPECT_THAT(
@@ -5189,6 +5204,37 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
         Not(UnorderedElementsAre(
             getDefaultBuilder().clearDupAckedStreamIntervals().build())));
   }
+}
+
+TEST_F(
+    AckEventForAppDataTest,
+    PartialOverlapCountsOnlyNewBytesAsRetransmitted) {
+  const auto streamId =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(streamId, "0123456789", false);
+  const auto overlapStart = frame.offset + 2;
+  const auto overlapEnd = frame.offset + 5;
+  StreamFrameAckDelivery delivery;
+  delivery.handled = true;
+  delivery.newlyDeliveredIntervals.emplace_back(frame.offset, overlapStart - 1);
+  delivery.newlyDeliveredIntervals.emplace_back(
+      overlapEnd + 1, frame.offset + frame.len - 1);
+
+  AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+  detailsPerStream.recordFrameDelivery(
+      frame, delivery, true /* retransmission */);
+
+  const auto overlapLength = overlapEnd - overlapStart + 1;
+  EXPECT_THAT(
+      detailsPerStream,
+      UnorderedElementsAre(
+          AckEventStreamDetailsMatcherBuilder()
+              .setStreamID(streamId)
+              .setStreamBytesAcked(frame.len - overlapLength)
+              .setStreamBytesAckedByRetrans(frame.len - overlapLength)
+              .addDupAckedStreamInterval(overlapStart, overlapEnd)
+              .build()));
 }
 
 /**
@@ -6795,11 +6841,15 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(s1f2.len)
                         // f1 - f4 now done, delivery offset = end of f4
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(s2f2.len)
                         // f1 - f4 now done, delivery offset = end of f4
                         .build()))));
   }
@@ -6820,6 +6870,8 @@ TEST_F(
                     // s1f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(0)
+                        .setStreamBytesAckedByRetrans(0)
                         // no change, since already ACKed by retrans
                         // orig ACKed after retrans, thus making f2 dupacked
                         .addDupAckedStreamInterval(
@@ -6828,6 +6880,8 @@ TEST_F(
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
+                        .setStreamBytesAcked(0)
+                        .setStreamBytesAckedByRetrans(0)
                         // no change, since already ACKed by retrans
                         // orig ACKed after retrans, thus making f2 dupacked
                         .addDupAckedStreamInterval(
@@ -7111,6 +7165,7 @@ TEST_F(AckEventForAppDataTest, AckEventRetransHasNewFrame) {
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         .setStreamBytesAcked(s1f1.len + s1f2.len)
+                        .setStreamBytesAckedByRetrans(s1f1.len)
                         .build()))));
   }
 }
@@ -7196,6 +7251,7 @@ TEST_F(
                   .setStreamID(stream->id)
                   .setStreamBytesAcked(
                       originalFrame.len - previouslyDeliveredLen)
+                  .setStreamBytesAckedByRetrans(0)
                   .addDupAckedStreamInterval(
                       previouslyDeliveredStart, previouslyDeliveredEnd)
                   .build()))));
@@ -7256,6 +7312,93 @@ TEST_F(AckEventForAppDataTest, AckCreditsEveryFrameByteAsInclusiveIntervals) {
   }
 }
 
+class AckEventForUnifiedSendBufferRetransmissionTest
+    : public AckEventForAppDataTest {
+ protected:
+  void SetUp() override {
+    AckEventForAppDataTest::SetUp();
+    getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+    stream_ = getConn()->streamManager->createNextBidirectionalStream().value();
+    ASSERT_NE(stream_, nullptr);
+    ASSERT_TRUE(stream_->streamSendBuffer.has_value());
+    frame_ = writeDataToQuicStreamAndGetFrame(stream_->id, "data", false);
+
+    // Send the frame, declare that packet lost, then retransmit the frame.
+    auto originalPacket = buildEmptyPacket(PacketNumberSpace::AppData);
+    originalPacket.packet.frames.emplace_back(*frame_);
+    sendAppDataPacket(originalPacket);
+    originalPacketNum_ = originalPacket.packet.header.getPacketSequenceNum();
+    auto& originalOutstanding = getConn()->outstandings.packets.back();
+    originalOutstanding.declaredLost = true;
+    ++getConn()->outstandings.declaredLostCount;
+    --getConn()->outstandings.packetCount[PacketNumberSpace::AppData];
+    ASSERT_TRUE(stream_->streamSendBuffer->markLoss(
+        {.offset = frame_->offset, .len = frame_->len, .fin = frame_->fin}));
+
+    auto retransmissionPacket = buildEmptyPacket(PacketNumberSpace::AppData);
+    retransmissionPacket.packet.frames.emplace_back(*frame_);
+    sendAppDataPacket(retransmissionPacket);
+    retransmissionPacketNum_ =
+        retransmissionPacket.packet.header.getPacketSequenceNum();
+    ASSERT_EQ(
+        WriteStreamFrame::Origin::LossRetransmission,
+        getConn()
+            ->outstandings.packets.back()
+            .packet.frames.front()
+            .asWriteStreamFrame()
+            ->origin);
+    ASSERT_FALSE(stream_->streamSendBuffer->hasPendingLoss());
+  }
+
+  QuicStreamState* stream_{nullptr};
+  Optional<WriteStreamFrame> frame_;
+  PacketNum originalPacketNum_{0};
+  PacketNum retransmissionPacketNum_{0};
+};
+
+TEST_F(
+    AckEventForUnifiedSendBufferRetransmissionTest,
+    RetransmissionAckCreditsRetransmittedBytes) {
+  const auto retransmissionAck = deliverAckForAppDataPackets(
+      retransmissionPacketNum_, retransmissionPacketNum_);
+  EXPECT_THAT(
+      retransmissionAck.ackedPackets,
+      ElementsAre(Field(
+          &AckEvent::AckPacket::detailsPerStream,
+          UnorderedElementsAre(
+              AckEventStreamDetailsMatcherBuilder()
+                  .setStreamID(stream_->id)
+                  .setStreamBytesAcked(frame_->len)
+                  .setStreamBytesAckedByRetrans(frame_->len)
+                  .build()))));
+}
+
+TEST_F(
+    AckEventForUnifiedSendBufferRetransmissionTest,
+    RetransmissionAckAfterSpuriousAckReportsRedelivery) {
+  // Bytes delivered by the spurious ACK are not attributed to any AckEvent
+  // per-stream detail.
+  const auto originalAck =
+      deliverAckForAppDataPackets(originalPacketNum_, originalPacketNum_);
+  EXPECT_EQ(1, originalAck.numPacketsSpuriouslyAcked);
+  EXPECT_THAT(originalAck.ackedPackets, IsEmpty());
+
+  const auto retransmissionAck = deliverAckForAppDataPackets(
+      retransmissionPacketNum_, retransmissionPacketNum_);
+  EXPECT_THAT(
+      retransmissionAck.ackedPackets,
+      ElementsAre(Field(
+          &AckEvent::AckPacket::detailsPerStream,
+          UnorderedElementsAre(
+              AckEventStreamDetailsMatcherBuilder()
+                  .setStreamID(stream_->id)
+                  .setStreamBytesAcked(0)
+                  .setStreamBytesAckedByRetrans(0)
+                  .addDupAckedStreamInterval(
+                      frame_->offset, frame_->offset + frame_->len - 1)
+                  .build()))));
+}
+
 /**
  * Frame retransmitted in a packet with a new frame (new data) for same
  * stream. Original and second packet ACKed at same time (spurious).
@@ -7314,6 +7457,7 @@ TEST_F(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
                         .build())),
             // pkt2
             Field(
@@ -7322,6 +7466,7 @@ TEST_F(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
                         // moved forward to f2
                         // retrans ACKed after original, thus making f1
                         // dupacked
@@ -7558,9 +7703,13 @@ TEST_F(AckEventForAppDataTest, AckEventRetransHasNewStreamFrame) {
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(s1f1.len)
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
                         .build()))));
   }
 }

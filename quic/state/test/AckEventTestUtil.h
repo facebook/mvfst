@@ -30,6 +30,7 @@ struct AckEventStreamDetailsMatcherBuilder {
 
   Builder&& setStreamID(const uint64_t streamIdIn);
   Builder&& setStreamBytesAcked(const uint64_t ackedIn);
+  Builder&& setStreamBytesAckedByRetrans(const uint64_t ackedIn);
   Builder&& addDupAckedStreamInterval(
       const DupAckedStreamIntervals::interval_type& intervalIn);
   Builder&& addDupAckedStreamInterval(
@@ -50,12 +51,20 @@ struct AckEventStreamDetailsMatcherBuilder {
               &AckEvent::AckPacket::StreamDetails::streamBytesAcked,
               maybeStreamBytesAcked.value()));
     }
+    if (maybeStreamBytesAckedByRetrans.has_value()) {
+      detailsMatcher = ::testing::AllOf(
+          detailsMatcher,
+          ::testing::Field(
+              &AckEvent::AckPacket::StreamDetails::streamBytesAckedByRetrans,
+              maybeStreamBytesAckedByRetrans.value()));
+    }
     return ::testing::Pair(maybeStreamId.value(), std::move(detailsMatcher));
   }
 
  private:
   Optional<uint64_t> maybeStreamId;
   Optional<uint64_t> maybeStreamBytesAcked;
+  Optional<uint64_t> maybeStreamBytesAckedByRetrans;
   DupAckedStreamIntervals dupAckedStreamIntervals;
 };
 

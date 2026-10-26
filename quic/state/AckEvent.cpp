@@ -16,7 +16,8 @@ namespace quic {
 
 bool AckEvent::AckPacket::DetailsPerStream::recordFrameDelivery(
     const WriteStreamFrame& frame,
-    const StreamFrameAckDelivery& delivery) {
+    const StreamFrameAckDelivery& delivery,
+    const bool retransmission) {
   if (!frame.len) { // may be FIN only
     return true;
   }
@@ -29,6 +30,7 @@ bool AckEvent::AckPacket::DetailsPerStream::recordFrameDelivery(
   const auto frameEnd = frame.offset + frame.len - 1;
   auto nextOffset = frame.offset;
   bool withinFrame = true;
+  uint64_t newlyDeliveredBytes{0};
   for (const auto& interval : delivery.newlyDeliveredIntervals) {
     // Streams report increasing subranges of the ACKed frame: the unified send
     // buffer clips them to the frame, and the legacy path CHECKs that the
@@ -46,11 +48,15 @@ bool AckEvent::AckPacket::DetailsPerStream::recordFrameDelivery(
       streamDetails.dupAckedStreamIntervals.insert(nextOffset, start - 1);
     }
     streamDetails.newlyDeliveredStreamIntervals.insert(start, end);
-    streamDetails.streamBytesAcked += end - start + 1;
+    newlyDeliveredBytes += end - start + 1;
     nextOffset = end + 1;
   }
   if (nextOffset <= frameEnd) {
     streamDetails.dupAckedStreamIntervals.insert(nextOffset, frameEnd);
+  }
+  streamDetails.streamBytesAcked += newlyDeliveredBytes;
+  if (retransmission) {
+    streamDetails.streamBytesAckedByRetrans += newlyDeliveredBytes;
   }
   return withinFrame;
 }

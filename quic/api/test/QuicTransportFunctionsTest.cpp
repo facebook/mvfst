@@ -435,6 +435,91 @@ TEST_F(QuicTransportFunctionsTest, UnifiedStreamClonePreservesPendingLoss) {
   EXPECT_EQ(conn->flowControlState.sumCurWriteOffset, 3);
 }
 
+namespace {
+
+WriteStreamFrame::Origin lastSentStreamFrameOrigin(
+    const QuicConnectionStateBase& conn) {
+  const auto& frame = conn.outstandings.packets.back().packet.frames.front();
+  CHECK(frame.asWriteStreamFrame());
+  return frame.asWriteStreamFrame()->origin;
+}
+
+} // namespace
+
+TEST_F(QuicTransportFunctionsTest, StreamFrameOriginRecordsLegacySendDecision) {
+  auto conn = createConn();
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(stream->streamSendBuffer.has_value());
+  constexpr uint64_t kWriteLen = 10000;
+  ASSERT_FALSE(
+      writeDataToQuicStream(
+          *stream, folly::IOBuf::copyBuffer(std::string(kWriteLen, 'a')), false)
+          .hasError());
+
+  ASSERT_FALSE(updateStreamFrame(
+                   *conn, WriteStreamFrame(stream->id, 0, kWriteLen, false))
+                   .hasError());
+  EXPECT_EQ(
+      WriteStreamFrame::Origin::NewData, lastSentStreamFrameOrigin(*conn));
+  ASSERT_EQ(kWriteLen, stream->currentWriteOffset);
+
+  // Declare the bytes lost, then retransmit a prefix from the loss buffer
+  // while the stream's write offset is 10000.
+  auto lostBuffer = stream->retransmissionBuffer.find(0);
+  ASSERT_NE(lostBuffer, stream->retransmissionBuffer.end());
+  stream->insertIntoLossBuffer(std::move(lostBuffer->second));
+  stream->retransmissionBuffer.erase(lostBuffer);
+  EXPECT_CALL(*quicStats_, onPacketRetransmission()).Times(1);
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 100, false))
+          .hasError());
+  EXPECT_EQ(
+      WriteStreamFrame::Origin::LossRetransmission,
+      lastSentStreamFrameOrigin(*conn));
+  const auto& retransmissionDetails =
+      conn->outstandings.packets.back().metadata.detailsPerStream.at(
+          stream->id);
+  EXPECT_EQ(0, retransmissionDetails.newStreamBytesSent);
+  EXPECT_FALSE(retransmissionDetails.maybeFirstNewStreamByteOffset.has_value());
+
+  ClonedPacketIdentifier cloneId(PacketNumberSpace::AppData, 0);
+  conn->outstandings.clonedPacketIdentifiers.insert(cloneId);
+  ASSERT_FALSE(updateStreamFrame(
+                   *conn, WriteStreamFrame(stream->id, 0, 100, false), cloneId)
+                   .hasError());
+  EXPECT_EQ(WriteStreamFrame::Origin::Clone, lastSentStreamFrameOrigin(*conn));
+}
+
+TEST_F(QuicTransportFunctionsTest, StreamFrameOriginRecordsUnifiedPtoProbe) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(writeDataToQuicStream(*stream, IOBuf::copyBuffer("abc"), false)
+                   .hasError());
+  ASSERT_FALSE(
+      updateStreamFrame(*conn, WriteStreamFrame(stream->id, 0, 3, false))
+          .hasError());
+  EXPECT_EQ(
+      WriteStreamFrame::Origin::NewData, lastSentStreamFrameOrigin(*conn));
+
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(WriteStreamFrame(stream->id, 0, 3, false));
+  ASSERT_FALSE(updateConnection(
+                   *conn,
+                   *currentPathInfo_,
+                   std::nullopt,
+                   packet.packet,
+                   TimePoint{},
+                   static_cast<uint32_t>(getEncodedSize(packet)),
+                   static_cast<uint32_t>(getEncodedBodySize(packet)),
+                   PacketTransmissionReason::PtoProbe,
+                   true /* isPtoRetransmission */)
+                   .hasError());
+  EXPECT_EQ(
+      WriteStreamFrame::Origin::PtoRetransmission,
+      lastSentStreamFrameOrigin(*conn));
+}
+
 TEST_F(QuicTransportFunctionsTest, UnifiedStreamDuplicateWithoutLossIsError) {
   auto conn = createConn();
   conn->transportSettings.useUnifiedAppStreamSendBuffer = true;

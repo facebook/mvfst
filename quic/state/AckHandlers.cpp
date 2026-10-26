@@ -146,13 +146,20 @@ struct AckFrameProcessingStats {
   uint64_t contiguousWriteStreamFrames{0};
 };
 
+// Whether mvfst recorded at send time that the frame's bytes had been sent
+// before, as a retransmission, clone or PTO probe.
+bool isPreviouslySentStreamFrame(const WriteStreamFrame& frame) {
+  return frame.origin != WriteStreamFrame::Origin::NewData;
+}
+
 // Records the stream ACK handler's delivery report for an ACKed stream frame,
 // and soft-reports outcomes that mvfst should never produce.
 void recordStreamFrameDelivery(
     [[maybe_unused]] QuicConnectionStateBase& conn,
     AckEvent::AckPacket::DetailsPerStream& detailsPerStream,
     const WriteStreamFrame& frame,
-    const StreamFrameAckDelivery& delivery) {
+    const StreamFrameAckDelivery& delivery,
+    const bool retransmission) {
   if (!delivery.handled) {
     // The ACK visitor hands a frame to its stream's ACK handler whenever the
     // stream exists, and that handler marks the delivery handled wherever it
@@ -170,7 +177,7 @@ void recordStreamFrameDelivery(
         "the stream");
     return;
   }
-  if (!detailsPerStream.recordFrameDelivery(frame, delivery)) {
+  if (!detailsPerStream.recordFrameDelivery(frame, delivery, retransmission)) {
     PROTO_OOPS_LOG_BUILDER_IF(
         conn.nodeType == QuicNodeType::Server,
         conn.oopsLogger,
@@ -222,7 +229,8 @@ quic::Expected<void, QuicError> processUnifiedStreamFramesForSpuriousAck(
           conn,
           ack.spuriousLossDetailsPerStream,
           *ackedWriteFrame,
-          streamFrameDelivery);
+          streamFrameDelivery,
+          isPreviouslySentStreamFrame(*ackedWriteFrame));
     }
   }
   return {};
@@ -647,7 +655,11 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
 
       if (ackedWriteFrame) {
         recordStreamFrameDelivery(
-            conn, detailsPerStream, *ackedWriteFrame, streamFrameDelivery);
+            conn,
+            detailsPerStream,
+            *ackedWriteFrame,
+            streamFrameDelivery,
+            isPreviouslySentStreamFrame(*ackedWriteFrame));
       }
     }
     auto maybeRxTimestamp = packetReceiveTimeStamps.find(
