@@ -31,6 +31,46 @@ FOLLY_GFLAGS_DECLARE_int32(qs_conn_id_version);
 
 namespace quic {
 
+struct ServerOptions {
+  TransportSettings transportSettings;
+  std::vector<QuicVersion> supportedVersions{
+      {QuicVersion::MVFST,
+       QuicVersion::MVFST_EXPERIMENTAL,
+       QuicVersion::MVFST_EXPERIMENTAL2,
+       QuicVersion::MVFST_EXPERIMENTAL3,
+       QuicVersion::MVFST_EXPERIMENTAL4,
+       QuicVersion::MVFST_EXPERIMENTAL5,
+       QuicVersion::MVFST_ALIAS,
+       QuicVersion::QUIC_V1,
+       QuicVersion::QUIC_V1_ALIAS,
+       QuicVersion::QUIC_V1_ALIAS2,
+       QuicVersion::MVFST_PRIMING}};
+  folly::SocketOptionMap socketOptions;
+  FollyAsyncUDPSocketAlias::BindOptions bindOptions;
+  ProcessId processId{ProcessId::ZERO};
+  uint32_t hostId{0};
+  Optional<ConnectionIdVersion> cidVersion;
+  Optional<std::string> healthCheckToken;
+  std::chrono::seconds rateLimitWindow{0};
+
+  // Owned factories create worker-local resources during bind.
+  std::unique_ptr<QuicUDPSocketFactory> listenerSocketFactory;
+  std::unique_ptr<QuicUDPSocketFactory> socketFactory;
+  std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory;
+  std::unique_ptr<QuicTransportStatsCallbackFactory> transportStatsFactory;
+
+  // Evaluated on worker EventBases. Callbacks shared by workers must support
+  // concurrent invocation; they must not block or call server control methods.
+  std::function<bool(const quic::SocketAddress&)> rejectNewConnections{
+      [](const quic::SocketAddress&) { return false; }};
+  std::function<bool()> isPrimingEnabled{[]() { return false; }};
+  std::function<bool(uint16_t)> isBlockListedSrcPort{
+      [](uint16_t) { return false; }};
+  std::function<uint64_t()> rateLimitCount;
+  std::function<int()> unfinishedHandshakeLimitFn{[]() { return 1048576; }};
+  std::function<void(quic::TransportSettings&)> transportSettingsOverrideFn;
+};
+
 class QuicServer : public QuicServerWorker::WorkerCallback,
                    public std::enable_shared_from_this<QuicServer> {
  public:
@@ -48,6 +88,12 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
     return std::shared_ptr<QuicServer>(
         new QuicServer(std::move(transportSettings)));
   }
+
+  static std::shared_ptr<QuicServer> createQuicServer(ServerOptions options) {
+    return std::make_shared<QuicServer>(std::move(options));
+  }
+
+  explicit QuicServer(ServerOptions options);
 
   ~QuicServer() override;
 

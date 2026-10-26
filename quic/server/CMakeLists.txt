@@ -60,6 +60,7 @@ mvfst_add_library(mvfst_server_server
     mvfst_common_buf_accessor
     mvfst_common_events_folly_eventbase
     mvfst_common_events_highres_quic_timer
+    mvfst_common_mvfst_check
     mvfst_common_transport_knobs
     mvfst_common_udpsocket_folly_async_udp_socket
     mvfst_common_udpsocket_quic_async_udp_socket

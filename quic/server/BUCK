@@ -101,6 +101,7 @@ mvfst_cpp_library(
         "//quic/api:transport_helpers",
         "//quic/codec:types",
         "//quic/common:buf_accessor",
+        "//quic/common:mvfst_check",
         "//quic/common:transport_knobs",
         "//quic/common/events:folly_eventbase",
         "//quic/common/events:highres_quic_timer",

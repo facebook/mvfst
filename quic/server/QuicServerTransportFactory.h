@@ -11,6 +11,7 @@
 
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/EventBase.h>
+#include <quic/common/MvfstCheck.h>
 #include <quic/server/QuicServerTransport.h>
 
 namespace quic {
@@ -20,10 +21,22 @@ class QuicServerTransportFactory {
   virtual ~QuicServerTransportFactory() = default;
 
   virtual QuicServerTransport::Ptr make(
+      folly::EventBase*,
+      std::unique_ptr<FollyAsyncUDPSocketAlias>,
+      const quic::SocketAddress&,
+      QuicVersion) noexcept {
+    MVCHECK(false, "QuicServerTransportFactory must override make()");
+    return nullptr;
+  }
+
+  virtual QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
       const quic::SocketAddress& addr,
       QuicVersion quicVersion,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept = 0;
+      std::shared_ptr<
+          const fizz::server::FizzServerContext> /* ctx */) noexcept {
+    return make(evb, std::move(socket), addr, quicVersion);
+  }
 };
 } // namespace quic

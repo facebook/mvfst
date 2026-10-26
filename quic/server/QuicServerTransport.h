@@ -28,6 +28,21 @@
 
 namespace quic {
 
+struct ServerAcceptParams {
+  TransportSettings transportSettings;
+  const std::vector<QuicVersion>& supportedVersions;
+  const SocketAddress& originalPeerAddress;
+  bool validNewToken{false};
+  const Optional<ConnectionId>& clientConnectionId;
+  const ConnectionId& clientChosenDestConnectionId;
+  ServerConnectionIdParams serverConnectionIdParams;
+  ConnectionIdAlgo* connIdAlgo{nullptr};
+  ServerConnectionIdRejector* connIdRejector{nullptr};
+  BufAccessor* bufAccessor{nullptr};
+  const QuicTimer::SharedPtr& pacingTimer;
+  QuicTransportStatsCallback* statsCallback{nullptr};
+};
+
 struct CipherInfo {
   TrafficKey trafficKey;
   fizz::CipherSuite cipherSuite;
@@ -169,6 +184,8 @@ class QuicServerTransport
   const fizz::server::FizzServerContext& getCtx() {
     return *ctx_;
   }
+
+  void configureForAccept(ServerAcceptParams&& params);
 
   virtual void accept(folly::Optional<QuicVersion> quicVersion = folly::none);
 

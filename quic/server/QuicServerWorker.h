@@ -13,7 +13,9 @@
 #include <folly/container/F14Set.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
+#include <atomic>
 #include <cstdint>
+#include <limits>
 #include <type_traits>
 
 #include <quic/api/QuicBatchWriterFactory.h>
@@ -35,6 +37,24 @@
 namespace quic {
 
 class AcceptObserver;
+class QuicServerWorker;
+
+struct DispatchTarget {
+  QuicServerWorker* worker = nullptr;
+};
+
+struct WorkerEndpoint {
+  folly::EventBase* evb = nullptr;
+  std::shared_ptr<DispatchTarget> target;
+};
+
+struct RunState {
+  static constexpr uint64_t kNoStopRequest =
+      std::numeric_limits<uint64_t>::max();
+
+  std::vector<WorkerEndpoint> peers;
+  std::atomic<uint64_t> stopReason{kNoStopRequest};
+};
 
 class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
                          public QuicServerTransport::RoutingCallback,

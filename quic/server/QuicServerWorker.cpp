@@ -779,23 +779,13 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
   if (trans) {
     globalUnfinishedHandshakes++;
     unfinishedHandshakes_++;
-    if (transportSettings_.dataPathType == DataPathType::ContinuousMemory &&
-        bufAccessor_) {
-      trans->setBufAccessor(bufAccessor_.get());
-    }
-    trans->setPacingTimer(pacingTimer_);
-    trans->setRoutingCallback(this);
-    trans->setHandshakeFinishedCallback(this);
-    trans->setSupportedVersions(supportedVersions_);
-    trans->setOriginalPeerAddress(client);
-    if (validNewToken) {
-      trans->verifiedClientAddress();
-    }
     trans->setCongestionControllerFactory(ccFactory_);
     if (batchWriterFactoryOverride_) {
       trans->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
     }
-    trans->setTransportStatsCallback(statsCallback_.get()); // ok if nullptr
+    trans->setShouldRegisterKnobParamHandlerFn(
+        shouldRegisterKnobParamHandlerFn_);
+    trans->setQuicExperimentHandlerFn(quicExperimentHandlerFn_);
 
     auto transportSettingsCopy = transportSettings_;
     if (quicVersion == QuicVersion::QUIC_V1_ALIAS ||
@@ -823,22 +813,33 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
             transportSettings_.dataPathType != DataPathType::ContinuousMemory)
         << "Overriding DataPathType to ContinuousMemory isn't supported";
 
-    trans->setTransportSettings(transportSettingsCopy);
-    trans->setConnectionIdAlgo(connIdAlgo_.get());
-    trans->setServerConnectionIdRejector(this);
-    trans->setShouldRegisterKnobParamHandlerFn(
-        shouldRegisterKnobParamHandlerFn_);
-    trans->setQuicExperimentHandlerFn(quicExperimentHandlerFn_);
-    if (srcConnId) {
-      trans->setClientConnectionId(*srcConnId);
+    BufAccessor* bufAccessor = nullptr;
+    if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
+      bufAccessor = bufAccessor_.get();
     }
-    trans->setClientChosenDestConnectionId(dstConnId);
+    trans->configureForAccept(
+        ServerAcceptParams{
+            .transportSettings = std::move(transportSettingsCopy),
+            .supportedVersions = supportedVersions_,
+            .originalPeerAddress = client,
+            .validNewToken = validNewToken,
+            .clientConnectionId = srcConnId,
+            .clientChosenDestConnectionId = dstConnId,
+            .serverConnectionIdParams = ServerConnectionIdParams(
+                cidVersion_,
+                hostId_,
+                static_cast<uint8_t>(processId_),
+                workerId_),
+            .connIdAlgo = connIdAlgo_.get(),
+            .connIdRejector = this,
+            .bufAccessor = bufAccessor,
+            .pacingTimer = pacingTimer_,
+            .statsCallback = statsCallback_.get()});
+    trans->setRoutingCallback(this);
+    trans->setHandshakeFinishedCallback(this);
     if (retryOriginalDstConnId) {
       trans->setRetryOriginalDstConnId(*retryOriginalDstConnId);
     }
-    // parameters to create server chosen connection id
-    trans->setServerConnectionIdParams(ServerConnectionIdParams(
-        cidVersion_, hostId_, static_cast<uint8_t>(processId_), workerId_));
     trans->accept(quicVersion);
     auto result = sourceAddressMap_.emplace(
         std::make_pair(std::make_pair(client, dstConnId), trans));

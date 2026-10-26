@@ -55,6 +55,14 @@ void ownedEvbDeleter(folly::IOExecutor* evb) {
 
 void unownedEvbDeleter(folly::IOExecutor*) {}
 
+void validateHealthCheckToken(const std::string& healthCheckToken) {
+  // Make sure the token satisfies the required properties, i.e. it is not a
+  // valid quic header.
+  auto parsed = parseHeader(*BufHelpers::copyBuffer(healthCheckToken));
+  MVCHECK(!parsed.has_value());
+  MVCHECK_GT(healthCheckToken.size(), kMinHealthCheckTokenSize);
+}
+
 } // namespace
 
 //
@@ -76,6 +84,39 @@ QuicServer::QuicServer(TransportSettings transportSettings)
     // cidVersion_ is V1 by default
     cidVersion_ = (ConnectionIdVersion)FLAGS_qs_conn_id_version;
   }
+}
+
+QuicServer::QuicServer(ServerOptions options)
+    : QuicServer(options.transportSettings) {
+  supportedVersions_ = std::move(options.supportedVersions);
+  socketOptions_ = std::move(options.socketOptions);
+  bindOptions_ = options.bindOptions;
+  processId_ = options.processId;
+  hostId_ = options.hostId;
+  if (options.cidVersion && !FLAGS_qs_conn_id_version) {
+    cidVersion_ = *options.cidVersion;
+  }
+  if (options.listenerSocketFactory) {
+    listenerSocketFactory_ = std::move(options.listenerSocketFactory);
+  }
+  if (options.socketFactory) {
+    socketFactory_ = std::move(options.socketFactory);
+  }
+  connIdAlgoFactory_ = std::move(options.connIdAlgoFactory);
+  transportStatsFactory_ = std::move(options.transportStatsFactory);
+  rejectNewConnections_ = std::move(options.rejectNewConnections);
+  isPrimingEnabled_ = std::move(options.isPrimingEnabled);
+  isBlockListedSrcPort_ = std::move(options.isBlockListedSrcPort);
+  if (options.healthCheckToken) {
+    validateHealthCheckToken(*options.healthCheckToken);
+  }
+  healthCheckToken_ = std::move(options.healthCheckToken);
+  if (options.rateLimitCount) {
+    rateLimit_.emplace(
+        std::move(options.rateLimitCount), options.rateLimitWindow);
+  }
+  unfinishedHandshakeLimitFn_ = std::move(options.unfinishedHandshakeLimitFn);
+  transportSettingsOverrideFn_ = std::move(options.transportSettingsOverrideFn);
 }
 
 void QuicServer::setQuicServerTransportFactory(
@@ -276,6 +317,7 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->setSupportedVersions(supportedVersions_);
   worker->rejectNewConnections(rejectNewConnections_);
   worker->setPrimingEnabledCallback(isPrimingEnabled_);
+  worker->setIsBlockListedSrcPort(isBlockListedSrcPort_);
   worker->setProcessId(processId_);
   worker->setHostId(hostId_);
   worker->setConnectionIdVersion(cidVersion_);
@@ -688,11 +730,7 @@ void QuicServer::setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn) {
 
 void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
   checkRunningInThread(mainThreadId_);
-  // Make sure the token satisfies the required properties, i.e. it is not a
-  // valid quic header.
-  auto parsed = parseHeader(*BufHelpers::copyBuffer(healthCheckToken));
-  MVCHECK(!parsed.has_value());
-  MVCHECK_GT(healthCheckToken.size(), kMinHealthCheckTokenSize);
+  validateHealthCheckToken(healthCheckToken);
   healthCheckToken_ = healthCheckToken;
   runOnAllWorkers([healthCheckToken](auto worker) mutable {
     worker->setHealthCheckToken(healthCheckToken);

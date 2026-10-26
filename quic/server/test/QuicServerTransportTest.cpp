@@ -2122,6 +2122,45 @@ TEST_F(QuicServerTransportTest, SetCongestionControl) {
   EXPECT_EQ(CongestionControlType::Cubic, cc->type());
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    ConfigureForAcceptRebuildsCongestionController) {
+  ASSERT_TRUE(server->getConn().congestionController);
+  EXPECT_EQ(
+      CongestionControlType::Cubic,
+      server->getConn().congestionController->type());
+
+  TransportSettings acceptSettings = server->getConn().transportSettings;
+  acceptSettings.defaultCongestionController = CongestionControlType::Cubic;
+  constexpr uint64_t kAcceptInitCwndInMss = 42;
+  acceptSettings.initCwndInMss = kAcceptInitCwndInMss;
+
+  Optional<ConnectionId> noClientConnectionId;
+  QuicTimer::SharedPtr noPacingTimer;
+  server->configureForAccept(
+      ServerAcceptParams{
+          .transportSettings = acceptSettings,
+          .supportedVersions = supportedVersions,
+          .originalPeerAddress = clientAddr,
+          .validNewToken = false,
+          .clientConnectionId = noClientConnectionId,
+          .clientChosenDestConnectionId = *initialDestinationConnectionId,
+          .serverConnectionIdParams = ServerConnectionIdParams(0, 0, 1),
+          .connIdAlgo = connIdAlgo_.get(),
+          .connIdRejector = nullptr,
+          .bufAccessor = nullptr,
+          .pacingTimer = noPacingTimer,
+          .statsCallback = quicStats_.get()});
+
+  ASSERT_TRUE(server->getConn().congestionController);
+  EXPECT_EQ(
+      CongestionControlType::Cubic,
+      server->getConn().congestionController->type());
+  EXPECT_EQ(
+      kAcceptInitCwndInMss * server->getConn().udpSendPacketLen,
+      server->getConn().congestionController->getCongestionWindow());
+}
+
 TEST_F(QuicServerTransportTest, TestServerNotDetachable) {
   EXPECT_FALSE(server->isDetachable());
   EXPECT_EQ(server->getConn().nodeType, QuicNodeType::Server);

@@ -242,6 +242,30 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
   return {};
 }
 
+void QuicServerTransport::configureForAccept(ServerAcceptParams&& params) {
+  if (params.bufAccessor) {
+    setBufAccessor(params.bufAccessor);
+  }
+  setPacingTimer(params.pacingTimer);
+  setSupportedVersions(params.supportedVersions);
+  setOriginalPeerAddress(params.originalPeerAddress);
+  if (params.validNewToken) {
+    verifiedClientAddress();
+  }
+  setTransportStatsCallback(params.statsCallback);
+  if (conn_->congestionController) {
+    conn_->congestionController.reset();
+  }
+  setTransportSettings(std::move(params.transportSettings));
+  setConnectionIdAlgo(params.connIdAlgo);
+  setServerConnectionIdRejector(params.connIdRejector);
+  if (params.clientConnectionId) {
+    setClientConnectionId(*params.clientConnectionId);
+  }
+  setClientChosenDestConnectionId(params.clientChosenDestConnectionId);
+  setServerConnectionIdParams(params.serverConnectionIdParams);
+}
+
 void QuicServerTransport::accept(folly::Optional<QuicVersion> quicVersion) {
   registerAllTransportKnobParamHandlers();
   setIdleTimer();
