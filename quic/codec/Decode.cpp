@@ -487,12 +487,10 @@ static quic::Expected<void, QuicError> decodeDraft02ReceiveTimestampsInAck(
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
           "Bad draft-02 timestamp_delta_count"));
     }
-    // Reject zero-delta ranges: the total-delta limit below keys on actual
+    // Skip zero-delta ranges: the total-delta limit below keys on actual
     // deltas, so empty ranges would bypass it and allow memory amplification.
     if (deltaCount->first == 0) {
-      return quic::make_unexpected(QuicError(
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          "draft-02 timestamp range has zero deltas"));
+      continue;
     }
     range.timestamp_delta_count = deltaCount->first;
     // Per draft-ietf-quic-receive-ts-02: total delta count across all ranges

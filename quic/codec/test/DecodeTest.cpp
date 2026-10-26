@@ -1696,11 +1696,11 @@ TEST_F(DecodeTest, Draft02AckOverLargeRangeCountFailsFastWithoutOOM) {
 // A range with `timestamp_delta_count == 0` consumes ~32 bytes per
 // materialized range vs ~2 wire bytes. A malformed peer could push
 // allocation past `kMaxReceiveTimestampsHardLimit` without the over-limit
-// check firing (it keys on total deltas, not range count). Reject empty
-// ranges as FRAME_ENCODING_ERROR. The spec's "0 or more receive timestamps"
+// check firing (it keys on total deltas, not range count). Skip empty
+// ranges instead of storing them. The spec's "0 or more receive timestamps"
 // allowance applies to the total count (covered by
 // `Draft02AckZeroRangesIsValid`), not per-range.
-TEST_F(DecodeTest, Draft02AckEmptyRangeRejected) {
+TEST_F(DecodeTest, Draft02AckEmptyRangeSkipped) {
   // Single range with 0 deltas.
   std::vector<Draft02NormalizedTimestampRange> ranges{
       {.deltaLargestAcknowledged = QuicInteger(0), .deltas = {}},
@@ -1719,20 +1719,24 @@ TEST_F(DecodeTest, Draft02AckEmptyRangeRejected) {
       makeHeader(),
       draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
       FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
-  ASSERT_TRUE(res.hasError());
-  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+  ASSERT_TRUE(res.has_value());
+  EXPECT_TRUE(cursor.isAtEnd());
+  EXPECT_TRUE(
+      res->asReadAckFrame()->draft02RecvdPacketsTimestampRanges.empty());
 }
 
-// A frame declaring many empty ranges must error out on the first one
+// A frame declaring many empty ranges must skip them
 // rather than materializing all of them, guarding against memory
 // amplification.
-TEST_F(DecodeTest, Draft02AckManyEmptyRangesFailsFast) {
+TEST_F(DecodeTest, Draft02AckManyEmptyRangesSkipped) {
   std::vector<Draft02NormalizedTimestampRange> ranges;
-  ranges.reserve(1000);
+  ranges.reserve(1001);
   for (int i = 0; i < 1000; ++i) {
     ranges.push_back(
         {.deltaLargestAcknowledged = QuicInteger(0), .deltas = {}});
   }
+  ranges.push_back(
+      {.deltaLargestAcknowledged = QuicInteger(5), .deltas = {QuicInteger(7)}});
   auto buf = createDraft02AckFrame(
       QuicInteger(100),
       QuicInteger(0),
@@ -1747,8 +1751,15 @@ TEST_F(DecodeTest, Draft02AckManyEmptyRangesFailsFast) {
       makeHeader(),
       draft02Params(/*advertisedMax=*/10, /*advertisedExponent=*/0),
       FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
-  ASSERT_TRUE(res.hasError());
-  EXPECT_EQ(res.error().code, TransportErrorCode::FRAME_ENCODING_ERROR);
+  ASSERT_TRUE(res.has_value());
+  EXPECT_TRUE(cursor.isAtEnd());
+  const auto& frame = *res->asReadAckFrame();
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltaLargestAcknowledged, 5);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltas,
+      (std::vector<uint64_t>{7}));
 }
 
 // The over-limit check sums delta counts across ranges. Two ranges of 2

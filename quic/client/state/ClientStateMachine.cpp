@@ -297,7 +297,8 @@ quic::Expected<void, QuicError> processServerInitialParams(
     return quic::make_unexpected(draft02ExpResult.error());
   }
   auto draft02ReceiveTimestampsExponent = draft02ExpResult.value();
-  if (draft02ReceiveTimestampsExponent.has_value() &&
+  if (draft02MaxReceiveTimestampsPerAck.value_or(0) > 0 &&
+      draft02ReceiveTimestampsExponent.has_value() &&
       *draft02ReceiveTimestampsExponent >
           kDraft02MaxReceiveTimestampsExponent) {
     return quic::make_unexpected(QuicError(

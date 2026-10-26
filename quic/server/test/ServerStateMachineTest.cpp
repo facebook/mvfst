@@ -717,6 +717,23 @@ TEST(ServerStateMachineTest, ProcessClientParamsDraft02ExponentWithoutMax) {
   EXPECT_FALSE(serverConn.maybePeerReceiveTimestampsConfig.has_value());
 }
 
+TEST(
+    ServerStateMachineTest,
+    ProcessClientParamsDraft02InvalidExponentIgnoredWithoutMax) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto clientParams = buildClientTpsWithTimestampParams(
+      std::nullopt,
+      std::nullopt,
+      std::nullopt,
+      /*draftMax=*/0,
+      /*draftExponent=*/21);
+
+  ASSERT_FALSE(processClientInitialParams(serverConn, clientParams).hasError());
+
+  EXPECT_FALSE(serverConn.maybePeerReceiveTimestampsConfig.has_value());
+}
+
 TEST(ServerStateMachineTest, ProcessClientParamsLegacyOnly) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
