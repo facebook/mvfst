@@ -22,6 +22,17 @@
 
 namespace quic {
 
+/**
+ * Options for the connection callback; see
+ * QuicSocketLite::setConnectionCallback().
+ *
+ * There are none yet. They come as a struct so that a new option does not
+ * change the signature of every implementation and mock again. The struct is
+ * defined outside QuicSocketLite so that its members can have default
+ * initializers and still be used for the default argument there.
+ */
+struct ConnectionCallbackOptions {};
+
 class QuicSocketLite {
  public:
   // Alias for backward compatibility after TransportInfo moved to quic
@@ -672,12 +683,15 @@ class QuicSocketLite {
   virtual void setConnectionSetupCallback(
       folly::MaybeManagedPtr<ConnectionSetupCallback> callback) = 0;
 
+  using ConnectionCallbackOptions = quic::ConnectionCallbackOptions;
+
   /**
    * Sets connection streams callback. This callback must be set after
    * connection set up is finished and is ready for streams processing.
    */
   virtual void setConnectionCallback(
-      folly::MaybeManagedPtr<ConnectionCallback> callback) = 0;
+      folly::MaybeManagedPtr<ConnectionCallback> callback,
+      ConnectionCallbackOptions options = {}) = 0;
 
   /**
    * Signal the transport that a certain stream is a control stream.

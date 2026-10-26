@@ -157,7 +157,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD(
       void,
       setConnectionCallback,
-      (folly::MaybeManagedPtr<ConnectionCallback>));
+      (folly::MaybeManagedPtr<ConnectionCallback>, ConnectionCallbackOptions));
 
   void setEarlyDataAppParamsHandler(
       EarlyDataAppParamsHandler* handler) override {

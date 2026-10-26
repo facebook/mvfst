@@ -194,7 +194,8 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
       folly::MaybeManagedPtr<ConnectionSetupCallback> callback) final;
 
   void setConnectionCallback(
-      folly::MaybeManagedPtr<ConnectionCallback> callback) final;
+      folly::MaybeManagedPtr<ConnectionCallback> callback,
+      ConnectionCallbackOptions options = {}) final;
 
   Optional<LocalErrorCode> setControlStream(StreamId id) override;
 

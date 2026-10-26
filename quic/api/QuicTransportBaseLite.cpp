@@ -896,7 +896,8 @@ void QuicTransportBaseLite::setConnectionSetupCallback(
 }
 
 void QuicTransportBaseLite::setConnectionCallback(
-    folly::MaybeManagedPtr<ConnectionCallback> callback) {
+    folly::MaybeManagedPtr<ConnectionCallback> callback,
+    ConnectionCallbackOptions /* options */) {
   connCallback_ = callback;
   if (connCallback_) {
     runOnEvbAsyncOp({.type = AsyncOpType::ProcessCallbacksAfterNetworkData});
