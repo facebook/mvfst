@@ -5116,7 +5116,7 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
         .setStreamID(s1Id)
         .setStreamBytesAcked(s1f2.len + s1f3.len)
         .setStreamBytesAckedByRetrans(s1f3.len)
-        .addDupAckedStreamInterval(s1f1.offset, s1f1.offset + s1f1.len - 1);
+        .addRedeliveredStreamInterval(s1f1.offset, s1f1.offset + s1f1.len - 1);
   };
 
   // correct
@@ -5174,35 +5174,35 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
                 .build())));
   }
 
-  // wrong dup acked stream intervals (add f3)
+  // wrong redelivered stream intervals (add f3)
   {
     EXPECT_THAT(
         detailsPerStream,
         Not(UnorderedElementsAre(
             getDefaultBuilder()
-                .addDupAckedStreamInterval(
+                .addRedeliveredStreamInterval(
                     s1f3.offset, s1f3.offset + s1f3.len - 1) // wrong
                 .build())));
   }
 
-  // wrong dup acked stream intervals (clear and add f1 wrong)
+  // wrong redelivered stream intervals (clear and add f1 wrong)
   {
     EXPECT_THAT(
         detailsPerStream,
         Not(UnorderedElementsAre(
             getDefaultBuilder()
-                .clearDupAckedStreamIntervals()
-                .addDupAckedStreamInterval(
+                .clearRedeliveredStreamIntervals()
+                .addRedeliveredStreamInterval(
                     s1f1.offset, s1f1.offset + s1f1.len) // wrong
                 .build())));
   }
 
-  // wrong dup acked stream intervals (empty)
+  // wrong redelivered stream intervals (empty)
   {
     EXPECT_THAT(
         detailsPerStream,
         Not(UnorderedElementsAre(
-            getDefaultBuilder().clearDupAckedStreamIntervals().build())));
+            getDefaultBuilder().clearRedeliveredStreamIntervals().build())));
   }
 }
 
@@ -5233,7 +5233,7 @@ TEST_F(
               .setStreamID(streamId)
               .setStreamBytesAcked(frame.len - overlapLength)
               .setStreamBytesAckedByRetrans(frame.len - overlapLength)
-              .addDupAckedStreamInterval(overlapStart, overlapEnd)
+              .addRedeliveredStreamInterval(overlapStart, overlapEnd)
               .build()));
 }
 
@@ -6647,18 +6647,18 @@ TEST_F(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         // no change, since already ACKed by original
-                        // retrans ACKed after original, thus making f2
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f2's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s1f2.offset, s1f2.offset + s1f2.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
                         // no change, since already ACKed by original
-                        // retrans ACKed after original, thus making f2
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f2's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s2f2.offset, s2f2.offset + s2f2.len - 1)
                         .build()))));
   }
@@ -6873,8 +6873,9 @@ TEST_F(
                         .setStreamBytesAcked(0)
                         .setStreamBytesAckedByRetrans(0)
                         // no change, since already ACKed by retrans
-                        // orig ACKed after retrans, thus making f2 dupacked
-                        .addDupAckedStreamInterval(
+                        // original ACKed after retransmission, so f2's interval
+                        // was redelivered
+                        .addRedeliveredStreamInterval(
                             s1f2.offset, s1f2.offset + s1f2.len - 1)
                         .build(),
                     // s2f1
@@ -6883,8 +6884,9 @@ TEST_F(
                         .setStreamBytesAcked(0)
                         .setStreamBytesAckedByRetrans(0)
                         // no change, since already ACKed by retrans
-                        // orig ACKed after retrans, thus making f2 dupacked
-                        .addDupAckedStreamInterval(
+                        // original ACKed after retransmission, so f2's interval
+                        // was redelivered
+                        .addRedeliveredStreamInterval(
                             s2f2.offset, s2f2.offset + s2f2.len - 1)
                         .build()))));
   }
@@ -7091,18 +7093,18 @@ TEST_F(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         // no change, since already ACKed by original
-                        // retrans ACKed after original, thus making f2
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f2's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s1f2.offset, s1f2.offset + s1f2.len - 1)
                         .build(),
                     // s2f1
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s2Id)
                         // no change, since already ACKed by original
-                        // retrans ACKed after original, thus making f2
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f2's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s2f2.offset, s2f2.offset + s2f2.len - 1)
                         .build()))));
   }
@@ -7203,7 +7205,7 @@ TEST_F(
               AckEventStreamDetailsMatcherBuilder()
                   .setStreamID(streamId)
                   .setStreamBytesAcked(originalFrame.len / 2)
-                  .addDupAckedStreamInterval(
+                  .addRedeliveredStreamInterval(
                       previouslyDeliveredStart, previouslyDeliveredEnd)
                   .build()))));
 }
@@ -7252,7 +7254,7 @@ TEST_F(
                   .setStreamBytesAcked(
                       originalFrame.len - previouslyDeliveredLen)
                   .setStreamBytesAckedByRetrans(0)
-                  .addDupAckedStreamInterval(
+                  .addRedeliveredStreamInterval(
                       previouslyDeliveredStart, previouslyDeliveredEnd)
                   .build()))));
   const AckEvent::AckPacket::StreamDetails::StreamIntervals
@@ -7394,7 +7396,7 @@ TEST_F(
                   .setStreamID(stream_->id)
                   .setStreamBytesAcked(0)
                   .setStreamBytesAckedByRetrans(0)
-                  .addDupAckedStreamInterval(
+                  .addRedeliveredStreamInterval(
                       frame_->offset, frame_->offset + frame_->len - 1)
                   .build()))));
 }
@@ -7468,9 +7470,9 @@ TEST_F(
                         .setStreamBytesAcked(s1f2.len)
                         .setStreamBytesAckedByRetrans(0)
                         // moved forward to f2
-                        // retrans ACKed after original, thus making f1
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f1's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
                         .build()))));
   }
@@ -7553,8 +7555,8 @@ TEST_F(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         .setStreamBytesAcked(s1f2.len)
-                        // p1 acked earlier, thus making f1 dupacked
-                        .addDupAckedStreamInterval(
+                        // p1 ACKed earlier, so f1's interval was redelivered
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
                         .build()))));
   }
@@ -7639,8 +7641,9 @@ TEST_F(
                         .setStreamID(s1Id)
                         .setStreamBytesAcked(0)
                         // no change, since already advanced by p2
-                        // orig ACKed after retrans, thus making f1 dupacked
-                        .addDupAckedStreamInterval(
+                        // original ACKed after retransmission, so f1's interval
+                        // was redelivered
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
                         .build()))));
   }
@@ -7780,9 +7783,9 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        // retrans ACKed after original, thus making f1
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f1's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
@@ -7868,9 +7871,9 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        // retrans ACKed after original, thus making f1
-                        // dupacked
-                        .addDupAckedStreamInterval(
+                        // retrans ACKed after original, so f1's interval was
+                        // redelivered
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
                         .build(),
                     AckEventStreamDetailsMatcherBuilder()
@@ -7960,17 +7963,18 @@ TEST_F(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
                         // no change, since already advanced by p2
-                        // orig ACKed after retrans, thus making f1 dupacked
-                        .addDupAckedStreamInterval(
+                        // original ACKed after retransmission, so f1's interval
+                        // was redelivered
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
                         .build()))));
   }
 }
 
 /**
- * Scenario where there are multiple dupacked intervals on a packet ACK.
+ * Scenario where there are multiple redelivered intervals on a packet ACK.
  */
-TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
+TEST_F(AckEventForAppDataTest, AckEventRetransMultipleRedeliveries) {
   // prevent packets from being marked as lost
   // must initialize srtt and lrtt in parallel
   getConn()->lossState.srtt = 1ms;
@@ -8087,11 +8091,12 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
-                        // retrans ACKed after original, thus making dupacks
+                        // retrans ACKed after original, so its intervals were
+                        // redelivered
                         // for both f1 and f3 (in ACKed packets p1 and p3)
-                        .addDupAckedStreamInterval(
+                        .addRedeliveredStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
-                        .addDupAckedStreamInterval(
+                        .addRedeliveredStreamInterval(
                             s1f3.offset, s1f3.offset + s1f3.len - 1)
                         .build()))));
   }
@@ -8756,7 +8761,7 @@ TEST_P(AckEventUndeliveredStreamFrameTest, AckAfterResetCreditsNothing) {
               AckEventStreamDetailsMatcherBuilder()
                   .setStreamID(stream_->id)
                   .setStreamBytesAcked(0)
-                  .addDupAckedStreamInterval(
+                  .addRedeliveredStreamInterval(
                       frame.offset, frame.offset + frame.len - 1)
                   .build()))));
 }

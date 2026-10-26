@@ -30,23 +30,23 @@ AckEventStreamDetailsMatcherBuilder::setStreamBytesAckedByRetrans(
 }
 
 AckEventStreamDetailsMatcherBuilder&&
-AckEventStreamDetailsMatcherBuilder::addDupAckedStreamInterval(
-    const DupAckedStreamIntervals::interval_type& interval) {
-  dupAckedStreamIntervals.insert(interval);
+AckEventStreamDetailsMatcherBuilder::addRedeliveredStreamInterval(
+    const RedeliveredStreamIntervals::interval_type& interval) {
+  redeliveredStreamIntervals.insert(interval);
   return std::move(*this);
 }
 
 AckEventStreamDetailsMatcherBuilder&&
-AckEventStreamDetailsMatcherBuilder::addDupAckedStreamInterval(
+AckEventStreamDetailsMatcherBuilder::addRedeliveredStreamInterval(
     const uint64_t startIn,
     const uint64_t endIn) {
-  dupAckedStreamIntervals.insert(startIn, endIn);
+  redeliveredStreamIntervals.insert(startIn, endIn);
   return std::move(*this);
 }
 
 AckEventStreamDetailsMatcherBuilder&&
-AckEventStreamDetailsMatcherBuilder::clearDupAckedStreamIntervals() {
-  dupAckedStreamIntervals.clear();
+AckEventStreamDetailsMatcherBuilder::clearRedeliveredStreamIntervals() {
+  redeliveredStreamIntervals.clear();
   return std::move(*this);
 }
 

@@ -23,27 +23,27 @@ namespace quic::test {
  */
 struct AckEventStreamDetailsMatcherBuilder {
   using Builder = AckEventStreamDetailsMatcherBuilder;
-  using DupAckedStreamIntervals =
-      AckEvent::AckPacket::StreamDetails::DupAckedStreamIntervals;
+  using RedeliveredStreamIntervals =
+      AckEvent::AckPacket::StreamDetails::RedeliveredStreamIntervals;
 
   explicit AckEventStreamDetailsMatcherBuilder() = default;
 
   Builder&& setStreamID(const uint64_t streamIdIn);
   Builder&& setStreamBytesAcked(const uint64_t ackedIn);
   Builder&& setStreamBytesAckedByRetrans(const uint64_t ackedIn);
-  Builder&& addDupAckedStreamInterval(
-      const DupAckedStreamIntervals::interval_type& intervalIn);
-  Builder&& addDupAckedStreamInterval(
+  Builder&& addRedeliveredStreamInterval(
+      const RedeliveredStreamIntervals::interval_type& intervalIn);
+  Builder&& addRedeliveredStreamInterval(
       const uint64_t startIn,
       const uint64_t endIn);
-  Builder&& clearDupAckedStreamIntervals();
+  Builder&& clearRedeliveredStreamIntervals();
 
   auto build() && {
     CHECK(maybeStreamId.has_value());
     ::testing::Matcher<AckEvent::AckPacket::StreamDetails> detailsMatcher =
         ::testing::Field(
-            &AckEvent::AckPacket::StreamDetails::dupAckedStreamIntervals,
-            dupAckedStreamIntervals);
+            &AckEvent::AckPacket::StreamDetails::redeliveredStreamIntervals,
+            redeliveredStreamIntervals);
     if (maybeStreamBytesAcked.has_value()) {
       detailsMatcher = ::testing::AllOf(
           detailsMatcher,
@@ -65,7 +65,7 @@ struct AckEventStreamDetailsMatcherBuilder {
   Optional<uint64_t> maybeStreamId;
   Optional<uint64_t> maybeStreamBytesAcked;
   Optional<uint64_t> maybeStreamBytesAckedByRetrans;
-  DupAckedStreamIntervals dupAckedStreamIntervals;
+  RedeliveredStreamIntervals redeliveredStreamIntervals;
 };
 
 } // namespace quic::test

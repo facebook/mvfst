@@ -45,14 +45,14 @@ bool AckEvent::AckPacket::DetailsPerStream::recordFrameDelivery(
       continue;
     }
     if (start > nextOffset) {
-      streamDetails.dupAckedStreamIntervals.insert(nextOffset, start - 1);
+      streamDetails.redeliveredStreamIntervals.insert(nextOffset, start - 1);
     }
     streamDetails.newlyDeliveredStreamIntervals.insert(start, end);
     newlyDeliveredBytes += end - start + 1;
     nextOffset = end + 1;
   }
   if (nextOffset <= frameEnd) {
-    streamDetails.dupAckedStreamIntervals.insert(nextOffset, frameEnd);
+    streamDetails.redeliveredStreamIntervals.insert(nextOffset, frameEnd);
   }
   streamDetails.streamBytesAcked += newlyDeliveredBytes;
   if (retransmission) {

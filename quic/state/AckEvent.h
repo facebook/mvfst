@@ -188,7 +188,7 @@ struct AckEvent {
       template <class T>
       using StreamIntervalSetVec = SmallVec<T, 1 /* stack size */>;
       using StreamIntervals = IntervalSet<uint64_t, 1, StreamIntervalSetVec>;
-      using DupAckedStreamIntervals = StreamIntervals;
+      using RedeliveredStreamIntervals = StreamIntervals;
 
       // Stream intervals this ACKed packet newly marked delivered, exactly as
       // the stream recorded them; their lengths sum to `streamBytesAcked`.
@@ -196,10 +196,10 @@ struct AckEvent {
       StreamIntervals newlyDeliveredStreamIntervals;
 
       // Stream intervals carried by this packet that its ACK did not newly
-      // mark delivered, usually because an earlier ACK already did.
+      // mark delivered, usually because another packet's ACK already did.
       //
       // Requires ACK processing for packets spuriously marked lost is enabled
-      DupAckedStreamIntervals dupAckedStreamIntervals;
+      RedeliveredStreamIntervals redeliveredStreamIntervals;
     };
 
     // Structure with information about each stream with frames in ACKed packet
@@ -210,7 +210,7 @@ struct AckEvent {
       /**
        * Record the stream's report of what ACK processing of `frame` newly
        * marked delivered. Bytes of the frame that were not newly delivered are
-       * recorded in `dupAckedStreamIntervals`.
+       * recorded in `redeliveredStreamIntervals`.
        *
        * `retransmission` is whether mvfst sent the frame's bytes as a
        * retransmission, clone or PTO probe, as recorded in
