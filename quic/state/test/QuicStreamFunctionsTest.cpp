@@ -202,6 +202,17 @@ TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferModeSurvivesMigration) {
   EXPECT_FALSE(migratedToEnabled.usesUnifiedSendBuffer());
 }
 
+TEST_F(QuicStreamFunctionsTestBase, RetiredIngressSurvivesMigration) {
+  QuicStreamState source(0x00, conn);
+  source.ingressRetired = true;
+  QuicClientConnectionState destination(
+      FizzClientQuicHandshakeContext::Builder().build());
+
+  QuicStreamState migrated(destination, std::move(source));
+
+  EXPECT_TRUE(migrated.ingressRetired);
+}
+
 TEST_F(QuicStreamFunctionsTestBase, UnifiedSendBufferFacades) {
   conn.transportSettings.useUnifiedAppStreamSendBuffer = true;
   QuicStreamState stream(0x00, conn);

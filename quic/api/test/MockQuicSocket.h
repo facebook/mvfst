@@ -170,6 +170,14 @@ class MockQuicSocket : public QuicSocket {
       (quic::Expected<void, LocalErrorCode>),
       stopSending,
       (StreamId, ApplicationErrorCode));
+  MOCK_METHOD(
+      (quic::Expected<void, LocalErrorCode>),
+      stopSendingAndDropIngress,
+      (StreamId, ApplicationErrorCode));
+  MOCK_METHOD(
+      (quic::Expected<void, LocalErrorCode>),
+      stopSendingAndDropIngressForAllStreams,
+      (ApplicationErrorCode));
 
   quic::Expected<std::pair<BufPtr, bool>, LocalErrorCode> read(
       StreamId id,

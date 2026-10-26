@@ -958,6 +958,18 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     }
   }
 
+  // Expires the loss detection timeout as if its time had come.
+  void fireLossTimeout() {
+    client->lossTimeout().cancelTimerCallback();
+    client->lossTimeout().timeoutExpired();
+  }
+
+  // Expires the idle timeout as if its time had come.
+  void fireIdleTimeout() {
+    client->idleTimeout().cancelTimerCallback();
+    client->idleTimeout().timeoutExpired();
+  }
+
   void loopForWrites() {
     // Loop the evb once to give writes some time to do their thing.
     eventbase_->loopOnce(EVLOOP_NONBLOCK);

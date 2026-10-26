@@ -612,6 +612,18 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     deliverData(NetworkData(ReceivedUdpPacket(std::move(data))), writes, peer);
   }
 
+  // Expires the loss detection timeout as if its time had come.
+  void fireLossTimeout() {
+    server->lossTimeout().cancelTimerCallback();
+    server->lossTimeout().timeoutExpired();
+  }
+
+  // Expires the idle timeout as if its time had come.
+  void fireIdleTimeout() {
+    server->idleTimeout().cancelTimerCallback();
+    server->idleTimeout().timeoutExpired();
+  }
+
   void loopForWrites() {
     evb.loopOnce(EVLOOP_NONBLOCK);
   }

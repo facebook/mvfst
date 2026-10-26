@@ -634,4 +634,98 @@ TEST_F(StreamStateFunctionsTests, isAllDataReceivedUntil4) {
       StreamBuffer(folly::IOBuf::copyBuffer("1"), 2, false));
   EXPECT_FALSE(isAllDataReceivedUntil(stream, 2));
 }
+
+TEST_F(StreamStateFunctionsTests, RetireIngressWaitsForFinalSize) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  ASSERT_FALSE(appendDataToReadBuffer(
+                   stream, StreamBuffer(folly::IOBuf::copyBuffer("hello"), 0))
+                   .hasError());
+
+  ASSERT_FALSE(retireIngress(stream).hasError());
+
+  EXPECT_TRUE(stream.ingressRetired);
+  EXPECT_TRUE(stream.stopSendingRequested);
+  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+  EXPECT_EQ(stream.currentReadOffset, 0);
+  EXPECT_EQ(conn.flowControlState.sumMaxObservedOffset, 5);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 0);
+  EXPECT_FALSE(conn.streamManager->readableStreams().contains(id));
+  EXPECT_FALSE(conn.streamManager->peekableStreams().contains(id));
+}
+
+TEST_F(StreamStateFunctionsTests, RetireIngressClosesWhenFinalSizeKnown) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  // A small window, so that crediting the stream would normally queue a
+  // stream window update.
+  stream.flowControlState.windowSize = 16;
+  stream.flowControlState.advertisedMaxOffset = 16;
+  // The FIN arrived, but the first five bytes are still missing.
+  ASSERT_FALSE(
+      appendDataToReadBuffer(
+          stream, StreamBuffer(folly::IOBuf::copyBuffer("world"), 5, true))
+          .hasError());
+  ASSERT_EQ(conn.flowControlState.sumMaxObservedOffset, 10);
+
+  ASSERT_FALSE(retireIngress(stream).hasError());
+
+  // Every byte up to the final size is credited, including the missing ones,
+  // and the FIN is consumed.
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_EQ(stream.currentReadOffset, 11);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 10);
+  EXPECT_FALSE(stream.hasReadableData());
+  EXPECT_FALSE(conn.streamManager->pendingWindowUpdate(id));
+}
+
+TEST_F(StreamStateFunctionsTests, RetireIngressAccountsReliableResetFinalSize) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  // None of the reliable bytes have arrived, so the reset does not account
+  // for its final size yet.
+  ASSERT_FALSE(
+      onResetQuicStream(
+          stream,
+          RstStreamFrame(id, GenericApplicationErrorCode::UNKNOWN, 100, 50))
+          .hasError());
+  ASSERT_EQ(conn.flowControlState.sumMaxObservedOffset, 0);
+
+  ASSERT_FALSE(retireIngress(stream).hasError());
+
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+  EXPECT_EQ(stream.maxOffsetObserved, 100);
+  EXPECT_EQ(conn.flowControlState.sumMaxObservedOffset, 100);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 100);
+  // The reset is still reported to the application, so no FIN is consumed.
+  EXPECT_EQ(stream.currentReadOffset, 100);
+}
+
+TEST_F(StreamStateFunctionsTests, RetireIngressRejectsFinalSizeAboveWindow) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  StreamId id = 1;
+  QuicStreamState stream(id, conn);
+  stream.flowControlState.advertisedMaxOffset = 100;
+  ASSERT_FALSE(
+      onResetQuicStream(
+          stream,
+          RstStreamFrame(id, GenericApplicationErrorCode::UNKNOWN, 200, 50))
+          .hasError());
+
+  auto result = retireIngress(stream);
+  ASSERT_TRUE(result.hasError());
+  ASSERT_NE(result.error().code.asTransportErrorCode(), nullptr);
+  EXPECT_EQ(
+      *result.error().code.asTransportErrorCode(),
+      TransportErrorCode::FLOW_CONTROL_ERROR);
+}
 } // namespace quic::test

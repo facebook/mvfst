@@ -994,6 +994,331 @@ TEST_F(QuicTransportImplTestBase, NoopStopSendingIngressClosed) {
   transport.reset();
 }
 
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingAndDropIngressDiscardsIngressWithoutTransportSetting) {
+  EXPECT_FALSE(transport->getTransportSettings().dropIngressOnStopSending);
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto id = transport->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  ASSERT_TRUE(transport->setReadCallback(id, &readCb).has_value());
+  transport->addDataToStream(
+      id,
+      StreamBuffer(folly::IOBuf::copyBuffer("some ingress stream data"), 0));
+  transport->driveReadCallbacks();
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_TRUE(stream.hasReadableData());
+  ASSERT_TRUE(streamManager.readableStreams().contains(id));
+  ASSERT_TRUE(streamManager.peekableStreams().contains(id));
+
+  EXPECT_CALL(readCb, readAvailable(id)).Times(0);
+  EXPECT_CALL(readCb, readError(id, _)).Times(0);
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+
+  EXPECT_TRUE(stream.ingressRetired);
+  EXPECT_TRUE(stream.stopSendingRequested);
+  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.peekableStreams().contains(id));
+  // The peer's final size is not known yet.
+  EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+  ASSERT_EQ(conn.pendingEvents.frames.size(), 1);
+  const auto& stopSendingFrame =
+      *CHECK_NOTNULL(conn.pendingEvents.frames.front().asStopSendingFrame());
+  EXPECT_EQ(stopSendingFrame.streamId, id);
+  EXPECT_EQ(stopSendingFrame.errorCode, GenericApplicationErrorCode::NO_ERROR);
+
+  // Retiring the receive side again does not send another STOP_SENDING.
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+
+  transport->driveReadCallbacks();
+  ASSERT_FALSE(
+      transport->setReadCallback(id, nullptr, std::nullopt).hasError());
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingAndDropIngressKeepsFlowControlAccounting) {
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto id = transport->createBidirectionalStream().value();
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
+  const auto len = data->length();
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_EQ(conn.flowControlState.sumMaxObservedOffset, len);
+  ASSERT_EQ(conn.flowControlState.sumCurReadOffset, 0);
+
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+  transport->addDataToStream(id, StreamBuffer(data->clone(), len));
+
+  // Later ingress counts against flow control but is never buffered, and
+  // nothing is credited back until the peer's final size is known.
+  EXPECT_EQ(stream.maxOffsetObserved, 2 * len);
+  EXPECT_EQ(conn.flowControlState.sumMaxObservedOffset, 2 * len);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 0);
+  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.peekableStreams().contains(id));
+  EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingWithDropIngressSettingNeverClosesIngressAfterPeerFin) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.dropIngressOnStopSending = true;
+  transport->setTransportSettings(transportSettings);
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto id = *streamManager.nextAcceptablePeerUnidirectionalStreamId();
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
+  const auto len = data->length();
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_TRUE(transport->stopSending(id, GenericApplicationErrorCode::NO_ERROR)
+                  .has_value());
+
+  ReadStreamFrame frame(id, len, true);
+  frame.data = data->clone();
+  ASSERT_FALSE(
+      receiveReadStreamFrameSMHandler(stream, std::move(frame)).hasError());
+
+  // The final size is known, but dropped data never advances the read offset,
+  // so the receive side stays open until a RESET_STREAM or connection close.
+  EXPECT_EQ(stream.finalReadOffset, Optional<uint64_t>(2 * len));
+  EXPECT_EQ(stream.currentReadOffset, 0);
+  EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+  EXPECT_FALSE(streamManager.closedStreams().contains(id));
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 0);
+}
+
+TEST_F(QuicTransportImplTestBase, StopSendingAndDropIngressClosesOnPeerFin) {
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto id = *streamManager.nextAcceptablePeerUnidirectionalStreamId();
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
+  const auto len = data->length();
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+
+  ReadStreamFrame frame(id, len, true);
+  frame.data = data->clone();
+  ASSERT_FALSE(
+      receiveReadStreamFrameSMHandler(stream, std::move(frame)).hasError());
+
+  // Every byte up to the final size is credited back to the connection, and
+  // the FIN is consumed instead of being delivered.
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+  EXPECT_EQ(conn.flowControlState.sumMaxObservedOffset, 2 * len);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 2 * len);
+  EXPECT_FALSE(stream.hasReadableData());
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.pendingWindowUpdate(id));
+  EXPECT_TRUE(streamManager.closedStreams().contains(id));
+
+  transport->invokeCheckForClosedStream();
+  EXPECT_FALSE(streamManager.streamExists(id));
+  EXPECT_FALSE(streamManager.streams().contains(id));
+}
+
+// If retiring a stream fails, the call closes the connection and leaves new
+// peer streams alone, since a closed connection opens none.
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingAndDropIngressForAllStreamsThatClosesTheConnectionLeavesNewPeerStreamsAlone) {
+  auto& streamManager = *transport->transportConn->streamManager;
+  const auto id = *streamManager.nextAcceptablePeerUnidirectionalStreamId();
+  auto& stream = *CHECK_NOTNULL(streamManager.getStream(id).value());
+  // A final size beyond the stream's window fails flow control when the
+  // retired receive side accounts for it.
+  stream.finalReadOffset = stream.flowControlState.advertisedMaxOffset + 1;
+
+  EXPECT_TRUE(transport
+                  ->stopSendingAndDropIngressForAllStreams(
+                      GenericApplicationErrorCode::NO_ERROR)
+                  .hasError());
+
+  EXPECT_TRUE(transport->isClosed());
+  EXPECT_FALSE(streamManager.newPeerStreamStopSendingError().has_value());
+}
+
+TEST_F(QuicTransportImplTestBase, StopSendingAndDropIngressClosesOnPeerReset) {
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto id = *streamManager.nextAcceptablePeerUnidirectionalStreamId();
+  auto data = folly::IOBuf::copyBuffer("some ingress stream data");
+  const auto len = data->length();
+  transport->addDataToStream(id, StreamBuffer(data->clone(), 0));
+  NiceMock<MockReadCallback> readCb;
+  ASSERT_TRUE(transport->setReadCallback(id, &readCb).has_value());
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  EXPECT_CALL(readCb, readError(id, _)).Times(0);
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+
+  // The reset's final size covers bytes that never arrived.
+  constexpr auto kResetCode = GenericApplicationErrorCode::UNKNOWN;
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(stream, RstStreamFrame(id, kResetCode, 3 * len))
+          .hasError());
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+  EXPECT_EQ(conn.flowControlState.sumMaxObservedOffset, 3 * len);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 3 * len);
+  EXPECT_TRUE(streamManager.closedStreams().contains(id));
+
+  // The reset still reaches the read callback, and the stream is then reaped.
+  EXPECT_CALL(readCb, readError(id, IsError(kResetCode)));
+  transport->readLooper()->runLoopCallback();
+  transport->invokeCheckForClosedStream();
+  EXPECT_FALSE(streamManager.streamExists(id));
+  EXPECT_FALSE(streamManager.streams().contains(id));
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingAndDropIngressDiscardsBufferedDataAfterPeerFin) {
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto id = transport->createBidirectionalStream().value();
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  auto data = folly::IOBuf::copyBuffer("buffered data with fin");
+  const auto len = data->length();
+  ReadStreamFrame frame(id, 0, true);
+  frame.data = data->clone();
+  ASSERT_FALSE(
+      receiveReadStreamFrameSMHandler(stream, std::move(frame)).hasError());
+  ASSERT_EQ(stream.recvState, StreamRecvState::Closed);
+  ASSERT_TRUE(streamManager.readableStreams().contains(id));
+  ASSERT_TRUE(streamManager.peekableStreams().contains(id));
+  ASSERT_EQ(conn.flowControlState.sumCurReadOffset, 0);
+  const auto pendingFrameCount = conn.pendingEvents.frames.size();
+
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+
+  // The unread bytes are credited back and the FIN is consumed; the receive
+  // side was already closed, so no STOP_SENDING is sent.
+  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_FALSE(stream.hasReadableData());
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_FALSE(streamManager.peekableStreams().contains(id));
+  EXPECT_EQ(stream.currentReadOffset, len + 1);
+  EXPECT_EQ(conn.flowControlState.sumCurReadOffset, len);
+  EXPECT_EQ(conn.pendingEvents.frames.size(), pendingFrameCount);
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingAndDropIngressConsumesPendingEmptyFin) {
+  auto& streamManager = *transport->transportConn->streamManager;
+  const auto id = transport->createBidirectionalStream().value();
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ReadStreamFrame frame(id, 0, true);
+  frame.data = folly::IOBuf::create(0);
+  ASSERT_FALSE(
+      receiveReadStreamFrameSMHandler(stream, std::move(frame)).hasError());
+  ASSERT_TRUE(stream.hasReadableData());
+  ASSERT_TRUE(streamManager.readableStreams().contains(id));
+  ASSERT_EQ(stream.finalReadOffset, Optional<uint64_t>(0));
+
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+
+  EXPECT_FALSE(stream.hasReadableData());
+  EXPECT_FALSE(streamManager.readableStreams().contains(id));
+  EXPECT_EQ(stream.currentReadOffset, 1);
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    StopSendingAndDropIngressForAllStreamsCoversEveryReceiveSide) {
+  EXPECT_FALSE(transport->getTransportSettings().dropIngressOnStopSending);
+  auto& conn = *transport->transportConn;
+  auto& streamManager = *conn.streamManager;
+  const auto localBidiId = transport->createBidirectionalStream().value();
+  const auto localUniId = transport->createUnidirectionalStream().value();
+  const auto peerBidiId =
+      streamManager.nextAcceptablePeerBidirectionalStreamId().value();
+  const auto firstPeerUniId =
+      streamManager.nextAcceptablePeerUnidirectionalStreamId().value();
+  const auto secondPeerUniId = firstPeerUniId + kStreamIncrement;
+  const auto thirdPeerUniId = secondPeerUniId + kStreamIncrement;
+  transport->addDataToStream(
+      localBidiId, StreamBuffer(folly::IOBuf::copyBuffer("bidi ingress"), 0));
+  transport->addDataToStream(
+      peerBidiId, StreamBuffer(folly::IOBuf::copyBuffer("peer ingress"), 0));
+  transport->addDataToStream(
+      thirdPeerUniId, StreamBuffer(folly::IOBuf::copyBuffer("uni ingress"), 0));
+  // Opening the third peer stream implicitly opens the first two, but their
+  // state has not been created yet.
+  ASSERT_TRUE(streamManager.streamExists(firstPeerUniId));
+  ASSERT_TRUE(streamManager.streamExists(secondPeerUniId));
+  ASSERT_FALSE(streamManager.streams().contains(firstPeerUniId));
+  ASSERT_FALSE(streamManager.streams().contains(secondPeerUniId));
+  const auto pendingFrameCount = conn.pendingEvents.frames.size();
+
+  ASSERT_TRUE(transport
+                  ->stopSendingAndDropIngressForAllStreams(
+                      GenericApplicationErrorCode::UNKNOWN)
+                  .has_value());
+
+  for (const auto id :
+       {localBidiId,
+        peerBidiId,
+        firstPeerUniId,
+        secondPeerUniId,
+        thirdPeerUniId}) {
+    const auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+    EXPECT_TRUE(stream.ingressRetired) << id;
+    EXPECT_TRUE(stream.readBuffer.empty()) << id;
+    EXPECT_EQ(stream.recvState, StreamRecvState::Open) << id;
+    EXPECT_FALSE(streamManager.readableStreams().contains(id)) << id;
+  }
+  const auto& localUniStream = *CHECK_NOTNULL(transport->getStream(localUniId));
+  EXPECT_FALSE(localUniStream.ingressRetired);
+  EXPECT_EQ(localUniStream.recvState, StreamRecvState::Invalid);
+
+  std::vector<StreamId> stoppedStreamIds;
+  for (size_t frameIndex = pendingFrameCount;
+       frameIndex < conn.pendingEvents.frames.size();
+       ++frameIndex) {
+    const auto& stopSendingFrame = *CHECK_NOTNULL(
+        conn.pendingEvents.frames[frameIndex].asStopSendingFrame());
+    EXPECT_EQ(stopSendingFrame.errorCode, GenericApplicationErrorCode::UNKNOWN);
+    stoppedStreamIds.push_back(stopSendingFrame.streamId);
+  }
+  EXPECT_THAT(
+      stoppedStreamIds,
+      UnorderedElementsAre(
+          localBidiId,
+          peerBidiId,
+          firstPeerUniId,
+          secondPeerUniId,
+          thirdPeerUniId));
+}
+
 TEST_F(QuicTransportImplTestBase, WriteAckPacketUnsetsLooper) {
   // start looper in running state first
   transport->writeLooper()->run(true);
@@ -3327,6 +3652,92 @@ TEST_F(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
   EXPECT_TRUE(
       transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
           .hasError());
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    GracefulCloseDoesNotWaitForPeerOnRetiredIngress) {
+  transport->transportConn->transportSettings.useUnifiedAppStreamSendBuffer =
+      true;
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
+  const auto id = transport->createBidirectionalStream().value();
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_FALSE(
+      transport->writeChain(id, IOBuf::copyBuffer("bye"), true).hasError());
+  ASSERT_TRUE(stream.streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 3, .fin = true}));
+  ASSERT_FALSE(
+      sendAckSMHandler(stream, WriteStreamFrame(id, 0, 3, true)).hasError());
+  ASSERT_EQ(stream.sendState, StreamSendState::Closed);
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+  ASSERT_EQ(stream.recvState, StreamRecvState::Open);
+
+  // The peer never finishes or resets its side of the stream.
+  transport->closeGracefully();
+  EXPECT_TRUE(transport->isClosed());
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    GracefulCloseDrainsEgressBeforeFinishingWithRetiredIngress) {
+  transport->transportConn->transportSettings.useUnifiedAppStreamSendBuffer =
+      true;
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
+  const auto id = transport->createBidirectionalStream().value();
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_FALSE(
+      transport->writeChain(id, IOBuf::copyBuffer("bye"), true).hasError());
+  ASSERT_TRUE(stream.streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 3, .fin = true}));
+  ASSERT_TRUE(
+      transport
+          ->stopSendingAndDropIngress(id, GenericApplicationErrorCode::NO_ERROR)
+          .has_value());
+
+  // The egress is not acknowledged yet, so the stream still has to drain.
+  transport->closeGracefully();
+  EXPECT_FALSE(transport->isClosed());
+
+  ASSERT_FALSE(
+      sendAckSMHandler(stream, WriteStreamFrame(id, 0, 3, true)).hasError());
+  transport->invokeCheckForClosedStream();
+  EXPECT_TRUE(transport->isClosed());
+}
+
+TEST_F(
+    QuicTransportImplTestBase,
+    GracefulCloseStillWaitsForPeerAfterStopSending) {
+  transport->transportConn->transportSettings.useUnifiedAppStreamSendBuffer =
+      true;
+  EXPECT_CALL(*socketPtr, write(_, _, _))
+      .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
+  const auto id = transport->createBidirectionalStream().value();
+  auto& stream = *CHECK_NOTNULL(transport->getStream(id));
+  ASSERT_FALSE(
+      transport->writeChain(id, IOBuf::copyBuffer("bye"), true).hasError());
+  ASSERT_TRUE(stream.streamSendBuffer->markNewDataSent(
+      {.offset = 0, .len = 3, .fin = true}));
+  ASSERT_FALSE(
+      sendAckSMHandler(stream, WriteStreamFrame(id, 0, 3, true)).hasError());
+  ASSERT_TRUE(transport->stopSending(id, GenericApplicationErrorCode::NO_ERROR)
+                  .has_value());
+
+  // stopSending() alone does not retire the receive side, so graceful close
+  // waits for the peer to close its side.
+  transport->closeGracefully();
+  EXPECT_FALSE(transport->isClosed());
+
+  ASSERT_FALSE(
+      receiveRstStreamSMHandler(
+          stream, RstStreamFrame(id, GenericApplicationErrorCode::NO_ERROR, 0))
+          .hasError());
+  transport->invokeCheckForClosedStream();
+  EXPECT_TRUE(transport->isClosed());
 }
 
 TEST_F(QuicTransportImplTestBase, TestResetRemovesDeliveryCb) {

@@ -21,6 +21,7 @@
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/state/stream/StreamStateFunctions.h>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -513,6 +514,76 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::stopSending(
   // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
+  return {};
+}
+
+quic::Expected<void, LocalErrorCode>
+QuicTransportBaseLite::stopSendingAndDropIngress(
+    StreamId id,
+    ApplicationErrorCode error) {
+  if (isSendingStream(conn_->nodeType, id)) {
+    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  [[maybe_unused]] auto self = sharedGuard();
+  auto* stream = conn_->streamManager->getStreamIfExists(id);
+  if (!stream) {
+    return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  if (stream->ingressRetired) {
+    return {};
+  }
+  // Even when the final size is already known, STOP_SENDING lets the peer
+  // stop retransmitting data we would only discard.
+  const bool sendStopSending = stream->recvState == StreamRecvState::Open;
+  auto retireResult = retireIngress(*stream);
+  if (!retireResult.has_value()) {
+    MVVLOG(4) << __func__ << " streamId=" << id << " "
+              << retireResult.error().message << " " << *this;
+    exceptionCloseWhat_ = retireResult.error().message;
+    closeImpl(QuicError(
+        retireResult.error().code,
+        std::string("stopSendingAndDropIngress() error")));
+    return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
+  }
+  if (sendStopSending) {
+    sendSimpleFrame(*conn_, StopSendingFrame(id, error));
+  }
+  updateWriteLooper(true);
+  return {};
+}
+
+quic::Expected<void, LocalErrorCode>
+QuicTransportBaseLite::stopSendingAndDropIngressForAllStreams(
+    ApplicationErrorCode error) {
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  [[maybe_unused]] auto self = sharedGuard();
+  const auto streamIds = conn_->streamManager->openReceiveStreamIds();
+
+  Optional<LocalErrorCode> firstError;
+  for (const auto id : streamIds) {
+    auto result = stopSendingAndDropIngress(id, error);
+    if (result.hasError() && !firstError.has_value()) {
+      firstError = result.error();
+    }
+  }
+  // A failure above closes the connection, which ends every stream, so there
+  // is nothing left to retire.
+  if (closeState_ != CloseState::OPEN) {
+    return quic::make_unexpected(
+        firstError.value_or(LocalErrorCode::CONNECTION_CLOSED));
+  }
+  // A peer stream that is not open yet, including one whose packet is already
+  // waiting to be processed, is retired as soon as its state is created, before
+  // any of its frames is applied.
+  conn_->streamManager->retireIngressOfNewPeerStreams(error);
+  if (firstError.has_value()) {
+    return quic::make_unexpected(*firstError);
+  }
   return {};
 }
 
@@ -1604,10 +1675,20 @@ void QuicTransportBaseLite::checkForClosedStream() {
     itr = conn_->streamManager->closedStreams().erase(itr);
   } // while
 
-  if (closeState_ == CloseState::GRACEFUL_CLOSING &&
-      conn_->streamManager->streamCount() == 0) {
+  if (closeState_ == CloseState::GRACEFUL_CLOSING && canFinishGracefulClose()) {
     closeImpl(std::nullopt);
   }
+}
+
+bool QuicTransportBaseLite::canFinishGracefulClose() const {
+  for (const auto& [id, stream] : conn_->streamManager->streams()) {
+    const bool sendFinished = stream.sendState == StreamSendState::Closed ||
+        stream.sendState == StreamSendState::Invalid;
+    if (!sendFinished || !stream.ingressRetired) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void QuicTransportBaseLite::writeSocketDataAndCatch() {

@@ -362,6 +362,7 @@ struct QuicStreamState : public QuicStreamLike {
     streamWriteError = other.streamWriteError;
     sendState = other.sendState;
     recvState = other.recvState;
+    ingressRetired = other.ingressRetired;
     isControl = other.isControl;
     lastHolbTime = other.lastHolbTime;
     totalHolbTime = other.totalHolbTime;
@@ -410,6 +411,19 @@ struct QuicStreamState : public QuicStreamLike {
 
   // State machine data
   StreamRecvState recvState{StreamRecvState::Open};
+
+  // Set when the application retires the receive side with
+  // stopSendingAndDropIngress(). Ingress is then only accounted for flow
+  // control, the receive side closes as soon as the peer's final size is
+  // known, and a graceful close does not wait for the peer on this stream.
+  bool ingressRetired{false};
+
+  // Marks the receive side retired without touching anything it has received.
+  // On a stream that has received nothing, this is all retiring it takes.
+  void markIngressRetired() {
+    ingressRetired = true;
+    stopSendingRequested = true;
+  }
 
   // Tells whether this stream is a control stream.
   // It is set by the app via setControlStream and the transport can use this

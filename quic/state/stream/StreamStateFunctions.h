@@ -28,4 +28,15 @@ bool isAllDataReceived(const QuicStreamState& stream);
 // given offset. This function can still return true even if the application has
 // not read all of it.
 bool isAllDataReceivedUntil(const QuicStreamState& stream, uint64_t offset);
+
+// Retires the receive side of a stream whose application will not read it
+// again: buffered ingress is dropped, later ingress is only accounted for flow
+// control, and the receive side closes once the peer's final size is known.
+[[nodiscard]] quic::Expected<void, QuicError> retireIngress(
+    QuicStreamState& stream);
+
+// Closes a retired receive side if the peer's final size is known, counting
+// every byte up to the final size as consumed for flow control.
+[[nodiscard]] quic::Expected<void, QuicError> maybeCloseRetiredIngress(
+    QuicStreamState& stream);
 } // namespace quic

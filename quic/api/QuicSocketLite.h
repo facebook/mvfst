@@ -621,6 +621,51 @@ class QuicSocketLite {
       ApplicationErrorCode error) = 0;
 
   /**
+   * Sends STOP_SENDING like stopSending(), and also retires the stream's
+   * receive side: the application will read nothing more from it.
+   *
+   * Ingress: buffered data is discarded, and later data still counts against
+   * flow control but is never buffered or delivered. A RESET_STREAM from the
+   * peer is still reported through readError(). This holds whatever
+   * dropIngressOnStopSending says.
+   *
+   * Graceful close: the receive side closes as soon as the peer's final size is
+   * known, so closeGracefully() waits neither for the peer's FIN or
+   * RESET_STREAM on this stream nor for the peer to acknowledge the
+   * STOP_SENDING. It still waits until the peer has acknowledged everything
+   * sent on the stream, through our FIN, retransmitting whatever is lost.
+   *
+   * Callbacks: no EOF is delivered after this call, so unless a RESET_STREAM is
+   * reported, an installed read callback keeps the stream from being reaped
+   * until the application unsets it.
+   *
+   * Results: INVALID_OPERATION if the stream cannot receive, CONNECTION_CLOSED
+   * once the connection is closing, and STREAM_NOT_EXISTS if the stream is not
+   * open. A stream whose receive side is already retired is left as it is. On
+   * a stream the peer has already reset, the call succeeds without sending
+   * STOP_SENDING, since nothing more can arrive.
+   */
+  virtual quic::Expected<void, LocalErrorCode> stopSendingAndDropIngress(
+      StreamId id,
+      ApplicationErrorCode error) = 0;
+
+  /**
+   * Calls stopSendingAndDropIngress() for every open stream that can receive,
+   * and for every peer stream opened afterwards.
+   *
+   * Peer streams that are open but whose state has not been created yet are
+   * covered too. A peer stream opened afterwards is retired as soon as its
+   * state is created, before any of its frames is applied.
+   *
+   * This cannot be undone: it is for an application that will read nothing
+   * more on this connection, typically just before closeGracefully(). Returns
+   * CONNECTION_CLOSED once the connection is closing, and otherwise the first
+   * error any stream returned.
+   */
+  virtual quic::Expected<void, LocalErrorCode>
+  stopSendingAndDropIngressForAllStreams(ApplicationErrorCode error) = 0;
+
+  /**
    * Sets connection setup callback. This callback must be set before using the
    * socket.
    */

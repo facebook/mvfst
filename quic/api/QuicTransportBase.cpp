@@ -98,8 +98,8 @@ void QuicTransportBase::closeGracefully() {
   peekLooper_->stop();
   cancelAllAppCallbacks(
       QuicError(QuicErrorCode(LocalErrorCode::NO_ERROR), "Graceful Close"));
-  // All streams are closed, close the transport for realz.
-  if (conn_->streamManager->streamCount() == 0) {
+  // All streams are closed or retired, close the transport for realz.
+  if (canFinishGracefulClose()) {
     closeImpl(std::nullopt);
   }
 }

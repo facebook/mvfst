@@ -98,6 +98,11 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   quic::Expected<void, LocalErrorCode> stopSending(
       StreamId id,
       ApplicationErrorCode error) override;
+  quic::Expected<void, LocalErrorCode> stopSendingAndDropIngress(
+      StreamId id,
+      ApplicationErrorCode error) override;
+  quic::Expected<void, LocalErrorCode> stopSendingAndDropIngressForAllStreams(
+      ApplicationErrorCode error) override;
 
   quic::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
       bool replaySafe = true) override;
@@ -766,6 +771,28 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void maybeStopWriteLooperAndArmSocketWritableEvent();
 
   void checkForClosedStream();
+
+  /**
+   * Whether a graceful close can finish: no remaining stream needs anything
+   * more from the peer.
+   *
+   * That is the case once every remaining stream has its receive side retired
+   * with stopSendingAndDropIngress() and its send side, if any, closed. Without
+   * retired streams, it means no stream remains.
+   *
+   * A send side closes once the peer has acknowledged all of its data through
+   * the FIN; until then, loss recovery keeps retransmitting it. The graceful
+   * close never resets a stream, but a send side the application reset itself
+   * closes once the peer acknowledges that RESET_STREAM, and for a reliable
+   * reset the data before its reliable size.
+   *
+   * Nothing is waited for on a retired receive side: neither the peer's
+   * acknowledgment of the STOP_SENDING nor the peer's FIN or RESET_STREAM.
+   *
+   * The scan stops at the first stream that still needs the peer, so it only
+   * walks past streams the application has retired.
+   */
+  [[nodiscard]] bool canFinishGracefulClose() const;
 
   void cancelTimeout(QuicTimerCallback* callback);
 

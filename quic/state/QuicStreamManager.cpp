@@ -209,6 +209,7 @@ QuicStreamManager::QuicStreamManager(
   openUnidirectionalLocalStreams_ =
       std::move(other.openUnidirectionalLocalStreams_);
   newPeerStreams_ = std::move(other.newPeerStreams_);
+  newPeerStreamStopSendingError_ = other.newPeerStreamStopSendingError_;
   blockedStreams_ = std::move(other.blockedStreams_);
   stopSendingStreams_ = std::move(other.stopSendingStreams_);
   windowUpdates_ = std::move(other.windowUpdates_);
@@ -332,6 +333,18 @@ void QuicStreamManager::streamStateForEach(
   for (auto& s : streams_) {
     f(s.second);
   }
+}
+
+std::vector<StreamId> QuicStreamManager::openReceiveStreamIds() const {
+  std::vector<StreamId> streamIds;
+  streamIds.reserve(
+      openBidirectionalPeerStreams_.size() +
+      openUnidirectionalPeerStreams_.size() +
+      openBidirectionalLocalStreams_.size());
+  openBidirectionalPeerStreams_.appendTo(streamIds);
+  openUnidirectionalPeerStreams_.appendTo(streamIds);
+  openBidirectionalLocalStreams_.appendTo(streamIds);
+  return streamIds;
 }
 
 void QuicStreamManager::removeLoss(StreamId id) {
@@ -817,6 +830,11 @@ QuicStreamManager::instantiatePeerStream(StreamId streamId) {
 
   if (inserted) {
     recordNewStream(conn_, it->second);
+    if (newPeerStreamStopSendingError_) {
+      it->second.markIngressRetired();
+      conn_.pendingEvents.frames.emplace_back(
+          StopSendingFrame(streamId, *newPeerStreamStopSendingError_));
+    }
   }
   return &it->second;
 }

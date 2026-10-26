@@ -165,4 +165,55 @@ bool isAllDataReceivedUntil(const QuicStreamState& stream, uint64_t offset) {
 
   return false;
 }
+
+quic::Expected<void, QuicError> retireIngress(QuicStreamState& stream) {
+  stream.markIngressRetired();
+  stream.readBuffer.clear();
+  auto closeResult = maybeCloseRetiredIngress(stream);
+  if (!closeResult.has_value()) {
+    return closeResult;
+  }
+  auto& streamManager = *MVCHECK_NOTNULL(stream.conn.streamManager.get());
+  streamManager.updateReadableStreams(stream);
+  streamManager.updatePeekableStreams(stream);
+  return {};
+}
+
+quic::Expected<void, QuicError> maybeCloseRetiredIngress(
+    QuicStreamState& stream) {
+  if (!stream.finalReadOffset) {
+    return {};
+  }
+  const auto finalSize = *stream.finalReadOffset;
+  if (stream.maxOffsetObserved < finalSize) {
+    // Only a reliable reset whose reliable bytes have not arrived leaves the
+    // final size unaccounted.
+    auto flowControlResult = updateFlowControlOnStreamData(
+        stream, stream.maxOffsetObserved, finalSize);
+    if (!flowControlResult.has_value()) {
+      return flowControlResult;
+    }
+    stream.maxOffsetObserved = finalSize;
+  }
+  // Close before crediting the discarded bytes, so that no stream window
+  // update is queued for a stream we no longer read.
+  stream.recvState = StreamRecvState::Closed;
+  if (stream.currentReadOffset < finalSize) {
+    const auto lastReadOffset = stream.currentReadOffset;
+    stream.currentReadOffset = finalSize;
+    auto flowControlResult =
+        updateFlowControlOnRead(stream, lastReadOffset, Clock::now());
+    if (!flowControlResult.has_value()) {
+      return flowControlResult;
+    }
+  }
+  if (!stream.streamReadError && stream.currentReadOffset == finalSize) {
+    // Consume the FIN as well, so that retired ingress delivers no EOF.
+    stream.currentReadOffset = finalSize + 1;
+  }
+  if (stream.inTerminalStates()) {
+    MVCHECK_NOTNULL(stream.conn.streamManager.get())->addClosed(stream.id);
+  }
+  return {};
+}
 } // namespace quic

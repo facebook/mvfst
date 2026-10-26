@@ -7068,4 +7068,806 @@ TYPED_TEST(QuicTypedTransportSconeTest, TestSconeFlag) {
   EXPECT_TRUE(this->getNonConstConn().transportSettings.enableSconeSend);
 }
 
+namespace {
+
+// Whether frames include STOP_SENDING for streamId.
+bool hasStopSending(
+    const std::vector<QuicWriteFrame>& frames,
+    StreamId streamId) {
+  return std::ranges::any_of(frames, [&](const auto& frame) {
+    const auto* simpleFrame = frame.asQuicSimpleFrame();
+    const auto* stopSending =
+        simpleFrame ? simpleFrame->asStopSendingFrame() : nullptr;
+    return stopSending && stopSending->streamId == streamId;
+  });
+}
+
+// The frame among frames that carries streamId's data from offset, if any.
+const WriteStreamFrame* findStreamFrame(
+    const std::vector<QuicWriteFrame>& frames,
+    StreamId streamId,
+    uint64_t offset) {
+  for (const auto& frame : frames) {
+    const auto* streamFrame = frame.asWriteStreamFrame();
+    if (streamFrame && streamFrame->streamId == streamId &&
+        streamFrame->offset == offset) {
+      return streamFrame;
+    }
+  }
+  return nullptr;
+}
+
+// Reads everything streamId has buffered.
+std::string readAll(QuicTransportBase& transport, StreamId streamId) {
+  auto result = transport.read(streamId, 0);
+  if (result.hasError() || !result->first) {
+    return "";
+  }
+  return result->first->moveToFbString().toStdString();
+}
+
+} // namespace
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressDropsUnreadPeerData) {
+  auto transport = this->getTransport();
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      streamId, IOBuf::copyBuffer("unread")));
+
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto written = this->loopForWrites();
+
+  ASSERT_TRUE(written.has_value());
+  EXPECT_TRUE(hasStopSending(this->getFramesInWrites(*written), streamId));
+  StrictMock<MockReadCallback> readCb;
+  EXPECT_CALL(readCb, readAvailable(_)).Times(0);
+  ASSERT_FALSE(transport->setReadCallback(streamId, &readCb).hasError());
+  this->deliverPacket(this->buildPeerPacketWithStreamDataAt(
+      streamId, IOBuf::copyBuffer(" more"), 6 /* offset */, false /* eof */));
+  ASSERT_FALSE(transport->setReadCallback(streamId, nullptr).hasError());
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressForAllStreamsRetiresAPeerStreamOpenedLater) {
+  auto transport = this->getTransport();
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+
+  // The peer opens a stream only after the call, and the application reads it.
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  StrictMock<MockReadCallback> readCb;
+  EXPECT_CALL(this->getConnCallback(), onNewUnidirectionalStream(streamId))
+      .WillOnce([&](StreamId id) {
+        EXPECT_FALSE(transport->setReadCallback(id, &readCb).hasError());
+      });
+  EXPECT_CALL(readCb, readAvailable(_)).Times(0);
+  // The STOP_SENDING goes out with the transport's response to the packet.
+  const auto written = this->writesDuring([&] {
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        streamId, IOBuf::copyBuffer("late")));
+  });
+
+  ASSERT_TRUE(written.has_value());
+  EXPECT_TRUE(hasStopSending(this->getFramesInWrites(*written), streamId));
+  ASSERT_FALSE(transport->setReadCallback(streamId, nullptr).hasError());
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressForAllStreamsRetiresAStreamWhoseCallbackIsPending) {
+  auto transport = this->getTransport();
+  const auto firstStreamId = this->getNextPeerUnidirectionalStreamId();
+  const auto secondStreamId = firstStreamId + detail::kStreamIncrement;
+
+  // Both streams arrive in one read, so the application handles the first
+  // stream while the second stream's new-stream callback is still pending.
+  StrictMock<MockReadCallback> readCb;
+  EXPECT_CALL(this->getConnCallback(), onNewUnidirectionalStream(firstStreamId))
+      .WillOnce([&](StreamId) {
+        EXPECT_FALSE(transport
+                         ->stopSendingAndDropIngressForAllStreams(
+                             GenericApplicationErrorCode::NO_ERROR)
+                         .hasError());
+      });
+  EXPECT_CALL(
+      this->getConnCallback(), onNewUnidirectionalStream(secondStreamId))
+      .WillOnce([&](StreamId id) {
+        EXPECT_FALSE(transport->setReadCallback(id, &readCb).hasError());
+      });
+  EXPECT_CALL(readCb, readAvailable(_)).Times(0);
+  std::vector<BufPtr> packets;
+  packets.push_back(this->buildPeerPacketWithStreamData(
+      firstStreamId, IOBuf::copyBuffer("first")));
+  packets.push_back(this->buildPeerPacketWithStreamData(
+      secondStreamId, IOBuf::copyBuffer("second")));
+  const auto written =
+      this->writesDuring([&] { this->deliverPackets(std::move(packets)); });
+
+  ASSERT_TRUE(written.has_value());
+  const auto frames = this->getFramesInWrites(*written);
+  for (const auto streamId : {firstStreamId, secondStreamId}) {
+    EXPECT_TRUE(hasStopSending(frames, streamId));
+  }
+  ASSERT_FALSE(transport->setReadCallback(secondStreamId, nullptr).hasError());
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressRetiresAnOpenPeerStreamWithoutState) {
+  auto transport = this->getTransport();
+  const auto firstStreamId = this->getNextPeerUnidirectionalStreamId();
+  const auto secondStreamId = firstStreamId + detail::kStreamIncrement;
+  // Data on the peer's second stream opens its first stream too, without
+  // creating state for it.
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      secondStreamId, IOBuf::copyBuffer("second")));
+
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       firstStreamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto written = this->loopForWrites();
+
+  ASSERT_TRUE(written.has_value());
+  EXPECT_TRUE(hasStopSending(this->getFramesInWrites(*written), firstStreamId));
+  StrictMock<MockReadCallback> readCb;
+  EXPECT_CALL(readCb, readAvailable(_)).Times(0);
+  ASSERT_FALSE(transport->setReadCallback(firstStreamId, &readCb).hasError());
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      firstStreamId, IOBuf::copyBuffer("first")));
+  ASSERT_FALSE(transport->setReadCallback(firstStreamId, nullptr).hasError());
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressForAllStreamsRetiresAnOpenPeerStreamWithoutState) {
+  auto transport = this->getTransport();
+  const auto firstStreamId = this->getNextPeerUnidirectionalStreamId();
+  const auto secondStreamId = firstStreamId + detail::kStreamIncrement;
+  // Data on the peer's second stream opens its first stream too, without
+  // creating state for it.
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      secondStreamId, IOBuf::copyBuffer("second")));
+
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto written = this->loopForWrites();
+
+  ASSERT_TRUE(written.has_value());
+  const auto frames = this->getFramesInWrites(*written);
+  for (const auto streamId : {firstStreamId, secondStreamId}) {
+    EXPECT_TRUE(hasStopSending(frames, streamId));
+  }
+  this->destroyTransport();
+}
+
+// Stopping one stream leaves the peer's other streams, open or opened later,
+// delivering as before.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressLeavesOtherStreamsAlone) {
+  auto transport = this->getTransport();
+  const auto stoppedStreamId = this->getNextPeerUnidirectionalStreamId();
+  const auto otherStreamId = stoppedStreamId + detail::kStreamIncrement;
+  const auto laterStreamId = otherStreamId + detail::kStreamIncrement;
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      stoppedStreamId, IOBuf::copyBuffer("stopped")));
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      otherStreamId, IOBuf::copyBuffer("other")));
+
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       stoppedStreamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto written = this->loopForWrites();
+
+  ASSERT_TRUE(written.has_value());
+  const auto frames = this->getFramesInWrites(*written);
+  EXPECT_TRUE(hasStopSending(frames, stoppedStreamId));
+  EXPECT_FALSE(hasStopSending(frames, otherStreamId));
+  // The other stream still delivers what it has and what arrives next.
+  this->deliverPacket(this->buildPeerPacketWithStreamDataAt(
+      otherStreamId,
+      IOBuf::copyBuffer(" more"),
+      5 /* offset */,
+      false /* eof */));
+  EXPECT_EQ(readAll(*transport, otherStreamId), "other more");
+  // So does a stream the peer opens later, and neither gets a STOP_SENDING.
+  EXPECT_CALL(
+      this->getConnCallback(), onNewUnidirectionalStream(laterStreamId));
+  const auto laterWritten = this->writesDuring([&] {
+    this->deliverPacket(this->buildPeerPacketWithStreamData(
+        laterStreamId, IOBuf::copyBuffer("later")));
+  });
+  EXPECT_EQ(readAll(*transport, laterStreamId), "later");
+  if (laterWritten.has_value()) {
+    const auto laterFrames = this->getFramesInWrites(*laterWritten);
+    EXPECT_FALSE(hasStopSending(laterFrames, otherStreamId));
+    EXPECT_FALSE(hasStopSending(laterFrames, laterStreamId));
+  }
+  this->destroyTransport();
+}
+
+// Data the peer sends only after the call is discarded too, and the end of
+// the stream reaches nobody.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressDropsPeerDataThatArrivesAfterTheCall) {
+  auto transport = this->getTransport();
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  // The application has read everything the peer sent so far.
+  this->deliverPacket(
+      this->buildPeerPacketWithStreamData(streamId, IOBuf::copyBuffer("read")));
+  ASSERT_EQ(readAll(*transport, streamId), "read");
+
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto written = this->loopForWrites();
+
+  ASSERT_TRUE(written.has_value());
+  EXPECT_TRUE(hasStopSending(this->getFramesInWrites(*written), streamId));
+  // A strict mock with no expectations: no data, EOF or error may arrive.
+  StrictMock<MockReadCallback> readCb;
+  ASSERT_FALSE(transport->setReadCallback(streamId, &readCb).hasError());
+  this->deliverPacket(this->buildPeerPacketWithStreamDataAt(
+      streamId, IOBuf::copyBuffer("late"), 4 /* offset */, true /* eof */));
+  this->loopForWrites();
+  ASSERT_FALSE(transport->setReadCallback(streamId, nullptr).hasError());
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressRejectsAStreamThatCannotReceive) {
+  auto transport = this->getTransport();
+  const auto localStreamId = transport->createUnidirectionalStream().value();
+
+  const auto result = transport->stopSendingAndDropIngress(
+      localStreamId, GenericApplicationErrorCode::NO_ERROR);
+
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error(), LocalErrorCode::INVALID_OPERATION);
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressRejectsAStreamThePeerHasNotOpened) {
+  auto transport = this->getTransport();
+
+  const auto result = transport->stopSendingAndDropIngress(
+      this->getNextPeerUnidirectionalStreamId(),
+      GenericApplicationErrorCode::NO_ERROR);
+
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error(), LocalErrorCode::STREAM_NOT_EXISTS);
+  this->destroyTransport();
+}
+
+// Once the peer has finished a stream and the application has read all of it,
+// the stream is gone.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressRejectsAStreamThatHasEnded) {
+  auto transport = this->getTransport();
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  // The application reads the whole stream, through its end.
+  NiceMock<MockReadCallback> readCb;
+  EXPECT_CALL(this->getConnCallback(), onNewUnidirectionalStream(streamId))
+      .WillOnce([&](StreamId id) {
+        EXPECT_FALSE(transport->setReadCallback(id, &readCb).hasError());
+      });
+  std::string received;
+  bool endReceived = false;
+  EXPECT_CALL(readCb, readAvailable(streamId)).WillRepeatedly([&](auto id) {
+    auto result = transport->read(id, 0);
+    ASSERT_FALSE(result.hasError());
+    if (result->first) {
+      received += result->first->moveToFbString().toStdString();
+    }
+    endReceived = endReceived || result->second;
+  });
+  // Once its end is delivered, the finished stream is reaped.
+  EXPECT_CALL(this->getConnCallback(), onStreamPreReaped(streamId));
+  this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
+      streamId, IOBuf::copyBuffer("done")));
+  ASSERT_TRUE(endReceived);
+  EXPECT_EQ(received, "done");
+
+  const auto result = transport->stopSendingAndDropIngress(
+      streamId, GenericApplicationErrorCode::NO_ERROR);
+
+  ASSERT_TRUE(result.hasError());
+  EXPECT_EQ(result.error(), LocalErrorCode::STREAM_NOT_EXISTS);
+  this->destroyTransport();
+}
+
+// A stream the peer has reset still exists while the reset is being reported,
+// and the call then succeeds without a STOP_SENDING, since nothing more can
+// arrive.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressAfterThePeerResetTheStreamSendsNoStopSending) {
+  auto transport = this->getTransport();
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  NiceMock<MockReadCallback> readCb;
+  EXPECT_CALL(this->getConnCallback(), onNewUnidirectionalStream(streamId))
+      .WillOnce([&](StreamId id) {
+        EXPECT_FALSE(transport->setReadCallback(id, &readCb).hasError());
+      });
+  this->deliverPacket(
+      this->buildPeerPacketWithStreamData(streamId, IOBuf::copyBuffer("data")));
+  Optional<quic::Expected<void, LocalErrorCode>> stopResult;
+  EXPECT_CALL(readCb, readError(streamId, _)).WillOnce([&](auto, const auto&) {
+    stopResult = transport->stopSendingAndDropIngress(
+        streamId, GenericApplicationErrorCode::NO_ERROR);
+  });
+
+  const auto written = this->writesDuring([&] {
+    this->deliverPacket(
+        this->buildPeerPacketWithRstStreamFrame(streamId, 4 /* offset */));
+  });
+
+  ASSERT_TRUE(stopResult.has_value());
+  EXPECT_FALSE(stopResult->hasError());
+  if (written.has_value()) {
+    EXPECT_FALSE(hasStopSending(this->getFramesInWrites(*written), streamId));
+  }
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressTwiceSendsOneStopSending) {
+  auto transport = this->getTransport();
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  this->deliverPacket(
+      this->buildPeerPacketWithStreamData(streamId, IOBuf::copyBuffer("data")));
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto firstWrite = this->loopForWrites();
+  ASSERT_TRUE(firstWrite.has_value());
+  ASSERT_TRUE(hasStopSending(this->getFramesInWrites(*firstWrite), streamId));
+
+  EXPECT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto secondWrite = this->loopForWrites();
+
+  if (secondWrite.has_value()) {
+    EXPECT_FALSE(
+        hasStopSending(this->getFramesInWrites(*secondWrite), streamId));
+  }
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    StopSendingAndDropIngressFailsOnceTheConnectionIsClosing) {
+  auto transport = this->getTransport();
+  const auto streamId = this->getNextPeerUnidirectionalStreamId();
+  this->deliverPacket(
+      this->buildPeerPacketWithStreamData(streamId, IOBuf::copyBuffer("data")));
+  // The peer's stream holds the graceful close open.
+  transport->closeGracefully();
+
+  const auto oneStream = transport->stopSendingAndDropIngress(
+      streamId, GenericApplicationErrorCode::NO_ERROR);
+  const auto allStreams = transport->stopSendingAndDropIngressForAllStreams(
+      GenericApplicationErrorCode::NO_ERROR);
+
+  ASSERT_TRUE(oneStream.hasError());
+  EXPECT_EQ(oneStream.error(), LocalErrorCode::CONNECTION_CLOSED);
+  ASSERT_TRUE(allStreams.hasError());
+  EXPECT_EQ(allStreams.error(), LocalErrorCode::CONNECTION_CLOSED);
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseIsNotHeldOpenByAPeerStreamOpenedAfterTheDiscard) {
+  auto transport = this->getTransport();
+  // Unacknowledged data on a local stream keeps the graceful close pending.
+  const auto localStreamId = transport->createUnidirectionalStream().value();
+  ASSERT_FALSE(
+      transport
+          ->writeChain(localStreamId, IOBuf::copyBuffer("bye"), true /* eof */)
+          .hasError());
+  this->loopForWrites();
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+
+  // The peer opens a stream while the close is pending.
+  this->deliverPacket(this->buildPeerPacketWithStreamData(
+      this->getNextPeerUnidirectionalStreamId(), IOBuf::copyBuffer("late")));
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // Once the local stream is acknowledged, nothing holds the close open, and
+  // the transport starts closing the connection.
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  const auto* oldest =
+      this->getOldestOutstandingPacket(PacketNumberSpace::AppData);
+  const auto* newest =
+      this->getNewestOutstandingPacket(PacketNumberSpace::AppData);
+  ASSERT_NE(oldest, nullptr);
+  ASSERT_NE(newest, nullptr);
+  // The ACK finishes the close, which deliverPacket() would report as an
+  // error.
+  this->deliverDataWithoutErrorCheck(
+      NetworkData(
+          this->buildAckPacketForSentPackets(
+              PacketNumberSpace::AppData,
+              oldest->packet.header.getPacketSequenceNum(),
+              newest->packet.header.getPacketSequenceNum()),
+          TimePoint::clock::now(),
+          0 /* tosValue */),
+      false /* writes */);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// On a stream whose receive side is retired, a graceful close waits until the
+// peer has acknowledged every byte of the send side through the FIN. It waits
+// neither for the peer's side of the stream nor for the peer to acknowledge
+// the STOP_SENDING.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressWaitsForThePeerToAckOurFin) {
+  auto transport = this->getTransport();
+  const auto streamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport
+          ->writeChain(streamId, IOBuf::copyBuffer("first"), false /* eof */)
+          .hasError());
+  const auto dataWrite = this->loopForWrites();
+  ASSERT_TRUE(dataWrite.has_value());
+  ASSERT_FALSE(
+      transport->writeChain(streamId, IOBuf::copyBuffer("last"), true /* eof */)
+          .hasError());
+  const auto finWrite = this->loopForWrites();
+  ASSERT_TRUE(finWrite.has_value());
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  const auto stopSendingWrite = this->loopForWrites();
+  ASSERT_TRUE(stopSendingWrite.has_value());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+
+  // The data before the FIN is acknowledged, but the FIN is not.
+  this->deliverPacket(this->buildAckPacketForSentAppDataPackets(dataWrite));
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // Acknowledging the FIN finishes the close, which deliverPacket() would
+  // report as an error. The STOP_SENDING is still unacknowledged.
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  this->deliverDataWithoutErrorCheck(
+      NetworkData(
+          this->buildAckPacketForSentAppDataPackets(finWrite),
+          TimePoint::clock::now(),
+          0 /* tosValue */),
+      false /* writes */);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// If the peer never acknowledges the FIN, the close does not wait forever: the
+// idle timeout ends the connection.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressEndsOnIdleTimeout) {
+  auto transport = this->getTransport();
+  const auto streamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport->writeChain(streamId, IOBuf::copyBuffer("bye"), true /* eof */)
+          .hasError());
+  ASSERT_TRUE(this->loopForWrites().has_value());
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  this->fireIdleTimeout();
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// While the FIN goes unacknowledged, each probe timeout retransmits it, until
+// the transport gives up after the maximum number of probe timeouts.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressGivesUpAfterTheMaximumProbeTimeouts) {
+  auto transport = this->getTransport();
+  const auto streamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport->writeChain(streamId, IOBuf::copyBuffer("bye"), true /* eof */)
+          .hasError());
+  ASSERT_TRUE(this->loopForWrites().has_value());
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  bool closed = false;
+  EXPECT_CALL(*observer, closeStarted(transport, _))
+      .WillOnce([&](auto, const auto&) { closed = true; });
+  transport->closeGracefully();
+  ASSERT_FALSE(closed);
+
+  size_t finRetransmissions = 0;
+  for (size_t timeouts = 0; timeouts <= kDefaultMaxNumPTO && !closed;
+       ++timeouts) {
+    const auto probe = this->fireLossTimeout();
+    if (probe.has_value()) {
+      const auto frames = this->getFramesInWrites(*probe);
+      const auto* fin = findStreamFrame(frames, streamId, 0);
+      finRetransmissions += fin && fin->fin ? 1 : 0;
+    }
+  }
+
+  EXPECT_TRUE(closed);
+  EXPECT_GT(finRetransmissions, 0);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// Loss recovery keeps running while a graceful close is pending: when the
+// packet carrying the FIN is lost, the FIN is retransmitted, and the close
+// finishes once the peer acknowledges the retransmission.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressRetransmitsALostFin) {
+  auto transport = this->getTransport();
+  // A bidirectional stream, so the close depends on its retired receive side
+  // and its send side rather than on the stream being gone.
+  const auto byeStreamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport
+          ->writeChain(byeStreamId, IOBuf::copyBuffer("bye"), true /* eof */)
+          .hasError());
+  ASSERT_TRUE(this->loopForWrites().has_value());
+  // Three more packets, so acknowledging them declares the FIN's packet lost.
+  const auto otherStreamId = transport->createUnidirectionalStream().value();
+  std::vector<typename TestFixture::NewOutstandingPacketInterval> laterWrites;
+  for (const bool eof : {false, false, true}) {
+    ASSERT_FALSE(
+        transport->writeChain(otherStreamId, IOBuf::copyBuffer("later"), eof)
+            .hasError());
+    const auto write = this->loopForWrites();
+    ASSERT_TRUE(write.has_value());
+    laterWrites.push_back(*write);
+  }
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+
+  // The later packets are acknowledged, the FIN's packet is declared lost, and
+  // the FIN is retransmitted.
+  const auto firstRetransmission =
+      getNextPacketNum(this->getConn(), PacketNumberSpace::AppData);
+  this->deliverPacket(this->buildAckPacketForSentAppDataPackets(laterWrites));
+  const auto nextPacket =
+      getNextPacketNum(this->getConn(), PacketNumberSpace::AppData);
+  ASSERT_GT(nextPacket, firstRetransmission);
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // Acknowledging the retransmission finishes the close, which deliverPacket()
+  // would report as an error.
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  this->deliverDataWithoutErrorCheck(
+      NetworkData(
+          this->buildAckPacketForSentPackets(
+              PacketNumberSpace::AppData, firstRetransmission, nextPacket - 1),
+          TimePoint::clock::now(),
+          0 /* tosValue */),
+      false /* writes */);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// A lost packet with data before the FIN is retransmitted too, and the close
+// waits until the retransmission is acknowledged.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressRetransmitsLostData) {
+  auto transport = this->getTransport();
+  const auto byeStreamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport
+          ->writeChain(byeStreamId, IOBuf::copyBuffer("data"), false /* eof */)
+          .hasError());
+  ASSERT_TRUE(this->loopForWrites().has_value());
+  ASSERT_FALSE(
+      transport->writeChain(byeStreamId, nullptr, true /* eof */).hasError());
+  const auto finWrite = this->loopForWrites();
+  ASSERT_TRUE(finWrite.has_value());
+  // Three more packets, so acknowledging them declares the data's packet lost.
+  const auto otherStreamId = transport->createUnidirectionalStream().value();
+  std::vector<typename TestFixture::NewOutstandingPacketInterval> acknowledged{
+      *finWrite};
+  for (const bool eof : {false, false, true}) {
+    ASSERT_FALSE(
+        transport->writeChain(otherStreamId, IOBuf::copyBuffer("later"), eof)
+            .hasError());
+    const auto write = this->loopForWrites();
+    ASSERT_TRUE(write.has_value());
+    acknowledged.push_back(*write);
+  }
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngressForAllStreams(
+                       GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+
+  // Everything but the data's packet is acknowledged, so the data is declared
+  // lost and retransmitted.
+  const auto retransmission = this->writesDuring([&] {
+    this->deliverPacket(
+        this->buildAckPacketForSentAppDataPackets(acknowledged));
+  });
+  ASSERT_TRUE(retransmission.has_value());
+  const auto retransmittedFrames = this->getFramesInWrites(*retransmission);
+  const auto* retransmitted =
+      findStreamFrame(retransmittedFrames, byeStreamId, 0);
+  ASSERT_NE(retransmitted, nullptr);
+  EXPECT_EQ(retransmitted->len, 4);
+  EXPECT_FALSE(retransmitted->fin);
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // Acknowledging the retransmission finishes the close, which deliverPacket()
+  // would report as an error.
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  this->deliverDataWithoutErrorCheck(
+      NetworkData(
+          this->buildAckPacketForSentAppDataPackets(retransmission),
+          TimePoint::clock::now(),
+          0 /* tosValue */),
+      false /* writes */);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// A RESET_STREAM abandons the data the peer has not acknowledged, so once the
+// application resets the send side of a stream whose receive side is retired,
+// a graceful close waits only for the peer to acknowledge the reset.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressWaitsForThePeerToAckOurReset) {
+  auto transport = this->getTransport();
+  const auto streamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport
+          ->writeChain(
+              streamId, IOBuf::copyBuffer("abandoned"), false /* eof */)
+          .hasError());
+  ASSERT_TRUE(this->loopForWrites().has_value());
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  ASSERT_FALSE(
+      transport->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
+  const auto resetWrite = this->loopForWrites();
+  ASSERT_TRUE(resetWrite.has_value());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // Acknowledging the reset finishes the close, which deliverPacket() would
+  // report as an error. The data it abandoned is never acknowledged.
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  this->deliverDataWithoutErrorCheck(
+      NetworkData(
+          this->buildAckPacketForSentAppDataPackets(resetWrite),
+          TimePoint::clock::now(),
+          0 /* tosValue */),
+      false /* writes */);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
+// A reliable reset abandons only the data after its reliable size, so a
+// graceful close also waits for the peer to acknowledge the data before it.
+TYPED_TEST(
+    QuicTypedTransportAfterStartTest,
+    GracefulCloseWithRetiredIngressWaitsForTheReliablePrefixOfAReliableReset) {
+  auto transport = this->getTransport();
+  // Both endpoints advertised support for reliable resets.
+  this->getNonConstConn()
+      .transportSettings.advertisedReliableResetStreamSupport = true;
+  this->getNonConstConn().peerAdvertisedReliableStreamResetSupport = true;
+  const auto streamId = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(
+      transport
+          ->writeChain(streamId, IOBuf::copyBuffer("reliable"), false /* eof */)
+          .hasError());
+  ASSERT_FALSE(
+      transport->updateReliableDeliveryCheckpoint(streamId).hasError());
+  const auto reliableWrite = this->loopForWrites();
+  ASSERT_TRUE(reliableWrite.has_value());
+  ASSERT_FALSE(transport
+                   ->stopSendingAndDropIngress(
+                       streamId, GenericApplicationErrorCode::NO_ERROR)
+                   .hasError());
+  ASSERT_FALSE(
+      transport
+          ->resetStreamReliably(streamId, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
+  const auto resetWrite = this->loopForWrites();
+  ASSERT_TRUE(resetWrite.has_value());
+  auto observer = std::make_unique<NiceMock<MockObserver>>();
+  transport->addObserver(observer.get());
+  EXPECT_CALL(*observer, closeStarted(transport, _)).Times(0);
+  transport->closeGracefully();
+
+  // The reset is acknowledged, but the reliable prefix is not.
+  this->deliverPacket(this->buildAckPacketForSentAppDataPackets(resetWrite));
+  Mock::VerifyAndClearExpectations(observer.get());
+
+  // Acknowledging the reliable prefix finishes the close, which deliverPacket()
+  // would report as an error. The ACK covers every packet sent since the
+  // prefix, in case the prefix was declared lost and retransmitted.
+  EXPECT_CALL(*observer, closeStarted(transport, _));
+  const auto* newest =
+      this->getNewestOutstandingPacket(PacketNumberSpace::AppData);
+  ASSERT_NE(newest, nullptr);
+  this->deliverDataWithoutErrorCheck(
+      NetworkData(
+          this->buildAckPacketForSentPackets(
+              PacketNumberSpace::AppData,
+              reliableWrite->start,
+              newest->packet.header.getPacketSequenceNum()),
+          TimePoint::clock::now(),
+          0 /* tosValue */),
+      false /* writes */);
+  Mock::VerifyAndClearExpectations(observer.get());
+  this->destroyTransport();
+}
+
 } // namespace quic::test

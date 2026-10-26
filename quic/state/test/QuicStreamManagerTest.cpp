@@ -867,6 +867,74 @@ TEST_P(QuicStreamManagerTest, SetPriorityQueueDrainsWithUninitPriority) {
   EXPECT_NE(mockPtr->inserts[0].id, mockPtr->inserts[1].id);
 }
 
+TEST_P(QuicStreamManagerTest, OpenReceiveStreamIdsIncludesImplicitPeerStreams) {
+  auto& manager = *conn.streamManager;
+  const auto localBidiId = manager.createNextBidirectionalStream().value()->id;
+  ASSERT_TRUE(manager.createNextUnidirectionalStream().has_value());
+  // Opening a peer stream implicitly opens the lower ones of the same type
+  // without creating their state.
+  ASSERT_NE(manager.getStream(4).value(), nullptr);
+  ASSERT_NE(manager.getStream(10).value(), nullptr);
+  ASSERT_FALSE(manager.streams().contains(2));
+
+  const std::vector<StreamId> expectedIds{localBidiId, 0, 4, 2, 6, 10};
+  EXPECT_THAT(
+      manager.openReceiveStreamIds(), UnorderedElementsAreArray(expectedIds));
+}
+
+// After retireIngressOfNewPeerStreams(), only peer streams created afterwards
+// are retired, each with one STOP_SENDING.
+TEST_P(
+    QuicStreamManagerTest,
+    RetireIngressOfNewPeerStreamsRetiresOnlyPeerStreamsCreatedLater) {
+  auto& manager = *conn.streamManager;
+  constexpr ApplicationErrorCode kError{7};
+  ASSERT_NE(manager.getStream(0).value(), nullptr);
+
+  manager.retireIngressOfNewPeerStreams(kError);
+  const auto localStreamId =
+      manager.createNextBidirectionalStream().value()->id;
+  ASSERT_NE(manager.getStream(4).value(), nullptr);
+
+  // Creating streams can move the others, so look each one up afterwards.
+  EXPECT_FALSE(CHECK_NOTNULL(manager.findStream(0))->ingressRetired);
+  EXPECT_FALSE(
+      CHECK_NOTNULL(manager.findStream(localStreamId))->ingressRetired);
+  EXPECT_TRUE(CHECK_NOTNULL(manager.findStream(4))->ingressRetired);
+  ASSERT_EQ(conn.pendingEvents.frames.size(), 1);
+  const auto* stopSending =
+      conn.pendingEvents.frames.front().asStopSendingFrame();
+  ASSERT_NE(stopSending, nullptr);
+  EXPECT_EQ(stopSending->streamId, 4);
+  EXPECT_EQ(stopSending->errorCode, kError);
+}
+
+TEST_P(QuicStreamManagerTest, RetireIngressOfNewPeerStreamsKeepsTheFirstError) {
+  auto& manager = *conn.streamManager;
+  manager.retireIngressOfNewPeerStreams(ApplicationErrorCode{7});
+  manager.retireIngressOfNewPeerStreams(ApplicationErrorCode{9});
+
+  EXPECT_EQ(
+      manager.newPeerStreamStopSendingError(),
+      Optional<ApplicationErrorCode>{ApplicationErrorCode{7}});
+}
+
+// A stream manager moved to another connection state keeps retiring new peer
+// streams.
+TEST_P(QuicStreamManagerTest, RetiringNewPeerStreamsSurvivesMovingTheManager) {
+  conn.streamManager->retireIngressOfNewPeerStreams(ApplicationErrorCode{7});
+
+  const QuicStreamManager moved(
+      conn,
+      conn.nodeType,
+      conn.transportSettings,
+      std::move(*conn.streamManager));
+
+  EXPECT_EQ(
+      moved.newPeerStreamStopSendingError(),
+      Optional<ApplicationErrorCode>{ApplicationErrorCode{7}});
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicStreamManagerTest,
     QuicStreamManagerTest,

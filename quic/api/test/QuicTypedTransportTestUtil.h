@@ -56,12 +56,33 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * std::nullopt.
    */
   Optional<NewOutstandingPacketInterval> loopForWrites() {
+    return writesDuring([this] { QuicTransportTestClass::loopForWrites(); });
+  }
+
+  /**
+   * Expires the loss detection timeout and lets the transport write.
+   *
+   * @return    Interval of the AppData packets written in response, or
+   * std::nullopt.
+   */
+  Optional<NewOutstandingPacketInterval> fireLossTimeout() {
+    return writesDuring([this] {
+      QuicTransportTestClass::fireLossTimeout();
+      QuicTransportTestClass::loopForWrites();
+    });
+  }
+
+  /**
+   * Runs action, and returns the interval of the AppData packets the transport
+   * wrote while it ran, or std::nullopt if it wrote none.
+   */
+  template <typename Action>
+  Optional<NewOutstandingPacketInterval> writesDuring(Action&& action) {
     // store the next packet number
     const auto preSendNextAppDataPacketNum =
         getNextPacketNum(getConn(), PacketNumberSpace::AppData);
 
-    // loop to trigger writes
-    QuicTransportTestClass::loopForWrites();
+    action();
 
     // if we cannot find an outstanding AppData packet, we sent nothing new.
     //
@@ -277,6 +298,31 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Build a packet from peer with stream data at offset, ending the stream if
+   * eof is set.
+   */
+  quic::BufPtr buildPeerPacketWithStreamDataAt(
+      const quic::StreamId streamId,
+      BufPtr data,
+      const uint64_t offset,
+      const bool eof) {
+    auto buf = quic::test::packetToBuf(createStreamPacket(
+        getSrcConnectionId(),
+        getDstConnectionId(),
+        peerPacketNumStore.nextAppDataPacketNum++,
+        streamId,
+        *data /* stream data */,
+        0 /* cipherOverhead */,
+        0 /* largest acked */,
+        std::nullopt /* longHeaderOverride */,
+        eof,
+        std::nullopt /* shortHeaderOverride */,
+        offset));
+    buf->coalesce();
+    return buf;
+  }
+
+  /**
    * Build a packet with a StopSendingFrame from peer.
    */
   quic::BufPtr buildPeerPacketWithStopSendingFrame(
@@ -479,6 +525,27 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     std::vector<quic::PacketNum> packetNums{
         std::forward<T0>(first), std::forward<Ts>(args)...};
     return buildAckPacketForSentAppDataPackets(packetNums);
+  }
+
+  /**
+   * The frames of the AppData packets written in interval, which
+   * loopForWrites() returned, as the transport sent them.
+   */
+  std::vector<quic::QuicWriteFrame> getFramesInWrites(
+      const NewOutstandingPacketInterval& interval) {
+    std::vector<quic::QuicWriteFrame> frames;
+    for (const auto& packet : getConn().outstandings.packets) {
+      const auto& header = packet.packet.header;
+      const auto packetNum = header.getPacketSequenceNum();
+      if (header.getPacketNumberSpace() == quic::PacketNumberSpace::AppData &&
+          packetNum >= interval.start && packetNum <= interval.end) {
+        frames.insert(
+            frames.end(),
+            packet.packet.frames.begin(),
+            packet.packet.frames.end());
+      }
+    }
+    return frames;
   }
 
   /**

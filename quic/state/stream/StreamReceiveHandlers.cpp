@@ -34,6 +34,8 @@ namespace quic {
  *      v                    |
  * Receive::Closed <---------+
  *
+ * Once the application retires the receive side (see retireIngress()), it
+ * closes as soon as a FIN or RST tells us the final size.
  */
 quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
     QuicStreamState& stream,
@@ -50,7 +52,12 @@ quic::Expected<void, QuicError> receiveReadStreamFrameSMHandler(
       bool allDataTillReliableSizeReceived = stream.reliableSizeFromPeer &&
           (*stream.reliableSizeFromPeer == 0 ||
            isAllDataReceivedUntil(stream, *stream.reliableSizeFromPeer - 1));
-      if (isAllDataReceived(stream) || allDataTillReliableSizeReceived) {
+      if (stream.ingressRetired) {
+        auto closeResult = maybeCloseRetiredIngress(stream);
+        if (!closeResult.has_value()) {
+          return closeResult;
+        }
+      } else if (isAllDataReceived(stream) || allDataTillReliableSizeReceived) {
         MVVLOG(10) << "Open: Transition to Closed" << " stream=" << stream.id
                    << " " << stream.conn;
         stream.recvState = StreamRecvState::Closed;
@@ -110,6 +117,14 @@ quic::Expected<void, QuicError> receiveRstStreamSMHandler(
       auto resetResult = onResetQuicStream(stream, rst);
       if (!resetResult.has_value()) {
         return resetResult;
+      }
+      if (stream.ingressRetired && stream.recvState == StreamRecvState::Open) {
+        // Retired ingress never buffers the reliable bytes that a reliable
+        // reset waits for, so close the receive side now.
+        auto closeResult = maybeCloseRetiredIngress(stream);
+        if (!closeResult.has_value()) {
+          return closeResult;
+        }
       }
       break;
     }

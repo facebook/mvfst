@@ -17,8 +17,10 @@
 #include <quic/priority/PriorityQueue.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
+#include <functional>
 #include <numeric>
 #include <set>
+#include <vector>
 
 namespace quic {
 class QLogger;
@@ -77,6 +79,19 @@ class StreamIdSet {
       ret += end - start + 1;
     }
     return ret;
+  }
+
+  void appendTo(std::vector<StreamId>& streamIds) const {
+    for (const auto& [start, end] : streams_) {
+      auto current = start;
+      while (true) {
+        streamIds.push_back(current * detail::kStreamIncrement + base_);
+        if (current == end) {
+          break;
+        }
+        ++current;
+      }
+    }
   }
 
   void clear() {
@@ -205,6 +220,12 @@ class QuicStreamManager {
    * Call the given function on every currently open stream's state.
    */
   void streamStateForEach(FunctionRef<void(QuicStreamState&)> f);
+
+  /*
+   * Snapshot every currently open receive-capable stream ID, including peer
+   * streams whose state has not yet been materialized.
+   */
+  [[nodiscard]] std::vector<StreamId> openReceiveStreamIds() const;
 
   [[nodiscard]] bool hasLoss() const noexcept {
     return numStreamsWithLoss_ > 0;
@@ -417,6 +438,28 @@ class QuicStreamManager {
     return newPeerStreams_;
   }
 
+  /*
+   * Retires the receive side of every peer stream opened from now on.
+   *
+   * Each such stream's state is created retired, before any frame is applied
+   * to it, and a STOP_SENDING with `error` is queued for it.
+   * stopSendingAndDropIngressForAllStreams() calls this once the application
+   * will read nothing more on the connection, so it cannot be undone, and a
+   * later call keeps the first error.
+   */
+  void retireIngressOfNewPeerStreams(ApplicationErrorCode error) {
+    if (!newPeerStreamStopSendingError_) {
+      newPeerStreamStopSendingError_ = error;
+    }
+  }
+
+  // The STOP_SENDING error that new peer streams are retired with, once
+  // retireIngressOfNewPeerStreams() has been called.
+  [[nodiscard]] Optional<ApplicationErrorCode> newPeerStreamStopSendingError()
+      const {
+    return newPeerStreamStopSendingError_;
+  }
+
   std::vector<StreamId> consumeNewPeerStreams();
 
   size_t streamCount() {
@@ -509,6 +552,8 @@ class QuicStreamManager {
   UnorderedMap<StreamId, QuicStreamState> streams_;
 
   std::vector<StreamId> newPeerStreams_;
+
+  Optional<ApplicationErrorCode> newPeerStreamStopSendingError_;
 
   UnorderedMap<StreamId, uint64_t> blockedStreams_; // StreamId -> offset
   UnorderedMap<StreamId, ApplicationErrorCode> stopSendingStreams_;

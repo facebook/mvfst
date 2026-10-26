@@ -15,6 +15,7 @@
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/state/stream/StreamStateFunctions.h>
 
 using namespace folly;
 using namespace testing;
@@ -1057,6 +1058,39 @@ TEST_F(QuicReliableResetTransitionTest, DataNotReceivedTillReliableSize) {
   ASSERT_FALSE(result.hasError());
   EXPECT_EQ(stream.sendState, StreamSendState::Open);
   EXPECT_EQ(stream.recvState, StreamRecvState::Open);
+}
+
+TEST_F(QuicReliableResetTransitionTest, RetiredIngressClosesOnReliableReset) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  ASSERT_FALSE(retireIngress(stream).hasError());
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100, 10);
+
+  ASSERT_FALSE(receiveRstStreamSMHandler(stream, rst).hasError());
+
+  // The reliable bytes would never be buffered, so they are not waited for.
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+  EXPECT_EQ(stream.currentReadOffset, 100);
+  EXPECT_EQ(conn->flowControlState.sumCurReadOffset, 100);
+}
+
+TEST_F(QuicOpenStateTest, RetiredIngressClosesOnFin) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  ASSERT_FALSE(retireIngress(stream).hasError());
+  ReadStreamFrame frame(id, 0, true);
+  frame.data = IOBuf::copyBuffer("hey");
+
+  ASSERT_FALSE(
+      receiveReadStreamFrameSMHandler(stream, std::move(frame)).hasError());
+
+  EXPECT_EQ(stream.recvState, StreamRecvState::Closed);
+  EXPECT_TRUE(stream.readBuffer.empty());
+  EXPECT_FALSE(stream.hasReadableData());
+  EXPECT_EQ(stream.currentReadOffset, 4);
+  EXPECT_EQ(conn->flowControlState.sumCurReadOffset, 3);
 }
 
 class QuicUnidirectionalStreamTest : public Test {};
