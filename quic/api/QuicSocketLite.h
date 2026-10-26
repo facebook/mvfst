@@ -255,6 +255,11 @@ class QuicSocketLite {
     // Does not include retransmissions of stream bytes.
     Optional<uint64_t> streamBytesSent{0};
 
+    // Largest contiguous stream offset ACKed starting at offset zero. Once the
+    // FIN is ACKed, this is the final offset (one past the last stream byte),
+    // matching the offsets used by delivery callbacks.
+    Optional<uint64_t> maybeLargestDeliverableOffset;
+
     // Total number of stream bytes received on this stream.
     Optional<uint64_t> streamBytesReceived{0};
 

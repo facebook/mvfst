@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdint>
 #include <map>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -209,6 +210,108 @@ TYPED_TEST(QuicTypedTransportTest, UnifiedSendBufferRetransmitsDeclaredLoss) {
       kData.size());
 
   this->destroyTransport();
+}
+
+enum class AppStreamSendBufferMode : std::uint8_t {
+  Legacy,
+  Unified,
+};
+
+template <typename T>
+class QuicTypedTransportLargestDeliverableOffsetTest
+    : public QuicTypedTransportTest<T> {
+ protected:
+  // Drives real ACKs through the transport and checks the contiguous ACK
+  // frontier reported by getStreamTransportInfo. Both send-buffer modes must
+  // report identical values.
+  void verifyLargestDeliverableOffsetTracksContiguousAcks(
+      const AppStreamSendBufferMode mode) {
+    constexpr auto kAckRtt = 27ms;
+    constexpr uint64_t kChunkLen = 10;
+
+    this->startTransport();
+    this->ackAllOutstandingPackets();
+    auto& conn = this->getNonConstConn();
+    conn.transportSettings.useUnifiedAppStreamSendBuffer =
+        mode == AppStreamSendBufferMode::Unified;
+    // Packet number skipping would make write intervals non-contiguous.
+    conn.transportSettings.skipOneInNPacketSequenceNumber = 0;
+    // Disable packet- and time-threshold loss detection so that ACKing a
+    // later packet never declares the unACKed hole lost.
+    conn.lossState.reorderingThreshold = 100;
+    conn.transportSettings.timeReorderingThreshDividend = 1000000;
+    conn.transportSettings.timeReorderingThreshDivisor = 1;
+
+    auto transport = this->getTransport();
+    const auto streamId = transport->createBidirectionalStream().value();
+    auto* stream = conn.streamManager->findStream(streamId);
+    ASSERT_NE(stream, nullptr);
+    ASSERT_EQ(
+        mode == AppStreamSendBufferMode::Unified,
+        stream->usesUnifiedSendBuffer());
+
+    const auto writeOnePacket = [&](BufPtr data, const bool eof) {
+      CHECK(!transport->writeChain(streamId, std::move(data), eof).hasError());
+      const auto packets = this->loopForWrites();
+      CHECK(packets.has_value());
+      CHECK_EQ(packets->start, packets->end);
+      return *packets;
+    };
+    const auto ackPacket = [&](const auto& packets) {
+      this->deliverPacketNoWrites(
+          this->buildAckPacketForSentAppDataPackets(packets),
+          packets.sentTime + kAckRtt);
+    };
+    const auto largestDeliverableOffset = [&]() {
+      const auto streamInfo = transport->getStreamTransportInfo(streamId);
+      CHECK(!streamInfo.hasError());
+      return streamInfo->maybeLargestDeliverableOffset;
+    };
+
+    // Stream bytes [0, 30) in three packets, then a FIN-only packet.
+    const auto first =
+        writeOnePacket(IOBuf::copyBuffer(std::string(kChunkLen, 'a')), false);
+    const auto second =
+        writeOnePacket(IOBuf::copyBuffer(std::string(kChunkLen, 'b')), false);
+    const auto third =
+        writeOnePacket(IOBuf::copyBuffer(std::string(kChunkLen, 'c')), false);
+    const auto fin = writeOnePacket(nullptr, true);
+
+    EXPECT_FALSE(largestDeliverableOffset().has_value());
+
+    ackPacket(first);
+    EXPECT_EQ(Optional<uint64_t>(kChunkLen - 1), largestDeliverableOffset());
+
+    // The frontier does not jump the hole left by the second packet.
+    ackPacket(third);
+    EXPECT_EQ(Optional<uint64_t>(kChunkLen - 1), largestDeliverableOffset());
+
+    ackPacket(second);
+    EXPECT_EQ(
+        Optional<uint64_t>(3 * kChunkLen - 1), largestDeliverableOffset());
+
+    // Once the FIN is ACKed, the frontier is the final offset, one past the
+    // last stream byte.
+    ackPacket(fin);
+    EXPECT_EQ(Optional<uint64_t>(3 * kChunkLen), largestDeliverableOffset());
+
+    this->destroyTransport();
+  }
+};
+
+TYPED_TEST_SUITE(
+    QuicTypedTransportLargestDeliverableOffsetTest,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
+TYPED_TEST(QuicTypedTransportLargestDeliverableOffsetTest, LegacySendBuffer) {
+  this->verifyLargestDeliverableOffsetTracksContiguousAcks(
+      AppStreamSendBufferMode::Legacy);
+}
+
+TYPED_TEST(QuicTypedTransportLargestDeliverableOffsetTest, UnifiedSendBuffer) {
+  this->verifyLargestDeliverableOffsetTracksContiguousAcks(
+      AppStreamSendBufferMode::Unified);
 }
 
 template <typename T>

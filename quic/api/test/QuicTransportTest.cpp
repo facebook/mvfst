@@ -5381,6 +5381,37 @@ TEST_F(QuicTransportTest, GetStreamPackestTxedSingleByte) {
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
 }
 
+TEST_F(QuicTransportTest, GetStreamTransportInfoAckDeliveryOffset) {
+  const auto streamId = transport_->createBidirectionalStream().value();
+  auto& conn = transport_->getConnectionState();
+  auto streamResult = conn.streamManager->getStream(streamId);
+  ASSERT_FALSE(streamResult.hasError());
+  auto* stream = streamResult.value();
+
+  auto streamInfo = transport_->getStreamTransportInfo(streamId);
+  ASSERT_FALSE(streamInfo.hasError());
+  EXPECT_FALSE(streamInfo->maybeLargestDeliverableOffset.has_value());
+
+  stream->ackedIntervals.insert(4, 9);
+  streamInfo = transport_->getStreamTransportInfo(streamId);
+  ASSERT_FALSE(streamInfo.hasError());
+  EXPECT_FALSE(streamInfo->maybeLargestDeliverableOffset.has_value());
+
+  stream->ackedIntervals.insert(0, 3);
+  streamInfo = transport_->getStreamTransportInfo(streamId);
+  ASSERT_FALSE(streamInfo.hasError());
+  ASSERT_TRUE(streamInfo->maybeLargestDeliverableOffset.has_value());
+  EXPECT_EQ(*streamInfo->maybeLargestDeliverableOffset, 9);
+
+  // Once the FIN is ACKed, the frontier is the final offset, one past the
+  // last stream byte (9).
+  ASSERT_FALSE(stream->updateAckedIntervals(4, 6, true /* eof */).hasError());
+  streamInfo = transport_->getStreamTransportInfo(streamId);
+  ASSERT_FALSE(streamInfo.hasError());
+  ASSERT_TRUE(streamInfo->maybeLargestDeliverableOffset.has_value());
+  EXPECT_EQ(*streamInfo->maybeLargestDeliverableOffset, 10);
+}
+
 TEST_F(QuicTransportTest, GetStreamPacketsTxedMultipleBytes) {
   const uint64_t streamBytes = 10;
   const uint64_t lastByte = streamBytes - 1;

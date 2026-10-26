@@ -1348,15 +1348,17 @@ QuicTransportBaseLite::getStreamTransportInfo(StreamId id) const {
   }
   auto packets = getNumPacketsTxWithNewData(*stream);
   return StreamTransportInfo{
-      stream->totalHolbTime,
-      stream->holbCount,
-      bool(stream->lastHolbTime),
-      packets,
-      stream->streamLossCount,
-      stream->finalWriteOffset,
-      stream->finalReadOffset,
-      stream->streamReadError,
-      stream->streamWriteError};
+      .totalHeadOfLineBlockedTime = stream->totalHolbTime,
+      .holbCount = stream->holbCount,
+      .isHolb = bool(stream->lastHolbTime),
+      .numPacketsTxWithNewData = packets,
+      .streamLossCount = stream->streamLossCount,
+      .streamBytesSent = stream->finalWriteOffset,
+      .maybeLargestDeliverableOffset = getLargestDeliverableOffset(*stream),
+      .streamBytesReceived = stream->finalReadOffset,
+      .streamReadError = stream->streamReadError,
+      .streamWriteError = stream->streamWriteError,
+  };
 }
 
 const quic::SocketAddress& QuicTransportBaseLite::getPeerAddress() const {
