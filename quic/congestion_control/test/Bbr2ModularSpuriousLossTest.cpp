@@ -209,7 +209,8 @@ class Bbr2ModularSpuriousLossTest : public Test {
   uint64_t totalBytesSent_{0};
 };
 
-TEST_F(Bbr2ModularSpuriousLossTest, DisabledByDefault) {
+TEST_F(Bbr2ModularSpuriousLossTest, ExplicitlyDisabled) {
+  conn_->transportSettings.ccaConfig.enableSpuriousLossRecovery = false;
   Bbr2Startup controller(*conn_);
   auto shared = Bbr2ModularTestPeer::shared(controller);
   Bbr2ModularTestPeer::setModelState(
@@ -230,7 +231,6 @@ TEST_F(Bbr2ModularSpuriousLossTest, DisabledByDefault) {
 }
 
 TEST_F(Bbr2ModularSpuriousLossTest, UndoesRealLossResponse) {
-  conn_->transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
   Bbr2Startup controller(*conn_);
   const auto cwndBeforeLoss = controller.getCongestionWindow();
 

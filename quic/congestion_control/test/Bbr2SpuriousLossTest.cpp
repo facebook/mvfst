@@ -336,7 +336,8 @@ class Bbr2SpuriousLossTest : public Test {
   uint64_t totalBytesSent_{0};
 };
 
-TEST_F(Bbr2SpuriousLossTest, DisabledByDefault) {
+TEST_F(Bbr2SpuriousLossTest, ExplicitlyDisabled) {
+  conn_->transportSettings.ccaConfig.enableSpuriousLossRecovery = false;
   Bbr2CongestionController controller(*conn_);
   Bbr2TestPeer::setModelState(
       controller, 20'000, kSavedBandwidth, 16'000, 18'000);
@@ -360,7 +361,6 @@ TEST_F(Bbr2SpuriousLossTest, DisabledByDefault) {
 }
 
 TEST_F(Bbr2SpuriousLossTest, UndoesRealLossResponse) {
-  conn_->transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
   Bbr2CongestionController controller(*conn_);
   const auto cwndBeforeLoss = controller.getCongestionWindow();
 
@@ -1081,6 +1081,7 @@ TEST_F(Bbr2SpuriousLossTest, StartupLossUndoRequiresCompleteEpisode) {
 }
 
 TEST_F(Bbr2SpuriousLossTest, DisabledStartupUndoPreservesLossExit) {
+  conn_->transportSettings.ccaConfig.enableSpuriousLossRecovery = false;
   Bbr2CongestionController controller(*conn_);
   exitStartupOnLoss(controller);
   const auto cwnd = controller.getCongestionWindow();

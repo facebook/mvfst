@@ -5214,21 +5214,21 @@ TEST_F(
   auto knobParamId = static_cast<uint64_t>(
       TransportKnobParamId::ADAPTIVE_LOSS_REORDERING_THRESHOLDS);
 
-  ASSERT_FALSE(transportSettings.useAdaptiveLossReorderingThresholds);
-
-  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(knobParamId))).Times(1);
-  server->handleKnobParams({{.id = knobParamId, .val = uint64_t{1}}});
-  EXPECT_TRUE(transportSettings.useAdaptiveLossReorderingThresholds);
+  ASSERT_TRUE(transportSettings.useAdaptiveLossReorderingThresholds);
 
   EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(knobParamId))).Times(1);
   server->handleKnobParams({{.id = knobParamId, .val = uint64_t{0}}});
   EXPECT_FALSE(transportSettings.useAdaptiveLossReorderingThresholds);
 
+  EXPECT_CALL(*quicStats_, onTransportKnobApplied(Eq(knobParamId))).Times(1);
+  server->handleKnobParams({{.id = knobParamId, .val = uint64_t{1}}});
+  EXPECT_TRUE(transportSettings.useAdaptiveLossReorderingThresholds);
+
   EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(knobParamId))).Times(2);
   server->handleKnobParams(
       {{.id = knobParamId, .val = uint64_t{2}},
        {.id = knobParamId, .val = std::string("true")}});
-  EXPECT_FALSE(transportSettings.useAdaptiveLossReorderingThresholds);
+  EXPECT_TRUE(transportSettings.useAdaptiveLossReorderingThresholds);
 }
 
 TEST_F(QuicServerTransportTest, TestRxPacketsBeforeAckKnobHandler) {

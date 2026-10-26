@@ -55,7 +55,7 @@ struct CongestionControlConfig {
   // Used by: Cubic, BBR2, and BBR2Modular
   // Allow a congestion controller to undo its congestion response when every
   // packet in a loss episode is explicitly acknowledged as spurious.
-  bool enableSpuriousLossRecovery{false};
+  bool enableSpuriousLossRecovery{true};
 
   // These parameters control how BBR sends ACK_FREQUENCY frames every new RTT.
   //  The first controls how many ack eliciting packets have to be received
@@ -373,7 +373,7 @@ struct TransportSettings {
   // A value of 0 means no fixed padding is added.
   size_t fixedShortHeaderPadding{0};
   // Whether to use adaptive loss thresholds for reodering and timeout
-  bool useAdaptiveLossReorderingThresholds{false};
+  bool useAdaptiveLossReorderingThresholds{true};
   bool useAdaptiveLossTimeThresholds{false};
   // Connection-level receive flow control window autotuning.
   // If locally consumed credit requires an update less than 2SRTTs after the

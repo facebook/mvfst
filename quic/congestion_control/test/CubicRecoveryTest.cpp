@@ -49,8 +49,9 @@ void processCubicEvent(
 
 class CubicRecoveryTest : public Test {};
 
-TEST_F(CubicRecoveryTest, SpuriousLossRecoveryDisabledByDefault) {
+TEST_F(CubicRecoveryTest, SpuriousLossRecoveryExplicitlyDisabled) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = false;
   Cubic cubic(conn);
   const auto sentTime = Clock::now() - 1s;
   auto packet = makeTestingWritePacket(0, 1000, 1000, sentTime);
@@ -68,7 +69,6 @@ TEST_F(CubicRecoveryTest, SpuriousLossRecoveryDisabledByDefault) {
 
 TEST_F(CubicRecoveryTest, RecoversAfterEntireLossEpisodeIsSpurious) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.transportSettings.ccaConfig.enableSpuriousLossRecovery = true;
   Cubic cubic(conn);
   const auto cwndBeforeLoss = cubic.getCongestionWindow();
   const auto sentTime = Clock::now() - 1s;
