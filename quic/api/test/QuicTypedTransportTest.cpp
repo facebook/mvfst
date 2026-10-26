@@ -7870,4 +7870,321 @@ TYPED_TEST(
   this->destroyTransport();
 }
 
+/**
+ * The cases the connection-end tests run, shared by the client and server
+ * fixtures below.
+ */
+class ConnectionEndTestCases {
+ public:
+  // How a test starts closing the connection.
+  enum class CloseStart : uint8_t {
+    CloseWithoutError,
+    CloseWithError,
+    CloseGracefully,
+    CloseGracefullyThenIdleTimeout,
+    CloseNow,
+    PeerConnectionClose,
+    DestroyTransport,
+  };
+
+  struct Case {
+    CloseStart closeStart;
+    bool reportLocalClose;
+    bool useConnectionEndWithErrorCallback;
+  };
+
+  static std::vector<Case> allCases() {
+    std::vector<Case> cases;
+    for (const auto closeStart :
+         {CloseStart::CloseWithoutError,
+          CloseStart::CloseWithError,
+          CloseStart::CloseGracefully,
+          CloseStart::CloseGracefullyThenIdleTimeout,
+          CloseStart::CloseNow,
+          CloseStart::PeerConnectionClose,
+          CloseStart::DestroyTransport}) {
+      for (const bool reportLocalClose : {false, true}) {
+        for (const bool useConnectionEndWithErrorCallback : {false, true}) {
+          cases.push_back(
+              {.closeStart = closeStart,
+               .reportLocalClose = reportLocalClose,
+               .useConnectionEndWithErrorCallback =
+                   useConnectionEndWithErrorCallback});
+        }
+      }
+    }
+    return cases;
+  }
+
+  static std::string caseName(const testing::TestParamInfo<Case>& info) {
+    static constexpr std::array<std::string_view, 7> kCloseStartNames{
+        "CloseWithoutError",
+        "CloseWithError",
+        "CloseGracefully",
+        "CloseGracefullyThenIdleTimeout",
+        "CloseNow",
+        "PeerConnectionClose",
+        "DestroyTransport"};
+    std::string name{
+        kCloseStartNames.at(static_cast<size_t>(info.param.closeStart))};
+    name +=
+        info.param.reportLocalClose ? "_ReportLocalClose" : "_DefaultOptions";
+    name += info.param.useConnectionEndWithErrorCallback ? "_EndWithError"
+                                                         : "_EndOrError";
+    return name;
+  }
+
+ protected:
+  // How the transport reports the end of the connection: the error code, and
+  // whether it goes to onConnectionError() rather than onConnectionEnd() when
+  // useConnectionEndWithErrorCallback is off.
+  struct ExpectedEnd {
+    QuicErrorCode code;
+    bool reportedAsError;
+  };
+
+  static inline const QuicErrorCode kPeerCloseErrorCode{
+      static_cast<ApplicationErrorCode>(17)};
+
+  static Optional<ExpectedEnd> expectedEndFor(const Case& testCase) {
+    // The application never dropped the callbacks on these paths.
+    if (testCase.closeStart == CloseStart::CloseNow) {
+      return ExpectedEnd{
+          .code = QuicErrorCode(GenericApplicationErrorCode::NO_ERROR),
+          .reportedAsError = false};
+    }
+    if (testCase.closeStart == CloseStart::PeerConnectionClose) {
+      return ExpectedEnd{.code = kPeerCloseErrorCode, .reportedAsError = true};
+    }
+    if (!testCase.reportLocalClose) {
+      return std::nullopt;
+    }
+    switch (testCase.closeStart) {
+      case CloseStart::CloseWithoutError:
+        return ExpectedEnd{
+            .code = QuicErrorCode(GenericApplicationErrorCode::NO_ERROR),
+            .reportedAsError = false};
+      case CloseStart::CloseWithError:
+        return ExpectedEnd{
+            .code = QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+            .reportedAsError = true};
+      case CloseStart::CloseGracefully:
+        return ExpectedEnd{
+            .code = QuicErrorCode(LocalErrorCode::NO_ERROR),
+            .reportedAsError = false};
+      case CloseStart::CloseGracefullyThenIdleTimeout:
+        return ExpectedEnd{
+            .code = QuicErrorCode(LocalErrorCode::IDLE_TIMEOUT),
+            .reportedAsError = false};
+      case CloseStart::DestroyTransport:
+        return ExpectedEnd{
+            .code = QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
+            .reportedAsError = false};
+      case CloseStart::CloseNow:
+      case CloseStart::PeerConnectionClose:
+        break;
+    }
+    return std::nullopt;
+  }
+
+  class MockConnectionEndCallback : public MockConnectionCallback {
+   public:
+    using MockConnectionCallback::onConnectionEnd;
+
+    void onConnectionEnd(QuicError error) noexcept override {
+      onConnectionEndWithError(std::move(error));
+    }
+
+    MOCK_METHOD((void), onConnectionEndWithError, (QuicError), (noexcept));
+  };
+};
+
+/**
+ * gtest cannot combine typed and value-parameterized tests, so the same
+ * value-parameterized fixture is instantiated once per transport type below.
+ */
+template <typename T>
+class QuicTypedTransportConnectionEndTest
+    : public QuicTypedTransportTest<T>,
+      public ConnectionEndTestCases,
+      public testing::WithParamInterface<ConnectionEndTestCases::Case> {
+ public:
+  bool getUseConnectionEndWithErrorCallback() override {
+    return GetParam().useConnectionEndWithErrorCallback;
+  }
+
+ protected:
+  void runConnectionEndTest();
+
+ private:
+  // Unlike deliverPacket(), touches nothing on the transport afterwards, which
+  // the connection-end callback may have released.
+  void deliverPacketWithoutErrorCheck(BufPtr buf) {
+    this->deliverDataWithoutErrorCheck(
+        NetworkData(std::move(buf), Clock::now(), 0), false /* writes */);
+  }
+};
+
+template <typename T>
+void QuicTypedTransportConnectionEndTest<T>::runConnectionEndTest() {
+  const auto& param = GetParam();
+  const auto expectedEnd = expectedEndFor(param);
+  auto* transport = this->getTransport();
+  this->startTransport();
+  const std::weak_ptr<void> weakTransport = this->getTestTransport();
+
+  // The transport is the only owner of these callbacks.
+  auto ownedSetupCallback =
+      std::make_shared<NiceMock<MockConnectionSetupCallback>>();
+  auto ownedConnCallback =
+      std::make_shared<NiceMock<MockConnectionEndCallback>>();
+  const std::weak_ptr<MockConnectionSetupCallback> setupCallback =
+      ownedSetupCallback;
+  const std::weak_ptr<MockConnectionEndCallback> connCallback =
+      ownedConnCallback;
+  transport->setConnectionSetupCallback(ownedSetupCallback);
+  transport->setConnectionCallback(
+      ownedConnCallback, {.reportLocalClose = param.reportLocalClose});
+
+  const auto streamId = this->createBidirectionalStream();
+  StrictMock<MockReadCallback> readCallback;
+  ASSERT_FALSE(transport->setReadCallback(streamId, &readCallback).hasError());
+  const auto& readCallbacks = this->getTestTransport()->getReadCallbacks();
+
+  bool readErrorReported = false;
+  int connectionEndReports = 0;
+  EXPECT_CALL(readCallback, readError(streamId, _))
+      .WillOnce([&](auto, const auto& /* error */) {
+        EXPECT_TRUE(readCallbacks.contains(streamId));
+        EXPECT_EQ(connectionEndReports, 0);
+        readErrorReported = true;
+      });
+
+  const bool destroying = param.closeStart == CloseStart::DestroyTransport;
+  const auto onConnectionEnd =
+      [&, transport, destroying](const Optional<QuicError>& error) {
+        ++connectionEndReports;
+        EXPECT_TRUE(readErrorReported);
+        EXPECT_TRUE(readCallbacks.empty());
+        EXPECT_FALSE(connCallback.expired());
+        if (error) {
+          EXPECT_EQ(error->code, expectedEnd->code);
+        }
+        // Closing again from the report does nothing, so the managed callback
+        // stays installed until the transport clears it after the report.
+        transport->close(std::nullopt);
+        transport->closeNow(std::nullopt);
+        transport->closeGracefully();
+        EXPECT_FALSE(connCallback.expired());
+        if (!destroying) {
+          // Release the last reference to the transport from inside its report.
+          this->destroyTransport();
+        }
+      };
+  const bool withError = param.useConnectionEndWithErrorCallback;
+  const bool reportedAsError = expectedEnd && expectedEnd->reportedAsError;
+  EXPECT_CALL(*ownedConnCallback, onConnectionEndWithError(_))
+      .Times(expectedEnd && withError ? 1 : 0)
+      .WillRepeatedly([&](const QuicError& error) { onConnectionEnd(error); });
+  EXPECT_CALL(*ownedConnCallback, onConnectionEnd())
+      .Times(expectedEnd && !withError && !reportedAsError ? 1 : 0)
+      .WillRepeatedly([&] { onConnectionEnd(std::nullopt); });
+  EXPECT_CALL(*ownedConnCallback, onConnectionError(_))
+      .Times(expectedEnd && !withError && reportedAsError ? 1 : 0)
+      .WillRepeatedly([&](const QuicError& error) { onConnectionEnd(error); });
+  EXPECT_CALL(*ownedSetupCallback, onConnectionSetupError(_)).Times(0);
+  ownedSetupCallback.reset();
+  ownedConnCallback.reset();
+  // Run the callback update scheduled by setConnectionCallback().
+  T::loopForWrites();
+
+  switch (param.closeStart) {
+    case CloseStart::CloseWithoutError:
+      transport->close(std::nullopt);
+      break;
+    case CloseStart::CloseWithError:
+      transport->close(QuicError(
+          QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+          std::string("stopping")));
+      break;
+    case CloseStart::CloseGracefully: {
+      ASSERT_FALSE(
+          transport->writeChain(streamId, IOBuf::copyBuffer("bye"), true)
+              .hasError());
+      const auto writeInterval = this->loopForWrites();
+      ASSERT_TRUE(writeInterval.has_value());
+      transport->closeGracefully();
+      EXPECT_EQ(connectionEndReports, 0);
+      EXPECT_EQ(connCallback.expired(), !param.reportLocalClose);
+      // The peer finishes its side, but our data is not acknowledged yet.
+      this->deliverPacketNoWrites(this->buildPeerPacketWithStreamDataAndEof(
+          streamId, IOBuf::copyBuffer("ok")));
+      EXPECT_EQ(connectionEndReports, 0);
+      deliverPacketWithoutErrorCheck(
+          this->buildAckPacketForSentAppDataPackets(writeInterval));
+      break;
+    }
+    case CloseStart::CloseGracefullyThenIdleTimeout: {
+      auto& idleTimeout = this->getTestTransport()->idleTimeout();
+      transport->closeGracefully();
+      EXPECT_EQ(connectionEndReports, 0);
+      EXPECT_EQ(connCallback.expired(), !param.reportLocalClose);
+      idleTimeout.timeoutExpired();
+      break;
+    }
+    case CloseStart::CloseNow:
+      transport->closeNow(std::nullopt);
+      break;
+    case CloseStart::PeerConnectionClose:
+      deliverPacketWithoutErrorCheck(
+          this->buildPeerPacketWithConnectionCloseFrame(
+              kPeerCloseErrorCode, "peer closing"));
+      break;
+    case CloseStart::DestroyTransport:
+      this->destroyTransport();
+      break;
+  }
+  T::loopForWrites();
+
+  EXPECT_EQ(connectionEndReports, expectedEnd ? 1 : 0);
+  EXPECT_TRUE(readErrorReported);
+  EXPECT_TRUE(setupCallback.expired());
+  EXPECT_TRUE(connCallback.expired());
+  if (this->getTestTransport()) {
+    this->destroyTransport();
+  }
+  EXPECT_TRUE(weakTransport.expired());
+}
+
+using QuicClientTransportConnectionEndTest =
+    QuicTypedTransportConnectionEndTest<QuicClientTransportTestBase>;
+using QuicServerTransportConnectionEndTest =
+    QuicTypedTransportConnectionEndTest<QuicServerTransportTestBase>;
+
+/**
+ * With reportLocalClose, the connection callback learns exactly
+ * once how the connection ended, after every read callback was retired, and
+ * the transport releases it right after. Without the setting, a local close
+ * or destruction reports nothing, as before.
+ */
+TEST_P(QuicClientTransportConnectionEndTest, ReportsConnectionEnd) {
+  runConnectionEndTest();
+}
+
+TEST_P(QuicServerTransportConnectionEndTest, ReportsConnectionEnd) {
+  runConnectionEndTest();
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicTypedTransportTest,
+    QuicClientTransportConnectionEndTest,
+    ValuesIn(ConnectionEndTestCases::allCases()),
+    ConnectionEndTestCases::caseName);
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicTypedTransportTest,
+    QuicServerTransportConnectionEndTest,
+    ValuesIn(ConnectionEndTestCases::allCases()),
+    ConnectionEndTestCases::caseName);
+
 } // namespace quic::test

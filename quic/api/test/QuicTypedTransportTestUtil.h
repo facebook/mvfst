@@ -392,6 +392,32 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Build a packet with a ConnectionCloseFrame from peer.
+   */
+  quic::BufPtr buildPeerPacketWithConnectionCloseFrame(
+      const QuicErrorCode& errorCode,
+      std::string reasonPhrase) {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        getDstConnectionId(),
+        peerPacketNumStore.nextAppDataPacketNum++);
+    RegularQuicPacketBuilder builder(
+        static_cast<uint32_t>(getConn().udpSendPacketLen),
+        std::move(header),
+        0 /* largestAcked */);
+    CHECK(!builder.encodePacketHeader().hasError());
+    CHECK(builder.canBuildPacket());
+
+    ConnectionCloseFrame connectionCloseFrame(
+        errorCode, std::move(reasonPhrase));
+    CHECK(!writeFrame(std::move(connectionCloseFrame), builder).hasError());
+
+    auto buf = quic::test::packetToBuf(std::move(builder).buildPacket());
+    buf->coalesce();
+    return buf;
+  }
+
+  /**
    * Build a packet from peer with ACK frame for previously sent packets.
    */
   quic::BufPtr buildAckPacketForSentPackets(

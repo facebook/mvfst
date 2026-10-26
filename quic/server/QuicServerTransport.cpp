@@ -80,9 +80,7 @@ QuicServerTransport::QuicServerTransport(
 
 QuicServerTransport::~QuicServerTransport() {
   MVVLOG(10) << "Destroyed connection to client=" << *this;
-  // The caller probably doesn't need the conn callback after destroying the
-  // transport.
-  resetConnectionCallbacks();
+  onApplicationClose();
   closeImpl(
       QuicError(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
@@ -187,9 +185,9 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
     routingCb_->onConnectionIdAvailable(
         shared_from_this(), *conn_->serverConnectionId);
   }
-  if (connSetupCallback_ && waitingForFirstPacket &&
+  if (connectionCallbacks_.setup() && waitingForFirstPacket &&
       hasReceivedUdpPackets(*conn_)) {
-    connSetupCallback_->onFirstPeerPacketProcessed();
+    connectionCallbacks_.setup()->onFirstPeerPacketProcessed();
   }
 
   uint64_t curWritableBytes = serverConn_->writableBytesLimit
@@ -829,8 +827,8 @@ void QuicServerTransport::maybeNotifyHandshakeFinished() {
     if (auto* handshakeCb = std::exchange(handshakeFinishedCb_, nullptr)) {
       handshakeCb->onHandshakeFinished();
     }
-    if (connSetupCallback_ && !handshakeDoneNotified_) {
-      connSetupCallback_->onFullHandshakeDone();
+    if (connectionCallbacks_.setup() && !handshakeDoneNotified_) {
+      connectionCallbacks_.setup()->onFullHandshakeDone();
       handshakeDoneNotified_ = true;
     }
   }
@@ -888,10 +886,10 @@ void QuicServerTransport::maybeNotifyWriteCipherAvailable() {
   // the legacy single-callback flow where onTransportReady() itself fires at
   // write-cipher availability, so onWriteCipherAvailable() is not delivered.
   if (serverConn_->transportSettings.retimeOnTransportReady &&
-      !writeCipherAvailableNotified_ && connSetupCallback_ &&
+      !writeCipherAvailableNotified_ && connectionCallbacks_.setup() &&
       hasWriteCipher()) {
     writeCipherAvailableNotified_ = true;
-    connSetupCallback_->onWriteCipherAvailable();
+    connectionCallbacks_.setup()->onWriteCipherAvailable();
   }
 }
 
@@ -899,7 +897,7 @@ void QuicServerTransport::maybeNotifyTransportReady() {
   // One-shot: return before computing readiness (incl. the handshake-layer
   // checks below) once transport-ready has already fired, to avoid per-read
   // overhead on the post-handshake hot path.
-  if (transportReadyNotified_ || !connSetupCallback_) {
+  if (transportReadyNotified_ || !connectionCallbacks_.setup()) {
     return;
   }
   // When retiming is enabled, drive onTransportReady() from the Fizz handshake
@@ -913,7 +911,7 @@ void QuicServerTransport::maybeNotifyTransportReady() {
     return;
   }
   transportReadyNotified_ = true;
-  connSetupCallback_->onTransportReady();
+  connectionCallbacks_.setup()->onTransportReady();
 
   // This is a new connection. Update QUIC Stats
   QUIC_STATS(conn_->statsCallback, onNewConnection);

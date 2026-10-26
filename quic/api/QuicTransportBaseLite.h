@@ -890,9 +890,10 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
   void scheduleAckTimeout();
   void schedulePathValidationTimeout();
 
-  void resetConnectionCallbacks() {
-    connSetupCallback_ = nullptr;
-    connCallback_ = nullptr;
+  // Tells the connection callbacks that the application closed the transport
+  // or is destroying it.
+  void onApplicationClose() {
+    connectionCallbacks_.onApplicationClose();
   }
 
   bool processCancelCode(const QuicError& cancelCode);
@@ -936,8 +937,76 @@ class QuicTransportBaseLite : virtual public QuicSocketLite,
 
   CloseState closeState_{CloseState::OPEN};
 
-  folly::MaybeManagedPtr<ConnectionSetupCallback> connSetupCallback_{nullptr};
-  folly::MaybeManagedPtr<ConnectionCallback> connCallback_{nullptr};
+  /**
+   * The application's connection callbacks, as far as the transport may still
+   * call them.
+   *
+   * The application installs them with setConnectionSetupCallback() and
+   * setConnectionCallback(). After that, the transport only tells this class
+   * what happened to the connection, and reads the callbacks back through
+   * setup() and connection(), which return null once a callback must not be
+   * called anymore.
+   *
+   * A close the application starts, including destroying the transport, ends
+   * the setup callback at once, because the application may destroy it as
+   * soon as the call returns. It ends the connection callback too, unless the
+   * application installed it with reportLocalClose: then the callback stays
+   * until closeImpl() has reported how the connection ended. Reporting that
+   * end, or destroying the transport, ends both for good.
+   */
+  class ConnectionCallbacks {
+   public:
+    [[nodiscard]] const folly::MaybeManagedPtr<ConnectionSetupCallback>& setup()
+        const {
+      return setup_;
+    }
+
+    [[nodiscard]] const folly::MaybeManagedPtr<ConnectionCallback>& connection()
+        const {
+      return connection_;
+    }
+
+   private:
+    friend class QuicTransportBaseLite;
+
+    void setSetupCallback(
+        folly::MaybeManagedPtr<ConnectionSetupCallback> callback) {
+      setup_ = std::move(callback);
+    }
+
+    void setConnectionCallback(
+        folly::MaybeManagedPtr<ConnectionCallback> callback,
+        ConnectionCallbackOptions options) {
+      connection_ = std::move(callback);
+      connectionOptions_ = options;
+    }
+
+    void onApplicationClose() {
+      setup_ = nullptr;
+      if (!connectionOptions_.reportLocalClose) {
+        connection_ = nullptr;
+      }
+    }
+
+    void onEndReported() {
+      end();
+    }
+
+    void onTransportDestroyed() {
+      end();
+    }
+
+    void end() {
+      setup_ = nullptr;
+      connection_ = nullptr;
+    }
+
+    folly::MaybeManagedPtr<ConnectionSetupCallback> setup_{nullptr};
+    folly::MaybeManagedPtr<ConnectionCallback> connection_{nullptr};
+    ConnectionCallbackOptions connectionOptions_;
+  };
+
+  ConnectionCallbacks connectionCallbacks_;
   // A flag telling transport if the new onConnectionEnd(error) cb must be used.
   bool useConnectionEndWithErrorCallback_{false};
 

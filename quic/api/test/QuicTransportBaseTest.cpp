@@ -255,9 +255,8 @@ class TestQuicTransport
   }
 
   ~TestQuicTransport() override {
-    resetConnectionCallbacks();
     // we need to call close in the derived class.
-    resetConnectionCallbacks();
+    onApplicationClose();
     closeImpl(
         QuicError(
             QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
@@ -3738,6 +3737,92 @@ TEST_F(
           .hasError());
   transport->invokeCheckForClosedStream();
   EXPECT_TRUE(transport->isClosed());
+}
+
+struct ConnectionSetupEndTestParam {
+  bool reportLocalClose;
+  bool closeGracefully;
+};
+
+class QuicTransportImplTestConnectionSetupEnd
+    : public QuicTransportImplTest,
+      public WithParamInterface<ConnectionSetupEndTestParam> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicTransportImplTest,
+    QuicTransportImplTestConnectionSetupEnd,
+    Values(
+        ConnectionSetupEndTestParam{
+            .reportLocalClose = false,
+            .closeGracefully = false},
+        ConnectionSetupEndTestParam{
+            .reportLocalClose = false,
+            .closeGracefully = true},
+        ConnectionSetupEndTestParam{
+            .reportLocalClose = true,
+            .closeGracefully = false},
+        ConnectionSetupEndTestParam{
+            .reportLocalClose = true,
+            .closeGracefully = true}));
+
+/**
+ * Before the transport is ready, the setup callback is the one told how the
+ * connection ends, and a local close drops it. So such a close reports
+ * nothing, even to a connection callback installed with reportLocalClose.
+ */
+TEST_P(
+    QuicTransportImplTestConnectionSetupEnd,
+    LocalCloseBeforeTransportReadyReportsNothing) {
+  const auto& param = GetParam();
+  transport->setConnectionCallback(
+      &connCallback, {.reportLocalClose = param.reportLocalClose});
+  const auto stream = transport->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCallback;
+  ASSERT_FALSE(transport->setReadCallback(stream, &readCallback).hasError());
+
+  EXPECT_CALL(readCallback, readError(stream, _));
+  EXPECT_CALL(connSetupCallback, onConnectionSetupError(_)).Times(0);
+  EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
+  EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
+
+  if (param.closeGracefully) {
+    transport->closeGracefully();
+    EXPECT_FALSE(transport->isClosed());
+    transport->closeStream(stream);
+  } else {
+    transport->close(QuicError(
+        QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+        std::string("stopping")));
+  }
+  EXPECT_TRUE(transport->isClosed());
+}
+
+// A connection callback installed with reportLocalClose stays past a local
+// close, and is released as soon as the transport has reported how the
+// connection ended, while the transport itself lives on. The setup callback is
+// released when the close starts.
+TEST_F(
+    QuicTransportImplTestBase,
+    AKeptConnectionCallbackIsReleasedOnceTheEndIsReported) {
+  auto setupCallback =
+      std::make_shared<NiceMock<MockConnectionSetupCallback>>();
+  auto connectionCallback =
+      std::make_shared<NiceMock<MockConnectionCallback>>();
+  transport->setConnectionSetupCallback(
+      std::shared_ptr<QuicSocket::ConnectionSetupCallback>(setupCallback));
+  transport->setConnectionCallback(
+      std::shared_ptr<QuicSocket::ConnectionCallback>(connectionCallback),
+      {.reportLocalClose = true});
+  // An open stream holds the graceful close open.
+  const auto stream = transport->createBidirectionalStream().value();
+
+  transport->closeGracefully();
+  EXPECT_EQ(setupCallback.use_count(), 1);
+  EXPECT_EQ(connectionCallback.use_count(), 2);
+  transport->closeStream(stream);
+
+  ASSERT_TRUE(transport->isClosed());
+  EXPECT_EQ(connectionCallback.use_count(), 1);
 }
 
 TEST_F(QuicTransportImplTestBase, TestResetRemovesDeliveryCb) {

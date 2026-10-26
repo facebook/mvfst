@@ -86,7 +86,7 @@ void QuicTransportBase::closeGracefully() {
     return;
   }
   [[maybe_unused]] auto self = sharedGuard();
-  resetConnectionCallbacks();
+  onApplicationClose();
   closeState_ = CloseState::GRACEFUL_CLOSING;
   updatePacingOnClose(*conn_);
   QLOG(*conn_, addConnectionClose, kNoError, kGracefulExit, true, false);

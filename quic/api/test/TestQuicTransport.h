@@ -37,7 +37,7 @@ class TestQuicTransport
 
   ~TestQuicTransport() override {
     // we need to call close in the derived class.
-    resetConnectionCallbacks();
+    onApplicationClose();
     closeImpl(
         QuicError(
             QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),

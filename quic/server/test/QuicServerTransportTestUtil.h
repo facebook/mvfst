@@ -53,8 +53,12 @@ class TestingQuicServerTransport : public QuicServerTransport {
       std::unique_ptr<FollyQuicAsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx)
-      : QuicTransportBaseLite(evb, std::move(sock)),
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      bool useConnectionEndWithErrorCallback = false)
+      : QuicTransportBaseLite(
+            evb,
+            std::move(sock),
+            useConnectionEndWithErrorCallback),
         QuicServerTransport(
             evb,
             nullptr /* Initialized through the QuicTransportBaseLite constructor
@@ -62,10 +66,16 @@ class TestingQuicServerTransport : public QuicServerTransport {
             ,
             connSetupCb,
             connCb,
-            std::move(ctx)) {}
+            std::move(ctx),
+            nullptr /* cryptoFactory */,
+            useConnectionEndWithErrorCallback) {}
 
   QuicTransportBase* getTransport() {
     return this;
+  }
+
+  const auto& getReadCallbacks() const {
+    return readCallbacks_;
   }
 
   QuicConnectionStateBase& getConnectionState() {
@@ -228,7 +238,12 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
     server = std::make_shared<TestingQuicServerTransport>(
-        qEvb_, std::move(sock), &connSetupCallback, &connCallback, serverCtx);
+        qEvb_,
+        std::move(sock),
+        &connSetupCallback,
+        &connCallback,
+        serverCtx,
+        getUseConnectionEndWithErrorCallback());
     server->setCongestionControllerFactory(ccFactory_);
     server->setCongestionControl(CongestionControlType::Cubic);
     server->setRoutingCallback(&routingCallback);
@@ -329,6 +344,10 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
   virtual uint16_t getSkipOneInNPacketSequenceNumber() {
     return kSkipOneInNPacketSequenceNumber;
+  }
+
+  virtual bool getUseConnectionEndWithErrorCallback() {
+    return false;
   }
 
   std::unique_ptr<Aead> getInitialCipher(

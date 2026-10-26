@@ -26,12 +26,27 @@ namespace quic {
  * Options for the connection callback; see
  * QuicSocketLite::setConnectionCallback().
  *
- * There are none yet. They come as a struct so that a new option does not
- * change the signature of every implementation and mock again. The struct is
- * defined outside QuicSocketLite so that its members can have default
- * initializers and still be used for the default argument there.
+ * They come as a struct so that a new option does not change the signature of
+ * every implementation and mock again. The struct is defined outside
+ * QuicSocketLite so that its members can have default initializers and still
+ * be used for the default argument there.
  */
-struct ConnectionCallbackOptions {};
+struct ConnectionCallbackOptions {
+  // Report how a close the application starts ends to the callback.
+  //
+  // By default, close(), closeGracefully() and destroying the transport drop
+  // the connection callback right away, so it learns nothing about how the
+  // connection ends. With this set, the transport keeps the callback until the
+  // connection actually closes, tells it once how it ended, and drops it right
+  // after. The setup callback is dropped either way, so a local close before
+  // the transport is ready reports nothing.
+  //
+  // The application must keep an unmanaged callback valid until that report,
+  // which can come after close() or closeGracefully() has returned, or from the
+  // transport's destructor. A report from the destructor may close the
+  // transport again, which does nothing, but must not otherwise use it.
+  bool reportLocalClose{false};
+};
 
 class QuicSocketLite {
  public:

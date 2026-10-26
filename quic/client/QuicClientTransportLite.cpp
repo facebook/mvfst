@@ -110,9 +110,7 @@ QuicClientTransportLite::QuicClientTransportLite(
 
 QuicClientTransportLite::~QuicClientTransportLite() {
   MVVLOG(10) << "Destroyed connection to server=" << conn_->peerAddress;
-  // The caller probably doesn't need the conn callback after destroying the
-  // transport.
-  resetConnectionCallbacks();
+  onApplicationClose();
   // Close without draining.
   closeImpl(
       QuicError(
@@ -1131,22 +1129,23 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
   if (!res.has_value()) {
     return res;
   }
-  if (connSetupCallback_ && waitingForFirstPacket &&
+  if (connectionCallbacks_.setup() && waitingForFirstPacket &&
       hasReceivedUdpPackets(*conn_)) {
-    connSetupCallback_->onFirstPeerPacketProcessed();
+    connectionCallbacks_.setup()->onFirstPeerPacketProcessed();
   }
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
-    connSetupCallback_->onTransportReady();
+    connectionCallbacks_.setup()->onTransportReady();
 
     // This is a new connection. Update QUIC Stats
     QUIC_STATS(statsCallback_, onNewConnection);
   }
 
-  // Checking connSetupCallback_ because application will start to write data
+  // Checking the setup callback because application will start to write data
   // in onTransportReady, if the write fails, QuicSocket can be closed
-  // and connSetupCallback_ is set nullptr.
-  if (connSetupCallback_ && !replaySafeNotified_ && conn_->oneRttWriteCipher) {
+  // and the setup callback is gone.
+  if (connectionCallbacks_.setup() && !replaySafeNotified_ &&
+      conn_->oneRttWriteCipher) {
     replaySafeNotified_ = true;
     // We don't need this any more. Also unset it so that we don't allow random
     // middleboxes to shutdown our connection once we have crypto keys.
@@ -1154,9 +1153,9 @@ quic::Expected<void, QuicError> QuicClientTransportLite::onReadData(
     if (!result.has_value()) {
       return quic::make_unexpected(result.error());
     }
-    connSetupCallback_->onReplaySafe();
-    if (connSetupCallback_) {
-      connSetupCallback_->onFullHandshakeDone();
+    connectionCallbacks_.setup()->onReplaySafe();
+    if (connectionCallbacks_.setup()) {
+      connectionCallbacks_.setup()->onFullHandshakeDone();
     }
   }
 
@@ -1400,9 +1399,8 @@ QuicClientTransportLite::startCryptoHandshake() {
     transportReadyNotified_ = true;
     runOnEvbAsyncOp({.type = AsyncOpType::TransportReady});
   } else if (clientConn_->transportSettings.isPriming) {
-    auto clientPtr = dynamic_cast<QuicClientTransportLite*>(self.get());
-    if (clientPtr->connSetupCallback_) {
-      clientPtr->connSetupCallback_->onConnectionSetupError(QuicError(
+    if (connectionCallbacks_.setup()) {
+      connectionCallbacks_.setup()->onConnectionSetupError(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           "Priming error: Zero-RTT not available"));
     }
@@ -1960,8 +1958,8 @@ void QuicClientTransportLite::setSupportedVersions(
 void QuicClientTransportLite::dispatchAsyncOp(AsyncOpData data) {
   switch (data.type) {
     case AsyncOpType::TransportReady:
-      if (connSetupCallback_) {
-        connSetupCallback_->onTransportReady();
+      if (connectionCallbacks_.setup()) {
+        connectionCallbacks_.setup()->onTransportReady();
       }
       break;
     case AsyncOpType::AsyncClose:

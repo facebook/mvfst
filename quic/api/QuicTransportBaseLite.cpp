@@ -311,7 +311,7 @@ QuicTransportBaseLite::QuicTransportBaseLite(
       readLooper_(new TransportLooper(evb_, this, LooperType::ReadLooper)) {}
 
 QuicTransportBaseLite::~QuicTransportBaseLite() {
-  resetConnectionCallbacks();
+  connectionCallbacks_.onTransportDestroyed();
   cancelTimeout(&drainTimeout_);
 
   // closeImpl and closeUdpSocket should have been triggered by destructor of
@@ -467,10 +467,14 @@ void QuicTransportBaseLite::onNetworkData(
 }
 
 void QuicTransportBaseLite::close(Optional<QuicError> errorCode) {
+  // As in closeGracefully(), there is nothing to do once the connection is
+  // closed. Returning before the guard also lets a connection callback run by
+  // the destructor call this, since shared_from_this() fails at that point.
+  if (closeState_ == CloseState::CLOSED) {
+    return;
+  }
   [[maybe_unused]] auto self = sharedGuard();
-  // The caller probably doesn't need a conn callback any more because they
-  // explicitly called close.
-  resetConnectionCallbacks();
+  onApplicationClose();
 
   // If we were called with no error code, ensure that we are going to write
   // an application close, so the peer knows it didn't come from the transport.
@@ -480,6 +484,14 @@ void QuicTransportBaseLite::close(Optional<QuicError> errorCode) {
 
 void QuicTransportBaseLite::closeNow(Optional<QuicError> errorCode) {
   MVDCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
+  // As in closeGracefully(), there is nothing to do once the connection is
+  // closed and drained. Returning before the guard also lets a connection
+  // callback run by the destructor call this, since shared_from_this() fails
+  // at that point.
+  if (closeState_ == CloseState::CLOSED &&
+      !isTimeoutScheduled(&drainTimeout_)) {
+    return;
+  }
   [[maybe_unused]] auto self = sharedGuard();
   MVVLOG(4) << __func__ << " " << *this;
   errorCode = maybeSetGenericAppError(std::move(errorCode));
@@ -892,21 +904,21 @@ uint64_t QuicTransportBaseLite::bufferSpaceAvailable() const {
 
 void QuicTransportBaseLite::setConnectionSetupCallback(
     folly::MaybeManagedPtr<ConnectionSetupCallback> callback) {
-  connSetupCallback_ = callback;
+  connectionCallbacks_.setSetupCallback(std::move(callback));
 }
 
 void QuicTransportBaseLite::setConnectionCallback(
     folly::MaybeManagedPtr<ConnectionCallback> callback,
-    ConnectionCallbackOptions /* options */) {
-  connCallback_ = callback;
-  if (connCallback_) {
+    ConnectionCallbackOptions options) {
+  connectionCallbacks_.setConnectionCallback(std::move(callback), options);
+  if (connectionCallbacks_.connection()) {
     runOnEvbAsyncOp({.type = AsyncOpType::ProcessCallbacksAfterNetworkData});
   }
 }
 
 void QuicTransportBaseLite::setConnectionCallbackFromCtor(
     folly::MaybeManagedPtr<ConnectionCallback> callback) {
-  connCallback_ = callback;
+  connectionCallbacks_.setConnectionCallback(std::move(callback), {});
 }
 
 Optional<LocalErrorCode> QuicTransportBaseLite::setControlStream(StreamId id) {
@@ -1280,29 +1292,29 @@ uint64_t QuicTransportBaseLite::maxWritableOnStream(
 
 void QuicTransportBaseLite::processConnectionSetupCallbacks(
     QuicError&& cancelCode) {
-  // connSetupCallback_ could be null if start() was never
-  // invoked and the transport was destroyed or if the app initiated close.
-  if (connSetupCallback_) {
-    connSetupCallback_->onConnectionSetupError(std::move(cancelCode));
+  // The setup callback is null if start() was never invoked and the transport
+  // was destroyed, or if the app initiated close.
+  if (connectionCallbacks_.setup()) {
+    connectionCallbacks_.setup()->onConnectionSetupError(std::move(cancelCode));
   }
 }
 
 void QuicTransportBaseLite::processConnectionCallbacks(QuicError&& cancelCode) {
-  // connCallback_ could be null if start() was never
-  // invoked and the transport was destroyed or if the app initiated close.
-  if (!connCallback_) {
+  // The connection callback is null if start() was never invoked and the
+  // transport was destroyed, or if the app initiated close.
+  if (!connectionCallbacks_.connection()) {
     return;
   }
 
   if (useConnectionEndWithErrorCallback_) {
-    connCallback_->onConnectionEnd(cancelCode);
+    connectionCallbacks_.connection()->onConnectionEnd(cancelCode);
     return;
   }
 
   if (processCancelCode(cancelCode)) {
-    connCallback_->onConnectionEnd();
+    connectionCallbacks_.connection()->onConnectionEnd();
   } else {
-    connCallback_->onConnectionError(std::move(cancelCode));
+    connectionCallbacks_.connection()->onConnectionError(std::move(cancelCode));
   }
 }
 
@@ -1653,8 +1665,8 @@ void QuicTransportBaseLite::checkForClosedStream() {
     }
 
     MVVLOG(10) << "Closing stream=" << *itr;
-    if (connCallback_) {
-      connCallback_->onStreamPreReaped(*itr);
+    if (connectionCallbacks_.connection()) {
+      connectionCallbacks_.connection()->onStreamPreReaped(*itr);
     }
     // onStreamPreReaped may synchronously close() the transport, which frees
     // readCallbacks_ and tears down stream state; bail before reusing readCbIt.
@@ -1790,7 +1802,7 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
           pendingWriteReason == WriteDataReason::CRYPTO_STREAM ||
           pendingWriteReason == WriteDataReason::STREAM ||
           pendingWriteReason == WriteDataReason::BLOCKED;
-      connSetupCallback_->onPrimingDataAvailable(
+      connectionCallbacks_.setup()->onPrimingDataAvailable(
           std::move(primingData), truncated);
     }
     if (closeState_ != CloseState::CLOSED) {
@@ -1887,8 +1899,8 @@ quic::Expected<void, QuicError> QuicTransportBaseLite::writeSocketData() {
           conn_->congestionController->getWritableBytes()) {
         conn_->congestionController->setAppLimited();
         // notify via connection call and any observer callbacks
-        if (transportReadyNotified_ && connCallback_) {
-          connCallback_->onAppRateLimited();
+        if (transportReadyNotified_ && connectionCallbacks_.connection()) {
+          connectionCallbacks_.connection()->onAppRateLimited();
         }
         conn_->appLimitedTracker.setAppLimited();
         notifyAppRateLimited();
@@ -2084,8 +2096,7 @@ void QuicTransportBaseLite::closeImpl(
     processConnectionSetupCallbacks(std::move(cancelCode));
   }
 
-  // can't invoke connection callbacks any more.
-  resetConnectionCallbacks();
+  connectionCallbacks_.onEndReported();
 
   // Don't need outstanding packets.
   conn_->outstandings.reset();
@@ -2181,7 +2192,7 @@ void QuicTransportBaseLite::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
   }
-  if (!connCallback_ || !conn_->streamManager) {
+  if (!connectionCallbacks_.connection() || !conn_->streamManager) {
     return;
   }
 
@@ -2386,7 +2397,8 @@ void QuicTransportBaseLite::invokeStreamsAvailableCallbacks() {
     // and max is already reached
     auto numOpenableStreams = getNumOpenableBidirectionalStreams();
     if (numOpenableStreams > 0) {
-      connCallback_->onBidirectionalStreamsAvailable(numOpenableStreams);
+      connectionCallbacks_.connection()->onBidirectionalStreamsAvailable(
+          numOpenableStreams);
     }
   }
   if (conn_->streamManager->consumeMaxLocalUnidirectionalStreamIdIncreased()) {
@@ -2394,7 +2406,8 @@ void QuicTransportBaseLite::invokeStreamsAvailableCallbacks() {
     // and max is already reached
     auto numOpenableStreams = getNumOpenableUnidirectionalStreams();
     if (numOpenableStreams > 0) {
-      connCallback_->onUnidirectionalStreamsAvailable(numOpenableStreams);
+      connectionCallbacks_.connection()->onUnidirectionalStreamsAvailable(
+          numOpenableStreams);
     }
   }
 }
@@ -2419,7 +2432,7 @@ void QuicTransportBaseLite::handleKnobCallbacks() {
                   observer->knobFrameReceived(observed, event);
                 });
       }
-      connCallback_->onKnob(
+      connectionCallbacks_.connection()->onKnob(
           knobFrame.knobSpace, knobFrame.id, std::move(knobFrame.blob));
     } else {
       // KnobId is ignored
@@ -2526,7 +2539,7 @@ void QuicTransportBaseLite::handleStreamFlowControlUpdatedCallbacks(
       pendingWriteCallbacks_.erase(streamId);
       continue;
     }
-    connCallback_->onFlowControlUpdate(streamId);
+    connectionCallbacks_.connection()->onFlowControlUpdate(streamId);
     if (closeState_ != CloseState::OPEN) {
       return;
     }
@@ -2563,7 +2576,7 @@ void QuicTransportBaseLite::handleStreamStopSendingCallbacks() {
   const auto stopSendingStreamsCopy =
       conn_->streamManager->consumeStopSending();
   for (auto [id, ec] : stopSendingStreamsCopy) {
-    connCallback_->onStopSending(id, ec);
+    connectionCallbacks_.connection()->onStopSending(id, ec);
     if (closeState_ != CloseState::OPEN) {
       return;
     }
@@ -2786,14 +2799,14 @@ void QuicTransportBaseLite::lossTimeoutExpired() noexcept {
     // These are set by onPTOAlarm when ptoCount crosses thresholds.
     if (conn_->pendingEvents.notifyPathDegrading) {
       conn_->pendingEvents.notifyPathDegrading = false;
-      if (connCallback_) {
-        connCallback_->onPathDegrading();
+      if (connectionCallbacks_.connection()) {
+        connectionCallbacks_.connection()->onPathDegrading();
       }
     }
     if (conn_->pendingEvents.notifyBlackholeDetected) {
       conn_->pendingEvents.notifyBlackholeDetected = false;
-      if (connCallback_) {
-        connCallback_->onBlackholeDetected();
+      if (connectionCallbacks_.connection()) {
+        connectionCallbacks_.connection()->onBlackholeDetected();
       }
     }
 
@@ -3214,8 +3227,8 @@ void QuicTransportBaseLite::invokeReadDataAndCallbacks(
           .version = rateSignal.version,
           .receivedTime = Clock::now()};
 
-      if (self->connCallback_) {
-        self->connCallback_->onSconeRateSignal(
+      if (self->connectionCallbacks_.connection()) {
+        self->connectionCallbacks_.connection()->onSconeRateSignal(
             rateSignal.rate, rateSignal.version);
       }
     }
@@ -3877,11 +3890,11 @@ void QuicTransportBaseLite::handleNewStreams(
     std::vector<StreamId>& streamStorage) {
   const auto& newPeerStreamIds = streamStorage;
   for (const auto& streamId : newPeerStreamIds) {
-    MVCHECK_NOTNULL(connCallback_.get());
+    MVCHECK_NOTNULL(connectionCallbacks_.connection().get());
     if (isBidirectionalStream(streamId)) {
-      connCallback_->onNewBidirectionalStream(streamId);
+      connectionCallbacks_.connection()->onNewBidirectionalStream(streamId);
     } else {
-      connCallback_->onNewUnidirectionalStream(streamId);
+      connectionCallbacks_.connection()->onNewUnidirectionalStream(streamId);
     }
 
     logStreamOpenEvent(streamId);

@@ -20,9 +20,7 @@ namespace quic {
 
 QuicClientTransport::~QuicClientTransport() {
   MVVLOG(10) << "Destroyed connection to server=" << conn_->peerAddress;
-  // The caller probably doesn't need the conn callback after destroying the
-  // transport.
-  resetConnectionCallbacks();
+  onApplicationClose();
   // Close without draining.
   closeImpl(
       QuicError(

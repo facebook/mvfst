@@ -475,6 +475,10 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     return nullptr;
   }
 
+  virtual bool getUseConnectionEndWithErrorCallback() {
+    return false;
+  }
+
   void SetUp() {
     auto socket =
         std::make_unique<testing::NiceMock<quic::test::MockAsyncUDPSocket>>(
@@ -486,7 +490,11 @@ class QuicClientTransportTestBase : public virtual testing::Test {
         .WillRepeatedly(testing::Return(quic::Expected<void, QuicError>{}));
 
     client = TestingQuicClientTransport::newClient<TestingQuicClientTransport>(
-        qEvb_, std::move(socket), getFizzClientContext());
+        qEvb_,
+        std::move(socket),
+        getFizzClientContext(),
+        0 /* connectionIdSize */,
+        getUseConnectionEndWithErrorCallback());
     destructionCallback =
         std::make_shared<TestingQuicClientTransport::DestructionCallback>();
     client->setDestructionCallback(destructionCallback);
