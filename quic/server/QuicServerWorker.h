@@ -702,6 +702,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   Optional<std::function<int()>> unfinishedHandshakeLimitFn_;
 
+  int unfinishedHandshakes_{0};
+
   // Wrapper around list of AcceptObservers to handle cleanup on destruction
   class AcceptObserverList {
    public:

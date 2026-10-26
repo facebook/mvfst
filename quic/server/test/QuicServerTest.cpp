@@ -1054,15 +1054,25 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       std::nullopt);
   eventbase_.loopIgnoreKeepAlive();
 
+  // Called for transport_'s own unbind and for the wrong-owner unbind
+  // attempt against transport2's source below.
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   worker_->onConnectionUnbound(
       transport_.get(),
       std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
       std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
+  // A wrong-owner unbind must not erase transport2's source entry.
   worker_->onConnectionUnbound(
       transport_.get(),
       std::make_pair(clientAddr2, connId2),
       std::vector<ConnectionIdData>{ConnectionIdData{connId2, 0}});
+  EXPECT_TRUE(addrMap.contains(std::make_pair(clientAddr2, connId2)));
+  EXPECT_CALL(*transport2, setRoutingCallback(nullptr));
+  worker_->onConnectionUnbound(
+      transport2.get(),
+      std::make_pair(clientAddr2, connId2),
+      std::vector<ConnectionIdData>{ConnectionIdData{connId2, 0}});
+  EXPECT_FALSE(addrMap.contains(std::make_pair(clientAddr2, connId2)));
   EXPECT_FALSE(connIdMap.contains(getTestConnectionId(hostId_)));
   EXPECT_FALSE(addrMap.contains(
       std::make_pair(kClientAddr, getTestConnectionId(hostId_))));
@@ -1345,6 +1355,33 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
   eventbase_.runInEventBaseThreadAndWait([&] { worker_.reset(); });
   eventbase_.terminateLoopSoon();
   t.join();
+}
+
+TEST_F(QuicServerWorkerTest, ShutdownTransportWithDuplicateConnectionId) {
+  const auto initialCid = getTestConnectionId(hostId_);
+  const auto serverCid = getTestConnectionId(hostId_ + 1);
+  auto firstSocket =
+      std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&eventbase_);
+  EXPECT_CALL(*firstSocket, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto firstTransport = std::make_shared<MockQuicTransport>(
+      qEvb_,
+      std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_, std::move(firstSocket)),
+      nullptr,
+      nullptr,
+      nullptr);
+  createQuicConnection(kClientAddr, initialCid);
+  worker_->onConnectionIdAvailable(firstTransport, serverCid);
+  worker_->onConnectionIdAvailable(transport_, serverCid);
+  EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
+      .WillOnce(Return(initialCid));
+  worker_->onConnectionIdBound(transport_);
+  EXPECT_TRUE(worker_->getSrcToTransportMap().empty());
+  EXPECT_EQ(worker_->getConnectionIdMap().at(serverCid), firstTransport);
+
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(1);
+  EXPECT_CALL(*transport_, setHandshakeFinishedCallback(nullptr)).Times(1);
+  worker_->shutdownAllConnections(LocalErrorCode::SHUTTING_DOWN);
 }
 
 TEST_F(QuicServerWorkerTest, PacketAfterShutdown) {

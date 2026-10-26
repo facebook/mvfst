@@ -569,6 +569,28 @@ TEST_F(QuicServerTransportTest, UnbindKeepsTransportAliveWhileRetiringConnIds) {
   EXPECT_TRUE(weakServer.expired());
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    UnbindKeepsTransportAliveDuringHandshakeCallback) {
+  server->setHandshakeFinishedCallback(&handshakeFinishedCallback);
+  std::weak_ptr<TestingQuicServerTransport> weakServer = server;
+  auto* transport = server.get();
+  auto releaseTransport = [&] {
+    server.reset();
+    EXPECT_FALSE(weakServer.expired());
+  };
+  if (server->getConn().serverHandshakeLayer->isHandshakeDone()) {
+    EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished())
+        .WillOnce(releaseTransport);
+  } else {
+    EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished())
+        .WillOnce(releaseTransport);
+  }
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _));
+  transport->unbindConnection();
+  EXPECT_TRUE(weakServer.expired());
+}
+
 TEST_F(QuicServerTransportTest, KeepaliveTimeoutExpired) {
   server->keepaliveTimeout().timeoutExpired();
 

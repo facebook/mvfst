@@ -778,6 +778,7 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
       transportFactory_->make(evb, std::move(sock), client, quicVersion, ctx_);
   if (trans) {
     globalUnfinishedHandshakes++;
+    unfinishedHandshakes_++;
     if (transportSettings_.dataPathType == DataPathType::ContinuousMemory &&
         bufAccessor_) {
       trans->setBufAccessor(bufAccessor_.get());
@@ -1548,8 +1549,8 @@ void QuicServerWorker::onConnectionIdAvailable(
     MVLOG_ERROR << "connectionIdMap_ already has CID=" << id
                 << " Is same transport: "
                 << (existingTransportPtr == transportPtr);
-  } else if (boundServerTransports_.emplace(transportPtr, weakTransport)
-                 .second) {
+  }
+  if (boundServerTransports_.emplace(transportPtr, weakTransport).second) {
     if (!isScheduled()) {
       // If we aren't currently running, start the timer.
       evb_->timer().scheduleTimeout(this, timeLoggingSamplingInterval_);
@@ -1648,14 +1649,19 @@ void QuicServerWorker::onConnectionUnbound(
     }
   }
 
-  sourceAddressMap_.erase(source);
+  auto iter = sourceAddressMap_.find(source);
+  if (iter != sourceAddressMap_.end() && iter->second.get() == transport) {
+    sourceAddressMap_.erase(iter);
+  }
 }
 
 void QuicServerWorker::onHandshakeFinished() noexcept {
+  MVCHECK_GE(--unfinishedHandshakes_, 0);
   MVCHECK_GE(--globalUnfinishedHandshakes, 0);
 }
 
 void QuicServerWorker::onHandshakeUnfinished() noexcept {
+  MVCHECK_GE(--unfinishedHandshakes_, 0);
   MVCHECK_GE(--globalUnfinishedHandshakes, 0);
 }
 
@@ -1696,6 +1702,14 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
       t->closeNow(
           QuicError(QuicErrorCode(error), std::string("shutting down")));
     }
+  }
+  if (unfinishedHandshakes_ != 0) {
+    MVCHECK_GE(
+        globalUnfinishedHandshakes.fetch_sub(
+            unfinishedHandshakes_, std::memory_order_relaxed) -
+            unfinishedHandshakes_,
+        0);
+    unfinishedHandshakes_ = 0;
   }
   cancelTimeout();
   boundServerTransports_.clear();

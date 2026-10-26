@@ -143,7 +143,6 @@ void QuicServerTransport::setTransportStatsCallback(
 
 void QuicServerTransport::setConnectionIdAlgo(
     ConnectionIdAlgo* connIdAlgo) noexcept {
-  MVCHECK(connIdAlgo);
   if (serverConn_) {
     serverConn_->connIdAlgo = connIdAlgo;
   }
@@ -151,7 +150,6 @@ void QuicServerTransport::setConnectionIdAlgo(
 
 void QuicServerTransport::setServerConnectionIdRejector(
     ServerConnectionIdRejector* connIdRejector) noexcept {
-  MVCHECK(connIdRejector);
   if (serverConn_) {
     serverConn_->connIdRejector = connIdRejector;
   }
@@ -434,11 +432,17 @@ quic::Expected<void, QuicError> QuicServerTransport::writeData() {
 }
 
 void QuicServerTransport::closeTransport() {
-  if (!serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+  [[maybe_unused]] auto self = weak_from_this().lock();
+  const bool handshakeDone =
+      serverConn_->serverHandshakeLayer->isHandshakeDone();
+  if (!handshakeDone) {
     QUIC_STATS(conn_->statsCallback, onServerUnfinishedHandshake);
-    if (handshakeFinishedCb_) {
-      handshakeFinishedCb_->onHandshakeUnfinished();
-      handshakeFinishedCb_ = nullptr;
+  }
+  if (auto* handshakeCb = std::exchange(handshakeFinishedCb_, nullptr)) {
+    if (handshakeDone) {
+      handshakeCb->onHandshakeFinished();
+    } else {
+      handshakeCb->onHandshakeUnfinished();
     }
   }
   serverConn_->serverHandshakeLayer->cancel();
@@ -449,33 +453,42 @@ void QuicServerTransport::closeTransport() {
 }
 
 void QuicServerTransport::unbindConnection() {
-  if (routingCb_) {
-    [[maybe_unused]] auto self = weak_from_this().lock();
-    auto routingCb = routingCb_;
-    routingCb_ = nullptr;
-    // Drain CIDs removed from selfConnectionIds but still in the routing map.
-    for (const auto& connId : *conn_->connIdsRetiringSoon) {
-      routingCb->onConnectionIdRetired(*this, connId);
+  [[maybe_unused]] auto self = weak_from_this().lock();
+  setTransportStatsCallback(nullptr);
+  setConnectionIdAlgo(nullptr);
+  setServerConnectionIdRejector(nullptr);
+  conn_->bufAccessor = nullptr;
+  if (auto* handshakeCb = std::exchange(handshakeFinishedCb_, nullptr)) {
+    if (serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+      handshakeCb->onHandshakeFinished();
+    } else {
+      handshakeCb->onHandshakeUnfinished();
     }
-    conn_->connIdsRetiringSoon->clear();
-    PROTO_OOPS_LOG_BUILDER_IF(
-        !conn_->clientChosenDestConnectionId,
-        conn_->oopsLogger,
-        proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
-        "quic_server_transport",
-        "invariant_violation: unbind missing client-chosen destination "
-        "connection id");
-    MVCHECK(conn_->clientChosenDestConnectionId);
-    if (conn_->serverConnectionId) {
-      auto connectionIds =
-          conn_->selfConnectionIds; // We pass a copy as this transport might be
-                                    // deleted.
-      routingCb->onConnectionUnbound(
-          this,
-          std::make_pair(
-              getOriginalPeerAddress(), *conn_->clientChosenDestConnectionId),
-          connectionIds);
-    }
+  }
+  auto* routingCb = std::exchange(routingCb_, nullptr);
+  if (!routingCb) {
+    return;
+  }
+  // Snapshot arguments before callbacks; callbacks may delete `this`.
+  auto retiringConnIds = *conn_->connIdsRetiringSoon;
+  conn_->connIdsRetiringSoon->clear();
+  PROTO_OOPS_LOG_BUILDER_IF(
+      !conn_->clientChosenDestConnectionId,
+      conn_->oopsLogger,
+      proto_oops::makeConnectionSpecificOopsFieldsBuilder(*conn_),
+      "quic_server_transport",
+      "invariant_violation: unbind missing client-chosen destination "
+      "connection id");
+  MVCHECK(conn_->clientChosenDestConnectionId);
+  auto source = std::make_pair(
+      getOriginalPeerAddress(), *conn_->clientChosenDestConnectionId);
+  const bool hasServerConnectionId = conn_->serverConnectionId.has_value();
+  auto connectionIds = conn_->selfConnectionIds;
+  for (const auto& connId : retiringConnIds) {
+    routingCb->onConnectionIdRetired(*this, connId);
+  }
+  if (hasServerConnectionId) {
+    routingCb->onConnectionUnbound(this, source, connectionIds);
   }
 }
 
@@ -792,9 +805,8 @@ void QuicServerTransport::maybeNotifyConnectionIdBound() {
 
 void QuicServerTransport::maybeNotifyHandshakeFinished() {
   if (serverConn_->serverHandshakeLayer->isHandshakeDone()) {
-    if (handshakeFinishedCb_) {
-      handshakeFinishedCb_->onHandshakeFinished();
-      handshakeFinishedCb_ = nullptr;
+    if (auto* handshakeCb = std::exchange(handshakeFinishedCb_, nullptr)) {
+      handshakeCb->onHandshakeFinished();
     }
     if (connSetupCallback_ && !handshakeDoneNotified_) {
       connSetupCallback_->onFullHandshakeDone();
