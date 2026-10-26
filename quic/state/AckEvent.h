@@ -14,6 +14,26 @@
 
 namespace quic {
 
+/**
+ * What a stream's ACK handling did with one ACKed WriteStreamFrame.
+ *
+ * processAckFrame installs one on the connection while the ACK visitor handles
+ * a stream frame. The stream's ACK handler marks it handled and records the
+ * bytes it newly marked delivered while updating its own delivery state, so
+ * AckEvent credits exactly those bytes. Bytes the stream had already
+ * delivered, holds in its loss buffer, or discarded in a reset are not newly
+ * marked delivered and so are not credited.
+ */
+struct StreamFrameAckDelivery {
+  // Set when the stream's ACK handler did its delivery bookkeeping for the
+  // frame, even if no byte was newly delivered; unset if it rejected the frame.
+  bool handled{false};
+
+  // Bytes newly marked delivered, as inclusive intervals in increasing offset
+  // order. A FIN carries no bytes and is not included.
+  SmallVec<Interval<uint64_t>, 1> newlyDeliveredIntervals;
+};
+
 struct AckEvent {
   struct AckPacket;
 
@@ -157,14 +177,22 @@ struct AckEvent {
     OutstandingPacketMetadata outstandingPacketMetadata;
 
     struct StreamDetails {
-      // definition for DupAckedStreamIntervalSet
-      // we expect this to be rare, any thus only allocate a single position
-      template <class T>
-      using DupAckedStreamIntervalSetVec = SmallVec<T, 1 /* stack size */>;
-      using DupAckedStreamIntervals =
-          IntervalSet<uint64_t, 1, DupAckedStreamIntervalSetVec>;
+      // Number of stream bytes newly marked delivered by this ACKed packet.
+      uint64_t streamBytesAcked{0};
 
-      // Intervals that had already been ACKed.
+      // A frame usually contributes a single interval, so reserve one inline.
+      template <class T>
+      using StreamIntervalSetVec = SmallVec<T, 1 /* stack size */>;
+      using StreamIntervals = IntervalSet<uint64_t, 1, StreamIntervalSetVec>;
+      using DupAckedStreamIntervals = StreamIntervals;
+
+      // Stream intervals this ACKed packet newly marked delivered, exactly as
+      // the stream recorded them; their lengths sum to `streamBytesAcked`.
+      // Delivery is reported once per byte, whichever ACK delivers it.
+      StreamIntervals newlyDeliveredStreamIntervals;
+
+      // Stream intervals carried by this packet that its ACK did not newly
+      // mark delivered, usually because an earlier ACK already did.
       //
       // Requires ACK processing for packets spuriously marked lost is enabled
       DupAckedStreamIntervals dupAckedStreamIntervals;
@@ -176,43 +204,17 @@ struct AckEvent {
     class DetailsPerStream : private MapType {
      public:
       /**
-       * Record that a frame contained in ACKed packet was marked as delivered.
+       * Record the stream's report of what ACK processing of `frame` newly
+       * marked delivered. Bytes of the frame that were not newly delivered are
+       * recorded in `dupAckedStreamIntervals`.
        *
-       * Specifically, during processing of this ACK, we were able to fill in a
-       * hole in the stream IntervalSet. This means that the intervals covered
-       * by said frame had not been delivered by another packet.
-       *
-       * If said frame had previously been sent in some previous packet before
-       * being sent in the packet that we are processing the ACK for now, then
-       * we can conclude that a retransmission enabled this frame to be
-       * delivered.
-       *
-       * See recordFrameAlreadyDelivered for the case where a frame contained in
-       * an ACKed packet had already been marked as delivered.
-       *
-       * @param frame          The frame that is being processed.
+       * Returns false if the report was not a list of increasing intervals
+       * within the frame; only the frame's bytes are then recorded, each at
+       * most once.
        */
-      void recordFrameDelivered(const WriteStreamFrame& frame);
-
-      /**
-       * Record that a frame had already been marked as delivered.
-       *
-       * This can occur if said frame was sent multiple times (e.g., in multiple
-       * packets) and an ACK for a different packet containing the frame was
-       * already processed. More specifically,, the hole in the stream
-       * IntervalSet associated with this frame was marked as delivered when
-       * some other packet's ACK was processed.
-       *
-       * Note that packet(s) carrying the frame may have been acknowledged at
-       * the same time by the remote (e.g., in the same ACK block / message), in
-       * which case we cannot discern "which" packet arrived first — we can only
-       * state that multiple packets(s) carrying the same frame successfully
-       * reached the remote.
-       *
-       * @param frame          The frame that is being processed and that was
-       *                       marked as delivered by some previous packet.
-       */
-      void recordFrameAlreadyDelivered(const WriteStreamFrame& frame);
+      bool recordFrameDelivery(
+          const WriteStreamFrame& frame,
+          const StreamFrameAckDelivery& delivery);
 
       [[nodiscard]] auto at(StreamId id) const {
         return MapType::at(id);
@@ -250,6 +252,31 @@ struct AckEvent {
     // app-limited state.
     bool isAppLimited;
 
+    // False when ACK processing skipped this packet's frames because another
+    // packet carrying the same frames was already ACKed or declared lost, as
+    // with a clone and its original. Such a packet credits no stream bytes.
+    bool framesProcessed{true};
+
+    // Whether this packet was the first copy of its frames to reach the peer.
+    // Copies are an original packet and its clones; a retransmission of lost
+    // data in a new packet is not a copy. This describes physical delivery and
+    // is independent of `framesProcessed`: a clone ACKed after its original
+    // was declared lost is the first arrival even though its frames are not
+    // processed, and its stream bytes are credited only when mvfst later
+    // delivers them.
+    enum class FirstArrival : uint8_t {
+      // Not a clone and never cloned, or the first copy of its clone group to
+      // be acknowledged.
+      Yes,
+      // Another copy was acknowledged by an earlier ACK, or arrived earlier
+      // according to the receive timestamps of this ACK.
+      No,
+      // Several copies were acknowledged by this ACK and receive timestamps
+      // do not order this copy relative to the others.
+      Unknown,
+    };
+    FirstArrival firstArrival{FirstArrival::Yes};
+
     struct Builder {
       Builder&& setPacketNum(quic::PacketNum packetNumIn);
       Builder&& setOutstandingPacketMetadata(
@@ -260,6 +287,8 @@ struct AckEvent {
       Builder&& setAppLimited(bool appLimitedIn);
       Builder&& setReceiveDeltaTimeStamp(
           OptionalMicros&& receiveRelativeTimeStampUsec);
+      Builder&& setFramesProcessed(bool framesProcessedIn);
+      Builder&& setFirstArrival(FirstArrival firstArrivalIn);
       AckPacket build() &&;
       void buildInto(std::vector<AckPacket>& ackedPacketsVec) &&;
       explicit Builder() = default;
@@ -272,6 +301,8 @@ struct AckEvent {
           nullptr};
       OptionalMicros receiveRelativeTimeStampUsec;
       bool isAppLimited{false};
+      bool framesProcessed{true};
+      FirstArrival firstArrival{FirstArrival::Yes};
     };
 
     // Better to use the Builder to construct. The reason we're not marking this
@@ -295,6 +326,10 @@ struct AckEvent {
   // lost. They are excluded from ackedPackets and ackedBytes because their
   // inflight and frame state was handled at loss time.
   uint64_t numPacketsSpuriouslyAcked{0};
+
+  // Stream bytes newly delivered by the ACK of packets previously declared
+  // lost. Only streams using the unified send buffer process those frames.
+  AckPacket::DetailsPerStream spuriousLossDetailsPerStream;
 
   struct BuilderFields {
     Optional<TimePoint> maybeAckTime;

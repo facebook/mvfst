@@ -208,6 +208,11 @@ struct OutstandingPacket {
   // lost.
   bool declaredLost : 1;
 
+  // True once ACK processing acknowledged another copy of this packet's clone
+  // group (the original packet or one of its clones), so this copy cannot be
+  // the first to reach the peer with these frames.
+  bool cloneGroupDelivered : 1;
+
   [[nodiscard]] quic::PacketNum getPacketSequenceNum() const {
     return packet.header.getPacketSequenceNum();
   }
@@ -240,6 +245,7 @@ struct OutstandingPacket {
     // TODO remove when C++20 everywhere.
     isAppLimited = false;
     declaredLost = false;
+    cloneGroupDelivered = false;
   }
 
   OutstandingPacket(OutstandingPacket&&) noexcept = default;

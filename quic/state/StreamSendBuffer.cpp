@@ -397,7 +397,8 @@ Optional<bool> StreamSendBuffer::abandon(const SendRange& range) {
 }
 
 Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
-    const SendRange& range) {
+    const SendRange& range,
+    NewlyAckedRangeCallback onNewlyAckedRange) {
   if (cancelled_) {
     return AckResult{};
   }
@@ -418,6 +419,20 @@ Optional<StreamSendBuffer::AckResult> StreamSendBuffer::markAcked(
     }
     result.newlyAckedBytes = newlyRetiredOutstanding;
     outstandingBytes_ -= newlyRetiredOutstanding;
+    if (onNewlyAckedRange && newlyRetiredOutstanding > 0) {
+      if (ackedIntervals_.empty() && abandonedIntervals_.empty()) {
+        onNewlyAckedRange(range.offset, *end);
+      } else {
+        forEachUncoveredRange(
+            std::array<const IntervalSet<uint64_t>*, 2>{
+                &ackedIntervals_, &abandonedIntervals_},
+            range.offset,
+            *end,
+            [&onNewlyAckedRange](uint64_t begin, uint64_t finish) {
+              onNewlyAckedRange(begin, finish);
+            });
+      }
+    }
   }
   if (range.len > 0 || range.fin) {
     ackedIntervals_.insert(range.offset, range.fin ? *end : *end - 1);

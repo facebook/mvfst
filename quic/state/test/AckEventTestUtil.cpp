@@ -16,6 +16,13 @@ AckEventStreamDetailsMatcherBuilder::setStreamID(const uint64_t streamIdIn) {
 }
 
 AckEventStreamDetailsMatcherBuilder&&
+AckEventStreamDetailsMatcherBuilder::setStreamBytesAcked(
+    const uint64_t ackedIn) {
+  maybeStreamBytesAcked = ackedIn;
+  return std::move(*this);
+}
+
+AckEventStreamDetailsMatcherBuilder&&
 AckEventStreamDetailsMatcherBuilder::addDupAckedStreamInterval(
     const DupAckedStreamIntervals::interval_type& interval) {
   dupAckedStreamIntervals.insert(interval);

@@ -91,7 +91,13 @@ class StreamSendBuffer {
   bool markLoss(const SendRange& range);
   void markRetransmissionSent(const SendRange& range);
   [[nodiscard]] Optional<bool> abandon(const SendRange& range);
-  [[nodiscard]] Optional<AckResult> markAcked(const SendRange& range);
+  // Invoked with each byte range [begin, end) that an ACK newly marks
+  // acknowledged; the ranges sum to AckResult::newlyAckedBytes.
+  using NewlyAckedRangeCallback = FunctionRef<void(uint64_t, uint64_t)>;
+
+  [[nodiscard]] Optional<AckResult> markAcked(
+      const SendRange& range,
+      NewlyAckedRangeCallback onNewlyAckedRange = {});
 
   [[nodiscard]] bool truncateFrom(uint64_t offset);
   void cancelAll();
@@ -142,6 +148,10 @@ class StreamSendBuffer {
 
   [[nodiscard]] uint64_t ackInsertVersion() const {
     return ackedIntervals_.insertVersion();
+  }
+
+  [[nodiscard]] const IntervalSet<uint64_t>& ackedIntervals() const {
+    return ackedIntervals_;
   }
 
  private:

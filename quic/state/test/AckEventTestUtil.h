@@ -12,6 +12,8 @@
 
 #include <quic/state/AckEvent.h>
 
+#include <utility>
+
 namespace quic::test {
 
 /**
@@ -27,6 +29,7 @@ struct AckEventStreamDetailsMatcherBuilder {
   explicit AckEventStreamDetailsMatcherBuilder() = default;
 
   Builder&& setStreamID(const uint64_t streamIdIn);
+  Builder&& setStreamBytesAcked(const uint64_t ackedIn);
   Builder&& addDupAckedStreamInterval(
       const DupAckedStreamIntervals::interval_type& intervalIn);
   Builder&& addDupAckedStreamInterval(
@@ -36,15 +39,23 @@ struct AckEventStreamDetailsMatcherBuilder {
 
   auto build() && {
     CHECK(maybeStreamId.has_value());
-    return ::testing::Pair(
-        maybeStreamId.value(),
+    ::testing::Matcher<AckEvent::AckPacket::StreamDetails> detailsMatcher =
         ::testing::Field(
             &AckEvent::AckPacket::StreamDetails::dupAckedStreamIntervals,
-            dupAckedStreamIntervals));
+            dupAckedStreamIntervals);
+    if (maybeStreamBytesAcked.has_value()) {
+      detailsMatcher = ::testing::AllOf(
+          detailsMatcher,
+          ::testing::Field(
+              &AckEvent::AckPacket::StreamDetails::streamBytesAcked,
+              maybeStreamBytesAcked.value()));
+    }
+    return ::testing::Pair(maybeStreamId.value(), std::move(detailsMatcher));
   }
 
  private:
   Optional<uint64_t> maybeStreamId;
+  Optional<uint64_t> maybeStreamBytesAcked;
   DupAckedStreamIntervals dupAckedStreamIntervals;
 };
 

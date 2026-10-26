@@ -17,6 +17,7 @@
 #include <quic/state/ConnectionOopsFields.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <algorithm>
 #include <iterator>
 
 namespace quic {
@@ -34,7 +35,108 @@ struct OutstandingPacketWithHandlerContext {
 
   OutstandingPacketWrapper* outstandingPacket;
   bool processAllFrames{false};
+  AckEvent::AckPacket::FirstArrival firstArrival{
+      AckEvent::AckPacket::FirstArrival::Yes};
 };
+
+/**
+ * A copy of a clone group (an original packet or one of its clones) that the
+ * ACK frame being processed acknowledges.
+ */
+struct AckedCloneCopy {
+  ClonedPacketIdentifier cloneId;
+  PacketNum packetNum;
+  // Index into the handler contexts, or none for a packet previously declared
+  // lost, which is not reported in AckEvent::ackedPackets.
+  Optional<size_t> contextIndex;
+  // Whether an earlier ACK already acknowledged another copy.
+  bool groupDeliveredBefore{false};
+};
+
+/**
+ * Resolves which copy of each clone group arrived first when this ACK frame
+ * acknowledges several copies of a group that no earlier ACK delivered. Receive
+ * timestamps order the copies when the peer reported one for every copy;
+ * otherwise their arrival order is unknown.
+ */
+void resolveSameAckCloneArrivals(
+    const SmallVec<AckedCloneCopy, 2>& ackedCloneCopies,
+    const UnorderedMap<PacketNum, uint64_t>& packetReceiveTimeStamps,
+    SmallVec<OutstandingPacketWithHandlerContext, 50>& contexts) {
+  using FirstArrival = AckEvent::AckPacket::FirstArrival;
+  for (size_t i = 0; i < ackedCloneCopies.size(); ++i) {
+    const auto& copy = ackedCloneCopies[i];
+    if (copy.groupDeliveredBefore) {
+      continue;
+    }
+    bool groupHandled = false;
+    for (size_t j = 0; j < i; ++j) {
+      groupHandled |= ackedCloneCopies[j].cloneId == copy.cloneId;
+    }
+    size_t groupSize = 0;
+    bool allTimestamped = true;
+    Optional<uint64_t> earliest;
+    for (const auto& member : ackedCloneCopies) {
+      if (member.cloneId != copy.cloneId) {
+        continue;
+      }
+      ++groupSize;
+      const auto it = packetReceiveTimeStamps.find(member.packetNum);
+      if (it == packetReceiveTimeStamps.end()) {
+        allTimestamped = false;
+      } else if (!earliest || it->second < *earliest) {
+        earliest = it->second;
+      }
+    }
+    if (groupHandled || groupSize < 2) {
+      continue;
+    }
+    size_t numEarliest = 0;
+    if (allTimestamped) {
+      for (const auto& member : ackedCloneCopies) {
+        numEarliest += member.cloneId == copy.cloneId &&
+            packetReceiveTimeStamps.at(member.packetNum) == *earliest;
+      }
+    }
+    for (const auto& member : ackedCloneCopies) {
+      if (member.cloneId != copy.cloneId || !member.contextIndex) {
+        continue;
+      }
+      auto& firstArrival = contexts[*member.contextIndex].firstArrival;
+      if (!allTimestamped) {
+        firstArrival = FirstArrival::Unknown;
+      } else if (packetReceiveTimeStamps.at(member.packetNum) != *earliest) {
+        firstArrival = FirstArrival::No;
+      } else {
+        firstArrival =
+            numEarliest == 1 ? FirstArrival::Yes : FirstArrival::Unknown;
+      }
+    }
+  }
+}
+
+/**
+ * Marks the outstanding copies of every clone group this ACK delivered, so a
+ * later ACK of another copy reports it as not the first arrival.
+ */
+void markCloneGroupsDelivered(
+    QuicConnectionStateBase& conn,
+    const SmallVec<AckedCloneCopy, 2>& ackedCloneCopies) {
+  if (ackedCloneCopies.empty()) {
+    return;
+  }
+  for (auto& packet : conn.outstandings.packets) {
+    if (!packet.maybeClonedPacketIdentifier || packet.cloneGroupDelivered) {
+      continue;
+    }
+    for (const auto& copy : ackedCloneCopies) {
+      if (copy.cloneId == *packet.maybeClonedPacketIdentifier) {
+        packet.cloneGroupDelivered = true;
+        break;
+      }
+    }
+  }
+}
 
 struct AckFrameProcessingStats {
   uint64_t ackedPackets{0};
@@ -44,30 +146,50 @@ struct AckFrameProcessingStats {
   uint64_t contiguousWriteStreamFrames{0};
 };
 
-Optional<uint64_t> getAckIntervalSetVersion(
-    QuicConnectionStateBase& conn,
-    const QuicWriteFrame& ackedFrame) {
-  if (ackedFrame.type() != QuicWriteFrame::Type::WriteStreamFrame) {
-    return std::nullopt;
+// Records the stream ACK handler's delivery report for an ACKed stream frame,
+// and soft-reports outcomes that mvfst should never produce.
+void recordStreamFrameDelivery(
+    [[maybe_unused]] QuicConnectionStateBase& conn,
+    AckEvent::AckPacket::DetailsPerStream& detailsPerStream,
+    const WriteStreamFrame& frame,
+    const StreamFrameAckDelivery& delivery) {
+  if (!delivery.handled) {
+    // The ACK visitor hands a frame to its stream's ACK handler whenever the
+    // stream exists, and that handler marks the delivery handled wherever it
+    // does delivery bookkeeping. A live stream's frame left unhandled bypassed
+    // that bookkeeping, so its bytes are neither credited nor recorded as
+    // redelivered.
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server &&
+            conn.streamManager->findStream(frame.streamId) != nullptr,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setStreamId(
+            frame.streamId),
+        "quic_ack_handlers",
+        "invariant_violation: ACK of a live stream's frame was not handled by "
+        "the stream");
+    return;
   }
-
-  const WriteStreamFrame& ackedWriteFrame = *ackedFrame.asWriteStreamFrame();
-
-  QuicStreamState* maybeAckedStreamState = nullptr;
-  maybeAckedStreamState =
-      conn.streamManager->findStream(ackedWriteFrame.streamId);
-  if (!maybeAckedStreamState) {
-    return std::nullopt;
+  if (!detailsPerStream.recordFrameDelivery(frame, delivery)) {
+    PROTO_OOPS_LOG_BUILDER_IF(
+        conn.nodeType == QuicNodeType::Server,
+        conn.oopsLogger,
+        proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn).setStreamId(
+            frame.streamId),
+        "quic_ack_handlers",
+        "invariant_violation: stream reported newly delivered bytes outside "
+        "the ACKed frame");
   }
-
-  // stream is alive and frame is WriteStreamFrame
-  return getAckIntervalSetVersion(*maybeAckedStreamState);
 }
 
+// Packets previously declared lost are not added to AckEvent::ackedPackets, so
+// stream bytes their ACK newly marks delivered in the unified send buffer are
+// recorded in AckEvent::spuriousLossDetailsPerStream.
 quic::Expected<void, QuicError> processUnifiedStreamFramesForSpuriousAck(
     QuicConnectionStateBase& conn,
     const OutstandingPacketWrapper& packet,
-    const AckedFrameVisitor& ackedFrameVisitor) {
+    const AckedFrameVisitor& ackedFrameVisitor,
+    AckEvent& ack) {
   for (const auto& packetFrame : packet.packet.frames) {
     bool shouldProcess = false;
     if (const auto* streamFrame = packetFrame.asWriteStreamFrame()) {
@@ -85,9 +207,22 @@ quic::Expected<void, QuicError> processUnifiedStreamFramesForSpuriousAck(
     if (!shouldProcess) {
       continue;
     }
+    const auto* ackedWriteFrame = packetFrame.asWriteStreamFrame();
+    StreamFrameAckDelivery streamFrameDelivery;
+    if (ackedWriteFrame) {
+      conn.streamFrameAckDelivery = &streamFrameDelivery;
+    }
     auto result = ackedFrameVisitor(packet, packetFrame);
+    conn.streamFrameAckDelivery = nullptr;
     if (!result.has_value()) {
       return result;
+    }
+    if (ackedWriteFrame) {
+      recordStreamFrameDelivery(
+          conn,
+          ack.spuriousLossDetailsPerStream,
+          *ackedWriteFrame,
+          streamFrameDelivery);
     }
   }
   return {};
@@ -243,6 +378,9 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
 
   // temporary storage to enable packets to be processed in sent order
   SmallVec<OutstandingPacketWithHandlerContext, 50> packetsWithHandlerContext;
+  // Copies of clone groups acknowledged by this ACK frame, used to report
+  // which copy of each group reached the peer first.
+  SmallVec<AckedCloneCopy, 2> ackedCloneCopies;
   AckFrameProcessingStats processingStats;
 
   // Store first outstanding packet number to ignore old receive timestamps.
@@ -285,6 +423,17 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
     conn.outstandings.scheduledForDestructionCount++;
     MVVLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace << conn;
+    if (ackedPacketIterator->maybeClonedPacketIdentifier) {
+      ackedCloneCopies.push_back(
+          AckedCloneCopy{
+              .cloneId = *ackedPacketIterator->maybeClonedPacketIdentifier,
+              .packetNum = currentPacketNum,
+              .contextIndex = ackedPacketIterator->declaredLost
+                  ? Optional<size_t>()
+                  : Optional<size_t>(packetsWithHandlerContext.size()),
+              .groupDeliveredBefore =
+                  ackedPacketIterator->cloneGroupDelivered});
+    }
     // If we hit a packet which has been declared lost we need to count the
     // spurious loss and ignore all other processing.
     if (ackedPacketIterator->declaredLost) {
@@ -315,7 +464,7 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
             ackedPacketIterator->packet.header.getPacketNumberSpace());
       }
       auto dataAckResult = processUnifiedStreamFramesForSpuriousAck(
-          conn, *ackedPacketIterator, ackedFrameVisitor);
+          conn, *ackedPacketIterator, ackedFrameVisitor, ack);
       if (!dataAckResult.has_value()) {
         return quic::make_unexpected(dataAckResult.error());
       }
@@ -410,6 +559,10 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       packetsWithHandlerContext.emplace_back(
           OutstandingPacketWithHandlerContext(wrapper));
       packetsWithHandlerContext.back().processAllFrames = needsProcess;
+      if (wrapper->cloneGroupDelivered) {
+        packetsWithHandlerContext.back().firstArrival =
+            AckEvent::AckPacket::FirstArrival::No;
+      }
     }
     ackedPacketIterator.next();
   }
@@ -423,6 +576,9 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       return quic::make_unexpected(tsResult.error());
     }
   }
+  resolveSameAckCloneArrivals(
+      ackedCloneCopies, packetReceiveTimeStamps, packetsWithHandlerContext);
+  markCloneGroupsDelivered(conn, ackedCloneCopies);
 
   // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
   // frame types only if the packet doesn't have an associated
@@ -432,6 +588,9 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
   Optional<StreamId> previousWriteStreamId;
   Optional<uint64_t> previousWriteStreamNextOffset;
   bool previousWriteStreamFin{false};
+  // Not std::views::reverse: some toolchains that build mvfst lack parts of
+  // <ranges> (see QuicWriteCodec.cpp).
+  // NOLINTNEXTLINE(modernize-loop-convert)
   for (auto packetWithHandlerContextItr = packetsWithHandlerContext.rbegin();
        packetWithHandlerContextItr != packetsWithHandlerContext.rend();
        packetWithHandlerContextItr++) {
@@ -455,25 +614,6 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
       }
       ++processingStats.processedFrames;
 
-      // We do a few things here for ACKs of WriteStreamFrames:
-      //  1. To understand whether the ACK of this frame changes the
-      //     stream's delivery offset, we record the delivery offset before
-      //     running the ackVisitor, run it, and then check if the stream's
-      //     delivery offset changed.
-      //
-      //  2. To understand whether the ACK of this frame is redundant (e.g.
-      //     the frame was already ACKed before), we record the version of
-      //     the stream's ACK IntervalSet before running the ackVisitor,
-      //     run it, and then check if the version changed. If it changed,
-      //     we know that _this_ ACK of _this_ frame had an impact.
-      //
-      //  3. If we determine that the ACK of the frame is not-redundant,
-      //     and the frame was retransmitted, we record the number of bytes
-      //     ACKed by a retransmit as well.
-
-      // Part 1: Record delivery offset prior to running ackVisitor.
-      Optional<uint64_t> maybePreAckIntervalSetVersion =
-          getAckIntervalSetVersion(conn, packetFrame);
       auto ackedWriteFrame = packetFrame.asWriteStreamFrame();
       if (ackedWriteFrame) {
         ++processingStats.processedWriteStreamFrames;
@@ -493,37 +633,21 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
         previousWriteStreamFin = false;
       }
 
-      // run the ACKed frame visitor
+      // run the ACKed frame visitor; for a stream frame, the stream's ACK
+      // handler reports the bytes it newly marks delivered
+      StreamFrameAckDelivery streamFrameDelivery;
+      if (ackedWriteFrame) {
+        conn.streamFrameAckDelivery = &streamFrameDelivery;
+      }
       auto result = ackedFrameVisitor(*outstandingPacket, packetFrame);
+      conn.streamFrameAckDelivery = nullptr;
       if (!result.has_value()) {
         return quic::make_unexpected(result.error());
       }
 
-      if (maybePreAckIntervalSetVersion.has_value()) {
-        Optional<uint64_t> maybePostAckIntervalSetVersion =
-            getAckIntervalSetVersion(conn, packetFrame);
-        PROTO_OOPS_LOG_BUILDER_IF(
-            conn.nodeType == QuicNodeType::Server &&
-                !maybePostAckIntervalSetVersion.has_value(),
-            conn.oopsLogger,
-            proto_oops::makeConnectionSpecificOopsFieldsBuilder(conn)
-                .setStreamId(ackedWriteFrame->streamId),
-            "quic_ack_handlers",
-            "invariant_violation: ACK processing missing post-ack interval "
-            "set version");
-        MVCHECK(
-            maybePostAckIntervalSetVersion.has_value(),
-            "Unable to get post-ack interval set version, even though "
-                << "pre-ack interval set version is available");
-
-        if (*maybePreAckIntervalSetVersion != *maybePostAckIntervalSetVersion) {
-          // we were able to fill in a hole in the ACK interval
-          detailsPerStream.recordFrameDelivered(*ackedWriteFrame);
-        } else {
-          // we got an ACK of a frame that was already marked as delivered
-          // when handling the ACK of some earlier packet; mark as such
-          detailsPerStream.recordFrameAlreadyDelivered(*ackedWriteFrame);
-        }
+      if (ackedWriteFrame) {
+        recordStreamFrameDelivery(
+            conn, detailsPerStream, *ackedWriteFrame, streamFrameDelivery);
       }
     }
     auto maybeRxTimestamp = packetReceiveTimeStamps.find(
@@ -537,6 +661,8 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
                 ? &outstandingPacket->lastAckedPacketInfo.value()
                 : nullptr)
         .setAppLimited(outstandingPacket->isAppLimited)
+        .setFramesProcessed(processAllFrames)
+        .setFirstArrival(packetWithHandlerContextItr->firstArrival)
         .setReceiveDeltaTimeStamp(
             maybeRxTimestamp != packetReceiveTimeStamps.end()
                 ? OptionalMicros(

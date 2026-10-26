@@ -14,6 +14,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/logging/oops_logger/OopsLogger.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/mvfst-config.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -21,12 +22,14 @@
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/StateData.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/state/stream/StreamStateFunctions.h>
 #include <quic/state/test/AckEventTestUtil.h>
 #include <quic/state/test/Mocks.h>
 
 #include <numeric>
 
 #include <array>
+#include <functional>
 
 using namespace testing;
 
@@ -4526,7 +4529,8 @@ class AckEventForAppDataTest : public Test {
   auto deliverAckForAppDataPackets(
       const quic::AckBlocks& ackBlocks,
       const TimePoint timepoint = Clock::now(),
-      const std::chrono::microseconds ackDelay = 0us) {
+      const std::chrono::microseconds ackDelay = 0us,
+      const std::function<void(ReadAckFrame&)>& customizeAckFrame = nullptr) {
     ReadAckFrame ackFrame = {};
     ackFrame.largestAcked = ackBlocks.back().end;
     ackFrame.ackDelay = ackDelay;
@@ -4536,6 +4540,9 @@ class AckEventForAppDataTest : public Test {
     while (it != ackBlocks.crend()) {
       ackFrame.ackBlocks.emplace_back(it->start, it->end);
       it++;
+    }
+    if (customizeAckFrame) {
+      customizeAckFrame(ackFrame);
     }
 
     auto result = processAckFrame(
@@ -4629,6 +4636,144 @@ TEST_F(AckEventForAppDataTest, SpuriousAckProcessesUnifiedStreamData) {
   EXPECT_EQ(0, stream->streamSendBuffer->outstandingBytes());
   EXPECT_EQ(frame.offset + frame.len - 1, getLargestDeliverableOffset(*stream));
   EXPECT_TRUE(getConn()->streamManager->deliverableContains(stream->id));
+
+  // The packet is not reported in ackedPackets; the bytes its ACK delivered
+  // are reported with the spurious-loss details.
+  EXPECT_TRUE(ack.ackedPackets.empty());
+  const auto& details = ack.spuriousLossDetailsPerStream.at(stream->id);
+  EXPECT_EQ(frame.len, details.streamBytesAcked);
+  const AckEvent::AckPacket::StreamDetails::StreamIntervals expected{
+      {frame.offset, frame.offset + frame.len - 1}};
+  EXPECT_EQ(expected, details.newlyDeliveredStreamIntervals);
+}
+
+class RecordingOopsLogger : public proto_oops::OopsLogger {
+ public:
+  using proto_oops::OopsLogger::log;
+
+  void log(proto_oops::OopsFields fields) override {
+    logged.push_back(std::move(fields));
+  }
+
+  std::vector<proto_oops::OopsFields> logged;
+};
+
+/**
+ * A visitor that bypasses a live stream's ACK handler leaves the frame
+ * unhandled: nothing is credited, and the server soft-reports it.
+ */
+TEST_F(AckEventForAppDataTest, UnhandledLiveStreamFrameAckIsSoftReported) {
+  RecordingOopsLogger oopsLogger;
+  getConn()->oopsLogger = &oopsLogger;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(stream->id, "data", false);
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(frame);
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  ReadAckFrame ackFrame = {};
+  ackFrame.largestAcked = packetNum;
+  ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
+  const auto ack = processAckFrame(
+      *getConn(),
+      PacketNumberSpace::AppData,
+      ackFrame,
+      [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+      [](const OutstandingPacketWrapper&, const QuicWriteFrame&)
+          -> quic::Expected<void, QuicError> { return {}; },
+      [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+        return {};
+      },
+      Clock::now());
+
+  ASSERT_FALSE(ack.hasError());
+  ASSERT_EQ(1, ack->ackedPackets.size());
+  EXPECT_TRUE(ack->ackedPackets.front().detailsPerStream.empty());
+  ASSERT_EQ(1, oopsLogger.logged.size());
+  EXPECT_EQ(stream->id, oopsLogger.logged.front().streamId);
+  EXPECT_THAT(
+      oopsLogger.logged.front().errorMessage, HasSubstr("was not handled"));
+  getConn()->oopsLogger = nullptr;
+}
+
+/**
+ * The ACK of a frame whose stream was already removed is skipped by the ACK
+ * visitor; that is expected and is not soft-reported.
+ */
+TEST_F(AckEventForAppDataTest, AckOfRemovedStreamFrameIsNotSoftReported) {
+  RecordingOopsLogger oopsLogger;
+  getConn()->oopsLogger = &oopsLogger;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  const auto streamId = stream->id;
+  const auto frame = writeDataToQuicStreamAndGetFrame(streamId, "data", false);
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(frame);
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  ASSERT_FALSE(
+      getConn()->streamManager->removeClosedStream(streamId).hasError());
+  ASSERT_EQ(nullptr, getConn()->streamManager->findStream(streamId));
+
+  const auto ack = deliverAckForAppDataPackets(packetNum, packetNum);
+
+  ASSERT_EQ(1, ack.ackedPackets.size());
+  EXPECT_TRUE(ack.ackedPackets.front().detailsPerStream.empty());
+  EXPECT_THAT(oopsLogger.logged, IsEmpty());
+  getConn()->oopsLogger = nullptr;
+}
+
+/**
+ * Streams report increasing intervals within the ACKed frame, possibly ending
+ * on its last byte. Reports outside the frame or out of order are clamped so
+ * only frame bytes are credited, each once, and the violation is returned.
+ */
+TEST(AckEventDetailsPerStreamTest, RecordFrameDeliveryClampsToFrame) {
+  const StreamId streamId = 4;
+  const WriteStreamFrame frame(
+      streamId, 10 /* offset */, 10 /* len */, false /* fin */);
+  using StreamIntervals = AckEvent::AckPacket::StreamDetails::StreamIntervals;
+  const auto delivered =
+      [](std::initializer_list<std::pair<uint64_t, uint64_t>> intervals) {
+        StreamFrameAckDelivery delivery;
+        delivery.handled = true;
+        for (const auto& [start, end] : intervals) {
+          delivery.newlyDeliveredIntervals.emplace_back(start, end);
+        }
+        return delivery;
+      };
+
+  {
+    AckEvent::AckPacket::DetailsPerStream details;
+    EXPECT_TRUE(details.recordFrameDelivery(frame, delivered({{15, 19}})));
+    const StreamIntervals expected{{15, 19}};
+    EXPECT_EQ(expected, details.at(streamId).newlyDeliveredStreamIntervals);
+    EXPECT_EQ(5, details.at(streamId).streamBytesAcked);
+  }
+
+  {
+    AckEvent::AckPacket::DetailsPerStream details;
+    EXPECT_FALSE(
+        details.recordFrameDelivery(frame, delivered({{5, 12}, {18, 25}})));
+    const StreamIntervals expected{{10, 12}, {18, 19}};
+    EXPECT_EQ(expected, details.at(streamId).newlyDeliveredStreamIntervals);
+    EXPECT_EQ(5, details.at(streamId).streamBytesAcked);
+  }
+
+  {
+    AckEvent::AckPacket::DetailsPerStream details;
+    EXPECT_FALSE(
+        details.recordFrameDelivery(frame, delivered({{14, 16}, {12, 17}})));
+    const StreamIntervals expected{{14, 17}};
+    EXPECT_EQ(expected, details.at(streamId).newlyDeliveredStreamIntervals);
+    EXPECT_EQ(4, details.at(streamId).streamBytesAcked);
+  }
 }
 
 TEST_F(AckEventForAppDataTest, SpuriousAckProcessesUnifiedCryptoData) {
@@ -4946,9 +5091,18 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
   // this ensures the rest of our test does not modify it inadvertently
   const auto detailsPerStream = [&]() {
     AckEvent::AckPacket::DetailsPerStream detailsPerStreamL;
-    detailsPerStreamL.recordFrameAlreadyDelivered(s1f1);
-    detailsPerStreamL.recordFrameDelivered(s1f2);
-    detailsPerStreamL.recordFrameDelivered(s1f3);
+    const auto deliveredWholeFrame = [](const WriteStreamFrame& frame) {
+      StreamFrameAckDelivery delivery;
+      delivery.handled = true;
+      delivery.newlyDeliveredIntervals.emplace_back(
+          frame.offset, frame.offset + frame.len - 1);
+      return delivery;
+    };
+    StreamFrameAckDelivery deliveredNothing;
+    deliveredNothing.handled = true;
+    detailsPerStreamL.recordFrameDelivery(s1f1, deliveredNothing);
+    detailsPerStreamL.recordFrameDelivery(s1f2, deliveredWholeFrame(s1f2));
+    detailsPerStreamL.recordFrameDelivery(s1f3, deliveredWholeFrame(s1f3));
     return detailsPerStreamL;
   }();
 
@@ -4956,6 +5110,7 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
   const auto&& getDefaultBuilder = [&]() {
     return AckEventStreamDetailsMatcherBuilder()
         .setStreamID(s1Id)
+        .setStreamBytesAcked(s1f2.len + s1f3.len)
         .addDupAckedStreamInterval(s1f1.offset, s1f1.offset + s1f1.len - 1);
   };
 
@@ -4976,6 +5131,32 @@ TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
     EXPECT_THAT(
         detailsPerStream,
         UnorderedElementsAre(getDefaultBuilder().setStreamID(s1Id).build()));
+  }
+
+  // wrong stream bytes acked
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder()
+                .setStreamBytesAcked(s1f2.len + s1f3.len + 1)
+                .build())));
+
+    // prove that matcher works if fixed
+    EXPECT_THAT(
+        detailsPerStream,
+        UnorderedElementsAre(
+            getDefaultBuilder()
+                .setStreamBytesAcked(s1f2.len + s1f3.len)
+                .build()));
+  }
+
+  // wrong stream bytes acked (empty)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder().setStreamBytesAcked(0).build())));
   }
 
   // wrong dup acked stream intervals (add f3)
@@ -5095,10 +5276,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f1
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f1.len)
                       .build(),
                   // s2f1
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f1.len)
                       .build())),
           // pkt2
           Field(
@@ -5107,10 +5290,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f2
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f2.len)
                       .build(),
                   // s2f2
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f2.len)
                       .build())),
           // pkt3
           Field(
@@ -5119,10 +5304,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f3
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f3.len)
                       .build(),
                   // s2f3
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f3.len)
                       .build())),
           // pkt4
           Field(
@@ -5131,6 +5318,7 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s3f1
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s3Id)
+                      .setStreamBytesAcked(s3f1.len)
                       .build())),
           // pkt5
           Field(
@@ -5139,10 +5327,12 @@ TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
                   // s1f4 w/ EOR
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f4.len)
                       .build(),
                   // s2f4 w/ EOR
                   AckEventStreamDetailsMatcherBuilder()
                       .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f4.len)
                       .build()))));
 }
 
@@ -6920,7 +7110,149 @@ TEST_F(AckEventForAppDataTest, AckEventRetransHasNewFrame) {
                     // s1f1 + s1f2
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len + s1f2.len)
                         .build()))));
+  }
+}
+
+TEST_F(
+    AckEventForAppDataTest,
+    PartiallyOverlappingFrameCreditsOnlyNewSubrange) {
+  const auto streamId =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  const auto originalFrame =
+      writeDataToQuicStreamAndGetFrame(streamId, "0123456789", false);
+  const auto previouslyDeliveredStart =
+      originalFrame.offset + originalFrame.len / 2;
+  const auto previouslyDeliveredEnd =
+      originalFrame.offset + originalFrame.len - 1;
+
+  auto originalPacket = buildEmptyPacket(PacketNumberSpace::AppData);
+  originalPacket.packet.frames.push_back(originalFrame);
+  sendAppDataPacket(originalPacket);
+  const auto originalPacketNum =
+      originalPacket.packet.header.getPacketSequenceNum();
+
+  auto* stream = getConn()->streamManager->findStream(streamId);
+  ASSERT_NE(stream, nullptr);
+  stream->ackedIntervals.insert(
+      previouslyDeliveredStart, previouslyDeliveredEnd);
+
+  const auto originalAck =
+      deliverAckForAppDataPackets(originalPacketNum, originalPacketNum);
+  EXPECT_THAT(
+      originalAck.ackedPackets,
+      ElementsAre(Field(
+          &AckEvent::AckPacket::detailsPerStream,
+          UnorderedElementsAre(
+              AckEventStreamDetailsMatcherBuilder()
+                  .setStreamID(streamId)
+                  .setStreamBytesAcked(originalFrame.len / 2)
+                  .addDupAckedStreamInterval(
+                      previouslyDeliveredStart, previouslyDeliveredEnd)
+                  .build()))));
+}
+
+TEST_F(
+    AckEventForAppDataTest,
+    UnifiedSendBufferPartiallyOverlappingFrameCreditsOnlyNewSubrange) {
+  getConn()->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream =
+      getConn()->streamManager->createNextBidirectionalStream().value();
+  ASSERT_NE(stream, nullptr);
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  const auto originalFrame =
+      writeDataToQuicStreamAndGetFrame(stream->id, "0123456789", false);
+  const auto previouslyDeliveredLen = originalFrame.len / 2;
+  const auto previouslyDeliveredStart =
+      originalFrame.offset + originalFrame.len - previouslyDeliveredLen;
+  const auto previouslyDeliveredEnd =
+      originalFrame.offset + originalFrame.len - 1;
+
+  auto originalPacket = buildEmptyPacket(PacketNumberSpace::AppData);
+  originalPacket.packet.frames.push_back(originalFrame);
+  sendAppDataPacket(originalPacket);
+  const auto originalPacketNum =
+      originalPacket.packet.header.getPacketSequenceNum();
+
+  // Delivery of the second half was already credited before this ACK. The
+  // unified send buffer, not QuicStreamState::ackedIntervals, records it.
+  ASSERT_TRUE(stream->streamSendBuffer
+                  ->markAcked(
+                      {.offset = previouslyDeliveredStart,
+                       .len = previouslyDeliveredLen,
+                       .fin = false})
+                  .has_value());
+  ASSERT_TRUE(stream->ackedIntervals.empty());
+
+  const auto originalAck =
+      deliverAckForAppDataPackets(originalPacketNum, originalPacketNum);
+  EXPECT_THAT(
+      originalAck.ackedPackets,
+      ElementsAre(Field(
+          &AckEvent::AckPacket::detailsPerStream,
+          UnorderedElementsAre(
+              AckEventStreamDetailsMatcherBuilder()
+                  .setStreamID(stream->id)
+                  .setStreamBytesAcked(
+                      originalFrame.len - previouslyDeliveredLen)
+                  .addDupAckedStreamInterval(
+                      previouslyDeliveredStart, previouslyDeliveredEnd)
+                  .build()))));
+  const AckEvent::AckPacket::StreamDetails::StreamIntervals
+      expectedNewlyDelivered{
+          {originalFrame.offset, previouslyDeliveredStart - 1}};
+  EXPECT_EQ(
+      expectedNewlyDelivered,
+      originalAck.ackedPackets.front()
+          .detailsPerStream.at(stream->id)
+          .newlyDeliveredStreamIntervals);
+}
+
+// Every byte of an ACKed frame is credited once, as inclusive intervals: a
+// 100-byte frame [0, 99] credits [0, 99] and 100 bytes, and a frame whose first
+// half was already delivered credits exactly its second half. Both send buffers
+// must agree; the unified one reports half-open ranges internally.
+TEST_F(AckEventForAppDataTest, AckCreditsEveryFrameByteAsInclusiveIntervals) {
+  using StreamIntervals = AckEvent::AckPacket::StreamDetails::StreamIntervals;
+  const std::string data(100, 'x');
+  for (const bool unified : {false, true}) {
+    SCOPED_TRACE(unified ? "unified send buffer" : "legacy send buffer");
+    getConn()->transportSettings.useUnifiedAppStreamSendBuffer = unified;
+    for (const bool firstHalfDelivered : {false, true}) {
+      SCOPED_TRACE(firstHalfDelivered ? "first half delivered" : "whole frame");
+      auto* stream =
+          getConn()->streamManager->createNextBidirectionalStream().value();
+      ASSERT_EQ(unified, stream->streamSendBuffer.has_value());
+      const auto frame =
+          writeDataToQuicStreamAndGetFrame(stream->id, data, false);
+      ASSERT_EQ(0, frame.offset);
+      ASSERT_EQ(100, frame.len);
+      auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+      packet.packet.frames.push_back(frame);
+      sendAppDataPacket(packet);
+      const auto packetNum = packet.packet.header.getPacketSequenceNum();
+      if (firstHalfDelivered) {
+        if (unified) {
+          ASSERT_TRUE(stream->streamSendBuffer
+                          ->markAcked({.offset = 0, .len = 50, .fin = false})
+                          .has_value());
+        } else {
+          stream->ackedIntervals.insert(0, 49);
+        }
+      }
+
+      const auto ack = deliverAckForAppDataPackets(packetNum, packetNum);
+
+      ASSERT_EQ(1, ack.ackedPackets.size());
+      const auto details =
+          ack.ackedPackets.front().detailsPerStream.at(stream->id);
+      const StreamIntervals expected{
+          firstHalfDelivered ? Interval<uint64_t>(50, 99)
+                             : Interval<uint64_t>(0, 99)};
+      EXPECT_EQ(expected, details.newlyDeliveredStreamIntervals);
+      EXPECT_EQ(firstHalfDelivered ? 50 : 100, details.streamBytesAcked);
+    }
   }
 }
 
@@ -6981,6 +7313,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
                         .build())),
             // pkt2
             Field(
@@ -6988,6 +7321,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
                         // moved forward to f2
                         // retrans ACKed after original, thus making f1
                         // dupacked
@@ -7054,6 +7388,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
                         .build()))));
   }
 
@@ -7072,6 +7407,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
                         // p1 acked earlier, thus making f1 dupacked
                         .addDupAckedStreamInterval(
                             s1f1.offset, s1f1.offset + s1f1.len - 1)
@@ -7137,6 +7473,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len + s1f2.len)
                         .build()))));
   }
 
@@ -7155,6 +7492,7 @@ TEST_F(
                 UnorderedElementsAre(
                     AckEventStreamDetailsMatcherBuilder()
                         .setStreamID(s1Id)
+                        .setStreamBytesAcked(0)
                         // no change, since already advanced by p2
                         // orig ACKed after retrans, thus making f1 dupacked
                         .addDupAckedStreamInterval(
@@ -8218,6 +8556,213 @@ TEST(LegacyAckProcessing, DecodesTwoRangesTheEncoderWould) {
   ASSERT_FALSE(res.hasError());
   EXPECT_EQ(
       out, timestampsByPacketNum({{98, 500}, {97, 490}, {92, 450}, {91, 430}}));
+}
+
+class AckEventUndeliveredStreamFrameTest
+    : public AckEventForAppDataTest,
+      public WithParamInterface<bool /* useUnifiedSendBuffer */> {
+ protected:
+  void SetUp() override {
+    AckEventForAppDataTest::SetUp();
+    getConn()->transportSettings.useUnifiedAppStreamSendBuffer = GetParam();
+    stream_ = getConn()->streamManager->createNextBidirectionalStream().value();
+    ASSERT_NE(stream_, nullptr);
+    ASSERT_EQ(GetParam(), stream_->streamSendBuffer.has_value());
+  }
+
+  QuicStreamState* stream_{nullptr};
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    SendBufferModes,
+    AckEventUndeliveredStreamFrameTest,
+    Values(false, true),
+    [](const TestParamInfo<bool>& info) {
+      return info.param ? "Unified" : "Legacy";
+    });
+
+TEST_P(AckEventUndeliveredStreamFrameTest, AckAfterResetCreditsNothing) {
+  const auto frame =
+      writeDataToQuicStreamAndGetFrame(stream_->id, "data", false);
+  auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet.packet.frames.emplace_back(frame);
+  sendAppDataPacket(packet);
+  const auto packetNum = packet.packet.header.getPacketSequenceNum();
+
+  // The reset discards the stream's send state, so the ACK below does not
+  // mark the frame's bytes delivered.
+  ASSERT_FALSE(resetQuicStream(*stream_, GenericApplicationErrorCode::UNKNOWN)
+                   .hasError());
+
+  const auto ack = deliverAckForAppDataPackets(packetNum, packetNum);
+  ASSERT_EQ(1, ack.ackedPackets.size());
+  EXPECT_TRUE(ack.ackedPackets.front()
+                  .detailsPerStream.at(stream_->id)
+                  .newlyDeliveredStreamIntervals.empty());
+  EXPECT_THAT(
+      ack.ackedPackets,
+      ElementsAre(Field(
+          &AckEvent::AckPacket::detailsPerStream,
+          UnorderedElementsAre(
+              AckEventStreamDetailsMatcherBuilder()
+                  .setStreamID(stream_->id)
+                  .setStreamBytesAcked(0)
+                  .addDupAckedStreamInterval(
+                      frame.offset, frame.offset + frame.len - 1)
+                  .build()))));
+}
+
+class AckEventFirstArrivalTest : public AckEventUndeliveredStreamFrameTest {
+ protected:
+  using FirstArrival = AckEvent::AckPacket::FirstArrival;
+
+  // Sends the original packet carrying `frame_`, then a clone of it, the way
+  // the cloning scheduler does: both carry the same ClonedPacketIdentifier.
+  void sendOriginalAndClone() {
+    frame_ = writeDataToQuicStreamAndGetFrame(stream_->id, "hello", false);
+    auto original = buildEmptyPacket(PacketNumberSpace::AppData);
+    original.packet.frames.emplace_back(*frame_);
+    sendAppDataPacket(original);
+    originalPacketNum_ = original.packet.header.getPacketSequenceNum();
+
+    auto& originalOutstanding = getConn()->outstandings.packets.back();
+    const ClonedPacketIdentifier cloneId(
+        PacketNumberSpace::AppData, originalPacketNum_);
+    originalOutstanding.maybeClonedPacketIdentifier = cloneId;
+    getConn()->outstandings.clonedPacketIdentifiers.insert(cloneId);
+    ++getConn()->outstandings.clonedPacketCount[PacketNumberSpace::AppData];
+
+    auto clone = buildEmptyPacket(PacketNumberSpace::AppData);
+    clone.packet.frames.emplace_back(*frame_);
+    auto pathInfo = getConn()->pathManager->getPath(getConn()->currentPathId);
+    ASSERT_TRUE(pathInfo);
+    ASSERT_FALSE(updateConnection(
+                     *getConn(),
+                     *pathInfo,
+                     cloneId,
+                     clone.packet,
+                     Clock::now(),
+                     getEncodedSize(clone),
+                     getEncodedBodySize(clone),
+                     PacketTransmissionReason::PtoProbe)
+                     .hasError());
+    clonePacketNum_ = clone.packet.header.getPacketSequenceNum();
+    ASSERT_EQ(originalPacketNum_ + 1, clonePacketNum_);
+  }
+
+  // ACKs both copies in one ACK frame. With `deltas`, the peer reports
+  // receive timestamps for the clone, then the original.
+  AckEvent ackBothCopies(Optional<std::array<uint64_t, 2>> deltas) {
+    if (deltas) {
+      getConn()->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+          AckReceiveTimestampsConfig{
+              .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0};
+    }
+    return deliverAckForAppDataPackets(
+        {{originalPacketNum_, clonePacketNum_}},
+        Clock::now(),
+        0us,
+        [&](ReadAckFrame& ackFrame) {
+          if (!deltas) {
+            return;
+          }
+          ackFrame.frameType = FrameType::ACK_RECEIVE_TIMESTAMPS;
+          ackFrame.timestampsVersion = AckReceiveTimestampsVersion::LegacyMvfst;
+          ackFrame.maybeLatestRecvdPacketNum = clonePacketNum_;
+          ackFrame.maybeLatestRecvdPacketTime = 1ms;
+          ackFrame.recvdPacketsTimestampRanges = {RecvdPacketsTimestampsRange{
+              .gap = 0,
+              .timestamp_delta_count = 2,
+              .deltas = {(*deltas)[0], (*deltas)[1]}}};
+        });
+  }
+
+  const AckEvent::AckPacket& ackedPacket(
+      const AckEvent& ack,
+      PacketNum packetNum) {
+    const auto it = std::find_if(
+        ack.ackedPackets.begin(),
+        ack.ackedPackets.end(),
+        [packetNum](const auto& packet) {
+          return packet.packetNum == packetNum;
+        });
+    CHECK(it != ack.ackedPackets.end());
+    return *it;
+  }
+
+  uint64_t creditedBytes(const AckEvent& ack) {
+    uint64_t total = 0;
+    for (const auto& packet : ack.ackedPackets) {
+      const auto it = packet.detailsPerStream.find(stream_->id);
+      if (it != packet.detailsPerStream.end()) {
+        total += it->second.streamBytesAcked;
+      }
+    }
+    return total;
+  }
+
+  Optional<WriteStreamFrame> frame_;
+  PacketNum originalPacketNum_{0};
+  PacketNum clonePacketNum_{0};
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    SendBufferModes,
+    AckEventFirstArrivalTest,
+    Values(false, true),
+    [](const TestParamInfo<bool>& info) {
+      return info.param ? "Unified" : "Legacy";
+    });
+
+TEST_P(AckEventFirstArrivalTest, CloneAckedAfterOriginalIsNotFirstArrival) {
+  sendOriginalAndClone();
+
+  const auto originalAck =
+      deliverAckForAppDataPackets(originalPacketNum_, originalPacketNum_);
+  const auto& original = ackedPacket(originalAck, originalPacketNum_);
+  EXPECT_TRUE(original.framesProcessed);
+  EXPECT_EQ(FirstArrival::Yes, original.firstArrival);
+  EXPECT_EQ(frame_->len, creditedBytes(originalAck));
+
+  const auto cloneAck =
+      deliverAckForAppDataPackets(clonePacketNum_, clonePacketNum_);
+  const auto& clone = ackedPacket(cloneAck, clonePacketNum_);
+  EXPECT_FALSE(clone.framesProcessed);
+  EXPECT_EQ(FirstArrival::No, clone.firstArrival);
+  EXPECT_EQ(0, creditedBytes(cloneAck));
+}
+
+TEST_P(AckEventFirstArrivalTest, SameAckWithoutTimestampsHasUnknownOrder) {
+  sendOriginalAndClone();
+
+  const auto ack = ackBothCopies(std::nullopt);
+  EXPECT_EQ(
+      FirstArrival::Unknown, ackedPacket(ack, originalPacketNum_).firstArrival);
+  EXPECT_EQ(
+      FirstArrival::Unknown, ackedPacket(ack, clonePacketNum_).firstArrival);
+  // mvfst processes the frames of one copy, so the bytes are credited once.
+  EXPECT_EQ(frame_->len, creditedBytes(ack));
+}
+
+TEST_P(AckEventFirstArrivalTest, SameAckTimestampsOrderCopies) {
+  sendOriginalAndClone();
+
+  // The original was received 300us before the clone.
+  const auto ack = ackBothCopies(std::array<uint64_t, 2>{1000, 300});
+  EXPECT_EQ(
+      FirstArrival::Yes, ackedPacket(ack, originalPacketNum_).firstArrival);
+  EXPECT_EQ(FirstArrival::No, ackedPacket(ack, clonePacketNum_).firstArrival);
+  EXPECT_EQ(frame_->len, creditedBytes(ack));
+}
+
+TEST_P(AckEventFirstArrivalTest, SameAckEqualTimestampsHaveUnknownOrder) {
+  sendOriginalAndClone();
+
+  const auto ack = ackBothCopies(std::array<uint64_t, 2>{1000, 0});
+  EXPECT_EQ(
+      FirstArrival::Unknown, ackedPacket(ack, originalPacketNum_).firstArrival);
+  EXPECT_EQ(
+      FirstArrival::Unknown, ackedPacket(ack, clonePacketNum_).firstArrival);
 }
 
 } // namespace quic::test

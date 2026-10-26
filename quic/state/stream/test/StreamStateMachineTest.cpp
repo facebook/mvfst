@@ -213,6 +213,58 @@ TEST_F(QuicOpenStateTest, AckStream) {
   ASSERT_EQ(stream->sendState, StreamSendState::Closed);
 }
 
+// A stream marks an ACKed frame handled only where it does delivery
+// bookkeeping: a closed stream accounts for the frame with nothing newly
+// delivered, while a stream in an invalid send state rejects it unhandled.
+TEST_F(QuicOpenStateTest, AckDeliveryHandledOnlyWhereBookkeepingRuns) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  const WriteStreamFrame frame(stream->id, 0, 5, false);
+
+  StreamFrameAckDelivery closedDelivery;
+  conn->streamFrameAckDelivery = &closedDelivery;
+  stream->sendState = StreamSendState::Closed;
+  ASSERT_FALSE(sendAckSMHandler(*stream, frame).hasError());
+  EXPECT_TRUE(closedDelivery.handled);
+  EXPECT_TRUE(closedDelivery.newlyDeliveredIntervals.empty());
+
+  StreamFrameAckDelivery invalidDelivery;
+  conn->streamFrameAckDelivery = &invalidDelivery;
+  stream->sendState = StreamSendState::Invalid;
+  EXPECT_TRUE(sendAckSMHandler(*stream, frame).hasError());
+  EXPECT_FALSE(invalidDelivery.handled);
+  conn->streamFrameAckDelivery = nullptr;
+}
+
+// The unified send buffer reports newly ACKed ranges as half-open
+// [begin, end); the stream reports them as inclusive delivery intervals that
+// cover every newly ACKed byte, including the last one.
+TEST_F(QuicOpenStateTest, UnifiedAckReportsInclusiveDeliveryIntervals) {
+  auto conn = createConn();
+  conn->transportSettings.useUnifiedAppStreamSendBuffer = true;
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_TRUE(stream->streamSendBuffer.has_value());
+  ASSERT_TRUE(stream->streamSendBuffer->append(
+      IOBuf::copyBuffer(std::string(200, 'x')), false));
+  ASSERT_TRUE(stream->streamSendBuffer->markNewDataSent({0, 200, false}));
+  const auto ackFrame = [&](uint64_t offset, uint64_t len) {
+    StreamFrameAckDelivery delivery;
+    conn->streamFrameAckDelivery = &delivery;
+    EXPECT_FALSE(sendAckSMHandler(
+                     *stream, WriteStreamFrame(stream->id, offset, len, false))
+                     .hasError());
+    conn->streamFrameAckDelivery = nullptr;
+    return std::vector<Interval<uint64_t>>(
+        delivery.newlyDeliveredIntervals.begin(),
+        delivery.newlyDeliveredIntervals.end());
+  };
+
+  EXPECT_THAT(ackFrame(0, 100), ElementsAre(Interval<uint64_t>(0, 99)));
+  // A frame [100, 199] whose second half an earlier ACK already delivered.
+  EXPECT_THAT(ackFrame(150, 50), ElementsAre(Interval<uint64_t>(150, 199)));
+  EXPECT_THAT(ackFrame(100, 100), ElementsAre(Interval<uint64_t>(100, 149)));
+}
+
 TEST_F(QuicOpenStateTest, AckStreamMulti) {
   auto conn = createConn();
 

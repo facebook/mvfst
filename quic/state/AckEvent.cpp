@@ -8,36 +8,51 @@
 #include <folly/MapUtil.h>
 #include <quic/common/MvfstLogging.h>
 #include <quic/state/AckEvent.h>
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
 namespace quic {
 
-void AckEvent::AckPacket::DetailsPerStream::recordFrameDelivered(
-    const WriteStreamFrame& frame) {
+bool AckEvent::AckPacket::DetailsPerStream::recordFrameDelivery(
+    const WriteStreamFrame& frame,
+    const StreamFrameAckDelivery& delivery) {
   if (!frame.len) { // may be FIN only
-    return;
-  }
-  emplace(
-      std::piecewise_construct,
-      std::make_tuple(frame.streamId),
-      std::make_tuple());
-}
-
-void AckEvent::AckPacket::DetailsPerStream::recordFrameAlreadyDelivered(
-    const WriteStreamFrame& frame) {
-  if (!frame.len) { // may be FIN only
-    return;
+    return true;
   }
   auto [it, inserted] = emplace(
       std::piecewise_construct,
       std::make_tuple(frame.streamId),
       std::make_tuple());
-  (void)inserted; // Unused after DSR removal
-
-  auto& outstandingPacketStreamDetails = it->second;
-  outstandingPacketStreamDetails.dupAckedStreamIntervals.insert(
-      frame.offset, frame.offset + frame.len - 1);
+  (void)inserted;
+  auto& streamDetails = it->second;
+  const auto frameEnd = frame.offset + frame.len - 1;
+  auto nextOffset = frame.offset;
+  bool withinFrame = true;
+  for (const auto& interval : delivery.newlyDeliveredIntervals) {
+    // Streams report increasing subranges of the ACKed frame: the unified send
+    // buffer clips them to the frame, and the legacy path CHECKs that the
+    // retransmission chunk it delivers has the frame's offset and length.
+    // Anything else is clamped so each frame byte is credited at most once.
+    if (interval.start < nextOffset || interval.end > frameEnd) {
+      withinFrame = false;
+    }
+    const auto start = std::max(interval.start, nextOffset);
+    const auto end = std::min(interval.end, frameEnd);
+    if (start > end) {
+      continue;
+    }
+    if (start > nextOffset) {
+      streamDetails.dupAckedStreamIntervals.insert(nextOffset, start - 1);
+    }
+    streamDetails.newlyDeliveredStreamIntervals.insert(start, end);
+    streamDetails.streamBytesAcked += end - start + 1;
+    nextOffset = end + 1;
+  }
+  if (nextOffset <= frameEnd) {
+    streamDetails.dupAckedStreamIntervals.insert(nextOffset, frameEnd);
+  }
+  return withinFrame;
 }
 
 AckEvent::AckPacket::AckPacket(
@@ -95,11 +110,23 @@ AckEvent::AckPacket::Builder::setReceiveDeltaTimeStamp(
   return std::move(*this);
 }
 
+AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setFramesProcessed(
+    bool framesProcessedIn) {
+  framesProcessed = framesProcessedIn;
+  return std::move(*this);
+}
+
+AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setFirstArrival(
+    FirstArrival firstArrivalIn) {
+  firstArrival = firstArrivalIn;
+  return std::move(*this);
+}
+
 AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
   MVCHECK(packetNum.has_value());
   MVCHECK(outstandingPacketMetadata);
   MVCHECK(detailsPerStream.has_value());
-  return AckEvent::AckPacket(
+  auto ackPacket = AckEvent::AckPacket(
       packetNum.value(),
       *outstandingPacketMetadata,
       detailsPerStream.value(),
@@ -108,6 +135,9 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
                           : std::nullopt,
       isAppLimited,
       std::move(receiveRelativeTimeStampUsec));
+  ackPacket.framesProcessed = framesProcessed;
+  ackPacket.firstArrival = firstArrival;
+  return ackPacket;
 }
 
 void AckEvent::AckPacket::Builder::buildInto(
@@ -115,7 +145,7 @@ void AckEvent::AckPacket::Builder::buildInto(
   MVCHECK(packetNum.has_value());
   MVCHECK(outstandingPacketMetadata);
   MVCHECK(detailsPerStream.has_value());
-  ackedPacketsVec.emplace_back(
+  auto& ackPacket = ackedPacketsVec.emplace_back(
       packetNum.value(),
       *outstandingPacketMetadata,
       detailsPerStream.value(),
@@ -124,6 +154,8 @@ void AckEvent::AckPacket::Builder::buildInto(
                           : std::nullopt,
       isAppLimited,
       std::move(receiveRelativeTimeStampUsec));
+  ackPacket.framesProcessed = framesProcessed;
+  ackPacket.firstArrival = firstArrival;
 }
 
 AckEvent::Builder&& AckEvent::Builder::setAckTime(TimePoint ackTimeIn) {

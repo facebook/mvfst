@@ -687,6 +687,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Holds the ACK events generated during the last round of ACK processing.
   std::vector<AckEvent> lastProcessedAckEvents;
 
+  // Set by processAckFrame only while the ACK visitor handles a stream frame;
+  // the stream's ACK handler reports what it newly marked delivered here.
+  StreamFrameAckDelivery* streamFrameAckDelivery{nullptr};
+
   // Type of node owning this connection (client or server).
   QuicNodeType nodeType;
 

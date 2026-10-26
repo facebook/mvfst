@@ -13,6 +13,8 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStreamFunctions.h>
 
+#include <algorithm>
+
 namespace quic {
 
 namespace {
@@ -93,6 +95,43 @@ void checkClosedSendState(const QuicStreamState& stream) {
       "quic_stream_send_handlers",
       "closed send stream has pending writes");
   MVDCHECK(stream.pendingWrites.empty());
+}
+
+// Reports the parts of [start, end] that `covered` does not include, with
+// inclusive bounds like IntervalSet (unlike StreamSendBuffer's half-open
+// ranges).
+template <typename IntervalSetT, typename Fn>
+void forEachUncoveredRange(
+    const IntervalSetT& covered,
+    uint64_t start,
+    uint64_t end,
+    Fn&& fn) {
+  auto nextOffset = start;
+  auto it = std::lower_bound(
+      covered.begin(),
+      covered.end(),
+      start,
+      [](const auto& interval, uint64_t offset) {
+        return interval.end < offset;
+      });
+  for (; it != covered.end() && it->start <= end && nextOffset <= end; ++it) {
+    if (it->start > nextOffset) {
+      fn(nextOffset, it->start - 1);
+    }
+    nextOffset = std::max(nextOffset, it->end + 1);
+  }
+  if (nextOffset <= end) {
+    fn(nextOffset, end);
+  }
+}
+
+void recordNewlyDelivered(
+    StreamFrameAckDelivery* delivery,
+    uint64_t start,
+    uint64_t end) {
+  if (delivery) {
+    delivery->newlyDeliveredIntervals.emplace_back(start, end);
+  }
 }
 
 } // namespace
@@ -266,12 +305,27 @@ quic::Expected<void, QuicError> sendRstSMHandler(
 quic::Expected<void, QuicError> sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame) {
+  // Mark the frame handled only where this stream does its delivery
+  // bookkeeping, so ACK processing can tell a frame the stream accounted for,
+  // even one whose bytes were already delivered, from one it rejected.
+  auto* delivery = stream.conn.streamFrameAckDelivery;
+  const auto markHandled = [delivery] {
+    if (delivery) {
+      delivery->handled = true;
+    }
+  };
   if (stream.streamSendBuffer && stream.sendState != StreamSendState::Invalid) {
+    markHandled();
     const bool hadLoss = stream.hasLoss();
     auto ackResult = stream.streamSendBuffer->markAcked(
         {.offset = ackedFrame.offset,
          .len = ackedFrame.len,
-         .fin = ackedFrame.fin});
+         .fin = ackedFrame.fin},
+        // markAcked() reports half-open [begin, end); delivery intervals are
+        // inclusive.
+        [delivery](uint64_t begin, uint64_t end) {
+          recordNewlyDelivered(delivery, begin, end - 1);
+        });
     if (!ackResult) {
       return quic::make_unexpected(QuicError(
           TransportErrorCode::INTERNAL_ERROR,
@@ -301,6 +355,7 @@ quic::Expected<void, QuicError> sendAckSMHandler(
   switch (stream.sendState) {
     case StreamSendState::Open:
     case StreamSendState::ResetSent: {
+      markHandled();
       // Clean up the acked buffers from the retransmissionBuffer.
       auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
@@ -344,6 +399,16 @@ quic::Expected<void, QuicError> sendAckSMHandler(
                    << " offset=" << ackedBuffer->second->offset
                    << " len=" << ackedBuffer->second->data.chainLength()
                    << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
+        if (const auto len = ackedBuffer->second->data.chainLength()) {
+          const auto start = ackedBuffer->second->offset;
+          forEachUncoveredRange(
+              stream.ackedIntervals,
+              start,
+              start + len - 1,
+              [delivery](uint64_t newlyStart, uint64_t newlyEnd) {
+                recordNewlyDelivered(delivery, newlyStart, newlyEnd);
+              });
+        }
         auto updateResult = stream.updateAckedIntervals(
             ackedBuffer->second->offset,
             ackedBuffer->second->data.chainLength(),
@@ -375,6 +440,7 @@ quic::Expected<void, QuicError> sendAckSMHandler(
       break;
     }
     case StreamSendState::Closed: {
+      markHandled();
       checkClosedSendState(stream);
       break;
     }

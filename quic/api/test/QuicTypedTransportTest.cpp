@@ -10,8 +10,10 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <map>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <quic/api/test/Mocks.h>
 #include <quic/api/test/QuicTypedTransportTestUtil.h>
@@ -22,6 +24,7 @@
 #include <quic/server/test/QuicServerTransportTestUtil.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
+#include <quic/state/test/AckEventTestUtil.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace folly;
@@ -4940,8 +4943,10 @@ TYPED_TEST(
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
-  auto typedTestWriteChain61 = this->getTransport()->writeChain(
-      streamId, IOBuf::copyBuffer("hello"), false);
+  auto streamBody = IOBuf::copyBuffer("hello");
+  const auto streamBodyLength = streamBody->computeChainDataLength();
+  auto typedTestWriteChain61 =
+      this->getTransport()->writeChain(streamId, std::move(streamBody), false);
   const auto maybeWrittenPackets = this->loopForWrites();
 
   // should have sent one packet
@@ -4954,7 +4959,7 @@ TYPED_TEST(
   const auto sentTime = maybeWrittenPackets->sentTime;
   const auto ackRecvTime = sentTime + 27ms;
   const auto ackDelay = 0us;
-  const auto matcher =
+  const auto matcher = testing::AllOf(
       AckEventMatcherBuilder<TypeParam>()
           .setExpectedAckedIntervals({maybeWrittenPackets})
           .setExpectedNumAckedPackets(1)
@@ -4968,7 +4973,20 @@ TYPED_TEST(
           .setRttNoAckDelay(
               std::chrono::duration_cast<std::chrono::microseconds>(
                   ackRecvTime - sentTime - ackDelay))
-          .build();
+          .build(),
+      testing::Property(
+          &SocketObserverInterface::AcksProcessedEvent::getAckEvents,
+          testing::ElementsAre(
+              testing::Field(
+                  &AckEvent::ackedPackets,
+                  testing::ElementsAre(
+                      testing::Field(
+                          &AckEvent::AckPacket::detailsPerStream,
+                          testing::UnorderedElementsAre(
+                              AckEventStreamDetailsMatcherBuilder()
+                                  .setStreamID(streamId)
+                                  .setStreamBytesAcked(streamBodyLength)
+                                  .build())))))));
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
   EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -8186,5 +8204,198 @@ INSTANTIATE_TEST_SUITE_P(
     QuicServerTransportConnectionEndTest,
     ValuesIn(ConnectionEndTestCases::allCases()),
     ConnectionEndTestCases::caseName);
+
+template <typename T>
+class QuicTypedTransportCloneAckAfterLossTest
+    : public QuicTypedTransportTest<T> {
+ protected:
+  // The original packet is declared lost while its PTO clone is outstanding,
+  // the clone is then ACKed, and the retransmission that follows is ACKed
+  // too. ACK processing skips the clone's frames, so the bytes must be
+  // credited once, to the retransmission.
+  void verifyBytesCreditedOnce(const bool useUnifiedSendBuffer) {
+    constexpr auto kAckRtt = 27ms;
+    constexpr std::string_view kData = "hello";
+
+    this->startTransport();
+    this->ackAllOutstandingPackets();
+    auto& conn = this->getNonConstConn();
+    conn.transportSettings.useUnifiedAppStreamSendBuffer = useUnifiedSendBuffer;
+    // Packet number skipping would make write intervals non-contiguous.
+    conn.transportSettings.skipOneInNPacketSequenceNumber = 0;
+    // Only packet-threshold loss detection, configured below, declares the
+    // original packet lost.
+    conn.lossState.reorderingThreshold = 100;
+    conn.transportSettings.timeReorderingThreshDividend = 1000000;
+    conn.transportSettings.timeReorderingThreshDivisor = 1;
+
+    auto transport = this->getTransport();
+    const auto streamId = transport->createBidirectionalStream().value();
+    auto* stream = conn.streamManager->findStream(streamId);
+    ASSERT_NE(stream, nullptr);
+    ASSERT_EQ(useUnifiedSendBuffer, stream->usesUnifiedSendBuffer());
+
+    ASSERT_FALSE(
+        transport->writeChain(streamId, IOBuf::copyBuffer(kData), false)
+            .hasError());
+    const auto original = this->loopForWrites();
+    ASSERT_TRUE(original.has_value());
+    ASSERT_EQ(original->start, original->end);
+    const auto originalPacketNum = original->start;
+
+    // Returns the newest AppData packet in the interval that carries stream
+    // data, or nullptr.
+    const auto findStreamPacket =
+        [&](const auto& interval) -> const OutstandingPacketWrapper* {
+      const OutstandingPacketWrapper* found = nullptr;
+      for (const auto& packet : conn.outstandings.packets) {
+        const auto packetNum = packet.packet.header.getPacketSequenceNum();
+        if (packet.packet.header.getPacketNumberSpace() ==
+                PacketNumberSpace::AppData &&
+            packetNum >= interval.start && packetNum <= interval.end &&
+            hasStreamFrame(packet.packet.frames)) {
+          found = &packet;
+        }
+      }
+      return found;
+    };
+
+    conn.pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 1;
+    this->getTestTransport()->writeLooper()->run(true);
+    const auto probes = this->loopForWrites();
+    ASSERT_TRUE(probes.has_value());
+    const auto* clonePacket = findStreamPacket(*probes);
+    ASSERT_NE(clonePacket, nullptr);
+    ASSERT_TRUE(clonePacket->maybeClonedPacketIdentifier.has_value());
+    const auto clonePacketNum =
+        clonePacket->packet.header.getPacketSequenceNum();
+    const auto cloneSentTime = clonePacket->metadata.time;
+
+    // ACKing a later packet on another stream declares the original packet,
+    // but not its clone, lost by packet threshold.
+    const auto triggerStreamId = transport->createBidirectionalStream().value();
+    ASSERT_FALSE(
+        transport->writeChain(triggerStreamId, IOBuf::copyBuffer("a"), false)
+            .hasError());
+    const auto trigger = this->loopForWrites();
+    ASSERT_TRUE(trigger.has_value());
+    ASSERT_EQ(trigger->start, trigger->end);
+    ASSERT_GT(clonePacketNum, originalPacketNum);
+    // A packet is lost by reordering when the ACKed packet is more than
+    // `reorderingThreshold` packets after it.
+    conn.lossState.reorderingThreshold =
+        static_cast<uint32_t>(trigger->end - originalPacketNum - 1);
+
+    LegacyObserver::EventSet eventSet;
+    eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
+    auto observer = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+    EXPECT_CALL(*observer, observerAttach(transport));
+    transport->addObserver(observer.get());
+
+    struct AckedPacketSummary {
+      bool framesProcessed{false};
+      AckEvent::AckPacket::FirstArrival firstArrival{
+          AckEvent::AckPacket::FirstArrival::Unknown};
+      uint64_t streamBytesAcked{0};
+      std::vector<Interval<uint64_t>> carriedStreamIntervals;
+    };
+
+    std::map<PacketNum, AckedPacketSummary> ackedPackets;
+    EXPECT_CALL(*observer, acksProcessed(transport, _))
+        .WillRepeatedly(Invoke(
+            [&](auto,
+                const SocketObserverInterface::AcksProcessedEvent& event) {
+              for (const auto& ackEvent : event.getAckEvents()) {
+                for (const auto& ackedPacket : ackEvent.ackedPackets) {
+                  auto& summary = ackedPackets[ackedPacket.packetNum];
+                  summary.framesProcessed = ackedPacket.framesProcessed;
+                  summary.firstArrival = ackedPacket.firstArrival;
+                  const auto carried = ackedPacket.outstandingPacketMetadata
+                                           .detailsPerStream.find(streamId);
+                  if (carried !=
+                      ackedPacket.outstandingPacketMetadata.detailsPerStream
+                          .end()) {
+                    summary.carriedStreamIntervals.assign(
+                        carried->second.streamIntervals.begin(),
+                        carried->second.streamIntervals.end());
+                  }
+                  const auto it = ackedPacket.detailsPerStream.find(streamId);
+                  if (it != ackedPacket.detailsPerStream.end()) {
+                    summary.streamBytesAcked += it->second.streamBytesAcked;
+                  }
+                }
+              }
+            }));
+
+    this->deliverPacketNoWrites(
+        this->buildAckPacketForSentAppDataPackets(trigger),
+        trigger->sentTime + kAckRtt);
+    const auto originalPacketIt = std::find_if(
+        conn.outstandings.packets.begin(),
+        conn.outstandings.packets.end(),
+        [&](const auto& packet) {
+          return packet.packet.header.getPacketSequenceNum() ==
+              originalPacketNum;
+        });
+    ASSERT_NE(originalPacketIt, conn.outstandings.packets.end());
+    ASSERT_TRUE(originalPacketIt->declaredLost);
+    conn.lossState.reorderingThreshold = 100;
+
+    this->deliverPacketNoWrites(
+        this->buildAckPacketForSentAppDataPacket(clonePacketNum),
+        cloneSentTime + kAckRtt);
+
+    this->getTestTransport()->writeLooper()->run(true);
+    const auto retransmissions = this->loopForWrites();
+    ASSERT_TRUE(retransmissions.has_value());
+    const auto* retransmissionPacket = findStreamPacket(*retransmissions);
+    ASSERT_NE(retransmissionPacket, nullptr);
+    ASSERT_FALSE(retransmissionPacket->maybeClonedPacketIdentifier.has_value());
+    const auto retransmissionPacketNum =
+        retransmissionPacket->packet.header.getPacketSequenceNum();
+    this->deliverPacketNoWrites(
+        this->buildAckPacketForSentAppDataPacket(retransmissionPacketNum),
+        retransmissionPacket->metadata.time + kAckRtt);
+
+    // The clone physically delivered the bytes first, but mvfst skipped its
+    // frames and credits the bytes when the retransmission delivers them.
+    using FirstArrival = AckEvent::AckPacket::FirstArrival;
+    ASSERT_TRUE(ackedPackets.contains(clonePacketNum));
+    const auto& clone = ackedPackets.at(clonePacketNum);
+    EXPECT_FALSE(clone.framesProcessed);
+    EXPECT_EQ(FirstArrival::Yes, clone.firstArrival);
+    EXPECT_EQ(0, clone.streamBytesAcked);
+    EXPECT_THAT(
+        clone.carriedStreamIntervals,
+        ElementsAre(Interval<uint64_t>(0, kData.size() - 1)));
+    ASSERT_TRUE(ackedPackets.contains(retransmissionPacketNum));
+    EXPECT_TRUE(ackedPackets.at(retransmissionPacketNum).framesProcessed);
+    EXPECT_EQ(
+        FirstArrival::Yes,
+        ackedPackets.at(retransmissionPacketNum).firstArrival);
+    EXPECT_EQ(
+        kData.size(),
+        ackedPackets.at(retransmissionPacketNum).streamBytesAcked);
+    uint64_t totalStreamBytesAcked = 0;
+    for (const auto& [packetNum, summary] : ackedPackets) {
+      totalStreamBytesAcked += summary.streamBytesAcked;
+    }
+    EXPECT_EQ(kData.size(), totalStreamBytesAcked);
+    this->destroyTransport();
+  }
+};
+
+TYPED_TEST_SUITE(
+    QuicTypedTransportCloneAckAfterLossTest,
+    ::TransportTypes,
+    ::TransportTypeNames);
+
+TYPED_TEST(QuicTypedTransportCloneAckAfterLossTest, LegacySendBuffer) {
+  this->verifyBytesCreditedOnce(false /* useUnifiedSendBuffer */);
+}
+
+TYPED_TEST(QuicTypedTransportCloneAckAfterLossTest, UnifiedSendBuffer) {
+  this->verifyBytesCreditedOnce(true /* useUnifiedSendBuffer */);
+}
 
 } // namespace quic::test

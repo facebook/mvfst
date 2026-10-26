@@ -91,6 +91,7 @@ mvfst_cpp_test(
         "//quic/common:mvfst_logging",
         "//quic/common/test:test_utils",
         "//quic/fizz/server/handshake:fizz_server_handshake",
+        "//quic/logging/oops_logger:oops_logger",
         "//quic/logging/test:mocks",
         "//quic/server/state:server",
         "//quic/state:ack_handler",

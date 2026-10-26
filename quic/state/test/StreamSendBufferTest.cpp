@@ -9,6 +9,8 @@
 
 #include <limits>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <folly/portability/GTest.h>
 
@@ -145,6 +147,46 @@ TEST(StreamSendBufferTest, OutOfOrderAckRetiresOnlyCoveredEntry) {
   EXPECT_TRUE(writeToString(buffer, 0, 3, remaining));
   EXPECT_EQ("abc", remaining);
   EXPECT_EQ(3, buffer.outstandingBytes());
+}
+
+TEST(StreamSendBufferTest, AckedIntervalsExposeDisjointAckedRanges) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdefghij"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 10, false}));
+
+  ASSERT_TRUE(buffer.markAcked({0, 2, false}).has_value());
+  ASSERT_TRUE(buffer.markAcked({6, 3, false}).has_value());
+
+  const IntervalSet<uint64_t> expected{{0, 1}, {6, 8}};
+  EXPECT_EQ(expected, buffer.ackedIntervals());
+}
+
+TEST(StreamSendBufferTest, MarkAckedReportsNewlyAckedRanges) {
+  StreamSendBuffer buffer;
+  ASSERT_TRUE(buffer.append(makeBuffer("abcdefghij"), false));
+  ASSERT_TRUE(buffer.markNewDataSent({0, 10, false}));
+  ASSERT_TRUE(buffer.markAcked({3, 3, false}).has_value());
+
+  std::vector<std::pair<uint64_t, uint64_t>> newlyAcked;
+  const auto result =
+      buffer.markAcked({0, 10, false}, [&](uint64_t begin, uint64_t end) {
+        newlyAcked.emplace_back(begin, end);
+      });
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(7, result->newlyAckedBytes);
+  const std::vector<std::pair<uint64_t, uint64_t>> expected{{0, 3}, {6, 10}};
+  EXPECT_EQ(expected, newlyAcked);
+
+  // A duplicate ACK newly ACKs nothing.
+  newlyAcked.clear();
+  ASSERT_TRUE(buffer
+                  .markAcked(
+                      {0, 10, false},
+                      [&](uint64_t begin, uint64_t end) {
+                        newlyAcked.emplace_back(begin, end);
+                      })
+                  .has_value());
+  EXPECT_TRUE(newlyAcked.empty());
 }
 
 TEST(StreamSendBufferTest, AckBeforeLossOnlySchedulesUnackedBytes) {
