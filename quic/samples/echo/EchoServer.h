@@ -37,23 +37,29 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     });
   }
 
-  explicit EchoServerTransportFactory(bool useDatagrams = false)
-      : useDatagrams_(useDatagrams) {}
+  explicit EchoServerTransportFactory(
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      bool useDatagrams = false)
+      : useDatagrams_(useDatagrams), ctx_(std::move(ctx)) {}
+
+  // Configure before starting workers; this sample does not support rotation.
+  void setFizzContext(
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
+    ctx_ = std::move(ctx);
+  }
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
       const quic::SocketAddress&,
-      QuicVersion,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
-      override {
+      QuicVersion) noexcept override {
     CHECK_EQ(evb, sock->getEventBase());
     if (draining_) {
       return nullptr;
     }
     auto echoHandler = std::make_unique<EchoHandler>(evb, useDatagrams_);
     auto transport = quic::QuicServerTransport::make(
-        evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx);
+        evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx_);
     echoHandler->setQuicSocket(transport);
     echoHandlers_.withWLock([&](auto& echoHandlers) {
       echoHandlers.push_back(std::move(echoHandler));
@@ -63,6 +69,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
 
  private:
   bool useDatagrams_;
+  std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   folly::Synchronized<std::vector<std::unique_ptr<EchoHandler>>> echoHandlers_;
   bool draining_{false};
 };
@@ -83,13 +90,13 @@ class EchoServer {
     settings.disableMigration = !enableMigration;
     server_ = QuicServer::createQuicServer(std::move(settings));
 
-    server_->setQuicServerTransportFactory(
-        std::make_unique<EchoServerTransportFactory>(useDatagrams));
-    server_->setTransportStatsCallbackFactory(
-        std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     serverCtx->setSupportedAlpns(std::move(alpns_));
+    server_->setQuicServerTransportFactory(
+        std::make_unique<EchoServerTransportFactory>(serverCtx, useDatagrams));
+    server_->setTransportStatsCallbackFactory(
+        std::make_unique<LogQuicStatsFactory>());
     server_->setFizzContext(serverCtx);
   }
 

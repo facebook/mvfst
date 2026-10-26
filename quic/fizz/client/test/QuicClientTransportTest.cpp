@@ -190,7 +190,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     }
     server->setTransportStatsCallbackFactory(std::move(statsFactory));
     server->setQuicServerTransportFactory(
-        std::make_unique<EchoServerTransportFactory>());
+        std::make_unique<EchoServerTransportFactory>(serverCtx));
     server->setQuicUDPSocketFactory(
         std::make_unique<QuicSharedUDPSocketFactory>());
     server->setFizzContext(serverCtx);

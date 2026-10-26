@@ -93,12 +93,18 @@ QuicAsyncTransportAcceptor::QuicAsyncTransportAcceptor(
     AsyncTransportHook asyncTransportHook)
     : asyncTransportHook_(std::move(asyncTransportHook)), evb_(evb) {}
 
+void QuicAsyncTransportAcceptor::setFizzContext(
+    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
+  MVCHECK(evb_);
+  evb_->runImmediatelyOrRunInEventBaseThreadAndWait(
+      [this, ctx = std::move(ctx)]() mutable { fizzCtx_ = std::move(ctx); });
+}
+
 quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
     folly::EventBase* evb,
     std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
     const quic::SocketAddress&,
-    QuicVersion,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
+    QuicVersion) noexcept {
   MVCHECK_EQ(evb, evb_);
 
   // wait for onTransportReady before invoking asyncTransportHook_
@@ -108,7 +114,7 @@ quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
           .release());
   // create quic socket
   auto transport = quic::QuicServerTransport::make(
-      evb, std::move(sock), connSetupCallback, connSetupCallback, ctx);
+      evb, std::move(sock), connSetupCallback, connSetupCallback, fizzCtx_);
   connSetupCallback->transport_ = transport;
 
   return transport;

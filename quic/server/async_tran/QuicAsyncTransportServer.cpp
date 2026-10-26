@@ -22,6 +22,9 @@ QuicAsyncTransportServer::QuicAsyncTransportServer(
 void QuicAsyncTransportServer::setFizzContext(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
   fizzCtx_ = std::move(ctx);
+  for (auto& acceptor : acceptors_) {
+    acceptor->setFizzContext(fizzCtx_);
+  }
 }
 
 void QuicAsyncTransportServer::start(
@@ -57,6 +60,7 @@ void QuicAsyncTransportServer::createAcceptors(
         evb, [this](folly::AsyncTransport::UniquePtr tran) {
           asyncTransportHook_(std::move(tran));
         });
+    acceptor->setFizzContext(fizzCtx_);
     quicServer_->addTransportFactory(evb, acceptor.get());
     acceptors_.push_back(std::move(acceptor));
   }

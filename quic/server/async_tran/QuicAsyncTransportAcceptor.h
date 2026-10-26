@@ -24,18 +24,20 @@ class QuicAsyncTransportAcceptor : public quic::QuicServerTransportFactory {
       AsyncTransportHook asyncTransportHook);
   ~QuicAsyncTransportAcceptor() override = default;
 
+  void setFizzContext(
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
+
   // quic::QuicServerTransportFactory
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> sock,
       const quic::SocketAddress&,
-      QuicVersion quickVersion,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
-      override;
+      QuicVersion quickVersion) noexcept override;
 
  private:
   AsyncTransportHook asyncTransportHook_;
   folly::EventBase* evb_;
+  std::shared_ptr<const fizz::server::FizzServerContext> fizzCtx_;
 };
 
 } // namespace quic

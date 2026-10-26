@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <atomic>
+
 #include <folly/futures/Future.h>
 #include <folly/io/async/test/MockAsyncTransport.h>
 #include <folly/portability/GMock.h>
@@ -138,6 +140,88 @@ TEST_F(QuicAsyncTransportServerTest, ReadWrite) {
 
   std::string clientReadString = std::move(future).get(1s);
   EXPECT_EQ(clientReadString, "jaja ding dong");
+}
+
+TEST(QuicAsyncTransportServerRotateTest, RotateAfterStartUsesNewContext) {
+  std::atomic<bool> serverAccepted{false};
+  folly::AsyncTransport::UniquePtr serverWrapper;
+  auto server = std::make_shared<QuicAsyncTransportServer>(
+      [&](folly::AsyncTransport::UniquePtr sock) {
+        serverAccepted.store(true);
+        serverWrapper = std::move(sock);
+      });
+  server->setFizzContext(test::createServerCtx());
+  server->start(quic::SocketAddress("::1", 0), 1);
+  auto serverAddr = server->quicServer().getAddress();
+
+  // Rotate after start to a context the test client cannot negotiate. The
+  // next handshake must fail, proving the new context is in use.
+  auto badCtx = test::createServerCtx();
+  badCtx->setSupportedAlpns({"bad_alpn"});
+  badCtx->setAlpnMode(fizz::server::AlpnMode::Required);
+  server->setFizzContext(badCtx);
+
+  folly::EventBase evb;
+  auto clientEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  std::thread clientThread([&]() { clientEvb->loopForever(); });
+
+  auto [promise, future] = folly::makePromiseContract<folly::Unit>();
+  auto failPromise =
+      std::make_shared<folly::Promise<folly::Unit>>(std::move(promise));
+  auto clientFailed = std::make_shared<std::atomic<bool>>(false);
+  auto signalFailure = [clientFailed, failPromise]() {
+    if (!clientFailed->exchange(true)) {
+      failPromise->setValue(folly::unit);
+    }
+  };
+
+  NiceMock<folly::test::MockReadCallback> readCB;
+  NiceMock<folly::test::MockWriteCallback> writeCB;
+  std::array<uint8_t, 1024> clientBuf{};
+  ON_CALL(readCB, isBufferMovable_()).WillByDefault(Return(false));
+  ON_CALL(readCB, getReadBuffer(_, _))
+      .WillByDefault([&](void** buf, size_t* len) {
+        *buf = clientBuf.data();
+        *len = clientBuf.size();
+      });
+  EXPECT_CALL(readCB, readErr_(_)).WillRepeatedly([&](auto&&...) {
+    signalFailure();
+  });
+  EXPECT_CALL(writeCB, writeErr_(_, _)).WillRepeatedly([&](auto&&...) {
+    signalFailure();
+  });
+
+  std::shared_ptr<QuicClientTransport> client;
+  QuicClientAsyncTransport::UniquePtr clientWrapper;
+  clientEvb->runInEventBaseThreadAndWait([&]() {
+    auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(clientEvb);
+    auto fizzClientContext =
+        FizzClientQuicHandshakeContext::Builder()
+            .setFizzClientContext(test::createClientCtx())
+            .setCertificateVerifier(test::createTestCertificateVerifier())
+            .build();
+    client = std::make_shared<QuicClientTransport>(
+        clientEvb, std::move(sock), std::move(fizzClientContext));
+    client->setHostname("echo.com");
+    client->addNewPeerAddress(serverAddr);
+    clientWrapper.reset(new QuicClientAsyncTransport(client));
+    clientWrapper->setReadCB(&readCB);
+    clientWrapper->writeChain(&writeCB, folly::IOBuf::copyBuffer("jaja"));
+  });
+
+  EXPECT_NO_THROW(std::move(future).get(5s));
+  server->shutdown();
+  EXPECT_FALSE(serverAccepted.load());
+
+  clientEvb->runInEventBaseThreadAndWait([&] {
+    clientWrapper = nullptr;
+    client = nullptr;
+  });
+  clientEvb->terminateLoopSoon();
+  clientThread.join();
+  server = nullptr;
+  EXPECT_EQ(serverWrapper, nullptr);
+  serverWrapper = nullptr;
 }
 
 } // namespace quic::test
