@@ -69,4 +69,9 @@ TEST(QuicExceptionFormatTest, UnassignedTransportErrorString) {
   EXPECT_EQ(toString(static_cast<TransportErrorCode>(0x020)), "Unknown error");
 }
 
+// One past MIGRATION_FAILED, the highest assigned LocalErrorCode.
+TEST(QuicExceptionFormatTest, UnassignedLocalErrorString) {
+  EXPECT_EQ(toString(static_cast<LocalErrorCode>(0x40000023)), "Unknown error");
+}
+
 } // namespace quic::test

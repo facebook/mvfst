@@ -60,6 +60,14 @@ target_link_libraries(
   ${BOOST_LIBRARIES}
 )
 
+quic_add_test(TARGET QuicExceptionFormatTest SOURCES
+  QuicExceptionFormatTest.cpp
+  DEPENDS
+  Folly::folly
+  fmt::fmt
+  mvfst_exception
+)
+
 quic_add_test(TARGET QuicCommonUtilTest SOURCES
   FunctionLooperTest.cpp
   TimeUtilTest.cpp
