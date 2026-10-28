@@ -11,11 +11,13 @@
 #include <quic/common/MvfstLogging.h>
 
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/LogQuicStats.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
+#include <quic/server/ThreadedQuicServer.h>
 
 namespace quic::samples {
 
@@ -60,6 +62,9 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     auto echoHandler = std::make_unique<EchoHandler>(evb, useDatagrams_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx_);
+    static auto ccFactory =
+        std::make_shared<quic::ServerCongestionControllerFactory>();
+    transport->setCongestionControllerFactory(ccFactory);
     echoHandler->setQuicSocket(transport);
     echoHandlers_.withWLock([&](auto& echoHandlers) {
       echoHandlers.push_back(std::move(echoHandler));
@@ -84,20 +89,18 @@ class EchoServer {
       uint64_t activeConnIdLimit = 10,
       bool enableMigration = true)
       : host_(host), port_(port), alpns_(std::move(alpns)) {
-    TransportSettings settings;
-    settings.datagramConfig.enabled = useDatagrams;
-    settings.selfActiveConnectionIdLimit = activeConnIdLimit;
-    settings.disableMigration = !enableMigration;
-    server_ = QuicServer::createQuicServer(std::move(settings));
+    quic::ServerOptions options;
+    options.transportSettings.datagramConfig.enabled = useDatagrams;
+    options.transportSettings.selfActiveConnectionIdLimit = activeConnIdLimit;
+    options.transportSettings.disableMigration = !enableMigration;
+    options.transportStatsFactory = std::make_unique<LogQuicStatsFactory>();
 
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     serverCtx->setSupportedAlpns(std::move(alpns_));
-    server_->setQuicServerTransportFactory(
+    server_ = std::make_unique<quic::ThreadedQuicServer>(
+        std::move(options),
         std::make_unique<EchoServerTransportFactory>(serverCtx, useDatagrams));
-    server_->setTransportStatsCallbackFactory(
-        std::make_unique<LogQuicStatsFactory>());
-    server_->setFizzContext(serverCtx);
   }
 
   ~EchoServer() {
@@ -117,7 +120,7 @@ class EchoServer {
   std::string host_;
   uint16_t port_;
   folly::EventBase eventbase_;
-  std::shared_ptr<quic::QuicServer> server_;
+  std::unique_ptr<quic::ThreadedQuicServer> server_;
   std::vector<std::string> alpns_;
 };
 } // namespace quic::samples

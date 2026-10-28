@@ -15,6 +15,7 @@
 #include <quic/common/MvfstLogging.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/oops_logger/GlogOopsLogger.h>
@@ -904,7 +905,10 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       uint64_t maxPacingRate,
       std::string qloggerPath,
       std::string pacingObserver,
-      TPerfServer::DoneCallback* doneCallback)
+      TPerfServer::DoneCallback* doneCallback,
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      std::shared_ptr<quic::CongestionControllerFactory> ccFactory,
+      quic::BatchWriterFactoryOverride batchWriterFactoryOverride)
       : blockSize_(blockSize),
         numStreams_(numStreams),
         maxBytesPerStream_(maxBytesPerStream),
@@ -912,15 +916,16 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         maxPacingRate_(maxPacingRate),
         qloggerPath_(std::move(qloggerPath)),
         pacingObserver_(std::move(pacingObserver)),
-        doneCallback_(doneCallback) {}
+        doneCallback_(doneCallback),
+        ctx_(std::move(ctx)),
+        ccFactory_(std::move(ccFactory)),
+        batchWriterFactoryOverride_(std::move(batchWriterFactoryOverride)) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       const quic::SocketAddress&,
-      QuicVersion,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
-      override {
+      QuicVersion) noexcept override {
     MVCHECK_EQ(evb, sock->getEventBase());
     auto serverHandler = std::make_unique<ServerStreamHandler>(
         evb,
@@ -932,7 +937,11 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         maxPacingRate_,
         doneCallback_);
     auto transport = quic::QuicServerTransport::make(
-        evb, std::move(sock), serverHandler.get(), serverHandler.get(), ctx);
+        evb, std::move(sock), serverHandler.get(), serverHandler.get(), ctx_);
+    transport->setCongestionControllerFactory(ccFactory_);
+    if (batchWriterFactoryOverride_) {
+      transport->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
+    }
     if (!qloggerPath_.empty()) {
       auto qlogger = std::make_shared<FileQLogger>(
           VantagePoint::Server,
@@ -982,6 +991,9 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
   std::string qloggerPath_;
   std::string pacingObserver_;
   TPerfServer::DoneCallback* doneCallback_{nullptr};
+  std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
+  std::shared_ptr<quic::CongestionControllerFactory> ccFactory_;
+  quic::BatchWriterFactoryOverride batchWriterFactoryOverride_;
 };
 
 TPerfServer::TPerfServer(
@@ -1111,8 +1123,20 @@ TPerfServer::TPerfServer(
     };
   }
 
-  server_ = QuicServer::createQuicServer(settings);
-  server_->setQuicServerTransportFactory(
+  auto serverCtx = quic::test::createServerCtx();
+  serverCtx->setClock(std::make_shared<fizz::SystemClock>());
+  std::shared_ptr<quic::CongestionControllerFactory> ccFactory;
+  if (congestionControlType == quic::CongestionControlType::StaticCwnd) {
+    ccFactory = std::make_shared<TperfStaticCwndCongestionControllerFactory>(
+        staticCwndConfig.staticCwndInBytes,
+        staticCwndConfig.pacerIntervalSource);
+  } else {
+    ccFactory = std::make_shared<ServerCongestionControllerFactory>();
+  }
+  quic::ServerOptions options;
+  options.transportSettings = std::move(settings);
+  server_ = std::make_unique<quic::ThreadedQuicServer>(
+      std::move(options),
       std::make_unique<TPerfServerTransportFactory>(
           blockSize,
           numStreams,
@@ -1121,43 +1145,31 @@ TPerfServer::TPerfServer(
           maxPacingRate_,
           std::move(qloggerPath),
           pacingObserver,
-          doneCallback));
-  auto serverCtx = quic::test::createServerCtx();
-  serverCtx->setClock(std::make_shared<fizz::SystemClock>());
-  server_->setFizzContext(serverCtx);
-
-  if (congestionControlType == quic::CongestionControlType::StaticCwnd) {
-    server_->setCongestionControllerFactory(
-        std::make_shared<TperfStaticCwndCongestionControllerFactory>(
-            staticCwndConfig.staticCwndInBytes,
-            staticCwndConfig.pacerIntervalSource));
-  } else {
-    server_->setCongestionControllerFactory(
-        std::make_shared<ServerCongestionControllerFactory>());
-  }
+          doneCallback,
+          serverCtx,
+          ccFactory,
+          batchWriterFactoryOverride_));
 }
 
 void TPerfServer::start() {
   // Create a SocketAddress and the default or passed in host.
   quic::SocketAddress addr1(host_.c_str(), port_);
   addr1.setFromHostPort(host_, port_);
-  if (batchWriterFactoryOverride_) {
-    server_->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
-  }
-  server_->start(addr1, numServerWorkers_);
+  server_->bind(addr1, numServerWorkers_);
   if (udpGsoZerocopyConfig_.enabled && udpGsoZerocopyConfig_.inplace) {
-    auto result = server_->enableZeroCopy();
+    auto result = server_->server().enableZeroCopy();
     if (result.hasError()) {
+      server_->shutdown();
       throw std::runtime_error(
           fmt::format(
               "QuicServer::enableZeroCopy failed: {}", result.error().message));
     }
     MVLOG_INFO << "tperf server enabled MSG_ZEROCOPY for inplace data path";
   }
-  auto workerEvbs = server_->getWorkerEvbs();
-  for (auto evb : workerEvbs) {
-    server_->addAcceptObserver(evb, acceptObserver_.get());
+  for (auto evb : server_->getWorkerEvbs()) {
+    server_->server().addAcceptObserver(evb, acceptObserver_.get());
   }
+  server_->start();
   MVLOG_INFO << "tperf server started at: " << addr1.describe();
   scheduleWriteStatsLog();
   eventBase_.loopForever();

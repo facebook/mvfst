@@ -6,7 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
-#include <quic/server/QuicServer.h>
+#include <quic/server/QuicServerBackend.h>
 
 #include <folly/io/async/IoUringBackend.h>
 
@@ -61,11 +61,9 @@ std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
 
 } // namespace
 
-QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
+EventBaseBackendDetails getEventBaseBackendDetails() {
   EventBaseBackendDetails ret;
   ret.factory = &getEventBaseBackend;
-  ret.supportsRecvmsgMultishot =
-      folly::IoUringBackend::kernelSupportsRecvmsgMultishot();
   return ret;
 }
 
@@ -75,7 +73,7 @@ QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
 
 namespace quic {
 
-QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
+EventBaseBackendDetails getEventBaseBackendDetails() {
   EventBaseBackendDetails ret;
   ret.factory = &folly::EventBase::getDefaultBackend;
   return ret;

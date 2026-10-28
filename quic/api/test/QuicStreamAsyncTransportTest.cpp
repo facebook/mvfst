@@ -24,6 +24,7 @@
 #include <quic/mvfst-config.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
+#include <quic/server/ThreadedQuicServer.h>
 #include <quic/server/test/Mocks.h>
 
 using namespace testing;
@@ -56,33 +57,30 @@ class QuicStreamAsyncTransportTest : public Test {
         std::make_unique<MockQuicServerTransportFactory>();
     // should only be invoked once since we open at most one connection; checked
     // via .WillOnce()
-    EXPECT_CALL(*serverTransportFactory, _make(_, _, _, _))
-        .WillOnce(Invoke(
-            [&](folly::EventBase* evb,
-                std::unique_ptr<FollyAsyncUDPSocketAlias>& socket,
-                const folly::SocketAddress& /*addr*/,
-                std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
-              auto transport = quic::QuicServerTransport::make(
-                  evb,
-                  std::move(socket),
-                  &serverConnectionSetupCB_,
-                  &serverConnectionCB_,
-                  std::move(ctx));
-              // serverSocket_ only set via the factory, validate it hasn't been
-              // set before.
-              CHECK(!serverSocket_);
-              serverSocket_ = transport;
-              return transport;
-            }));
+    EXPECT_CALL(*serverTransportFactory, _make(_, _, _))
+        .WillOnce(Invoke([&](folly::EventBase* evb,
+                             std::unique_ptr<FollyAsyncUDPSocketAlias>& socket,
+                             const folly::SocketAddress& /*addr*/) {
+          auto transport = quic::QuicServerTransport::make(
+              evb,
+              std::move(socket),
+              &serverConnectionSetupCB_,
+              &serverConnectionCB_,
+              serverCtx_);
+          // serverSocket_ only set via the factory, validate it hasn't been
+          // set before.
+          CHECK(!serverSocket_);
+          serverSocket_ = transport;
+          return transport;
+        }));
 
     // server setup
-    server_ = QuicServer::createQuicServer();
-    server_->setFizzContext(test::createServerCtx());
-    server_->setQuicServerTransportFactory(std::move(serverTransportFactory));
+    serverCtx_ = test::createServerCtx();
+    server_ = std::make_unique<ThreadedQuicServer>(
+        ServerOptions(), std::move(serverTransportFactory));
 
     // start server
     server_->start(folly::SocketAddress("::1", 0), 1);
-    server_->waitUntilInitialized();
     serverAddr_ = server_->getAddress();
   }
 
@@ -190,7 +188,8 @@ class QuicStreamAsyncTransportTest : public Test {
   }
 
  protected:
-  std::shared_ptr<QuicServer> server_;
+  std::unique_ptr<ThreadedQuicServer> server_;
+  std::shared_ptr<const fizz::server::FizzServerContext> serverCtx_;
   folly::SocketAddress serverAddr_;
   NiceMock<MockConnectionSetupCallback> serverConnectionSetupCB_;
   NiceMock<MockConnectionCallback> serverConnectionCB_;

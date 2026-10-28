@@ -15,8 +15,12 @@ QuicAsyncTransportServer::QuicAsyncTransportServer(
     QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook,
     quic::TransportSettings ts)
     : asyncTransportHook_(std::move(asyncTransportHook)),
-      quicServer_(quic::QuicServer::createQuicServer(std::move(ts))) {
+      transportSettings_(std::move(ts)) {
   MVCHECK(asyncTransportHook_);
+}
+
+QuicAsyncTransportServer::~QuicAsyncTransportServer() {
+  shutdown();
 }
 
 void QuicAsyncTransportServer::setFizzContext(
@@ -46,8 +50,10 @@ void QuicAsyncTransportServer::start(
 void QuicAsyncTransportServer::start(
     const quic::SocketAddress& address,
     std::vector<folly::EventBase*> evbs) {
-  quicServer_->initialize(address, evbs, false /* useDefaultTransport */);
-  quicServer_->waitUntilInitialized();
+  quic::ServerOptions options;
+  options.transportSettings = transportSettings_;
+  quicServer_ = quic::QuicServer::createQuicServer(std::move(options));
+  quicServer_->bind(address, evbs);
   createAcceptors(evbs);
   quicServer_->start();
 }
@@ -55,7 +61,6 @@ void QuicAsyncTransportServer::start(
 void QuicAsyncTransportServer::createAcceptors(
     std::vector<folly::EventBase*>& evbs) {
   for (auto evb : evbs) {
-    quicServer_->setFizzContext(evb, fizzCtx_);
     auto acceptor = std::make_unique<QuicAsyncTransportAcceptor>(
         evb, [this](folly::AsyncTransport::UniquePtr tran) {
           asyncTransportHook_(std::move(tran));
@@ -67,9 +72,11 @@ void QuicAsyncTransportServer::createAcceptors(
 }
 
 void QuicAsyncTransportServer::shutdown() {
-  quicServer_->rejectNewConnections(
-      [](const quic::SocketAddress&) { return true; });
-  quicServer_->shutdown();
-  quicServer_.reset();
+  if (quicServer_) {
+    quicServer_->shutdown();
+    quicServer_.reset();
+  }
+  acceptors_.clear();
+  workerEvbs_.clear();
 }
 } // namespace quic

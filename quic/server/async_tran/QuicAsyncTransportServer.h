@@ -23,7 +23,7 @@ class QuicAsyncTransportServer {
   explicit QuicAsyncTransportServer(
       QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook,
       quic::TransportSettings ts = quic::TransportSettings());
-  virtual ~QuicAsyncTransportServer() = default;
+  virtual ~QuicAsyncTransportServer();
 
   void setFizzContext(
       std::shared_ptr<const fizz::server::FizzServerContext> ctx);
@@ -44,6 +44,7 @@ class QuicAsyncTransportServer {
   void createAcceptors(std::vector<folly::EventBase*>& evbs);
 
   QuicAsyncTransportAcceptor::AsyncTransportHook asyncTransportHook_;
+  quic::TransportSettings transportSettings_;
   std::shared_ptr<quic::QuicServer> quicServer_;
   std::vector<std::unique_ptr<QuicAsyncTransportAcceptor>> acceptors_;
   std::vector<std::unique_ptr<folly::ScopedEventBaseThread>> workerEvbs_;

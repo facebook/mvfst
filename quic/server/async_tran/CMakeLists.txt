@@ -12,6 +12,7 @@ mvfst_add_library(mvfst_server_async_tran_server_async_transport
     QuicServerAsyncTransport.cpp
   DEPS
     mvfst_common_mvfst_logging
+    mvfst_congestion_control_server_congestion_controller_factory
     Folly::folly_system_hardware_concurrency
   EXPORTED_DEPS
     mvfst_api_stream_async_transport

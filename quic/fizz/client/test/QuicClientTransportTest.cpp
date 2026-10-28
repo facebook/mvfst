@@ -32,6 +32,7 @@
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 #include <quic/server/QuicServer.h>
+#include <quic/server/ThreadedQuicServer.h>
 #include <algorithm>
 
 using namespace testing;
@@ -159,7 +160,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     return client;
   }
 
-  std::shared_ptr<QuicServer> createServer(
+  std::unique_ptr<ThreadedQuicServer> createServer(
       ProcessId processId,
       bool withRetryPacket = false,
       bool enableScone = false,
@@ -177,28 +178,26 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     if (enableSconeSendOnly) {
       transportSettings.enableSconeSend = true;
     }
-    auto server = QuicServer::createQuicServer(transportSettings);
-
     auto statsFactory = std::make_unique<NiceMock<MockQuicStatsFactory>>();
     ON_CALL(*statsFactory, make()).WillByDefault(Invoke([&]() {
       auto newStatsCallback = std::make_unique<NiceMock<MockQuicStats>>();
       statsCallbacks_.push_back(newStatsCallback.get());
       return newStatsCallback;
     }));
+    ServerOptions options;
+    options.transportSettings = std::move(transportSettings);
     if (withRetryPacket) {
-      server->setRateLimit([]() { return 0u; }, 1s);
+      options.rateLimitCount = []() { return uint64_t{0}; };
+      options.rateLimitWindow = std::chrono::seconds(1);
     }
-    server->setTransportStatsCallbackFactory(std::move(statsFactory));
-    server->setQuicServerTransportFactory(
+    options.transportStatsFactory = std::move(statsFactory);
+    options.socketFactory = std::make_unique<QuicSharedUDPSocketFactory>();
+    options.supportedVersions = {getVersion(), MVFST1};
+    options.processId = processId;
+    auto server = std::make_unique<ThreadedQuicServer>(
+        std::move(options),
         std::make_unique<EchoServerTransportFactory>(serverCtx));
-    server->setQuicUDPSocketFactory(
-        std::make_unique<QuicSharedUDPSocketFactory>());
-    server->setFizzContext(serverCtx);
-    server->setSupportedVersion({getVersion(), MVFST1});
-    quic::SocketAddress addr("::1", 0);
-    server->setProcessId(processId);
-    server->start(addr, 1);
-    server->waitUntilInitialized();
+    server->start(folly::SocketAddress("::1", 0), 1);
     return server;
   }
 
@@ -312,7 +311,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<fizz::client::FizzClientContext> clientCtx;
   std::shared_ptr<fizz::CertificateVerifier> verifier;
   std::shared_ptr<QuicPskCache> pskCache_;
-  std::shared_ptr<QuicServer> server_;
+  std::unique_ptr<ThreadedQuicServer> server_;
   bool connected_{false};
   std::shared_ptr<MockQuicStats> quicStats_;
   std::vector<MockQuicStats*> statsCallbacks_;
@@ -1007,8 +1006,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
   setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
-  // Change the ctx
-  server_->setFizzContext(serverCtx);
+  // The echo factory holds this same context object; mutations above are
+  // visible to new transports without a server setter.
   Optional<std::string> alpn = std::string("h3");
   bool performedValidation = false;
   earlyDataHandler_.validateFn =
@@ -1099,8 +1098,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
   setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
-  // Change the ctx
-  retryServer->setFizzContext(serverCtx);
+  // The echo factory holds this same context object (see above).
 
   std::vector<uint8_t> clientConnIdVec = {};
   ConnectionId clientConnId =
@@ -1317,8 +1315,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   client->getNonConstConn().qLogger = qLogger;
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
-  // Change the ctx
-  server_->setFizzContext(serverCtx);
+  // The echo factory holds this same context object; mutations above are
+  // visible to new transports without a server setter.
   bool performedValidation = false;
   earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
                                      const BufPtr&) {
@@ -1403,8 +1401,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   expectTransportCallbacks();
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
-  // Change the ctx
-  server_->setFizzContext(serverCtx);
+  // The echo factory holds this same context object; mutations above are
+  // visible to new transports without a server setter.
   client->getNonConstConn().transportSettings.attemptEarlyData = false;
   earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
                                      const BufPtr&) {
@@ -1445,8 +1443,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   expectTransportCallbacks();
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
-  // Change the ctx
-  server_->setFizzContext(serverCtx);
+  // The echo factory holds this same context object; mutations above are
+  // visible to new transports without a server setter.
   bool performedValidation = false;
   earlyDataHandler_.validateFn = [&](const Optional<std::string>&,
                                      const BufPtr&) {

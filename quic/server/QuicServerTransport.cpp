@@ -241,6 +241,13 @@ quic::Expected<void, QuicError> QuicServerTransport::onReadData(
 }
 
 void QuicServerTransport::configureForAccept(ServerAcceptParams&& params) {
+  if (!conn_->congestionControllerFactory) {
+    // The application factory owns congestion-control policy; keep the
+    // historical shared default when it does not install one.
+    static auto defaultCcFactory =
+        std::make_shared<ServerCongestionControllerFactory>();
+    setCongestionControllerFactory(defaultCcFactory);
+  }
   if (params.bufAccessor) {
     setBufAccessor(params.bufAccessor);
   }

@@ -6,6 +6,7 @@
  */
 
 #include <quic/common/MvfstLogging.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/server/async_tran/QuicAsyncTransportAcceptor.h>
 #include <quic/server/async_tran/QuicServerAsyncTransport.h>
 
@@ -115,6 +116,9 @@ quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
   // create quic socket
   auto transport = quic::QuicServerTransport::make(
       evb, std::move(sock), connSetupCallback, connSetupCallback, fizzCtx_);
+  static auto ccFactory =
+      std::make_shared<quic::ServerCongestionControllerFactory>();
+  transport->setCongestionControllerFactory(ccFactory);
   connSetupCallback->transport_ = transport;
 
   return transport;

@@ -208,15 +208,6 @@ void QuicServerWorker::setTransportSettingsOverrideFn(
   transportSettingsOverrideFn_ = std::move(fn);
 }
 
-void QuicServerWorker::setShouldRegisterKnobParamHandlerFn(
-    ShouldRegisterKnobParamHandlerFn fn) {
-  shouldRegisterKnobParamHandlerFn_ = std::move(fn);
-}
-
-void QuicServerWorker::setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn) {
-  quicExperimentHandlerFn_ = std::move(fn);
-}
-
 void QuicServerWorker::setTransportStatsCallback(
     std::unique_ptr<QuicTransportStatsCallback> statsCallback) noexcept {
   MVCHECK(statsCallback);
@@ -232,17 +223,6 @@ void QuicServerWorker::setConnectionIdAlgo(
     std::unique_ptr<ConnectionIdAlgo> connIdAlgo) noexcept {
   MVCHECK(connIdAlgo);
   connIdAlgo_ = std::move(connIdAlgo);
-}
-
-void QuicServerWorker::setCongestionControllerFactory(
-    std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  MVCHECK(ccFactory);
-  ccFactory_ = ccFactory;
-}
-
-void QuicServerWorker::setBatchWriterFactoryOverride(
-    quic::BatchWriterFactoryOverride override) {
-  batchWriterFactoryOverride_ = std::move(override);
 }
 
 void QuicServerWorker::setRateLimiter(
@@ -865,17 +845,10 @@ QuicServerTransport::Ptr QuicServerWorker::makeTransport(
   auto* evb = getEventBase();
   auto sock = zeroCopyEnabled_ ? makeAlias() : makeSocket(evb);
   auto trans =
-      transportFactory_->make(evb, std::move(sock), client, quicVersion, ctx_);
+      transportFactory_->make(evb, std::move(sock), client, quicVersion);
   if (trans) {
     globalUnfinishedHandshakes++;
     unfinishedHandshakes_++;
-    trans->setCongestionControllerFactory(ccFactory_);
-    if (batchWriterFactoryOverride_) {
-      trans->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
-    }
-    trans->setShouldRegisterKnobParamHandlerFn(
-        shouldRegisterKnobParamHandlerFn_);
-    trans->setQuicExperimentHandlerFn(quicExperimentHandlerFn_);
 
     auto transportSettingsCopy = transportSettings_;
     if (quicVersion == QuicVersion::QUIC_V1_ALIAS ||
@@ -1583,11 +1556,6 @@ void QuicServerWorker::setTransportFactory(
 void QuicServerWorker::setSupportedVersions(
     const std::vector<QuicVersion>& supportedVersions) {
   supportedVersions_ = supportedVersions;
-}
-
-void QuicServerWorker::setFizzContext(
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
-  ctx_ = ctx;
 }
 
 void QuicServerWorker::rejectNewConnections(

@@ -18,14 +18,12 @@
 #include <limits>
 #include <type_traits>
 
-#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/events/HighResQuicTimer.h>
 #include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 #include <quic/common/udpsocket/QuicAsyncUDPSocket.h>
-#include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerTransportFactory.h>
 #include <quic/server/QuicUDPSocketFactory.h>
@@ -86,12 +84,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   using TransportSettingsOverrideFn =
       std::function<void(quic::TransportSettings&)>;
 
-  using ShouldRegisterKnobParamHandlerFn =
-      std::function<bool(TransportKnobParamId)>;
-
-  using QuicExperimentHandlerFn =
-      std::function<void(QuicConnectionStateBase&, uint16_t)>;
-
   QuicServerWorker(
       RunState* runState,
       size_t workerIndex,
@@ -109,14 +101,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * experiments.
    */
   void setTransportSettingsOverrideFn(TransportSettingsOverrideFn fn);
-
-  /*
-   * Set a callback to validate whether a specific transport knob parameter
-   * is allowed to be registered.
-   */
-  void setShouldRegisterKnobParamHandlerFn(ShouldRegisterKnobParamHandlerFn fn);
-
-  void setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn);
 
   /**
    * Sets the listening socket
@@ -284,9 +268,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   void setSupportedVersions(const std::vector<QuicVersion>& supportedVersions);
 
-  void setFizzContext(
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
-
   /**
    * If true, start to reject any new connection during handshake
    */
@@ -330,23 +311,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   void setConnectionIdAlgo(
       std::unique_ptr<ConnectionIdAlgo> connIdAlgo) noexcept;
-
-  /**
-   * Set factory to create specific congestion controller instances
-   * for a given connection
-   * This must be set before the server starts (and accepts connections)
-   */
-  void setCongestionControllerFactory(
-      std::shared_ptr<CongestionControllerFactory> factory);
-
-  /**
-   * Set the per-server batch writer factory override. It will be copied onto
-   * each accepted connection's `QuicConnectionStateBase` so the override is
-   * scoped to this worker's connections only.
-   *
-   * Empty (default-constructed `std::function`) disables the override.
-   */
-  void setBatchWriterFactoryOverride(quic::BatchWriterFactoryOverride override);
 
   /**
    * Set the rate limiter which will be used to rate limit new connections.
@@ -680,10 +644,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   // factories are owned by quic server
   QuicUDPSocketFactory* socketFactory_{nullptr};
   QuicServerTransportFactory* transportFactory_{nullptr};
-  std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
-  // Per-server `BatchWriterFactoryOverride` propagated to each accepted
-  // connection's `QuicConnectionStateBase::batchWriterFactoryOverride`.
-  quic::BatchWriterFactoryOverride batchWriterFactoryOverride_;
 
   ConnIdToTransportMap connectionIdMap_;
   SrcToTransportMap sourceAddressMap_;
@@ -704,7 +664,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   BufPtr readBuffer_;
   bool shutdown_{false};
   std::vector<QuicVersion> supportedVersions_;
-  std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   const TransportSettings transportSettings_;
   // Same value as transportSettings_.numGROBuffers_ if the kernel
   // supports GRO. otherwise 1
@@ -735,12 +694,6 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
 
   // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
-
-  // Used to validate whether a transport knob parameter is allowed to be
-  // registered
-  ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
-
-  QuicExperimentHandlerFn quicExperimentHandlerFn_;
 
   // Output buffer to be used for continuous memory GSO write
   std::unique_ptr<BufAccessor> bufAccessor_;

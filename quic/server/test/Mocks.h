@@ -35,15 +35,12 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
  public:
   ~MockQuicServerTransportFactory() override = default;
 
-  // wrapper for mocked make since gmock doesn't support methods with rvalue ref
   QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
       const quic::SocketAddress& addr,
-      QuicVersion,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
-      override {
-    return _make(evb, socket, addr, ctx);
+      QuicVersion) noexcept override {
+    return _make(evb, socket, addr);
   }
 
   MOCK_METHOD(
@@ -51,8 +48,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       _make,
       (folly::EventBase*,
        std::unique_ptr<FollyAsyncUDPSocketAlias>&,
-       const quic::SocketAddress&,
-       std::shared_ptr<const fizz::server::FizzServerContext>),
+       const quic::SocketAddress&),
       (noexcept));
 };
 

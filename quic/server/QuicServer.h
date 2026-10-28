@@ -11,16 +11,12 @@
 #include <vector>
 
 #include <folly/Function.h>
-#include <folly/ThreadLocal.h>
 #include <folly/container/F14Map.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
-#include <folly/io/async/ScopedEventBaseThread.h>
 
 #include <quic/QuicConstants.h>
-#include <quic/api/QuicBatchWriterFactory.h>
 #include <quic/codec/ConnectionIdAlgo.h>
-#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/server/QuicServerTransportFactory.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/QuicUDPSocketFactory.h>
@@ -36,6 +32,9 @@ class QuicServerTest;
 class QuicServerMultiWorkerRoutingTest;
 } // namespace test
 
+// Construction-time server configuration. Application policy (TLS context,
+// congestion-controller factory, batch-writer override, transport knob and
+// experiment hooks, session setup) lives on the transport factory, not here.
 struct ServerOptions {
   TransportSettings transportSettings;
   std::vector<QuicVersion> supportedVersions{
@@ -76,22 +75,18 @@ struct ServerOptions {
   std::function<void(quic::TransportSettings&)> transportSettingsOverrideFn;
 };
 
-class QuicServer : public std::enable_shared_from_this<QuicServer> {
+// Synchronous lifecycle owner for a fixed set of EventBase-local listeners.
+//
+// QuicServer always borrows its EventBases and transport factories; both
+// must outlive the server (or its completed shutdown()). Control methods
+// (bind/start/pauseRead/all-worker updates/shutdown and the destructor) form
+// a single externally serialized sequence and, with more than one worker,
+// must not run on a worker EventBase or from within a worker callback.
+// Worker callbacks may only requestShutdown() asynchronously.
+class QuicServer {
  public:
   using TransportSettingsOverrideFn =
       std::function<void(quic::TransportSettings&)>;
-
-  using ShouldRegisterKnobParamHandlerFn =
-      std::function<bool(TransportKnobParamId)>;
-
-  using QuicExperimentHandlerFn =
-      std::function<void(QuicConnectionStateBase&, uint16_t)>;
-
-  static std::shared_ptr<QuicServer> createQuicServer(
-      TransportSettings transportSettings = TransportSettings()) {
-    return std::shared_ptr<QuicServer>(
-        new QuicServer(std::move(transportSettings)));
-  }
 
   static std::shared_ptr<QuicServer> createQuicServer(ServerOptions options) {
     return std::make_shared<QuicServer>(std::move(options));
@@ -116,423 +111,110 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
     return runState_.stopRequested() && phase_ != State::Stopped;
   }
 
+  // Creates one worker per EventBase and binds its listener. Throws on
+  // failure after rolling back on the correct EventBases. inheritedFds are
+  // takeover listening fds, one per worker (-1 entries bind normally).
   void bind(
       const quic::SocketAddress& address,
       const std::vector<folly::EventBase*>& evbs,
       const std::vector<int>& inheritedFds = {});
 
-  // Initialize and start the quic server where the quic server manages
-  // the eventbases for workers
-  void start(const quic::SocketAddress& address, size_t maxWorkers);
+  // Attaches a borrowed transport factory to the worker on evb. Completes
+  // on the destination EventBase; only before the first start().
+  void addTransportFactory(
+      folly::EventBase* evb,
+      QuicServerTransportFactory* factory);
 
-  /**
-   * Number of workers ::start() creates for a requested worker count and a
-   * given cpu count. A requested count of 0 means one worker per cpu. The
-   * result never exceeds the worker limit ::start() enforces on a requested
-   * count, so every worker gets a worker id a connection id can carry.
-   */
-  static size_t numWorkersToCreate(size_t maxWorkers, size_t numCpu) noexcept;
+  bool addAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
+  bool removeAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
 
-  // Initialize quic server worker per evb.
-  void initialize(
-      const quic::SocketAddress& address,
-      const std::vector<folly::EventBase*>& evbs,
-      bool useDefaultTransport = false);
-
-  /**
-   * start reading from sockets
-   */
+  // Bound -> Running; Paused -> Running. Every worker is prepared (factory,
+  // socket, zero-copy, startup observers) before any read is enabled.
   void start();
 
-  /*
-   * Pause reading from the listening socket the server workers are bound to
-   */
+  // Pauses reading on the primary listeners; Running -> Paused.
   void pauseRead();
 
-  /*
-   * Take in a function to supply overrides for transport parameters, given
-   * the client address as input. This can be useful if we are running
-   * experiments.
-   */
-  void setTransportSettingsOverrideFn(TransportSettingsOverrideFn fn);
+  // Latches an asynchronous stop request; safe from worker callbacks.
+  void requestShutdown(LocalErrorCode error = LocalErrorCode::SHUTTING_DOWN);
 
-  /*
-   * Set a callback to validate whether a specific transport knob parameter
-   * is allowed to be registered.
-   */
-  void setShouldRegisterKnobParamHandlerFn(ShouldRegisterKnobParamHandlerFn fn);
+  // Completes shutdown: closes connections and destroys workers on their
+  // EventBases before returning.
+  void shutdown(LocalErrorCode error = LocalErrorCode::SHUTTING_DOWN);
 
-  void setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn);
+  // Bound address by value (cold-path snapshot). Requires bind().
+  quic::SocketAddress getAddress() const;
 
-  /*
-   * Transport factory to create server-transport.
-   * QuicServer calls 'make()' on the supplied transport factory for *each* new
-   * connection.
-   * This is useful to do proper set-up on the callers side for each new
-   * established connection, such as transport settings and setup sessions.
-   */
-  void setQuicServerTransportFactory(
-      std::unique_ptr<QuicServerTransportFactory> factory);
+  std::vector<folly::EventBase*> getWorkerEvbs() const noexcept;
 
-  /*
-   * The socket factory used to create sockets for client connections.  These
-   * will end up backing QuicServerTransports and managing per connection state.
-   */
-  void setQuicUDPSocketFactory(std::unique_ptr<QuicUDPSocketFactory> factory);
-
-  /*
-   * The socket factory used to create acceptor sockets.  The sockets created
-   * from this factory will listen for udp packets and create new connections
-   * via the factory specified in setQuicUDPSocketFactory.
-   */
-  void setListenerSocketFactory(std::unique_ptr<QuicUDPSocketFactory> factory);
-
-  /**
-   * Set factory to create specific congestion controller instances
-   * for a given connection
-   * This must be set before the server is started.
-   */
-  void setCongestionControllerFactory(
-      std::shared_ptr<CongestionControllerFactory> ccFactory);
-
-  /**
-   * Install a `BatchWriterFactoryOverride` propagated to every accepted
-   * connection. Must be set before `start()`; empty (the default) disables.
-   * See `quic::BatchWriterFactoryOverride` for the per-server rationale.
-   */
-  void setBatchWriterFactoryOverride(quic::BatchWriterFactoryOverride override);
-
-  /**
-   * Returns the override installed by `setBatchWriterFactoryOverride`. Like
-   * the setter, intended to be called from the main thread before `start()`;
-   * the returned reference aliases an `std::function` whose assignment is not
-   * atomic, so concurrent reads racing with `setBatchWriterFactoryOverride`
-   * on another thread are undefined behavior.
-   */
-  const quic::BatchWriterFactoryOverride& getBatchWriterFactoryOverride()
-      const noexcept;
-
-  /**
-   * Invoke `fn` once per worker with that worker's listener
-   * `const folly::AsyncUDPSocket*`. Unbound/stopped workers are skipped —
-   * `fn` is never called with `nullptr`. Each invocation runs
-   * synchronously on the owning worker's EventBase; pointers are owned by
-   * the worker and must not outlive the callback. Intended for observation
-   * only (e.g. aggregating per-fd MSG_ZEROCOPY counters across the
-   * alias-socket model's one-listener-fd-per-worker layout); callers
-   * needing to mutate worker socket state should use the non-const
-   * `QuicServerWorker::getListenerSocket()` directly.
-   */
-  void forEachListenerSocket(
-      folly::FunctionRef<void(const folly::AsyncUDPSocket*)> fn) const;
-
-  void setRateLimit(
-      std::function<uint64_t()> count,
-      std::chrono::seconds window);
-
-  void setUnfinishedHandshakeLimit(std::function<int()> limitFn);
-
-  /**
-   * Set list of supported QUICVersion for this server. These versions will be
-   * used during the 'Version-Negotiation' phase with the client.
-   */
-  void setSupportedVersion(const std::vector<QuicVersion>& versions);
-
-  /**
-   * A token to use for health checking VIPs. When a UDP packet is sent to the
-   * server with the exact contents of the health check token, the server will
-   * respond with an "OK".
-   */
-  void setHealthCheckToken(const std::string& healthCheckToken);
-
-  /**
-   * Set server TLS context.
-   */
-  void setFizzContext(
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
-
-  /**
-   * Set server TLS context for a worker associated with the given eventbase.
-   */
-  void setFizzContext(
-      folly::EventBase* evb,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
-
-  /**
-   * Set socket options for the underlying socket.
-   * Options are being set before and after bind, and not at the time of
-   * invoking this function.
-   */
-  void setSocketOptions(const folly::SocketOptionMap& options) noexcept;
-
-  /**
-   * Sets whether the underlying socket should set the IPV6_ONLY socket option
-   * or not. If set to false, IPv4-mapped IPv6 addresses will be enabled on the
-   * socket.
-   */
-  void setBindV6Only(bool bindV6Only);
-
-  /**
-   * Set the server id of the quic server.
-   * Note that this function must be called before initialize(..)
-   */
-  void setProcessId(ProcessId id) noexcept;
+  const TransportSettings& getTransportSettings() const noexcept;
 
   ProcessId getProcessId() const noexcept;
 
-  /**
-   * Set the id of the host where this server is running.
-   * It is used to make routing decision by setting this id in the ConnectionId
-   */
+  // Live controls: copied to each worker on its EventBase.
   void setHostId(uint32_t hostId) noexcept;
 
-  /**
-   * Set version of connection ID used by quic server.
-   * Note that this function must be called before initialize(..)
-   */
-  void setConnectionIdVersion(ConnectionIdVersion cidVersion) noexcept;
-
-  /**
-   * Get transport settings.
-   */
-  const TransportSettings& getTransportSettings() const noexcept;
-
-  /**
-   * Tells the server to start rejecting any new connection. The parameter
-   * function is stored and evaluated on each new connection before being
-   * accepted.
-   */
   void rejectNewConnections(
       std::function<bool(const quic::SocketAddress&)> rejectFn);
 
-  /**
-   * Set callback to determine if MVFST_PRIMING version handling is
-   * enabled.
-   */
   void setPrimingEnabledCallback(std::function<bool()> isPrimingEnabled);
 
-  /**
-   * Tells the server to begin rejecting any new connections with block listed
-   * source ports. Like rejectNewConnections above, the parameter function is
-   * stored and evaluated on each new connection before being accepted.
-   */
   void blockListedSrcPort(std::function<bool(uint16_t)> isBlockListedSrcPort);
 
-  /**
-   * Returns listening address of this server
-   */
-  quic::SocketAddress getAddress() const;
+  void setHealthCheckToken(const std::string& healthCheckToken);
 
-  /**
-   * Returns true iff the server is fully initialized
-   */
-  bool isInitialized() const noexcept;
-
-  void requestShutdown(LocalErrorCode error = LocalErrorCode::SHUTTING_DOWN);
-
-  /**
-   * Shutdown the sever (and all the workers)
-   */
-  void shutdown(LocalErrorCode error = LocalErrorCode::SHUTTING_DOWN);
-
-  /**
-   * Returns true if the server has begun the termination process or if it has
-   * not been initialized
-   */
-  bool hasShutdown() const noexcept;
-
-  /**
-   * Blocks the calling thread until isInitialized() is true
-   */
-  void waitUntilInitialized();
-
-  /**
-   * Set the transport factory for the worker associated with the given
-   * eventbase.
-   * This is relevant if the QuicServer is initialized with the vector of
-   * event-bases supplied by the caller.
-   * Typically, this is useful when the server is already running fixed pool of
-   * thread ('workers'), and want to run QuicServer within those workers.
-   * In such scenario, the supplied factory's make() will be called (lock-free)
-   * upon each new connection establishment within each worker.
-   */
-  void addTransportFactory(
-      folly::EventBase*,
-      QuicServerTransportFactory* acceptor);
-
-  /**
-   * Enable SO_ZEROCOPY on every worker's listener socket and create a
-   * per-worker shared MSG_ZEROCOPY bookkeeping object. After this returns,
-   * every per-connection write socket created by a worker (via
-   * QuicSharedUDPSocketFactory, which shares the listener fd) will be
-   * automatically wired to its worker's bookkeeping so MSG_ZEROCOPY sends
-   * and listener-side completion drains stay coherent.
-   *
-   * Must be called after start() so that worker listener sockets exist.
-   * Calls into each worker's eventbase synchronously; returns the first
-   * error encountered across workers, or success if all worker listeners
-   * enabled zerocopy.
-   */
-  quic::Expected<void, QuicError> enableZeroCopy();
-
-  /**
-   * Initialize necessary steps to enable being taken over of this server by
-   * another server, such as binding to a local port so that once another
-   * process starts to takeover the port this server is listening to, the other
-   * server can forward packets belonging to this server
-   * Note that this method cannot be called on a worker's thread.
-   * Note that this should also be called after initialize(..),
-   * calling this before initialize is undefined.
-   */
+  // Takeover operations.
   void allowBeingTakenOver(const quic::SocketAddress& addr);
 
   quic::SocketAddress overrideTakeoverHandlerAddress(
       const quic::SocketAddress& addr);
 
-  /*
-   * Setup and initialize the listening socket of the old server from the given
-   * address to forward misrouted packets belonging to that server during
-   * the takeover process
-   */
   void startPacketForwarding(const quic::SocketAddress& destAddr);
 
-  /*
-   * Disable packet forwarding, even if the packet has no connection id
-   * associated with it after the 'delayMS' milliseconds
-   */
   void stopPacketForwarding(std::chrono::milliseconds delay);
 
-  /**
-   * Set takenover socket fds for the quic server from another process.
-   * Quic server calls ::dup for each fd and will not bind to the address for
-   * all the valid fds (i.e. not -1) in the given vector
-   * NOTE: it must be called before calling 'start()'
-   */
-  void setListeningFDs(const std::vector<int>& fds);
-
-  /*
-   * Returns the File Descriptor of the listening socket for this server.
-   */
   int getListeningSocketFD() const;
 
-  /*
-   * Returns all the File Descriptor of the listening sockets for each
-   * worker for this server.
-   */
   std::vector<int> getAllListeningSocketFDs() const noexcept;
 
-  /*
-   * Once this server is notified that another server has initiated the takeover
-   * it opens a new communication channel so that new server can forward
-   * misrouted packets to this server.
-   * This method returns the File Descriptor of a local port that this server
-   * is listening to.
-   */
   int getTakeoverHandlerSocketFD() const;
 
   TakeoverProtocolVersion getTakeoverProtocolVersion() const noexcept;
 
-  /**
-   * Factory to create per worker callback for various transport stats (such as
-   * packet received, dropped etc). QuicServer calls 'make' during the
-   * initialization _for each worker_.
-   * Also, 'make' is called from the worker's eventbase.
-   *
-   * NOTE: Since the callback is invoked very frequently and per thread,
-   * it is important that the implementation of QuicTransportStatsCallback is
-   * efficient.
-   * NOTE: Quic does not synchronize across threads before calling
-   * callbacks for various stats.
-   */
-  void setTransportStatsCallbackFactory(
-      std::unique_ptr<QuicTransportStatsCallbackFactory> statsFactory);
-
-  /**
-   * Factory to create per worker ConnectionIdAlgo instance
-   * NOTE: it must be set before calling 'start()' or 'initialize(..)'
-   */
-  void setConnectionIdAlgoFactory(
-      std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory);
-
-  /**
-   * Returns vector of running eventbases.
-   * This is useful if QuicServer is initialized with a 'default' mode by just
-   * specifying number of workers.
-   */
-  std::vector<folly::EventBase*> getWorkerEvbs() const noexcept;
-
-  /**
-   * Adds observer for accept events.
-   *
-   * Adds for the worker associated with the given EventBase. This is relevant
-   * if the QuicServer is initialized with a vector of EventBase supplied by
-   * the caller. With this approach, each worker thread can (but is not
-   * required to) have its own observer, removing the need for the observer
-   * implementation to be thread safe.
-   *
-   * Can be used to install socket observers and instrumentation without
-   * changing / interfering with application-specific acceptor logic.
-   *
-   * See AcceptObserver class for details.
-   *
-   * @param evb           Worker EventBase for which we want to add observer.
-   * @param observer      Observer to add (implements AcceptObserver).
-   * @return              Whether worker found and observer added.
-   */
-  bool addAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
-
-  /**
-   * Remove observer for accept events.
-   *
-   * Removes for the worker associated with the given EventBase.
-   *
-   * @param evb           Worker EventBase for which we want to remove observer.
-   * @param observer      Observer to remove.
-   * @return              Whether worker + observer found and observer removed.
-   */
-  bool removeAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
+  // Enables SO_ZEROCOPY on every worker listener; see QuicServerWorker.
+  quic::Expected<void, QuicError> enableZeroCopy();
 
   void getAllConnectionsStats(std::vector<QuicConnectionStats>& stats);
+
+  // Invokes fn once per bound worker listener, synchronously on the
+  // owning worker's EventBase; stopped workers are skipped. Pointers are
+  // worker-owned and must not outlive the callback; observation only.
+  void forEachListenerSocket(
+      folly::FunctionRef<void(const folly::AsyncUDPSocket*)> fn) const;
 
  private:
   friend class test::QuicServerTest;
   friend class test::QuicServerMultiWorkerRoutingTest;
-
-  explicit QuicServer(TransportSettings transportSettings);
+  friend class ThreadedQuicServer;
 
   QuicServerWorker* FOLLY_NULLABLE findWorkerForEvb(folly::EventBase* evb);
 
   static TransportSettings validateTransportSettings(
       TransportSettings transportSettings);
 
-  using MaybeOwnedEvbPtr =
-      std::unique_ptr<folly::IOExecutor, void (*)(folly::IOExecutor*)>;
-
-  // initializes a QuicServerWorker per evb.
-  void initializeImpl(
+  void bindImpl(
       const quic::SocketAddress& address,
-      std::vector<MaybeOwnedEvbPtr> evbs,
-      bool useDefaultTransport = false,
-      const std::vector<int>* inheritedFds = nullptr);
+      const std::vector<folly::EventBase*>& evbs,
+      const std::vector<int>& inheritedFds);
 
-  struct EventBaseBackendDetails {
-    std::unique_ptr<folly::EventBaseBackendBase> (*factory)();
-    bool supportsRecvmsgMultishot = false;
-  };
-
-  static EventBaseBackendDetails getEventBaseBackendDetails();
-
-  // helper function to initialize workers
-  void initializeWorkers();
+  void createWorkers();
 
   std::unique_ptr<QuicServerWorker> newWorkerWithoutSocket(size_t workerIndex);
 
-  // helper method to run the given function in all worker synchronously
-  void runOnAllWorkersSync(const std::function<void(QuicServerWorker*)>& func);
+  void bindWorkersToSocket(const quic::SocketAddress& address);
 
-  void bindWorkersToSocket(
-      const quic::SocketAddress& address,
-      bool useDefaultTransport);
+  // Synchronous: completes on each worker EventBase before returning.
+  void runOnAllWorkersSync(const std::function<void(QuicServerWorker*)>& func);
 
   std::vector<QuicVersion> supportedVersions_{{
       QuicVersion::MVFST,
@@ -549,31 +231,20 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
   }};
 
   State phase_{State::Created};
-  std::atomic<bool> shutdown_{true};
-  std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   const TransportSettings transportSettings_;
   std::mutex startMutex_;
-  std::atomic<bool> initialized_{false};
   std::atomic<bool> takeoverHandlerInitialized_{false};
 
-  // stores all the worker evbs which may be owned (i.e. ScopedEventBaseThread)
-  // or unowned (i.e. folly::EventBase*)
-  folly::Synchronized<std::vector<MaybeOwnedEvbPtr>> workerEvbs_;
+  // Borrowed worker EventBases, fixed at bind().
+  std::vector<folly::EventBase*> workerEvbs_;
 
   RunState runState_;
   std::vector<std::unique_ptr<QuicServerWorker>> workers_;
   folly::F14FastMap<folly::EventBase*, QuicServerWorker*> evbToWorkers_;
-  std::unique_ptr<QuicServerTransportFactory> transportFactory_;
-  // factory used for workers to create their listening / bound sockets
   std::unique_ptr<QuicUDPSocketFactory> listenerSocketFactory_;
-  // factory used by workers to create sockets for connection transports
   std::unique_ptr<QuicUDPSocketFactory> socketFactory_;
-  // factory used to create specific instance of Congestion control algorithm
-  std::shared_ptr<CongestionControllerFactory> ccFactory_;
-  quic::BatchWriterFactoryOverride batchWriterFactoryOverride_;
 
   Optional<std::string> healthCheckToken_;
-  // vector of all the listening fds on each quic server worker
   std::vector<int> listeningFDs_;
   ProcessId processId_{ProcessId::ZERO};
   uint32_t hostId_{0};
@@ -583,21 +254,12 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
   std::function<bool()> isPrimingEnabled_{[]() { return false; }};
   std::function<bool(uint16_t)> isBlockListedSrcPort_{
       [](uint16_t) { return false; }};
-  // factory to create per worker QuicTransportStatsCallback
   std::unique_ptr<QuicTransportStatsCallbackFactory> transportStatsFactory_;
-  // factory to create per worker ConnectionIdAlgo
   std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory_;
-  // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
-  // Used to validate whether a transport knob parameter is allowed to be
-  // registered
-  ShouldRegisterKnobParamHandlerFn shouldRegisterKnobParamHandlerFn_;
-  QuicExperimentHandlerFn quicExperimentHandlerFn_;
-  // address that the server is bound to
   quic::SocketAddress boundAddress_;
   folly::SocketOptionMap socketOptions_;
 
-  // Rate limits
   struct RateLimit {
     RateLimit(std::function<uint64_t()> c, std::chrono::seconds w)
         : count(std::move(c)), window(w) {}
@@ -610,27 +272,7 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
 
   std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1048576; }};
 
-  // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
   FollyAsyncUDPSocketAlias::BindOptions bindOptions_;
-
-  // set by getEventBaseBackend if multishot callback is
-  // supported
-  bool backendSupportsMultishotCallback_{false};
-
-  // flag to ensure baton is only posted once
-  folly::once_flag startDone_;
-  // baton used to block in ::waitUntilInitialized – posted via shutdown path or
-  // last worker to have been initialized
-  folly::Baton<> startDoneBaton_;
-
-  /**
-   * QuicServer does not support multi-threaded/concurrent access. mainThreadId_
-   * is initialized to the id of the thread that constructed the QuicServer and
-   * all member methods check the invariant that they are invoked in
-   * mainThreadId_. This is temporary until we move all member methods that
-   * shouldn't be invoked after initialization into the constructor.
-   */
-  const std::thread::id mainThreadId_{};
 };
 
 } // namespace quic

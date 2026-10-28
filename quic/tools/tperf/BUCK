@@ -44,6 +44,7 @@ mvfst_cpp_library(
         "//fizz/record:record",
         "//quic/common/test:test_utils",
         "//quic/common/udpsocket:folly_async_udp_socket",
+        "//quic/congestion_control:server_congestion_controller_factory",
         "//quic/congestion_control:static_cwnd_congestion_controller",
         "//quic/logging/oops_logger:glog_oops_logger",
     ],

@@ -8,7 +8,7 @@
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/EventBaseBackendBase.h>
 #include <quic/common/MvfstLogging.h>
-#include <quic/server/QuicServer.h>
+#include <quic/server/QuicServerBackend.h>
 
 namespace quic {
 
@@ -102,8 +102,8 @@ getWindowsEventBaseBackend() {
 
 #endif
 
-QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
-  EventBaseBackendDetails ret;
+EventBaseBackendDetails getEventBaseBackendDetails() {
+  EventBaseBackendDetails ret{};
 #ifdef _WIN32
   ret.factory = &getWindowsEventBaseBackend;
 #else

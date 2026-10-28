@@ -28,6 +28,7 @@ mvfst_add_library(mvfst_server_server
     QuicServerPacketRouter.cpp
     QuicServerTransport.cpp
     QuicServerWorker.cpp
+    ThreadedQuicServer.cpp
   DEPS
     mvfst_codec_header_codec
     mvfst_common_mvfst_logging
@@ -35,6 +36,7 @@ mvfst_add_library(mvfst_server_server
     mvfst_common_socket_util
     mvfst_congestion_control_bbr
     mvfst_congestion_control_copa
+    mvfst_congestion_control_server_congestion_controller_factory
     mvfst_fizz_handshake
     mvfst_fizz_server_handshake
     mvfst_logging_oops_logger
@@ -53,19 +55,16 @@ mvfst_add_library(mvfst_server_server
     Folly::folly_system_thread_id
     fmt::fmt
   EXPORTED_DEPS
-    mvfst_api_quic_batch_writer
     mvfst_api_transport
     mvfst_api_transport_helpers
     mvfst_codec_types
     mvfst_common_buf_accessor
     mvfst_common_events_folly_eventbase
     mvfst_common_events_highres_quic_timer
-    mvfst_common_mvfst_check
     mvfst_common_transport_knobs
     mvfst_common_udpsocket_folly_async_udp_socket
     mvfst_common_udpsocket_quic_async_udp_socket
     mvfst_congestion_control_congestion_controller_factory
-    mvfst_congestion_control_server_congestion_controller_factory
     mvfst_constants
     mvfst_handshake
     mvfst_server_handshake_server_extension

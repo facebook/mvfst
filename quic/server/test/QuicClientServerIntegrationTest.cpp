@@ -10,8 +10,10 @@
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
+#include <quic/server/ThreadedQuicServer.h>
 
 #include <folly/container/F14Map.h>
 #include <folly/portability/GMock.h>
@@ -67,20 +69,22 @@ class ServerTransportCapture {
 
 class QuicTransportFactory : public quic::QuicServerTransportFactory {
  public:
-  explicit QuicTransportFactory(std::shared_ptr<ServerTransportCapture> capture)
-      : capture_(std::move(capture)) {}
+  QuicTransportFactory(
+      std::shared_ptr<ServerTransportCapture> capture,
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx)
+      : capture_(std::move(capture)), ctx_(std::move(ctx)) {}
 
-  // no-op quic server transport factory
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
       const quic::SocketAddress& /* peerAddr */,
-      quic::QuicVersion /*quicVersion*/,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
-      override {
+      quic::QuicVersion /*quicVersion*/) noexcept override {
     auto noopCb = std::make_shared<NiceMock<MockMergedConnectionCallbacks>>();
     auto transport = quic::QuicServerTransport::make(
-        evb, std::move(socket), noopCb.get(), noopCb.get(), ctx);
+        evb, std::move(socket), noopCb.get(), noopCb.get(), ctx_);
+    static auto ccFactory =
+        std::make_shared<quic::ServerCongestionControllerFactory>();
+    transport->setCongestionControllerFactory(ccFactory);
     if (capture_) {
       capture_->set(transport, std::move(noopCb));
     }
@@ -89,6 +93,7 @@ class QuicTransportFactory : public quic::QuicServerTransportFactory {
 
  private:
   std::shared_ptr<ServerTransportCapture> capture_;
+  std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
 };
 
 // Copy of the server-side connection-state fields the tests assert on. The
@@ -174,14 +179,13 @@ class ServerTransportParameters : public testing::Test {
   // start server with the transport settings that unit test can set accordingly
   void startServer() {
     serverTs_.statelessResetTokenSecret = getRandSecret();
-    server_ = QuicServer::createQuicServer(serverTs_);
-    // set server configs
-    server_->setFizzContext(quic::test::createServerCtx());
-    server_->setQuicServerTransportFactory(
-        std::make_unique<QuicTransportFactory>(serverCapture_));
-    // start server
+    quic::ServerOptions options;
+    options.transportSettings = serverTs_;
+    server_ = std::make_unique<quic::ThreadedQuicServer>(
+        std::move(options),
+        std::make_unique<QuicTransportFactory>(
+            serverCapture_, quic::test::createServerCtx()));
     server_->start(quic::SocketAddress("::1", 0), 1);
-    server_->waitUntilInitialized();
   }
 
   // Snapshot the server-side connection-state fields. Call after
@@ -228,7 +232,7 @@ class ServerTransportParameters : public testing::Test {
         qEvb_,
         std::make_unique<FollyQuicAsyncUDPSocket>(qEvb_),
         std::move(fizzClientContext));
-    client->addNewPeerAddress(server_->getAddress());
+    client->addNewPeerAddress(server_->server().getAddress());
     client->setHostname("::1");
     client->setSupportedVersions({QuicVersion::MVFST});
     return client;
@@ -252,7 +256,7 @@ class ServerTransportParameters : public testing::Test {
   }
 
   std::shared_ptr<QuicClientTransport> client_;
-  std::shared_ptr<QuicServer> server_;
+  std::unique_ptr<quic::ThreadedQuicServer> server_;
   std::shared_ptr<ServerTransportCapture> serverCapture_;
   TransportSettings serverTs_{};
   folly::EventBase evb_;

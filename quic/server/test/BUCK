@@ -160,6 +160,7 @@ fb_dirsync_cpp_unittest(
         "//quic/common/events:folly_eventbase",
         "//quic/common/test:test_client_utils",
         "//quic/common/test:test_utils",
+        "//quic/congestion_control:server_congestion_controller_factory",
         "//quic/fizz/client/handshake:fizz_client_handshake",
         "//quic/server:server",
     ],

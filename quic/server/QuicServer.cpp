@@ -9,9 +9,7 @@
 #include <quic/server/QuicServer.h>
 
 #include <folly/Random.h>
-#include <folly/io/async/EventBaseManager.h>
 #include <folly/portability/GFlags.h>
-#include <folly/system/HardwareConcurrency.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/server/QuicReusePortUDPSocketFactory.h>
@@ -29,21 +27,8 @@ FOLLY_GFLAGS_DEFINE_int32(
 namespace {
 using namespace quic;
 
-[[maybe_unused]] constexpr std::string_view kQuicServerNotInitialized =
-    "Quic server is not initialized. "
-    "Consider calling waitUntilInitialized() prior to: ";
-
-void checkRunningInThread(const std::thread::id expectedThreadId) {
-  MVCHECK(std::this_thread::get_id() == expectedThreadId);
-}
-
-// these two functions either delete the IOExecutor if we own it, or otherwise
-// no-op
-void ownedEvbDeleter(folly::IOExecutor* evb) {
-  std::default_delete<folly::IOExecutor>()(evb);
-}
-
-void unownedEvbDeleter(folly::IOExecutor*) {}
+[[maybe_unused]] constexpr std::string_view kQuicServerNotBound =
+    "Quic server is not bound. Consider calling bind() prior to: ";
 
 void validateHealthCheckToken(const std::string& healthCheckToken) {
   // Make sure the token satisfies the required properties, i.e. it is not a
@@ -58,10 +43,9 @@ void validateHealthCheckToken(const std::string& healthCheckToken) {
 //
 namespace quic {
 
-QuicServer::QuicServer(TransportSettings transportSettings)
+QuicServer::QuicServer(ServerOptions options)
     : transportSettings_(
-          validateTransportSettings(std::move(transportSettings))),
-      mainThreadId_(std::this_thread::get_id()) {
+          validateTransportSettings(std::move(options.transportSettings))) {
 #ifdef _WIN32
   listenerSocketFactory_ = std::make_unique<QuicReusePortUDPSocketFactory>(
       true /* reusePort*/, true /* reuseAddr */);
@@ -74,10 +58,6 @@ QuicServer::QuicServer(TransportSettings transportSettings)
     // cidVersion_ is V1 by default
     cidVersion_ = (ConnectionIdVersion)FLAGS_qs_conn_id_version;
   }
-}
-
-QuicServer::QuicServer(ServerOptions options)
-    : QuicServer(options.transportSettings) {
   supportedVersions_ = std::move(options.supportedVersions);
   socketOptions_ = std::move(options.socketOptions);
   bindOptions_ = options.bindOptions;
@@ -107,44 +87,6 @@ QuicServer::QuicServer(ServerOptions options)
   }
   unfinishedHandshakeLimitFn_ = std::move(options.unfinishedHandshakeLimitFn);
   transportSettingsOverrideFn_ = std::move(options.transportSettingsOverrideFn);
-}
-
-void QuicServer::setQuicServerTransportFactory(
-    std::unique_ptr<QuicServerTransportFactory> factory) {
-  checkRunningInThread(mainThreadId_);
-  transportFactory_ = std::move(factory);
-}
-
-void QuicServer::setQuicUDPSocketFactory(
-    std::unique_ptr<QuicUDPSocketFactory> factory) {
-  checkRunningInThread(mainThreadId_);
-  socketFactory_ = std::move(factory);
-}
-
-void QuicServer::setListenerSocketFactory(
-    std::unique_ptr<QuicUDPSocketFactory> factory) {
-  checkRunningInThread(mainThreadId_);
-  listenerSocketFactory_ = std::move(factory);
-}
-
-void QuicServer::setCongestionControllerFactory(
-    std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
-  MVCHECK(ccFactory);
-  ccFactory_ = std::move(ccFactory);
-}
-
-void QuicServer::setBatchWriterFactoryOverride(
-    quic::BatchWriterFactoryOverride override) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
-  batchWriterFactoryOverride_ = std::move(override);
-}
-
-const quic::BatchWriterFactoryOverride&
-QuicServer::getBatchWriterFactoryOverride() const noexcept {
-  return batchWriterFactoryOverride_;
 }
 
 void QuicServer::forEachListenerSocket(
@@ -180,120 +122,21 @@ void QuicServer::forEachListenerSocket(
   }
 }
 
-void QuicServer::setRateLimit(
-    std::function<uint64_t()> count,
-    std::chrono::seconds window) {
-  checkRunningInThread(mainThreadId_);
-  rateLimit_ = quic::make_optional<RateLimit>(std::move(count), window);
-}
-
-void QuicServer::setUnfinishedHandshakeLimit(std::function<int()> limitFn) {
-  checkRunningInThread(mainThreadId_);
-  unfinishedHandshakeLimitFn_ = std::move(limitFn);
-}
-
-void QuicServer::setSupportedVersion(const std::vector<QuicVersion>& versions) {
-  checkRunningInThread(mainThreadId_);
-  supportedVersions_ = versions;
-}
-
-void QuicServer::setProcessId(ProcessId id) noexcept {
-  checkRunningInThread(mainThreadId_);
-  processId_ = id;
-}
-
 ProcessId QuicServer::getProcessId() const noexcept {
   return processId_;
-}
-
-bool QuicServer::isInitialized() const noexcept {
-  return initialized_;
-}
-
-size_t QuicServer::numWorkersToCreate(
-    size_t maxWorkers,
-    size_t numCpu) noexcept {
-  if (maxWorkers == 0) {
-    maxWorkers = numCpu;
-  }
-  return std::min(
-      {numCpu,
-       maxWorkers,
-       static_cast<size_t>(std::numeric_limits<uint8_t>::max())});
-}
-
-void QuicServer::start(const quic::SocketAddress& address, size_t maxWorkers) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(ctx_, "Must set a TLS context for the Quic server");
-  MVCHECK_LE(
-      maxWorkers,
-      std::numeric_limits<uint8_t>::max(),
-      "Quic server doesn't support more than "
-          << (int)std::numeric_limits<uint8_t>::max() << " workers");
-  auto const backendDetails = getEventBaseBackendDetails();
-  backendSupportsMultishotCallback_ = backendDetails.supportsRecvmsgMultishot;
-  const size_t numCpu = folly::available_concurrency();
-  auto numWorkers = numWorkersToCreate(maxWorkers, numCpu);
-  if (maxWorkers == 0 && numWorkers < numCpu) {
-    MVLOG_WARNING << "Starting " << numWorkers
-                  << " quic workers on a host with " << numCpu
-                  << " cpus; Quic server doesn't support more workers";
-  }
-
-  // ::start() is the api for QuicServer to construct and own the EventBases the
-  // QuicServerWorkers are running on
-  std::vector<MaybeOwnedEvbPtr> ownedEvbs;
-  ownedEvbs.reserve(numWorkers);
-  for (size_t i = 0; i < numWorkers; ++i) {
-    auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>(
-        folly::EventBase::Options().setBackendFactory(backendDetails.factory),
-        nullptr,
-        "");
-
-    ownedEvbs.push_back({scopedEvb.release(), ownedEvbDeleter});
-  }
-  initializeImpl(address, std::move(ownedEvbs), true /* useDefaultTransport */);
-  start();
 }
 
 void QuicServer::bind(
     const quic::SocketAddress& address,
     const std::vector<folly::EventBase*>& evbs,
     const std::vector<int>& inheritedFds) {
-  checkRunningInThread(mainThreadId_);
-  std::vector<MaybeOwnedEvbPtr> unownedEvbs;
-  unownedEvbs.reserve(evbs.size());
-  for (auto* evb : evbs) {
-    unownedEvbs.push_back(
-        {static_cast<folly::IOExecutor*>(evb), unownedEvbDeleter});
-  }
-  initializeImpl(address, std::move(unownedEvbs), false, &inheritedFds);
+  bindImpl(address, evbs, inheritedFds);
 }
 
-void QuicServer::initialize(
+void QuicServer::bindImpl(
     const quic::SocketAddress& address,
     const std::vector<folly::EventBase*>& evbs,
-    bool useDefaultTransport) {
-  checkRunningInThread(mainThreadId_);
-
-  // transform evbs to std::vector<MaybeOwnedEvbPtr> with no ownership
-  std::vector<MaybeOwnedEvbPtr> unownedEvbs;
-  unownedEvbs.reserve(evbs.size());
-
-  for (auto* evb : evbs) {
-    unownedEvbs.push_back(
-        {static_cast<folly::IOExecutor*>(evb), unownedEvbDeleter});
-  }
-
-  initializeImpl(address, std::move(unownedEvbs), useDefaultTransport);
-}
-
-void QuicServer::initializeImpl(
-    const quic::SocketAddress& address,
-    std::vector<MaybeOwnedEvbPtr> evbs,
-    bool useDefaultTransport,
-    const std::vector<int>* inheritedFds) {
-  checkRunningInThread(mainThreadId_);
+    const std::vector<int>& inheritedFds) {
   MVCHECK(phase_ == State::Created, "QuicServer::bind requires Created state");
   if (evbs.size() > std::numeric_limits<uint8_t>::max()) {
     throw std::invalid_argument(
@@ -302,11 +145,10 @@ void QuicServer::initializeImpl(
   MVCHECK(!evbs.empty());
   {
     folly::F14FastSet<folly::EventBase*> seen;
-    for (auto& evb : evbs) {
-      auto* raw = evb->getEventBase();
-      MVCHECK(raw, "QuicServer::bind requires non-null EventBases");
+    for (auto* evb : evbs) {
+      MVCHECK(evb, "QuicServer::bind requires non-null EventBases");
       MVCHECK(
-          seen.insert(raw).second,
+          seen.insert(evb).second,
           "QuicServer::bind requires distinct EventBases");
     }
   }
@@ -315,44 +157,33 @@ void QuicServer::initializeImpl(
     throw std::runtime_error(
         "QuicServer::bind called after shutdown was requested");
   }
-  if (inheritedFds) {
-    listeningFDs_ = *inheritedFds;
-  }
-  MVCHECK(shutdown_);
-  shutdown_ = false;
+  listeningFDs_ = inheritedFds;
 
-  // it the connid algo factory is not set, use default impl
+  // if the connid algo factory is not set, use default impl
   if (!connIdAlgoFactory_) {
     connIdAlgoFactory_ = std::make_unique<DefaultConnectionIdAlgoFactory>();
   }
 
-  if (!ccFactory_) {
-    ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
-  }
-
-  workerEvbs_.swap(evbs);
-
+  workerEvbs_ = evbs;
   try {
-    initializeWorkers();
-    bindWorkersToSocket(address, useDefaultTransport);
+    createWorkers();
+    bindWorkersToSocket(address);
   } catch (...) {
     shutdown(LocalErrorCode::INTERNAL_ERROR);
     throw;
   }
+  phase_ = State::Bound;
 }
 
-void QuicServer::initializeWorkers() {
+void QuicServer::createWorkers() {
   MVVLOG(4) << "Initializing workers";
   MVCHECK(workers_.empty());
-  // iterate in the order of insertion in vector
-  auto workerEvbs = workerEvbs_.rlock();
   runState_.peers.clear();
-  runState_.peers.reserve(workerEvbs->size());
-  for (size_t i = 0; i < workerEvbs->size(); ++i) {
+  runState_.peers.reserve(workerEvbs_.size());
+  for (auto* evb : workerEvbs_) {
     runState_.peers.push_back(
         WorkerEndpoint{
-            .evb = (*workerEvbs)[i]->getEventBase(),
-            .target = std::make_shared<DispatchTarget>()});
+            .evb = evb, .target = std::make_shared<DispatchTarget>()});
   }
 }
 
@@ -385,8 +216,6 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket(
         "QuicServer connection id algo factory returned null");
   }
   worker->setConnectionIdAlgo(std::move(connIdAlgo));
-  worker->setCongestionControllerFactory(ccFactory_);
-  worker->setBatchWriterFactoryOverride(batchWriterFactoryOverride_);
   if (rateLimit_) {
     worker->setRateLimiter(
         std::make_unique<SlidingWindowRateLimiter>(
@@ -394,54 +223,35 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket(
   }
   worker->setUnfinishedHandshakeLimit(unfinishedHandshakeLimitFn_);
   worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
-  worker->setShouldRegisterKnobParamHandlerFn(
-      shouldRegisterKnobParamHandlerFn_);
-  worker->setQuicExperimentHandlerFn(quicExperimentHandlerFn_);
   return worker;
 }
 
-void QuicServer::bindWorkersToSocket(
-    const quic::SocketAddress& address,
-    bool useDefaultTransport) {
-  auto workerEvbs = workerEvbs_.rlock();
-  auto numWorkers = workerEvbs->size();
-  MVCHECK(!initialized_);
+void QuicServer::bindWorkersToSocket(const quic::SocketAddress& address) {
   boundAddress_ = address;
   std::exception_ptr failure;
-  for (size_t i = 0; i < numWorkers; ++i) {
-    auto* workerEvb = (*workerEvbs)[i]->getEventBase();
+  for (size_t i = 0; i < workerEvbs_.size(); ++i) {
+    auto* workerEvb = workerEvbs_[i];
+    // Synchronous: `this` outlives the call. The AndWait boundary is
+    // noexcept, so capture failures and rethrow below; bindImpl rolls back.
     workerEvb->runImmediatelyOrRunInEventBaseThreadAndWait(
-        [self = this->shared_from_this(),
-         workerEvb,
-         useDefaultTransport,
-         processId = processId_,
-         idx = i,
-         &failure] {
-          std::lock_guard<std::mutex> guard(self->startMutex_);
+        [this, workerEvb, processId = processId_, idx = i, &failure] {
+          std::lock_guard<std::mutex> guard(startMutex_);
           if (failure) {
             return;
           }
           try {
-            if (self->shutdown_ || self->runState_.stopRequested()) {
+            if (runState_.stopRequested()) {
               throw std::runtime_error(
                   "QuicServer bind aborted: shutdown was requested");
             }
-            auto worker = self->newWorkerWithoutSocket(idx);
-            if (useDefaultTransport) {
-              if (!self->transportFactory_) {
-                throw std::runtime_error("Transport factory is not set");
-              }
-              worker->setTransportFactory(self->transportFactory_.get());
-              worker->setFizzContext(self->ctx_);
-            }
+            auto worker = newWorkerWithoutSocket(idx);
             worker->setWorkerId(static_cast<uint8_t>(idx));
-            auto workerSocket =
-                self->listenerSocketFactory_->make(workerEvb, -1);
+            auto workerSocket = listenerSocketFactory_->make(workerEvb, -1);
             int takeoverOverFd = -1;
-            if (self->listeningFDs_.size() > idx) {
-              takeoverOverFd = self->listeningFDs_[idx];
+            if (listeningFDs_.size() > idx) {
+              takeoverOverFd = listeningFDs_[idx];
             }
-            worker->setSocketOptions(&self->socketOptions_);
+            worker->setSocketOptions(&socketOptions_);
             // dup the takenover socket on only one worker and bind the rest
             if (takeoverOverFd >= 0) {
               workerSocket->setFD(
@@ -451,28 +261,27 @@ void QuicServer::bindWorkersToSocket(
                   FollyAsyncUDPSocketAlias::FDOwnership::OWNS);
               worker->setSocket(std::move(workerSocket));
               if (idx == 0) {
-                self->boundAddress_ = worker->getAddress();
+                boundAddress_ = worker->getAddress();
               }
-              MVVLOG(4) << "Set up dup()'ed fd for address="
-                        << self->boundAddress_
+              MVVLOG(4) << "Set up dup()'ed fd for address=" << boundAddress_
                         << " on workerId=" << (int)worker->getWorkerId();
               worker->applyAllSocketOptions();
             } else {
               MVVLOG(4) << "No valid takenover fd found for address="
-                        << self->boundAddress_
+                        << boundAddress_
                         << ". binding on worker=" << worker.get()
                         << " workerId=" << (int)worker->getWorkerId()
                         << " processId=" << (int)processId;
               worker->setSocket(std::move(workerSocket));
-              worker->bind(self->boundAddress_, self->bindOptions_);
+              worker->bind(boundAddress_, bindOptions_);
               if (idx == 0) {
-                self->boundAddress_ = worker->getAddress();
+                boundAddress_ = worker->getAddress();
               }
             }
             auto* workerPtr = worker.get();
-            self->workers_.push_back(std::move(worker));
-            self->evbToWorkers_.emplace(workerEvb, workerPtr);
-            self->runState_.peers[idx].target->worker = workerPtr;
+            evbToWorkers_.emplace(workerEvb, workerPtr);
+            workers_.push_back(std::move(worker));
+            runState_.peers[idx].target->worker = workerPtr;
           } catch (...) {
             if (!failure) {
               failure = std::current_exception();
@@ -492,25 +301,20 @@ void QuicServer::bindWorkersToSocket(
   if (failure) {
     std::rethrow_exception(failure);
   }
-  if (runState_.stopRequested() || shutdown_) {
+  if (runState_.stopRequested()) {
     throw std::runtime_error("QuicServer bind aborted: shutdown was requested");
   }
-  MVVLOG(4) << "Initialized all workers in the eventbase";
-  phase_ = State::Bound;
-  initialized_ = true;
-  folly::call_once(startDone_, [this]() { startDoneBaton_.post(); });
 }
 
 void QuicServer::start() {
-  checkRunningInThread(mainThreadId_);
   if (phase_ == State::Running) {
     return;
   }
   MVCHECK(
       phase_ == State::Bound || phase_ == State::Paused,
-      kQuicServerNotInitialized << __func__);
+      kQuicServerNotBound << __func__);
   std::exception_ptr failure;
-  if (runState_.stopRequested() || shutdown_) {
+  if (runState_.stopRequested()) {
     failure = std::make_exception_ptr(
         std::runtime_error(
             "QuicServer::start called after shutdown was requested"));
@@ -537,7 +341,7 @@ void QuicServer::start() {
       }
     }
   }
-  if (!failure && (runState_.stopRequested() || shutdown_)) {
+  if (!failure && runState_.stopRequested()) {
     failure = std::make_exception_ptr(
         std::runtime_error(
             "QuicServer::start aborted: shutdown was requested"));
@@ -568,7 +372,7 @@ void QuicServer::start() {
     shutdown(LocalErrorCode::INTERNAL_ERROR);
     std::rethrow_exception(failure);
   }
-  if (runState_.stopRequested() || shutdown_) {
+  if (runState_.stopRequested()) {
     shutdown(LocalErrorCode::INTERNAL_ERROR);
     throw std::runtime_error(
         "QuicServer::start aborted: shutdown was requested");
@@ -577,7 +381,6 @@ void QuicServer::start() {
 }
 
 quic::Expected<void, QuicError> QuicServer::enableZeroCopy() {
-  checkRunningInThread(mainThreadId_);
   if (workers_.empty()) {
     return quic::make_unexpected(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
@@ -602,9 +405,8 @@ quic::Expected<void, QuicError> QuicServer::enableZeroCopy() {
 void QuicServer::allowBeingTakenOver(const quic::SocketAddress& addr) {
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker
-  checkRunningInThread(mainThreadId_);
   MVCHECK(!workers_.empty());
-  MVCHECK(!shutdown_);
+  MVCHECK(!runState_.stopRequested());
 
   // this function shouldn't be called from worker's thread
   for ([[maybe_unused]] auto& worker : workers_) {
@@ -624,7 +426,6 @@ void QuicServer::allowBeingTakenOver(const quic::SocketAddress& addr) {
         return;
       }
       try {
-        MVCHECK(initialized_);
         auto it = evbToWorkers_.find(workerEvb);
         MVCHECK(it != evbToWorkers_.end());
         auto worker = it->second;
@@ -657,11 +458,10 @@ void QuicServer::allowBeingTakenOver(const quic::SocketAddress& addr) {
 
 quic::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
     const quic::SocketAddress& addr) {
-  checkRunningInThread(mainThreadId_);
   // synchronously bind workers to takeover handler port.
   // This method should not be called from a worker
   MVCHECK(!workers_.empty());
-  MVCHECK(!shutdown_);
+  MVCHECK(!runState_.stopRequested());
   MVCHECK(takeoverHandlerInitialized_, "TakeoverHanders are not initialized. ");
 
   // this function shouldn't be called from worker's thread
@@ -680,7 +480,6 @@ quic::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
         return;
       }
       try {
-        MVCHECK(initialized_);
         if (worker->isStopping()) {
           throw std::runtime_error(
               "QuicServer takeover setup on a stopping worker");
@@ -706,7 +505,6 @@ quic::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
 }
 
 void QuicServer::pauseRead() {
-  checkRunningInThread(mainThreadId_);
   runOnAllWorkersSync([&](auto worker) mutable { worker->pauseRead(); });
   if (phase_ == State::Running) {
     phase_ = State::Paused;
@@ -727,36 +525,20 @@ QuicServer::findWorkerForEvb(folly::EventBase* evb) {
   return nullptr;
 }
 
-void QuicServer::waitUntilInitialized() {
-  if (shutdown_ || initialized_) {
-    return;
-  }
-  for (auto& worker : workers_) {
-    MVCHECK(!worker->getEventBase()->isInEventBaseThread());
-  }
-  // block until all workers have been initialized or shutdown completed
-  startDoneBaton_.wait();
-  MVCHECK(initialized_ || shutdown_);
-}
-
 QuicServer::~QuicServer() {
   shutdown(LocalErrorCode::SHUTTING_DOWN);
 }
 
 void QuicServer::shutdown(LocalErrorCode error) {
   if (phase_ == State::Stopped) {
-    shutdown_ = true;
     return;
   }
   runState_.latchStop(error);
-  shutdown_ = true;
   auto reason = runState_.latchedStopReason(error);
   if (phase_ == State::Created && workers_.empty()) {
     evbToWorkers_.clear();
     runState_.peers.clear();
     phase_ = State::Stopped;
-    initialized_ = false;
-    folly::call_once(startDone_, [this]() { this->startDoneBaton_.post(); });
     return;
   }
   for (auto& worker : workers_) {
@@ -776,12 +558,6 @@ void QuicServer::shutdown(LocalErrorCode error) {
   evbToWorkers_.clear();
   runState_.peers.clear();
   phase_ = State::Stopped;
-  initialized_ = false;
-  folly::call_once(startDone_, [this]() { this->startDoneBaton_.post(); });
-}
-
-bool QuicServer::hasShutdown() const noexcept {
-  return shutdown_;
 }
 
 void QuicServer::runOnAllWorkersSync(
@@ -789,7 +565,7 @@ void QuicServer::runOnAllWorkersSync(
   std::vector<WorkerEndpoint> peers;
   {
     std::scoped_lock guard(startMutex_);
-    if (shutdown_) {
+    if (runState_.stopRequested()) {
       return;
     }
     peers = runState_.peers;
@@ -799,10 +575,10 @@ void QuicServer::runOnAllWorkersSync(
       continue;
     }
     peer.evb->runImmediatelyOrRunInEventBaseThreadAndWait(
-        [target = peer.target, self = this->shared_from_this(), &func] {
+        [target = peer.target, this, &func] {
           auto* worker = target->worker;
-          if (worker == nullptr || worker->isStopping() || self->shutdown_ ||
-              self->runState_.stopRequested()) {
+          if (worker == nullptr || worker->isStopping() ||
+              runState_.stopRequested()) {
             return;
           }
           func(worker);
@@ -811,82 +587,23 @@ void QuicServer::runOnAllWorkersSync(
 }
 
 void QuicServer::setHostId(uint32_t hostId) noexcept {
-  // TODO(damlaj): T205141168; lift commmented checkRunningInThread check below
-  // checkRunningInThread(mainThreadId_);
   if (hostId_ == hostId) {
     MVLOG_WARNING << "HostId is already set to " << hostId;
     return;
   }
   hostId_ = hostId;
   MVVLOG(4) << "Setting hostId to " << hostId_ << " for quic server ";
-  if (initialized_) {
+  if (!workers_.empty()) {
     runOnAllWorkersSync(
         [hostId](auto worker) mutable { worker->setHostId(hostId); });
   }
 }
 
-void QuicServer::setConnectionIdVersion(
-    ConnectionIdVersion cidVersion) noexcept {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
-  if (FLAGS_qs_conn_id_version) {
-    MVLOG_ERROR << "Connection Id Version has been set to " << (int)cidVersion_
-                << " by --qs_conn_id_version from the command line.";
-  } else {
-    cidVersion_ = cidVersion;
-  }
-}
-
-void QuicServer::setTransportSettingsOverrideFn(
-    TransportSettingsOverrideFn fn) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
-  transportSettingsOverrideFn_ = std::move(fn);
-}
-
-void QuicServer::setShouldRegisterKnobParamHandlerFn(
-    ShouldRegisterKnobParamHandlerFn fn) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
-  shouldRegisterKnobParamHandlerFn_ = std::move(fn);
-}
-
-void QuicServer::setQuicExperimentHandlerFn(QuicExperimentHandlerFn fn) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_, kQuicServerNotInitialized << __func__);
-  quicExperimentHandlerFn_ = std::move(fn);
-}
-
 void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
-  checkRunningInThread(mainThreadId_);
   validateHealthCheckToken(healthCheckToken);
   healthCheckToken_ = healthCheckToken;
   runOnAllWorkersSync([healthCheckToken](auto worker) mutable {
     worker->setHealthCheckToken(healthCheckToken);
-  });
-}
-
-void QuicServer::setFizzContext(
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
-  checkRunningInThread(mainThreadId_);
-  ctx_ = ctx;
-  runOnAllWorkersSync(
-      [ctx](auto worker) mutable { worker->setFizzContext(ctx); });
-}
-
-void QuicServer::setFizzContext(
-    folly::EventBase* evb,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
-  MVCHECK(evb);
-  MVCHECK(ctx);
-  evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
-    std::scoped_lock guard(startMutex_);
-    if (shutdown_) {
-      return;
-    }
-    auto it = evbToWorkers_.find(evb);
-    MVCHECK(it != evbToWorkers_.end());
-    it->second->setFizzContext(ctx);
   });
 }
 
@@ -912,7 +629,6 @@ void QuicServer::setPrimingEnabledCallback(
 
 void QuicServer::blockListedSrcPort(
     std::function<bool(uint16_t)> isBlockListedSrcPort) {
-  checkRunningInThread(mainThreadId_);
   isBlockListedSrcPort_ = isBlockListedSrcPort;
   runOnAllWorkersSync([isBlockListedSrcPort](auto worker) mutable {
     worker->setIsBlockListedSrcPort(isBlockListedSrcPort);
@@ -920,8 +636,7 @@ void QuicServer::blockListedSrcPort(
 }
 
 void QuicServer::startPacketForwarding(const quic::SocketAddress& destAddr) {
-  checkRunningInThread(mainThreadId_);
-  if (initialized_) {
+  if (!workers_.empty()) {
     runOnAllWorkersSync([destAddr](auto worker) mutable {
       worker->startPacketForwarding(destAddr);
     });
@@ -929,27 +644,11 @@ void QuicServer::startPacketForwarding(const quic::SocketAddress& destAddr) {
 }
 
 void QuicServer::stopPacketForwarding(std::chrono::milliseconds delay) {
-  checkRunningInThread(mainThreadId_);
-  if (!initialized_ || shutdown_) {
+  if (workers_.empty() || runState_.stopRequested()) {
     return;
   }
   runOnAllWorkersSync(
       [delay](auto worker) { worker->stopPacketForwardingAfter(delay); });
-}
-
-void QuicServer::setTransportStatsCallbackFactory(
-    std::unique_ptr<QuicTransportStatsCallbackFactory> statsFactory) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(statsFactory);
-  transportStatsFactory_ = std::move(statsFactory);
-}
-
-void QuicServer::setConnectionIdAlgoFactory(
-    std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory) {
-  checkRunningInThread(mainThreadId_);
-  MVCHECK(!initialized_);
-  MVCHECK(connIdAlgoFactory);
-  connIdAlgoFactory_ = std::move(connIdAlgoFactory);
 }
 
 void QuicServer::addTransportFactory(
@@ -962,7 +661,7 @@ void QuicServer::addTransportFactory(
   MVCHECK(acceptor);
   evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
     std::scoped_lock guard(startMutex_);
-    if (shutdown_) {
+    if (runState_.stopRequested()) {
       return;
     }
     auto it = evbToWorkers_.find(evb);
@@ -975,14 +674,8 @@ void QuicServer::addTransportFactory(
 }
 
 quic::SocketAddress QuicServer::getAddress() const {
-  MVCHECK(phase_ != State::Created, kQuicServerNotInitialized << __func__);
+  MVCHECK(phase_ != State::Created, kQuicServerNotBound << __func__);
   return boundAddress_;
-}
-
-void QuicServer::setListeningFDs(const std::vector<int>& fds) {
-  checkRunningInThread(mainThreadId_);
-  std::lock_guard<std::mutex> guard(startMutex_);
-  listeningFDs_ = fds;
 }
 
 int QuicServer::getListeningSocketFD() const {
@@ -1010,7 +703,6 @@ int QuicServer::getListeningSocketFD() const {
 }
 
 std::vector<int> QuicServer::getAllListeningSocketFDs() const noexcept {
-  checkRunningInThread(mainThreadId_);
   if (phase_ == State::Stopped || stopping()) {
     return {};
   }
@@ -1052,7 +744,6 @@ TakeoverProtocolVersion QuicServer::getTakeoverProtocolVersion()
 }
 
 int QuicServer::getTakeoverHandlerSocketFD() const {
-  checkRunningInThread(mainThreadId_);
   if (phase_ == State::Stopped || stopping()) {
     return -1;
   }
@@ -1078,11 +769,10 @@ int QuicServer::getTakeoverHandlerSocketFD() const {
 }
 
 std::vector<folly::EventBase*> QuicServer::getWorkerEvbs() const noexcept {
-  checkRunningInThread(mainThreadId_);
   if (phase_ == State::Stopped) {
     return {};
   }
-  MVCHECK(initialized_, kQuicServerNotInitialized << __func__);
+  MVCHECK(phase_ != State::Created, kQuicServerNotBound << __func__);
   std::vector<folly::EventBase*> ebvs;
   for (const auto& worker : workers_) {
     if (worker == nullptr) {
@@ -1101,12 +791,12 @@ bool QuicServer::addAcceptObserver(
   if (phase_ == State::Stopped) {
     return false;
   }
-  MVCHECK(initialized_, kQuicServerNotInitialized << __func__);
+  MVCHECK(phase_ != State::Created, kQuicServerNotBound << __func__);
   MVCHECK(evb);
   bool success = false;
   evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
     std::scoped_lock guard(startMutex_);
-    if (shutdown_) {
+    if (runState_.stopRequested()) {
       return;
     }
     auto it = evbToWorkers_.find(evb);
@@ -1128,12 +818,12 @@ bool QuicServer::removeAcceptObserver(
   if (phase_ == State::Stopped) {
     return false;
   }
-  MVCHECK(initialized_, kQuicServerNotInitialized << __func__);
+  MVCHECK(phase_ != State::Created, kQuicServerNotBound << __func__);
   MVCHECK(evb);
   bool success = false;
   evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
     std::scoped_lock guard(startMutex_);
-    if (shutdown_) {
+    if (runState_.stopRequested()) {
       return;
     }
     auto it = evbToWorkers_.find(evb);
@@ -1146,22 +836,6 @@ bool QuicServer::removeAcceptObserver(
     }
   });
   return success;
-}
-
-void QuicServer::setSocketOptions(
-    const folly::SocketOptionMap& options) noexcept {
-  checkRunningInThread(mainThreadId_);
-  socketOptions_ = options;
-}
-
-/**
- * Sets whether the underlying socket should set the IPV6_ONLY socket option
- * or not. If set to false, IPv4-mapped IPv6 addresses will be enabled on the
- * socket.
- */
-void QuicServer::setBindV6Only(bool bindV6Only) {
-  checkRunningInThread(mainThreadId_);
-  bindOptions_.bindV6Only = bindV6Only;
 }
 
 // STATIC

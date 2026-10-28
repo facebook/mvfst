@@ -23,6 +23,7 @@
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
+#include <quic/server/ThreadedQuicServer.h>
 
 namespace quic::tperf {
 
@@ -601,7 +602,7 @@ class TPerfServer {
   folly::EventBase eventBase_;
   std::shared_ptr<TPerfWriteStats> writeStats_;
   std::unique_ptr<TPerfAcceptObserver> acceptObserver_;
-  std::shared_ptr<quic::QuicServer> server_;
+  std::unique_ptr<quic::ThreadedQuicServer> server_;
   double latencyFactor_;
   bool useAckReceiveTimestamps_{false};
   bool useDraft02AckReceiveTimestamps_{false};
