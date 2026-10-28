@@ -30,6 +30,7 @@ fb_dirsync_cpp_unittest(
         "fbsource//xplat/folly/io/async/test:mocks",
         "fbsource//xplat/folly/portability:gmock",
         "fbsource//xplat/folly/portability:gtest",
+        "fbsource//xplat/folly/system:hardware_concurrency",
         ":mocks",
         "//quic/api:transport",
         "//quic/api/test:api_mocks",

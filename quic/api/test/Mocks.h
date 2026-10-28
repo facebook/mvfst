@@ -64,6 +64,11 @@ class MockQuicTransport : public QuicServerTransport {
     customDestructor();
   }
 
+  [[nodiscard]] const std::shared_ptr<CongestionControllerFactory>&
+  congestionControllerFactoryForTest() const {
+    return conn_->congestionControllerFactory;
+  }
+
   MOCK_METHOD(void, customDestructor, ());
   MOCK_METHOD(const quic::SocketAddress&, getPeerAddress, (), (const));
   MOCK_METHOD(const quic::SocketAddress&, getOriginalPeerAddress, (), (const));

@@ -541,17 +541,18 @@ void QuicServer::shutdown(LocalErrorCode error) {
     phase_ = State::Stopped;
     return;
   }
-  for (auto& worker : workers_) {
-    worker->getEventBase()->runImmediatelyOrRunInEventBaseThreadAndWait(
+  for (size_t i = 0; i < workers_.size(); ++i) {
+    auto& worker = workers_[i];
+    workerEvbs_[i]->runImmediatelyOrRunInEventBaseThreadAndWait(
         [&] { worker->stopLocal(reason); });
     // protecting the erase in map with the mutex since
     // the erase could potentially affect concurrent accesses from other threads
     std::scoped_lock guard(startMutex_);
-    evbToWorkers_.erase(worker->getEventBase());
+    evbToWorkers_.erase(workerEvbs_[i]);
   }
-  for (auto& worker : workers_) {
-    auto* evb = worker->getEventBase();
-    evb->runImmediatelyOrRunInEventBaseThreadAndWait(
+  for (size_t i = 0; i < workers_.size(); ++i) {
+    auto& worker = workers_[i];
+    workerEvbs_[i]->runImmediatelyOrRunInEventBaseThreadAndWait(
         [&worker] { worker.reset(); });
   }
   workers_.clear();

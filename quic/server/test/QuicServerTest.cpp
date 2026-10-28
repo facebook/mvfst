@@ -14,6 +14,7 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
+#include <folly/system/HardwareConcurrency.h>
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
@@ -34,6 +35,7 @@
 
 #include <memory>
 #include <set>
+#include <type_traits>
 
 using namespace testing;
 using namespace folly;
@@ -2591,7 +2593,14 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
         memcpy(workerBuf, writtenData->buffer(), bufLen);
 
         // The forwarded packet must reach the owning transport with the
-        // decoded original client address and payload intact.
+        // decoded original client address and payload intact. Use a
+        // takeover-peer (outer) sender address distinct from both the
+        // encapsulated client address and the forwarding destination so
+        // that an implementation using the outer sender would fail.
+        const quic::SocketAddress takeoverPeerAddr(
+            folly::IPAddress("9.9.9.9"), 9999);
+        EXPECT_NE(takeoverPeerAddr, clientAddr);
+        EXPECT_NE(takeoverPeerAddr, client);
         auto transport = makeMockTransport();
         takeoverWorker_->onConnectionIdAvailable(transport, connId);
         EXPECT_CALL(*factory_, _make(_, _, _)).Times(0);
@@ -2601,7 +2610,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
             .Times(1);
 
         takeoverCb->onDataAvailable(
-            client, bufLen, false, OnDataAvailableParams());
+            takeoverPeerAddr, bufLen, false, OnDataAvailableParams());
         return bufLen;
       }));
   EXPECT_CALL(*quicStats_, onPacketReceived());
@@ -2673,6 +2682,9 @@ class QuicServerTest : public Test {
     }
     if (rejectNewConnections_) {
       options.rejectNewConnections = rejectNewConnections_;
+    }
+    if (isBlockListedSrcPort_) {
+      options.isBlockListedSrcPort = isBlockListedSrcPort_;
     }
     options.transportStatsFactory = std::move(statsFactory);
     return options;
@@ -2896,6 +2908,7 @@ class QuicServerTest : public Test {
   std::vector<folly::EventBase*> boundEvbs_;
   std::string healthCheckToken_;
   std::function<bool(const quic::SocketAddress&)> rejectNewConnections_;
+  std::function<bool(uint16_t)> isBlockListedSrcPort_;
   MockQuicServerTransportFactory* factory_;
   TransportSettings transportSettings_;
   MockQuicStatsFactory* transportStatsFactory_;
@@ -3669,6 +3682,48 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   EXPECT_EQ(versionPacket->versions.at(0), QuicVersion::MVFST_INVALID);
 }
 
+TEST_F(QuicServerTest, ServerOptionsBlockListedSrcPortDropsFirstPacket) {
+  folly::Promise<uint16_t> blockedPortPromise;
+  auto blockedPortFuture = blockedPortPromise.getFuture();
+  isBlockListedSrcPort_ = [&blockedPortPromise](uint16_t port) mutable {
+    blockedPortPromise.setValue(port);
+    return true;
+  };
+
+  EXPECT_CALL(*factory_, _make(_, _, _)).Times(0);
+
+  auto* stats = new NiceMock<MockQuicStats>();
+  EXPECT_CALL(
+      *stats,
+      onPacketDropped(PacketDropReason(PacketDropReason::INVALID_SRC_PORT)))
+      .Times(1);
+  auto serverAddr = initializeServer({evbThread_.getEventBase()}, stats);
+
+  quic::SocketAddress addr2("::1", 0);
+  std::unique_ptr<UDPReader> reader = std::make_unique<UDPReader>();
+  reader->start(evbThread_.getEventBase(), addr2);
+
+  SCOPE_EXIT {
+    shutdownServer();
+    evbThread_.getEventBase()->runInEventBaseThreadAndWait(
+        [&] { reader->getSocket().close(); });
+  };
+
+  StreamId id = 1;
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
+  auto buf = createData(kMinInitialPacketSize);
+  auto packet =
+      createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
+  reader->getSocket().write(serverAddr, packet->clone());
+
+  EXPECT_EQ(
+      std::move(blockedPortFuture).get(200ms),
+      reader->getSocket().address().getPort());
+  EXPECT_THROW(reader->readOne().get(200ms), folly::FutureTimeout);
+}
+
 TEST_F(QuicServerTest, NetworkTestHealthCheck) {
   quic::SocketAddress addr("::1", 0);
   std::string healthCheckToken = "health";
@@ -4085,26 +4140,29 @@ class ThreadRecordingStatsFactory : public QuicTransportStatsCallbackFactory {
       : evbs_(std::move(evbs)) {}
 
   std::unique_ptr<QuicTransportStatsCallback> make() override {
-    bool onWorker = false;
+    folly::EventBase* current = nullptr;
     for (auto* evb : evbs_) {
-      onWorker = onWorker || evb->isInEventBaseThread();
+      if (evb->isInEventBaseThread()) {
+        current = evb;
+        break;
+      }
     }
     {
       std::scoped_lock lock(mutex_);
-      onWorkerThread_.push_back(onWorker);
+      recordedEvbs_.push_back(current);
     }
     return std::make_unique<NiceMock<MockQuicStats>>();
   }
 
-  std::vector<bool> results() {
+  std::vector<folly::EventBase*> recordedEvbs() {
     std::scoped_lock lock(mutex_);
-    return onWorkerThread_;
+    return recordedEvbs_;
   }
 
  private:
   std::vector<folly::EventBase*> evbs_;
   std::mutex mutex_;
-  std::vector<bool> onWorkerThread_;
+  std::vector<folly::EventBase*> recordedEvbs_;
 };
 
 class ThrowOnCallStatsFactory : public QuicTransportStatsCallbackFactory {
@@ -4140,6 +4198,28 @@ class QueuedListenerSocketFactory : public QuicUDPSocketFactory {
  private:
   std::vector<std::unique_ptr<FollyAsyncUDPSocketAlias>> sockets_;
   size_t next_{0};
+};
+
+class FailOnNthListenerSocketFactory : public QuicUDPSocketFactory {
+ public:
+  explicit FailOnNthListenerSocketFactory(size_t failOnCall)
+      : failOnCall_(failOnCall) {}
+
+  std::unique_ptr<FollyAsyncUDPSocketAlias> make(
+      folly::EventBase* evb,
+      int /*fd*/) override {
+    if (++calls_ == failOnCall_) {
+      throw std::runtime_error("listener factory failure");
+    }
+    auto sock = std::make_unique<FollyAsyncUDPSocketAlias>(evb);
+    sock->setReusePort(true);
+    sock->setReuseAddr(false);
+    return sock;
+  }
+
+ private:
+  size_t failOnCall_;
+  size_t calls_{0};
 };
 
 TEST_F(QuicServerTest, QueriesAfterShutdownReturnUnavailable) {
@@ -4229,12 +4309,45 @@ TEST_F(QuicServerTest, StartAfterRequestShutdownFailsCleanly) {
 TEST_F(QuicServerTest, StartWithoutFactoryOnOneWorkerFails) {
   folly::ScopedEventBaseThread evbThreadA;
   folly::ScopedEventBaseThread evbThreadB;
-  quic::SocketAddress addr("::1", 0);
-  server_->bind(addr, {evbThreadA.getEventBase(), evbThreadB.getEventBase()});
-  server_->addTransportFactory(evbThreadA.getEventBase(), factory_);
-  EXPECT_THROW(server_->start(), std::runtime_error);
-  EXPECT_EQ(server_->state(), QuicServer::State::Stopped);
-  EXPECT_EQ(server_->getListeningSocketFD(), -1);
+  auto* evbA = evbThreadA.getEventBase();
+  auto* evbB = evbThreadB.getEventBase();
+  quic::SocketAddress boundAddr("::1", 10000);
+  std::unique_ptr<FollyAsyncUDPSocketAlias> sockA;
+  std::unique_ptr<FollyAsyncUDPSocketAlias> sockB;
+  folly::test::MockAsyncUDPSocketT<>* rawA = nullptr;
+  folly::test::MockAsyncUDPSocketT<>* rawB = nullptr;
+  evbA->runInEventBaseThreadAndWait([&] {
+    auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(evbA);
+    rawA = sock.get();
+    sockA = std::move(sock);
+  });
+  evbB->runInEventBaseThreadAndWait([&] {
+    auto sock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(evbB);
+    rawB = sock.get();
+    sockB = std::move(sock);
+  });
+  EXPECT_CALL(*rawA, address()).WillRepeatedly(ReturnRef(boundAddr));
+  EXPECT_CALL(*rawB, address()).WillRepeatedly(ReturnRef(boundAddr));
+  // Prepare must validate every worker before any listener is activated:
+  // neither worker may resume reads when one worker lacks a factory.
+  EXPECT_CALL(*rawA, resumeRead(_)).Times(0);
+  EXPECT_CALL(*rawB, resumeRead(_)).Times(0);
+  EXPECT_CALL(*rawA, pauseRead()).Times(testing::AnyNumber());
+  EXPECT_CALL(*rawB, pauseRead()).Times(testing::AnyNumber());
+  EXPECT_CALL(*factory_, _make(_, _, _)).Times(0);
+  ServerOptions options;
+  auto listenerFactory = std::make_unique<QueuedListenerSocketFactory>();
+  listenerFactory->addSocket(std::move(sockA));
+  listenerFactory->addSocket(std::move(sockB));
+  options.listenerSocketFactory = std::move(listenerFactory);
+  auto server = QuicServer::createQuicServer(std::move(options));
+  server->bind(quic::SocketAddress("::1", 0), {evbA, evbB});
+  ASSERT_EQ(server->state(), QuicServer::State::Bound);
+  server->addTransportFactory(evbA, factory_);
+  // Deliberately omit the factory for evbB.
+  EXPECT_THROW(server->start(), std::runtime_error);
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+  EXPECT_EQ(server->getListeningSocketFD(), -1);
 }
 
 TEST(QuicServerLifecycleContractTest, StartActivationFailureRollsBack) {
@@ -4259,11 +4372,18 @@ TEST(QuicServerLifecycleContractTest, StartActivationFailureRollsBack) {
   });
   EXPECT_CALL(*rawA, address()).WillRepeatedly(ReturnRef(boundAddr));
   EXPECT_CALL(*rawB, address()).WillRepeatedly(ReturnRef(boundAddr));
-  EXPECT_CALL(*rawA, resumeRead(_)).Times(1);
-  EXPECT_CALL(*rawB, resumeRead(_))
-      .WillOnce(Throw(std::runtime_error("resume failed")));
-  EXPECT_CALL(*rawA, pauseRead()).Times(AtLeast(1));
+  // Worker A activates, worker B fails, and rollback must pause A before
+  // start() returns. No connection is accepted on either worker.
+  {
+    InSequence seq;
+    EXPECT_CALL(*rawA, resumeRead(_)).Times(1);
+    EXPECT_CALL(*rawB, resumeRead(_))
+        .WillOnce(Throw(std::runtime_error("resume failed")));
+    EXPECT_CALL(*rawA, pauseRead()).Times(AtLeast(1));
+  }
+  EXPECT_CALL(*rawB, pauseRead()).Times(testing::AnyNumber());
   MockQuicServerTransportFactory transportFactory;
+  EXPECT_CALL(transportFactory, _make(_, _, _)).Times(0);
   ServerOptions options;
   auto listenerFactory = std::make_unique<QueuedListenerSocketFactory>();
   listenerFactory->addSocket(std::move(sockA));
@@ -4276,6 +4396,27 @@ TEST(QuicServerLifecycleContractTest, StartActivationFailureRollsBack) {
   server->addTransportFactory(evbA, &transportFactory);
   server->addTransportFactory(evbB, &transportFactory);
   EXPECT_THROW(server->start(), std::runtime_error);
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+  EXPECT_EQ(server->getListeningSocketFD(), -1);
+  int listenersAfterRollback = 0;
+  server->forEachListenerSocket(
+      [&](const folly::AsyncUDPSocket*) { ++listenersAfterRollback; });
+  EXPECT_EQ(listenersAfterRollback, 0);
+  EXPECT_NO_THROW(server->shutdown());
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+}
+
+TEST(
+    QuicServerLifecycleContractTest,
+    StartWithoutTransportFactoryThrowsAndRollsBack) {
+  folly::ScopedEventBaseThread evbThread;
+  auto server = QuicServer::createQuicServer(ServerOptions{});
+  server->bind(quic::SocketAddress("::1", 0), {evbThread.getEventBase()});
+  ASSERT_EQ(server->state(), QuicServer::State::Bound);
+  EXPECT_THROW(server->start(), std::runtime_error);
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+  EXPECT_EQ(server->getListeningSocketFD(), -1);
+  EXPECT_NO_THROW(server->shutdown());
   EXPECT_EQ(server->state(), QuicServer::State::Stopped);
 }
 
@@ -4310,20 +4451,34 @@ TEST_F(QuicServerTest, ForEachListenerSocketRunsOnWorkerEvbs) {
   server_->start();
   ASSERT_EQ(server_->state(), QuicServer::State::Running);
   std::atomic<int> count{0};
-  std::atomic<bool> allOnWorker{true};
+  std::atomic<bool> allOnOwningEvb{true};
   std::atomic<bool> allNonNull{true};
+  std::mutex observedMutex;
+  std::set<folly::EventBase*> observedEvbs;
   server_->forEachListenerSocket([&](const folly::AsyncUDPSocket* sock) {
     if (sock == nullptr) {
       allNonNull = false;
+      ++count;
+      return;
     }
-    if (!evbA->isInEventBaseThread() && !evbB->isInEventBaseThread()) {
-      allOnWorker = false;
+    auto* owningEvb = sock->getEventBase();
+    if (owningEvb == nullptr || !owningEvb->isInEventBaseThread()) {
+      allOnOwningEvb = false;
+    } else {
+      std::scoped_lock lock(observedMutex);
+      observedEvbs.insert(owningEvb);
     }
     ++count;
   });
   EXPECT_EQ(count.load(), 2);
-  EXPECT_TRUE(allOnWorker.load());
+  EXPECT_TRUE(allOnOwningEvb.load());
   EXPECT_TRUE(allNonNull.load());
+  {
+    std::scoped_lock lock(observedMutex);
+    EXPECT_EQ(observedEvbs.size(), 2);
+    EXPECT_TRUE(observedEvbs.contains(evbA));
+    EXPECT_TRUE(observedEvbs.contains(evbB));
+  }
   server_->shutdown();
   count = 0;
   server_->forEachListenerSocket(
@@ -4369,10 +4524,14 @@ TEST(QuicServerLifecycleContractTest, StatsFactoryRunsOnWorkerEventBases) {
   options.transportStatsFactory = std::move(statsFactory);
   auto server = QuicServer::createQuicServer(std::move(options));
   server->bind(quic::SocketAddress("::1", 0), evbs);
-  auto results = rawFactory->results();
-  ASSERT_EQ(results.size(), 2);
-  EXPECT_TRUE(results[0]);
-  EXPECT_TRUE(results[1]);
+  auto recorded = rawFactory->recordedEvbs();
+  ASSERT_EQ(recorded.size(), 2);
+  // Bind creates workers in evbs order, so the first callback must have
+  // run on evbs[0] and the second on evbs[1]; running both on one
+  // EventBase would fail here.
+  EXPECT_EQ(recorded[0], evbs[0]);
+  EXPECT_EQ(recorded[1], evbs[1]);
+  EXPECT_NE(recorded[0], recorded[1]);
   server->shutdown();
 }
 
@@ -4680,6 +4839,375 @@ TEST_F(QuicServerTest, ObserverAttachConcurrentWithSetHostId) {
   EXPECT_TRUE(observerOk.load());
   EXPECT_TRUE(observer.attachRanOnExpectedEvb);
   server_->shutdown();
+}
+
+class QuicServerLifecycleTest : public Test {
+ protected:
+  std::shared_ptr<QuicServer> makeServer(ServerOptions options = {}) {
+    return QuicServer::createQuicServer(std::move(options));
+  }
+
+  MockQuicServerTransportFactory factory_;
+  quic::SocketAddress addr_{"::1", 0};
+};
+
+TEST_F(QuicServerLifecycleTest, BindFailureRollsBackToStopped) {
+  folly::ScopedEventBaseThread evbThreadA;
+  folly::ScopedEventBaseThread evbThreadB;
+  ServerOptions options;
+  options.listenerSocketFactory =
+      std::make_unique<FailOnNthListenerSocketFactory>(2);
+  auto server = makeServer(std::move(options));
+  // The first worker binds a real listener; the injected factory failure
+  // on the second worker must roll the whole bind back.
+  EXPECT_THROW(
+      server->bind(
+          addr_, {evbThreadA.getEventBase(), evbThreadB.getEventBase()}),
+      std::runtime_error);
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+  EXPECT_EQ(server->getListeningSocketFD(), -1);
+  // The first worker really bound, and rollback released its socket: the
+  // port can be bound again without any reuse flags.
+  auto firstWorkerAddr = server->getAddress();
+  ASSERT_NE(firstWorkerAddr.getPort(), 0);
+  folly::ScopedEventBaseThread probeThread;
+  auto* probeEvb = probeThread.getEventBase();
+  bool rebound = false;
+  probeEvb->runInEventBaseThreadAndWait([&] {
+    try {
+      FollyAsyncUDPSocketAlias probe(probeEvb);
+      probe.setReusePort(false);
+      probe.setReuseAddr(false);
+      probe.bind(firstWorkerAddr);
+      rebound = true;
+      probe.close();
+    } catch (...) {
+      rebound = false;
+    }
+  });
+  EXPECT_TRUE(rebound);
+  EXPECT_NO_THROW(server->shutdown());
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+}
+
+TEST_F(QuicServerLifecycleTest, StateTransitionsAndIdempotentShutdown) {
+  folly::ScopedEventBaseThread evbThread;
+  auto* evb = evbThread.getEventBase();
+  auto server = makeServer();
+  EXPECT_EQ(server->state(), QuicServer::State::Created);
+  EXPECT_FALSE(server->stopping());
+
+  server->bind(addr_, {evb});
+  EXPECT_EQ(server->state(), QuicServer::State::Bound);
+
+  server->addTransportFactory(evb, &factory_);
+  server->start();
+  EXPECT_EQ(server->state(), QuicServer::State::Running);
+
+  server->pauseRead();
+  EXPECT_EQ(server->state(), QuicServer::State::Paused);
+
+  server->start();
+  EXPECT_EQ(server->state(), QuicServer::State::Running);
+
+  server->requestShutdown();
+  EXPECT_TRUE(server->stopping());
+
+  server->shutdown();
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+  EXPECT_FALSE(server->stopping());
+
+  // Completed shutdown is idempotent.
+  server->shutdown();
+  EXPECT_EQ(server->state(), QuicServer::State::Stopped);
+}
+
+TEST_F(QuicServerLifecycleTest, AddressSnapshotByValue) {
+  folly::ScopedEventBaseThread evbThread;
+  auto* evb = evbThread.getEventBase();
+  auto server = makeServer();
+  static_assert(
+      std::is_same_v<decltype(server->getAddress()), quic::SocketAddress>);
+  server->bind(addr_, {evb});
+
+  auto snapshot = server->getAddress();
+  EXPECT_NE(snapshot.getPort(), 0);
+  EXPECT_EQ(snapshot, server->getAddress());
+
+  server->addTransportFactory(evb, &factory_);
+  server->start();
+  EXPECT_EQ(snapshot, server->getAddress());
+
+  server->shutdown();
+  // The snapshot is a value: it outlives the stopped server unchanged.
+  EXPECT_EQ(snapshot.getPort(), server->getAddress().getPort());
+}
+
+TEST_F(QuicServerLifecycleTest, EnableZeroCopyBeforeBindFails) {
+  auto server = makeServer();
+  auto result = server->enableZeroCopy();
+  EXPECT_TRUE(result.hasError());
+  EXPECT_EQ(server->state(), QuicServer::State::Created);
+}
+
+TEST(QuicServerLifecycleDeathTest, BindDuplicateEventBase) {
+  EXPECT_DEATH(
+      {
+        folly::EventBase evb;
+        auto server = QuicServer::createQuicServer(ServerOptions());
+        server->bind(quic::SocketAddress("::1", 0), {&evb, &evb});
+      },
+      "");
+}
+
+TEST(QuicServerLifecycleDeathTest, BindNullEventBase) {
+  EXPECT_DEATH(
+      {
+        auto server = QuicServer::createQuicServer(ServerOptions());
+        server->bind(
+            quic::SocketAddress("::1", 0),
+            {static_cast<folly::EventBase*>(nullptr)});
+      },
+      "");
+}
+
+TEST(QuicServerLifecycleDeathTest, BindTwice) {
+  EXPECT_DEATH(
+      {
+        folly::EventBase evb;
+        auto server = QuicServer::createQuicServer(ServerOptions());
+        server->bind(quic::SocketAddress("::1", 0), {&evb});
+        server->bind(quic::SocketAddress("::1", 0), {&evb});
+      },
+      "");
+}
+
+TEST(QuicServerLifecycleDeathTest, StartBeforeBind) {
+  EXPECT_DEATH(
+      {
+        auto server = QuicServer::createQuicServer(ServerOptions());
+        server->start();
+      },
+      "");
+}
+
+TEST(QuicServerLifecycleDeathTest, GetAddressBeforeBind) {
+  EXPECT_DEATH(
+      {
+        auto server = QuicServer::createQuicServer(ServerOptions());
+        (void)server->getAddress();
+      },
+      "");
+}
+
+class TwoWorkerRoutingTest : public Test {
+ protected:
+  void SetUp() override {
+    runState_ = std::make_unique<RunState>();
+    runState_->peers.push_back(
+        WorkerEndpoint{
+            .evb = &evb0_, .target = std::make_shared<DispatchTarget>()});
+    runState_->peers.push_back(
+        WorkerEndpoint{
+            .evb = &evb1_, .target = std::make_shared<DispatchTarget>()});
+    worker0_ = makeWorker(0, factory0_, socketFactory0_);
+    worker1_ = makeWorker(1, factory1_, socketFactory1_);
+    runState_->peers[0].target->worker = worker0_.get();
+    runState_->peers[1].target->worker = worker1_.get();
+  }
+
+  std::unique_ptr<QuicServerWorker> makeWorker(
+      size_t index,
+      MockQuicServerTransportFactory& factory,
+      MockQuicUDPSocketFactory& socketFactory) {
+    auto worker = std::make_unique<QuicServerWorker>(runState_.get(), index);
+    worker->setWorkerId(static_cast<uint8_t>(index));
+    worker->setHostId(kHostId);
+    worker->setProcessId(ProcessId::ONE);
+    worker->setConnectionIdVersion(ConnectionIdVersion::V2);
+    worker->setConnectionIdAlgo(std::make_unique<DefaultConnectionIdAlgo>());
+    worker->setSupportedVersions({QuicVersion::MVFST});
+    worker->setTransportStatsCallback(
+        std::make_unique<NiceMock<MockQuicStats>>());
+    worker->setSocket(
+        std::make_unique<folly::test::MockAsyncUDPSocketT<>>(
+            runState_->peers[index].evb));
+    worker->setTransportFactory(&factory);
+    worker->setNewConnectionSocketFactory(&socketFactory);
+    return worker;
+  }
+
+  ConnectionId serverCidForWorker(uint8_t workerId) {
+    DefaultConnectionIdAlgo algo;
+    auto encoded = algo.encodeConnectionId(ServerConnectionIdParams(
+        ConnectionIdVersion::V2,
+        kHostId,
+        static_cast<uint8_t>(ProcessId::ONE),
+        workerId));
+    CHECK(!encoded.hasError());
+    return encoded.value();
+  }
+
+  static constexpr uint32_t kHostId = 49;
+  folly::EventBase evb0_;
+  folly::EventBase evb1_;
+  std::unique_ptr<RunState> runState_;
+  std::unique_ptr<QuicServerWorker> worker0_;
+  std::unique_ptr<QuicServerWorker> worker1_;
+  NiceMock<MockQuicServerTransportFactory> factory0_;
+  NiceMock<MockQuicServerTransportFactory> factory1_;
+  NiceMock<MockQuicUDPSocketFactory> socketFactory0_;
+  NiceMock<MockQuicUDPSocketFactory> socketFactory1_;
+};
+
+// A cross-worker dispatch is delivered through the destination handle:
+// while the destination is live the packet reaches its transport factory,
+// and a dispatch still queued when the destination is destroyed is
+// dropped instead of dereferencing the dead worker.
+TEST_F(TwoWorkerRoutingTest, HeldDispatchAfterPeerStopIsDropped) {
+  EXPECT_CALL(factory0_, _make(_, _, _)).Times(0);
+
+  auto routeInitialToWorker1 =
+      [this](const quic::SocketAddress& client, ConnectionId sourceCid) {
+        RoutingData routingData(
+            HeaderForm::Long,
+            true /* isInitial */,
+            false /* is0Rtt */,
+            serverCidForWorker(1),
+            sourceCid);
+        auto data = createData(kMinInitialPacketSize + 10);
+        worker0_->routeOrDispatch(
+            client,
+            std::move(routingData),
+            NetworkData(data->clone(), Clock::now(), 0),
+            QuicVersion::MVFST,
+            false /* isForwardedData */);
+      };
+
+  // Positive control: the same Initial, dispatched while the destination
+  // is live, is delivered to its transport factory.
+  EXPECT_CALL(factory1_, _make(_, _, _)).Times(1).WillOnce(Return(nullptr));
+  routeInitialToWorker1(kClientAddr, getTestConnectionId(7));
+  evb1_.loopOnce(EVLOOP_NONBLOCK);
+  evb1_.loopOnce(EVLOOP_NONBLOCK);
+  Mock::VerifyAndClearExpectations(&factory1_);
+
+  // Queue another dispatch, then destroy the destination before its
+  // EventBase runs the held callback.
+  EXPECT_CALL(factory1_, _make(_, _, _)).Times(0);
+  routeInitialToWorker1(kClientAddr2, getTestConnectionId(8));
+  worker1_.reset();
+  EXPECT_EQ(runState_->peers[1].target->worker, nullptr);
+
+  evb1_.loopOnce(EVLOOP_NONBLOCK);
+  evb1_.loopOnce(EVLOOP_NONBLOCK);
+}
+
+// RunState::requestStop enqueues stop callbacks through the same handles;
+// a peer that already stopped must not be called again.
+TEST_F(TwoWorkerRoutingTest, RequestStopAfterPeerStopIsSafe) {
+  worker1_->stopLocal(LocalErrorCode::SHUTTING_DOWN);
+  EXPECT_TRUE(worker1_->isStopping());
+
+  runState_->requestStop(LocalErrorCode::SHUTTING_DOWN);
+  evb0_.loopOnce();
+  evb1_.loopOnce();
+
+  EXPECT_TRUE(worker0_->isStopping());
+  EXPECT_TRUE(worker1_->isStopping());
+}
+
+TEST(ConfigureForAcceptTest, AppliesBundleInOrder) {
+  folly::EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  auto mockSock = std::make_unique<folly::test::MockAsyncUDPSocketT<>>(&evb);
+  quic::SocketAddress sockAddr("::1", 0);
+  ON_CALL(*mockSock, address()).WillByDefault(ReturnRef(sockAddr));
+  auto qSock =
+      std::make_unique<FollyQuicAsyncUDPSocket>(qEvb, std::move(mockSock));
+  NiceMock<MockConnectionSetupCallback> connSetupCb;
+  NiceMock<MockConnectionCallback> connCb;
+  auto transport = std::make_shared<MockQuicTransport>(
+      qEvb, std::move(qSock), &connSetupCb, &connCb, nullptr);
+  EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(qEvb));
+
+  BufAccessor bufAccessor(1024);
+  DefaultConnectionIdAlgo connIdAlgo;
+  std::vector<QuicVersion> versions{QuicVersion::MVFST, QuicVersion::QUIC_V1};
+  auto clientCid = getTestConnectionId(3);
+  Optional<ConnectionId> clientCidOpt = clientCid;
+  auto chosenDestCid = getTestConnectionId(4);
+  QuicTimer::SharedPtr pacingTimer;
+
+  // The bundle is applied synchronously, BufAccessor before settings so a
+  // ContinuousMemory data path never observes settings without its buffer.
+  InSequence seq;
+  EXPECT_CALL(*transport, setBufAccessor(&bufAccessor));
+  EXPECT_CALL(*transport, setSupportedVersions(versions));
+  EXPECT_CALL(*transport, setOriginalPeerAddress(kClientAddr));
+  EXPECT_CALL(*transport, setTransportSettings(_));
+  EXPECT_CALL(*transport, setConnectionIdAlgo(&connIdAlgo));
+
+  transport->configureForAccept(
+      ServerAcceptParams{
+          .transportSettings = TransportSettings(),
+          .supportedVersions = versions,
+          .originalPeerAddress = kClientAddr,
+          .validNewToken = false,
+          .clientConnectionId = clientCidOpt,
+          .clientChosenDestConnectionId = chosenDestCid,
+          .serverConnectionIdParams =
+              ServerConnectionIdParams(ConnectionIdVersion::V2, 49, 1, 0),
+          .connIdAlgo = &connIdAlgo,
+          .connIdRejector = nullptr,
+          .bufAccessor = &bufAccessor,
+          .pacingTimer = pacingTimer,
+          .statsCallback = nullptr});
+
+  // The default congestion-controller factory is installed by
+  // configureForAccept when the application factory installed none.
+  EXPECT_NE(transport->congestionControllerFactoryForTest(), nullptr);
+}
+
+class ThreadedQuicServerTest : public Test {
+ protected:
+  class NullFactory : public QuicServerTransportFactory {
+   public:
+    QuicServerTransport::Ptr make(
+        folly::EventBase*,
+        std::unique_ptr<FollyAsyncUDPSocketAlias>,
+        const quic::SocketAddress&,
+        QuicVersion) noexcept override {
+      return nullptr;
+    }
+  };
+};
+
+TEST_F(ThreadedQuicServerTest, StartReturnsBoundAddressAndWorkers) {
+  ThreadedQuicServer server(ServerOptions(), std::make_unique<NullFactory>());
+  auto bound = server.start(quic::SocketAddress("::1", 0), 2);
+  EXPECT_NE(bound.getPort(), 0);
+  EXPECT_EQ(bound, server.getAddress());
+  EXPECT_EQ(
+      server.getWorkerEvbs().size(),
+      ThreadedQuicServer::numWorkersToCreate(
+          2, folly::available_concurrency()));
+  server.shutdown();
+}
+
+TEST_F(ThreadedQuicServerTest, BindFailureCleansUp) {
+  // The injected listener failure must complete shutdown of the
+  // partially started core and stay destructible.
+  ServerOptions options;
+  options.listenerSocketFactory =
+      std::make_unique<FailOnNthListenerSocketFactory>(1);
+  EXPECT_THROW(
+      {
+        ThreadedQuicServer server(
+            std::move(options), std::make_unique<NullFactory>());
+        server.start(quic::SocketAddress("::1", 0), 2);
+      },
+      std::runtime_error);
 }
 
 } // namespace quic::test
