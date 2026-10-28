@@ -2285,24 +2285,18 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::resetStreamInternal(
     if (!stream) {
       return quic::make_unexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
-    if (stream->appErrorCodeToPeer &&
-        *stream->appErrorCodeToPeer != errorCode) {
-      // We can't change the error code across resets for a stream
-      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
+    if (stream->appErrorCodeToPeer) {
+      // The error code can't change across resets for a stream
+      errorCode = *stream->appErrorCodeToPeer;
     }
     Optional<uint64_t> maybeReliableSize = std::nullopt;
     if (reliable) {
       maybeReliableSize = stream->reliableResetCheckpoint;
     }
-    if (stream->reliableSizeToPeer && maybeReliableSize &&
-        *maybeReliableSize > *stream->reliableSizeToPeer) {
-      // We can't increase the reliable size in a reset
-      return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-    }
-    if (maybeReliableSize && *maybeReliableSize > 0 &&
-        (stream->sendState == StreamSendState::ResetSent)) {
-      // We can't send a reliable reset with a non-zero reliable size if
-      // we've already sent a non-reliable reset
+    if (stream->sendState == StreamSendState::ResetSent &&
+        maybeReliableSize.value_or(0) >
+            stream->reliableSizeToPeer.value_or(0)) {
+      // We can't increase the reliable size in a subsequent reset
       return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
     }
     // Invoke state machine

@@ -871,6 +871,91 @@ TEST_F(QuicSendResetTest, FromResetSent) {
   ASSERT_FALSE(result.hasError());
 }
 
+TEST_F(QuicSendResetTest, RstAfterReliableRst) {
+  for (bool unified : {false, true}) {
+    SCOPED_TRACE(unified ? "unified send buffer" : "legacy send buffer");
+    auto conn = createConn();
+    conn->transportSettings.useUnifiedAppStreamSendBuffer = unified;
+    auto stream = conn->streamManager->createNextBidirectionalStream().value();
+    ASSERT_FALSE(
+        writeDataToQuicStream(*stream, IOBuf::copyBuffer("0123456789"), false)
+            .hasError());
+
+    ASSERT_FALSE(
+        sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 6)
+            .hasError());
+    EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
+    EXPECT_EQ(stream->reliableSizeToPeer, 6u);
+    EXPECT_EQ(stream->pendingWriteBytes(), 6);
+    EXPECT_EQ(conn->pendingEvents.resets.at(stream->id).reliableSize, 6u);
+
+    ASSERT_FALSE(sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN)
+                     .hasError());
+    EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
+    EXPECT_FALSE(stream->reliableSizeToPeer.has_value());
+    EXPECT_EQ(stream->pendingWriteBytes(), 0);
+    ASSERT_EQ(conn->pendingEvents.resets.size(), 1);
+    EXPECT_FALSE(
+        conn->pendingEvents.resets.at(stream->id).reliableSize.has_value());
+  }
+}
+
+TEST_F(QuicSendResetTest, ReduceReliableSize) {
+  for (bool unified : {false, true}) {
+    SCOPED_TRACE(unified ? "unified send buffer" : "legacy send buffer");
+    auto conn = createConn();
+    conn->transportSettings.useUnifiedAppStreamSendBuffer = unified;
+    auto stream = conn->streamManager->createNextBidirectionalStream().value();
+    ASSERT_FALSE(
+        writeDataToQuicStream(*stream, IOBuf::copyBuffer("0123456789"), false)
+            .hasError());
+
+    ASSERT_FALSE(
+        sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 6)
+            .hasError());
+    ASSERT_FALSE(
+        sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 3)
+            .hasError());
+    EXPECT_EQ(stream->reliableSizeToPeer, 3u);
+    EXPECT_EQ(stream->pendingWriteBytes(), 3);
+    EXPECT_EQ(conn->pendingEvents.resets.at(stream->id).reliableSize, 3u);
+  }
+}
+
+TEST_F(QuicSendResetTest, StopSendingAfterReliableRst) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(
+      writeDataToQuicStream(*stream, IOBuf::copyBuffer("0123456789"), false)
+          .hasError());
+  ASSERT_FALSE(
+      sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN, 6)
+          .hasError());
+
+  ASSERT_FALSE(
+      sendStopSendingSMHandler(
+          *stream,
+          StopSendingFrame(stream->id, GenericApplicationErrorCode::NO_ERROR))
+          .hasError());
+  EXPECT_THAT(
+      conn->streamManager->stopSendingStreams(),
+      ElementsAre(Pair(stream->id, GenericApplicationErrorCode::NO_ERROR)));
+}
+
+TEST_F(QuicSendResetTest, StopSendingAfterRst) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  ASSERT_FALSE(sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN)
+                   .hasError());
+
+  ASSERT_FALSE(
+      sendStopSendingSMHandler(
+          *stream,
+          StopSendingFrame(stream->id, GenericApplicationErrorCode::NO_ERROR))
+          .hasError());
+  EXPECT_TRUE(conn->streamManager->stopSendingStreams().empty());
+}
+
 class QuicRecvResetTest : public Test {};
 
 TEST_F(QuicRecvResetTest, FromOpen) {

@@ -2414,6 +2414,73 @@ TEST_F(QuicTransportTest, RstStreamReliablyFallsBackWithoutPeerSupport) {
   EXPECT_TRUE(transport_->isReliableResetSupported());
 }
 
+TEST_F(QuicTransportTest, RstStreamAfterRstStreamReliably) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.advertisedReliableResetStreamSupport = true;
+  conn.peerAdvertisedReliableStreamResetSupport = true;
+
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto stream = conn.streamManager->findStream(streamId);
+
+  EXPECT_CALL(*socket_, write(_, _, _))
+      .WillRepeatedly(testing::WithArgs<1, 2>(Invoke(getTotalIovecLen)));
+  auto buf1 = IOBuf::create(10);
+  buf1->append(10);
+  ASSERT_FALSE(
+      transport_->writeChain(streamId, std::move(buf1), false).hasError());
+  ASSERT_FALSE(
+      transport_->updateReliableDeliveryCheckpoint(streamId).hasError());
+  auto buf2 = IOBuf::create(5);
+  buf2->append(5);
+  ASSERT_FALSE(
+      transport_->writeChain(streamId, std::move(buf2), false).hasError());
+
+  ASSERT_FALSE(
+      transport_
+          ->resetStreamReliably(streamId, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
+  loopForWrites();
+
+  auto findReset = [&]() -> Optional<RstStreamFrame> {
+    auto& packet =
+        getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
+    for (auto& frame : packet.frames) {
+      if (auto* rst = frame.asRstStreamFrame()) {
+        return *rst;
+      }
+    }
+    return std::nullopt;
+  };
+  auto reliableRst = findReset();
+  ASSERT_TRUE(reliableRst.has_value());
+  EXPECT_EQ(reliableRst->reliableSize, 10u);
+  EXPECT_EQ(reliableRst->finalSize, 10u);
+
+  // The downgrade keeps the first reset's error code.
+  ASSERT_FALSE(
+      transport_->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR)
+          .hasError());
+  EXPECT_FALSE(stream->reliableSizeToPeer.has_value());
+  loopForWrites();
+
+  auto rst = findReset();
+  ASSERT_TRUE(rst.has_value());
+  EXPECT_FALSE(rst->reliableSize.has_value());
+  EXPECT_EQ(rst->finalSize, 10u);
+  EXPECT_EQ(rst->errorCode, GenericApplicationErrorCode::UNKNOWN);
+
+  // A reliable reset can't follow a non-reliable one.
+  EXPECT_EQ(
+      transport_
+          ->resetStreamReliably(streamId, GenericApplicationErrorCode::UNKNOWN)
+          .error(),
+      LocalErrorCode::INVALID_OPERATION);
+
+  // ACKing the RESET_STREAM closes the stream without the reliable bytes.
+  ASSERT_FALSE(sendRstAckSMHandler(*stream, std::nullopt).hasError());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+}
+
 TEST_F(QuicTransportTest, StopSending) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _, _))

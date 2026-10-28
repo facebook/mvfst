@@ -197,7 +197,10 @@ quic::Expected<void, QuicError> sendStopSendingSMHandler(
       break;
     }
     case StreamSendState::ResetSent: {
-      // no-op, we already sent a reset
+      if (stream.reliableSizeToPeer) {
+        // The app may still drop the reliable bytes with a plain reset.
+        stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
+      }
       break;
     }
     case StreamSendState::Invalid: {
@@ -216,64 +219,7 @@ quic::Expected<void, QuicError> sendRstSMHandler(
     ApplicationErrorCode errorCode,
     const Optional<uint64_t>& reliableSize) {
   switch (stream.sendState) {
-    // TODO: Allow the sending of multiple RESET_STREAM OR RESET_STREAM_AT
-    // frames.
     case StreamSendState::Open: {
-      // We're assuming that higher-level functions perform the necessary
-      // error checks before calling this function, which is why we're doing
-      // CHECKs here.
-      if (reliableSize && stream.reliableSizeToPeer) {
-        PROTO_OOPS_LOG_BUILDER_IF(
-            stream.conn.nodeType == QuicNodeType::Server &&
-                *reliableSize > *stream.reliableSizeToPeer,
-            stream.conn.oopsLogger,
-            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
-                .setStreamId(stream.id)
-                .setErrorCode(
-                    static_cast<uint64_t>(
-                        TransportErrorCode::STREAM_STATE_ERROR)),
-            "quic_stream_send_handlers",
-            "reliable reset size increased");
-        MVCHECK_LE(
-            *reliableSize,
-            *stream.reliableSizeToPeer,
-            "It is illegal to increase the reliable size");
-      }
-      if (stream.appErrorCodeToPeer) {
-        PROTO_OOPS_LOG_BUILDER_IF(
-            stream.conn.nodeType == QuicNodeType::Server &&
-                *stream.appErrorCodeToPeer != errorCode,
-            stream.conn.oopsLogger,
-            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
-                .setStreamId(stream.id)
-                .setErrorCode(
-                    static_cast<uint64_t>(
-                        TransportErrorCode::STREAM_STATE_ERROR)),
-            "quic_stream_send_handlers",
-            "reset application error code changed");
-        MVCHECK_EQ(
-            *stream.appErrorCodeToPeer,
-            errorCode,
-            "Cannot change application error code in a reset");
-      }
-      if (!stream.reliableSizeToPeer &&
-          stream.sendState == StreamSendState::ResetSent) {
-        PROTO_OOPS_LOG_BUILDER_IF(
-            stream.conn.nodeType == QuicNodeType::Server && reliableSize &&
-                *reliableSize != 0,
-            stream.conn.oopsLogger,
-            proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
-                .setStreamId(stream.id)
-                .setErrorCode(
-                    static_cast<uint64_t>(
-                        TransportErrorCode::STREAM_STATE_ERROR)),
-            "quic_stream_send_handlers",
-            "reliable reset size increased");
-        MVCHECK(
-            !reliableSize || *reliableSize == 0,
-            "RESET_STREAM frame was previously sent, and we "
-                << "are increasing the reliable size");
-      }
       stream.appErrorCodeToPeer = errorCode;
       auto resetResult = resetQuicStream(stream, errorCode, reliableSize);
       if (!resetResult.has_value()) {
@@ -288,7 +234,48 @@ quic::Expected<void, QuicError> sendRstSMHandler(
       break;
     }
     case StreamSendState::ResetSent: {
-      // do nothing
+      // A subsequent reset may only reduce the reliable size and must keep the
+      // error code. Higher-level functions check this, so we CHECK here.
+      uint64_t newReliableSize = reliableSize.value_or(0);
+      uint64_t prevReliableSize = stream.reliableSizeToPeer.value_or(0);
+      PROTO_OOPS_LOG_BUILDER_IF(
+          stream.conn.nodeType == QuicNodeType::Server &&
+              newReliableSize > prevReliableSize,
+          stream.conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+              .setStreamId(stream.id)
+              .setErrorCode(
+                  static_cast<uint64_t>(
+                      TransportErrorCode::STREAM_STATE_ERROR)),
+          "quic_stream_send_handlers",
+          "reliable reset size increased");
+      MVCHECK_LE(
+          newReliableSize,
+          prevReliableSize,
+          "It is illegal to increase the reliable size");
+      PROTO_OOPS_LOG_BUILDER_IF(
+          stream.conn.nodeType == QuicNodeType::Server &&
+              stream.appErrorCodeToPeer &&
+              *stream.appErrorCodeToPeer != errorCode,
+          stream.conn.oopsLogger,
+          proto_oops::makeConnectionSpecificOopsFieldsBuilder(stream.conn)
+              .setStreamId(stream.id)
+              .setErrorCode(
+                  static_cast<uint64_t>(
+                      TransportErrorCode::STREAM_STATE_ERROR)),
+          "quic_stream_send_handlers",
+          "reset application error code changed");
+      MVCHECK(
+          !stream.appErrorCodeToPeer || *stream.appErrorCodeToPeer == errorCode,
+          "Cannot change application error code in a reset");
+      if (newReliableSize == prevReliableSize) {
+        break;
+      }
+      auto resetResult = resetQuicStream(stream, errorCode, reliableSize);
+      if (!resetResult.has_value()) {
+        return resetResult;
+      }
+      appendPendingStreamReset(stream.conn, stream, errorCode, reliableSize);
       break;
     }
     case StreamSendState::Invalid: {

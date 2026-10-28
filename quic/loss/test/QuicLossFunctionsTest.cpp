@@ -1265,6 +1265,81 @@ TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
   EXPECT_TRUE(rstFound);
 }
 
+TEST_F(QuicLossFunctionsTest, TestMarkReliableRstLossAfterReduction) {
+  auto conn = createConn();
+  folly::EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
+  ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  stream->sendState = StreamSendState::ResetSent;
+  stream->reliableSizeToPeer = 5;
+  RstStreamFrame rstFrame(
+      stream->id, GenericApplicationErrorCode::UNKNOWN, 10, 5);
+  conn->pendingEvents.resets.insert({stream->id, rstFrame});
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   socket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   *conn->version,
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
+  ASSERT_EQ(conn->outstandings.packets.size(), 1);
+  ASSERT_TRUE(conn->pendingEvents.resets.empty());
+
+  // The reliable size drops to 2 while the frame is in flight.
+  stream->reliableSizeToPeer = 2;
+  auto& packet =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+  ASSERT_TRUE(conn->pendingEvents.resets.contains(stream->id));
+  auto& retx = conn->pendingEvents.resets.at(stream->id);
+  EXPECT_EQ(retx.reliableSize, 2u);
+  EXPECT_EQ(retx.finalSize, 10);
+}
+
+TEST_F(QuicLossFunctionsTest, TestMarkReliableRstLossAfterNonReliableRst) {
+  auto conn = createConn();
+  folly::EventBase evb;
+  auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
+  MockAsyncUDPSocket socket(qEvb);
+  ON_CALL(socket, getGSO).WillByDefault(testing::Return(0));
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  stream->sendState = StreamSendState::ResetSent;
+  stream->reliableSizeToPeer = 5;
+  RstStreamFrame rstFrame(
+      stream->id, GenericApplicationErrorCode::UNKNOWN, 10, 5);
+  conn->pendingEvents.resets.insert({stream->id, rstFrame});
+  ASSERT_FALSE(writeQuicDataToSocket(
+                   socket,
+                   *conn,
+                   *conn->clientConnectionId,
+                   *conn->serverConnectionId,
+                   *aead,
+                   *headerCipher,
+                   *conn->version,
+                   conn->transportSettings.writeConnectionDataPacketsLimit)
+                   .hasError());
+  ASSERT_EQ(conn->outstandings.packets.size(), 1);
+
+  // A RESET_STREAM followed, so the lost RESET_STREAM_AT is resent as one.
+  stream->reliableSizeToPeer = std::nullopt;
+  auto& packet =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  ASSERT_FALSE(
+      markPacketLoss(*conn, conn->currentPathId, packet, false).hasError());
+  ASSERT_TRUE(conn->pendingEvents.resets.contains(stream->id));
+  auto& retx = conn->pendingEvents.resets.at(stream->id);
+  EXPECT_FALSE(retx.reliableSize.has_value());
+  EXPECT_EQ(retx.finalSize, 10);
+}
+
 TEST_F(QuicLossFunctionsTest, ReorderingThresholdChecksSamePacketNumberSpace) {
   auto conn = createConn();
   uint16_t lossVisitorCount = 0;

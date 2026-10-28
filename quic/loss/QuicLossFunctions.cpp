@@ -322,7 +322,11 @@ quic::Expected<void, QuicError> markPacketLoss(
         if (!stream) {
           break;
         }
-        conn.pendingEvents.resets.emplace(frame.streamId, frame);
+        // A later reset may have reduced the reliable size, so retransmit with
+        // the stream's current one.
+        RstStreamFrame retx = frame;
+        retx.reliableSize = stream->reliableSizeToPeer;
+        conn.pendingEvents.resets.emplace(frame.streamId, std::move(retx));
         break;
       }
       case QuicWriteFrame::Type::StreamDataBlockedFrame: {

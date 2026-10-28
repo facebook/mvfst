@@ -311,6 +311,10 @@ class QuicSocket : virtual public QuicSocketLite {
    * Send a reliable reset to the peer. The reliable size sent to the peer is
    * determined by when checkpoint(streamId) was last called. If reliable resets
    * are not supported on this connection, a regular reset is sent instead.
+   *
+   * A later resetStream() downgrades it to a plain RESET_STREAM with this
+   * reset's error code, which is the way to answer a STOP_SENDING that arrives
+   * after the reset.
    */
   virtual quic::Expected<void, LocalErrorCode> resetStreamReliably(
       StreamId id,

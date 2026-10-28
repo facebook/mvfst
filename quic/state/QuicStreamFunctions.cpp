@@ -541,14 +541,13 @@ void appendPendingStreamReset(
    *
    * 1. We only egress a RESET_STREAM_AT or RESET_STREAM frame when all data
    * upto the reliable reset offset has been egressed.
-   * 2. The user is not allowed to increase the reliable size in subsequent
-   * calls to resetStream().
+   * 2. Subsequent resets can only reduce the reliable size, and the next
+   * offset to write never moves backwards.
    *
-   * Therefore, if a RESET_STREAM_AT frame has been egressed, it means that the
-   * data until the reliableSize in that frame has been egressed, so we end up
-   * with the same calculation of the finalSize in subsequent RESET_STREAM or
-   * RESET_STREAM_AT frames by virtue of the fact that it's the maxiumum of the
-   * current write offset and the new reliable size.
+   * Therefore, once a reset has been egressed, the next offset to write equals
+   * its finalSize, and any later reset computes the same value. A reset that
+   * was never egressed may be replaced with a different finalSize, since it
+   * never reached the peer.
    */
   uint64_t finalSize = stream.nextOffsetToWrite();
   if (reliableSize) {
@@ -561,10 +560,10 @@ void appendPendingStreamReset(
       finalSize,
       stream.finalWriteOffset.value_or(std::numeric_limits<uint64_t>::max()));
 
-  conn.pendingEvents.resets.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(stream.id),
-      std::forward_as_tuple(stream.id, errorCode, finalSize, reliableSize));
+  // A later reset with a smaller reliable size replaces one that has not been
+  // written yet.
+  conn.pendingEvents.resets.insert_or_assign(
+      stream.id, RstStreamFrame(stream.id, errorCode, finalSize, reliableSize));
 }
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
