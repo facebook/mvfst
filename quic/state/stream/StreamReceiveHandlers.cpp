@@ -118,9 +118,10 @@ quic::Expected<void, QuicError> receiveRstStreamSMHandler(
       if (!resetResult.has_value()) {
         return resetResult;
       }
-      if (stream.ingressRetired && stream.recvState == StreamRecvState::Open) {
-        // Retired ingress never buffers the reliable bytes that a reliable
-        // reset waits for, so close the receive side now.
+      if (stream.stopSendingRequested &&
+          stream.recvState == StreamRecvState::Open) {
+        // Dropped ingress never buffers the reliable bytes of a reliable reset,
+        // so close the receive side now.
         auto closeResult = maybeCloseRetiredIngress(stream);
         if (!closeResult.has_value()) {
           return closeResult;

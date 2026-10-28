@@ -523,6 +523,17 @@ quic::Expected<void, LocalErrorCode> QuicTransportBaseLite::stopSending(
     return {};
   }
   processTxStopSending(*stream);
+  if (stream->stopSendingRequested && stream->reliableSizeFromPeer) {
+    // The reliable bytes of a pending reliable reset are now dropped, so close
+    // the receive side.
+    auto closeResult = maybeCloseRetiredIngress(*stream);
+    if (!closeResult.has_value()) {
+      closeImpl(QuicError(
+          closeResult.error().code, std::string("stopSending() error")));
+      return quic::make_unexpected(LocalErrorCode::TRANSPORT_ERROR);
+    }
+    updateReadLooper();
+  }
   // send STOP_SENDING frame to peer
   sendSimpleFrame(*conn_, StopSendingFrame(id, error));
   updateWriteLooper(true);
