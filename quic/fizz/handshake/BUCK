@@ -50,9 +50,9 @@ mvfst_fbcode_only(
         "ovr_config//os:linux-x86_64",
     ],
     deps = [
+        "fbsource//xplat/folly:c_portability",
         ":contiguous_aead",
         ":fizz_bridge",
-        "//folly:c_portability",
     ] + select({
         "ovr_config//cpu:arm64": [
             "//xsec_crypto/haberdashery/bindings/c89/aead:aes128gcm_neoversev2",
