@@ -4061,4 +4061,221 @@ INSTANTIATE_TEST_SUITE_P(
         FrameType::ACK_ECN,
         FrameType::ACK_RECEIVE_TIMESTAMPS,
         FrameType::ACK_EXTENDED));
+
+// Byte-exact wire vectors. The draft-02 vectors are the examples in
+// draft-ietf-quic-receive-ts-03 Section 8 (exponent 0). The legacy mvfst and
+// ACK_EXTENDED vectors pin those formats.
+namespace {
+
+std::vector<uint8_t> toBytes(const folly::IOBuf& buf) {
+  return std::vector<uint8_t>(buf.data(), buf.data() + buf.length());
+}
+
+WriteAckFrameMetaData makeWireVectorMetaData(
+    const WriteAckFrameState& ackState,
+    TimePoint connTime) {
+  return WriteAckFrameMetaData{
+      .ackState = ackState,
+      .ackDelay = 0us,
+      .ackDelayExponent = static_cast<uint8_t>(kDefaultAckDelayExponent),
+      .connTime = connTime,
+  };
+}
+
+// Packets 96..100 received in order, 10us apart, 100us after connTime.
+WriteAckFrameState makeInOrderWireVectorAckState(TimePoint connTime) {
+  AckBlocks ackBlocks = {{96, 100}};
+  return makeDraft02AckState(
+      ackBlocks,
+      connTime,
+      {{96, 100}, {97, 110}, {98, 120}, {99, 130}, {100, 140}});
+}
+
+} // namespace
+
+TEST_F(QuicWriteCodecTest, WriteDraft02AckSpecExampleWireBytes) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  AckBlocks ackBlocks = {{96, 100}, {87, 91}};
+  std::map<PacketNum, uint64_t> offsets = {
+      {87, 300},
+      {88, 305},
+      {89, 310},
+      {90, 320},
+      {91, 330},
+      {96, 350},
+      {97, 355},
+      {98, 360},
+      {99, 370},
+      {100, 380},
+  };
+  auto ackState = makeDraft02AckState(ackBlocks, connTime, offsets);
+  auto result = writeAckFrameDraft02(
+      makeWireVectorMetaData(ackState, connTime),
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02,
+      /*peerExponent=*/0,
+      /*peerMaxReceiveTimestampsPerAck=*/10);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  const std::vector<uint8_t> expected = {
+      0x83, 0x17, 0x83, 0x07, // Type
+      0x40, 0x64, 0x00, 0x01, 0x04, 0x03, 0x04, // ACK fields
+      0x02, // Timestamp Range Count
+      0x00, 0x05, 0x41, 0x7c, 0x0a, 0x0a, 0x05, 0x05, // Range 1
+      0x09, 0x05, 0x14, 0x0a, 0x0a, 0x05, 0x05, // Range 2
+  };
+  EXPECT_EQ(toBytes(*builtOut.second), expected);
+}
+
+TEST_F(QuicWriteCodecTest, WriteDraft02AckSpecOutOfOrderExampleWireBytes) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  AckBlocks ackBlocks = {{87, 100}};
+  WriteAckFrameState ackState{.acks = ackBlocks};
+  // 92..95 arrive after 100, as in the second Section 8 example.
+  const std::vector<std::pair<PacketNum, uint64_t>> receivedPackets = {
+      {87, 300},
+      {88, 305},
+      {89, 310},
+      {90, 320},
+      {91, 330},
+      {96, 350},
+      {97, 355},
+      {98, 360},
+      {99, 370},
+      {100, 380},
+      {92, 390},
+      {93, 392},
+      {94, 394},
+      {95, 395},
+  };
+  for (const auto& [pktNum, offsetUs] : receivedPackets) {
+    WriteAckFrameState::ReceivedPacket rpi;
+    rpi.pktNum = pktNum;
+    rpi.timings.receiveTimePoint =
+        connTime + std::chrono::microseconds(offsetUs);
+    ackState.recvdPacketInfos.emplace_back(std::move(rpi));
+  }
+  ackState.lastRecvdPacketInfo = WriteAckFrameState::ReceivedPacket{
+      ackState.recvdPacketInfos.back().pktNum,
+      ackState.recvdPacketInfos.back().timings};
+
+  auto result = writeAckFrameDraft02(
+      makeWireVectorMetaData(ackState, connTime),
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02,
+      /*peerExponent=*/0,
+      /*peerMaxReceiveTimestampsPerAck=*/14);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  const std::vector<uint8_t> expected = {
+      0x83, 0x17, 0x83, 0x07, // Type
+      0x40, 0x64, 0x00, 0x00, 0x0d, // ACK fields
+      0x03, // Timestamp Range Count
+      0x05, 0x04, 0x41, 0x8b, 0x01, 0x02, 0x02, // Range 1
+      0x00, 0x05, 0x0a, 0x0a, 0x0a, 0x05, 0x05, // Range 2
+      0x09, 0x05, 0x14, 0x0a, 0x0a, 0x05, 0x05, // Range 3
+  };
+  EXPECT_EQ(toBytes(*builtOut.second), expected);
+}
+
+TEST_F(QuicWriteCodecTest, WriteDraft02EcnAckWireBytes) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  auto ackState = makeInOrderWireVectorAckState(connTime);
+  ackState.ecnECT0CountReceived = 1;
+  ackState.ecnECT1CountReceived = 2;
+  ackState.ecnCECountReceived = 3;
+  auto result = writeAckFrameDraft02(
+      makeWireVectorMetaData(ackState, connTime),
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN,
+      /*peerExponent=*/0,
+      /*peerMaxReceiveTimestampsPerAck=*/10);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  const std::vector<uint8_t> expected = {
+      0x83, 0x17, 0x83, 0x08, // Type
+      0x40, 0x64, 0x00, 0x00, 0x04, // ACK fields
+      0x01, 0x02, 0x03, // ECN Counts
+      0x01, // Timestamp Range Count
+      0x00, 0x05, 0x40, 0x8c, 0x0a, 0x0a, 0x0a, 0x0a, // Range 1
+  };
+  EXPECT_EQ(toBytes(*builtOut.second), expected);
+}
+
+TEST_F(QuicWriteCodecTest, WriteLegacyAckReceiveTimestampsWireBytes) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  auto ackState = makeInOrderWireVectorAckState(connTime);
+  auto result = writeAckFrame(
+      makeWireVectorMetaData(ackState, connTime),
+      pktBuilder,
+      FrameType::ACK_RECEIVE_TIMESTAMPS,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0},
+      /*maxRecvTimestampsToSend=*/10);
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  const std::vector<uint8_t> expected = {
+      0x40, 0xb0, // Type
+      0x40, 0x64, 0x00, 0x00, 0x04, // ACK fields
+      0x40, 0x64, // Latest Received Packet Number
+      0x40, 0x8c, // Latest Received Packet Time (us, unscaled)
+      0x01, // Timestamp Range Count
+      0x00, 0x05, 0x40, 0x8c, 0x0a, 0x0a, 0x0a, 0x0a, // Range 1
+  };
+  EXPECT_EQ(toBytes(*builtOut.second), expected);
+}
+
+TEST_F(QuicWriteCodecTest, WriteAckExtendedWireBytes) {
+  MockQuicPacketBuilder pktBuilder;
+  setupCommonExpects(pktBuilder);
+
+  TimePoint connTime = Clock::now();
+  auto ackState = makeInOrderWireVectorAckState(connTime);
+  auto result = writeAckFrame(
+      makeWireVectorMetaData(ackState, connTime),
+      pktBuilder,
+      FrameType::ACK_EXTENDED,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0},
+      /*maxRecvTimestampsToSend=*/10,
+      static_cast<ExtendedAckFeatureMaskType>(
+          ExtendedAckFeatureMask::ECN_COUNTS) |
+          static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS));
+  ASSERT_FALSE(result.hasError());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  const std::vector<uint8_t> expected = {
+      0x40, 0xb1, // Type
+      0x40, 0x64, 0x00, 0x00, 0x04, // ACK fields
+      0x03, // Extended Ack Features
+      0x00, 0x00, 0x00, // ECN Counts
+      0x40, 0x64, // Latest Received Packet Number
+      0x40, 0x8c, // Latest Received Packet Time (us, unscaled)
+      0x01, // Timestamp Range Count
+      0x00, 0x05, 0x40, 0x8c, 0x0a, 0x0a, 0x0a, 0x0a, // Range 1
+  };
+  EXPECT_EQ(toBytes(*builtOut.second), expected);
+}
 } // namespace quic::test

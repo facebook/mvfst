@@ -1838,4 +1838,162 @@ TEST_F(DecodeTest, LegacyAckSetsTimestampsVersionLegacyMvfst) {
       AckReceiveTimestampsVersion::LegacyMvfst);
 }
 
+// Byte-exact wire vectors, matching QuicWriteCodecTest. The draft-02 vectors
+// are the examples in draft-ietf-quic-receive-ts-03 Section 8 (exponent 0).
+// The legacy mvfst and ACK_EXTENDED vectors pin those formats.
+namespace {
+
+ReadAckFrame parseWireBytesAsAck(
+    const std::vector<uint8_t>& bytes,
+    const CodecParameters& params) {
+  BufQueue queue(folly::IOBuf::copyBuffer(bytes.data(), bytes.size()));
+  const PacketHeader header(makeHeader());
+  auto result = parseFrame(queue, header, params);
+  if (!result.has_value() || !result->asReadAckFrame()) {
+    ADD_FAILURE() << "Failed to parse an ACK frame from the wire bytes";
+    return ReadAckFrame{};
+  }
+  EXPECT_EQ(queue.chainLength(), 0);
+  return *result->asReadAckFrame();
+}
+
+CodecParameters legacyWireVectorParams() {
+  return CodecParameters(
+      kDefaultAckDelayExponent,
+      QuicVersion::MVFST,
+      AckReceiveTimestampsConfig{
+          .maxReceiveTimestampsPerAck = 10, .receiveTimestampsExponent = 0},
+      static_cast<ExtendedAckFeatureMaskType>(
+          ExtendedAckFeatureMask::ECN_COUNTS) |
+          static_cast<ExtendedAckFeatureMaskType>(
+              ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS));
+}
+
+} // namespace
+
+TEST_F(DecodeTest, Draft02AckSpecExampleWireBytes) {
+  const std::vector<uint8_t> bytes = {
+      0x83, 0x17, 0x83, 0x07, // Type
+      0x40, 0x64, 0x00, 0x01, 0x04, 0x03, 0x04, // ACK fields
+      0x02, // Timestamp Range Count
+      0x00, 0x05, 0x41, 0x7c, 0x0a, 0x0a, 0x05, 0x05, // Range 1
+      0x09, 0x05, 0x14, 0x0a, 0x0a, 0x05, 0x05, // Range 2
+  };
+
+  auto frame = parseWireBytesAsAck(bytes, draft02Params());
+
+  EXPECT_EQ(frame.frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02);
+  EXPECT_EQ(frame.largestAcked, 100);
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 2);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltaLargestAcknowledged, 0);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltas,
+      (std::vector<uint64_t>{380, 10, 10, 5, 5}));
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[1].deltaLargestAcknowledged, 9);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[1].deltas,
+      (std::vector<uint64_t>{20, 10, 10, 5, 5}));
+}
+
+TEST_F(DecodeTest, Draft02AckSpecOutOfOrderExampleWireBytes) {
+  const std::vector<uint8_t> bytes = {
+      0x83, 0x17, 0x83, 0x07, // Type
+      0x40, 0x64, 0x00, 0x00, 0x0d, // ACK fields
+      0x03, // Timestamp Range Count
+      0x05, 0x04, 0x41, 0x8b, 0x01, 0x02, 0x02, // Range 1
+      0x00, 0x05, 0x0a, 0x0a, 0x0a, 0x05, 0x05, // Range 2
+      0x09, 0x05, 0x14, 0x0a, 0x0a, 0x05, 0x05, // Range 3
+  };
+
+  auto frame = parseWireBytesAsAck(bytes, draft02Params(/*advertisedMax=*/14));
+
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 3);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltaLargestAcknowledged, 5);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltas,
+      (std::vector<uint64_t>{395, 1, 2, 2}));
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[1].deltaLargestAcknowledged, 0);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[1].deltas,
+      (std::vector<uint64_t>{10, 10, 10, 5, 5}));
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[2].deltaLargestAcknowledged, 9);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[2].deltas,
+      (std::vector<uint64_t>{20, 10, 10, 5, 5}));
+}
+
+TEST_F(DecodeTest, Draft02EcnAckWireBytes) {
+  const std::vector<uint8_t> bytes = {
+      0x83, 0x17, 0x83, 0x08, // Type
+      0x40, 0x64, 0x00, 0x00, 0x04, // ACK fields
+      0x01, 0x02, 0x03, // ECN Counts
+      0x01, // Timestamp Range Count
+      0x00, 0x05, 0x40, 0x8c, 0x0a, 0x0a, 0x0a, 0x0a, // Range 1
+  };
+
+  auto frame = parseWireBytesAsAck(bytes, draft02Params());
+
+  EXPECT_EQ(frame.frameType, FrameType::ACK_RECEIVE_TIMESTAMPS_DRAFT_02_ECN);
+  EXPECT_EQ(frame.ecnECT0Count, 1);
+  EXPECT_EQ(frame.ecnECT1Count, 2);
+  EXPECT_EQ(frame.ecnCECount, 3);
+  ASSERT_EQ(frame.draft02RecvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(
+      frame.draft02RecvdPacketsTimestampRanges[0].deltas,
+      (std::vector<uint64_t>{140, 10, 10, 10, 10}));
+}
+
+TEST_F(DecodeTest, LegacyAckReceiveTimestampsWireBytes) {
+  const std::vector<uint8_t> bytes = {
+      0x40, 0xb0, // Type
+      0x40, 0x64, 0x00, 0x00, 0x04, // ACK fields
+      0x40, 0x64, // Latest Received Packet Number
+      0x40, 0x8c, // Latest Received Packet Time (us, unscaled)
+      0x01, // Timestamp Range Count
+      0x00, 0x05, 0x40, 0x8c, 0x0a, 0x0a, 0x0a, 0x0a, // Range 1
+  };
+
+  auto frame = parseWireBytesAsAck(bytes, legacyWireVectorParams());
+
+  EXPECT_EQ(frame.frameType, FrameType::ACK_RECEIVE_TIMESTAMPS);
+  ASSERT_TRUE(frame.maybeLatestRecvdPacketNum.has_value());
+  EXPECT_EQ(frame.maybeLatestRecvdPacketNum.value(), 100);
+  ASSERT_TRUE(frame.maybeLatestRecvdPacketTime.has_value());
+  EXPECT_EQ(
+      frame.maybeLatestRecvdPacketTime.value(), std::chrono::microseconds(140));
+  ASSERT_EQ(frame.recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(frame.recvdPacketsTimestampRanges[0].gap, 0);
+  EXPECT_EQ(
+      frame.recvdPacketsTimestampRanges[0].deltas,
+      (std::vector<uint64_t>{140, 10, 10, 10, 10}));
+}
+
+TEST_F(DecodeTest, AckExtendedWireBytes) {
+  const std::vector<uint8_t> bytes = {
+      0x40, 0xb1, // Type
+      0x40, 0x64, 0x00, 0x00, 0x04, // ACK fields
+      0x03, // Extended Ack Features
+      0x00, 0x00, 0x00, // ECN Counts
+      0x40, 0x64, // Latest Received Packet Number
+      0x40, 0x8c, // Latest Received Packet Time (us, unscaled)
+      0x01, // Timestamp Range Count
+      0x00, 0x05, 0x40, 0x8c, 0x0a, 0x0a, 0x0a, 0x0a, // Range 1
+  };
+
+  auto frame = parseWireBytesAsAck(bytes, legacyWireVectorParams());
+
+  EXPECT_EQ(frame.frameType, FrameType::ACK_EXTENDED);
+  ASSERT_TRUE(frame.maybeLatestRecvdPacketNum.has_value());
+  EXPECT_EQ(frame.maybeLatestRecvdPacketNum.value(), 100);
+  ASSERT_EQ(frame.recvdPacketsTimestampRanges.size(), 1);
+  EXPECT_EQ(
+      frame.recvdPacketsTimestampRanges[0].deltas,
+      (std::vector<uint64_t>{140, 10, 10, 10, 10}));
+}
+
 } // namespace quic::test

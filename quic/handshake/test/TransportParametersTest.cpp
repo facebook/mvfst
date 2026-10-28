@@ -787,4 +787,86 @@ TEST_F(TransportParametersTest, SconeTPIncluded) {
                            << sconeCount << " times (expected exactly 1)";
 }
 
+// Byte-exact receive-timestamp transport parameters. The draft-02 values are
+// the temporary codepoints in draft-ietf-quic-receive-ts-03 Section 10. The
+// legacy mvfst values pin that format.
+namespace {
+
+std::vector<uint8_t> encodedParameterBytes(
+    const std::vector<TransportParameter>& params,
+    TransportParameterId id) {
+  auto it = findParameter(params, id);
+  if (it == params.end()) {
+    return {};
+  }
+  auto buf = it->encode();
+  buf->coalesce();
+  return std::vector<uint8_t>(buf->data(), buf->data() + buf->length());
+}
+
+} // namespace
+
+TEST_F(TransportParametersTest, Draft02ReceiveTimestampsTpsWireBytes) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ts = serverConn.transportSettings;
+  ts.enableIetfAckReceiveTimestamps = true;
+  ts.maybeAckReceiveTimestampsConfigSentToPeer = AckReceiveTimestampsConfig{
+      .maxReceiveTimestampsPerAck = 30, .receiveTimestampsExponent = 0};
+
+  auto params = getSupportedExtTransportParams(serverConn);
+
+  const std::vector<uint8_t> expectedMax = {0x80, 0x04, 0xac, 0x07, 0x01, 0x1e};
+  const std::vector<uint8_t> expectedExponent = {
+      0x80, 0x04, 0xac, 0x26, 0x01, 0x00};
+  EXPECT_EQ(
+      encodedParameterBytes(
+          params,
+          TransportParameterId::draft_02_max_receive_timestamps_per_ack),
+      expectedMax);
+  EXPECT_EQ(
+      encodedParameterBytes(
+          params, TransportParameterId::draft_02_receive_timestamps_exponent),
+      expectedExponent);
+}
+
+TEST_F(TransportParametersTest, LegacyReceiveTimestampsTpsWireBytes) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto& ts = serverConn.transportSettings;
+  ts.maybeAckReceiveTimestampsConfigSentToPeer = AckReceiveTimestampsConfig{
+      .maxReceiveTimestampsPerAck = 30, .receiveTimestampsExponent = 0};
+  ts.advertisedExtendedAckFeatures =
+      static_cast<ExtendedAckFeatureMaskType>(
+          ExtendedAckFeatureMask::ECN_COUNTS) |
+      static_cast<ExtendedAckFeatureMaskType>(
+          ExtendedAckFeatureMask::RECEIVE_TIMESTAMPS);
+
+  auto params = getSupportedExtTransportParams(serverConn);
+
+  const std::vector<uint8_t> expectedEnabled = {
+      0x8f, 0xf0, 0xa0, 0x01, 0x01, 0x01};
+  const std::vector<uint8_t> expectedMax = {0x8f, 0xf0, 0xa0, 0x02, 0x01, 0x1e};
+  const std::vector<uint8_t> expectedExponent = {
+      0x8f, 0xf0, 0xa0, 0x03, 0x01, 0x00};
+  const std::vector<uint8_t> expectedExtendedAckFeatures = {
+      0x8f, 0xf0, 0xa0, 0x04, 0x01, 0x03};
+  EXPECT_EQ(
+      encodedParameterBytes(
+          params, TransportParameterId::ack_receive_timestamps_enabled),
+      expectedEnabled);
+  EXPECT_EQ(
+      encodedParameterBytes(
+          params, TransportParameterId::max_receive_timestamps_per_ack),
+      expectedMax);
+  EXPECT_EQ(
+      encodedParameterBytes(
+          params, TransportParameterId::receive_timestamps_exponent),
+      expectedExponent);
+  EXPECT_EQ(
+      encodedParameterBytes(
+          params, TransportParameterId::extended_ack_features),
+      expectedExtendedAckFeatures);
+}
+
 } // namespace quic::test
