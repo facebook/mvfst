@@ -280,6 +280,7 @@ class MockQuicSocket : public QuicSocket {
       (quic::Expected<void, LocalErrorCode>),
       resetStreamReliably,
       (StreamId, ApplicationErrorCode));
+  MOCK_METHOD(bool, isReliableResetSupported, (), (const));
   MOCK_METHOD(
       (quic::Expected<void, LocalErrorCode>),
       maybeResetStreamFromReadError,

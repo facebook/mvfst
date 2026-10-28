@@ -309,11 +309,18 @@ class QuicSocket : virtual public QuicSocketLite {
 
   /**
    * Send a reliable reset to the peer. The reliable size sent to the peer is
-   * determined by when checkpoint(streamId) was last called.
+   * determined by when checkpoint(streamId) was last called. If reliable resets
+   * are not supported on this connection, a regular reset is sent instead.
    */
   virtual quic::Expected<void, LocalErrorCode> resetStreamReliably(
       StreamId id,
       ApplicationErrorCode error) = 0;
+
+  /**
+   * Whether both endpoints advertised support for reliable resets. Before the
+   * handshake completes, a client uses the cached 0-RTT transport parameters.
+   */
+  [[nodiscard]] virtual bool isReliableResetSupported() const = 0;
 
   /**
    * Set the ping callback

@@ -2386,6 +2386,34 @@ TEST_F(QuicTransportTest, RstStreamReliably) {
   EXPECT_EQ(stream->sendState, StreamSendState::Closed);
 }
 
+TEST_F(QuicTransportTest, RstStreamReliablyFallsBackWithoutPeerSupport) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.advertisedReliableResetStreamSupport = true;
+  conn.peerAdvertisedReliableStreamResetSupport = false;
+  EXPECT_FALSE(transport_->isReliableResetSupported());
+
+  auto streamId = transport_->createBidirectionalStream().value();
+  auto stream = conn.streamManager->findStream(streamId);
+  auto buf = IOBuf::create(10);
+  buf->append(10);
+  ASSERT_FALSE(
+      transport_->writeChain(streamId, std::move(buf), false).hasError());
+  ASSERT_FALSE(
+      transport_->updateReliableDeliveryCheckpoint(streamId).hasError());
+
+  auto resetResult = transport_->resetStreamReliably(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
+  EXPECT_FALSE(resetResult.hasError());
+
+  // A regular reset discards the checkpointed data.
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
+  EXPECT_FALSE(stream->reliableSizeToPeer.has_value());
+  EXPECT_EQ(stream->pendingWrites.chainLength(), 0);
+
+  conn.peerAdvertisedReliableStreamResetSupport = true;
+  EXPECT_TRUE(transport_->isReliableResetSupported());
+}
+
 TEST_F(QuicTransportTest, StopSending) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _, _))

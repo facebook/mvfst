@@ -191,11 +191,14 @@ class QuicTransportBase : public QuicSocket,
 
   /**
    * Send a reliable reset to the peer. The reliable size sent to the peer is
-   * determined by when checkpoint(streamId) was last called.
+   * determined by when checkpoint(streamId) was last called. If reliable resets
+   * are not supported on this connection, a regular reset is sent instead.
    */
   quic::Expected<void, LocalErrorCode> resetStreamReliably(
       StreamId id,
       ApplicationErrorCode error) override;
+
+  [[nodiscard]] bool isReliableResetSupported() const override;
 
   /**
    * Set control messages to be sent for socket_ write, note that it's for this

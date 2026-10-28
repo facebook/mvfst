@@ -725,11 +725,12 @@ QuicTransportBase::updateReliableDeliveryCheckpoint(StreamId id) {
 quic::Expected<void, LocalErrorCode> QuicTransportBase::resetStreamReliably(
     StreamId id,
     ApplicationErrorCode errorCode) {
-  if (!conn_->transportSettings.advertisedReliableResetStreamSupport ||
-      !conn_->peerAdvertisedReliableStreamResetSupport) {
-    return quic::make_unexpected(LocalErrorCode::INVALID_OPERATION);
-  }
-  return resetStreamInternal(id, errorCode, true /* reliable */);
+  return resetStreamInternal(id, errorCode, isReliableResetSupported());
+}
+
+bool QuicTransportBase::isReliableResetSupported() const {
+  return conn_->transportSettings.advertisedReliableResetStreamSupport &&
+      conn_->peerAdvertisedReliableStreamResetSupport;
 }
 
 void QuicTransportBase::setCmsgs(const folly::SocketCmsgMap& options) {
