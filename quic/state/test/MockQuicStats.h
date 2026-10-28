@@ -89,6 +89,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onKeyUpdateAttemptReceived, ());
   MOCK_METHOD(void, onKeyUpdateAttemptSucceeded, ());
   MOCK_METHOD(void, onSconePacketSent, ());
+  MOCK_METHOD(void, onAckReceiveTimestampsReceived, (uint64_t));
   MOCK_METHOD(void, onBBR1ExitStartup, ());
   MOCK_METHOD(void, onBBR2ExitStartup, ());
 };

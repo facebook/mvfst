@@ -24,6 +24,7 @@
 #include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/stream/StreamStateFunctions.h>
 #include <quic/state/test/AckEventTestUtil.h>
+#include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
 #include <numeric>
@@ -8917,6 +8918,55 @@ TEST_P(AckEventFirstArrivalTest, SameAckEqualTimestampsHaveUnknownOrder) {
       FirstArrival::Unknown, ackedPacket(ack, originalPacketNum_).firstArrival);
   EXPECT_EQ(
       FirstArrival::Unknown, ackedPacket(ack, clonePacketNum_).firstArrival);
+}
+
+class AckReceiveTimestampsStatsTest : public Test {
+ protected:
+  void SetUp() override {
+    conn_.statsCallback = &quicStats_;
+    setReceiveTimestampsConfig(conn_, 10);
+    emplacePackets(conn_, 10, startTime_, PacketNumberSpace::AppData);
+  }
+
+  quic::Expected<AckEvent, QuicError> processAck(const ReadAckFrame& frame) {
+    return processAckFrame(
+        conn_,
+        PacketNumberSpace::AppData,
+        frame,
+        [](auto&) -> quic::Expected<void, quic::QuicError> { return {}; },
+        [](const auto&, const auto&) -> quic::Expected<void, quic::QuicError> {
+          return {};
+        },
+        [](auto&, auto, auto&, bool) -> quic::Expected<void, quic::QuicError> {
+          return {};
+        },
+        startTime_ + 10ms);
+  }
+
+  NiceMock<MockQuicStats> quicStats_;
+  QuicServerConnectionState conn_{
+      FizzServerQuicHandshakeContext::Builder().build()};
+  const TimePoint startTime_{Clock::now()};
+};
+
+TEST_F(AckReceiveTimestampsStatsTest, ReportsTimestampsStoredFromAck) {
+  auto frame = makeDraft02AckFrame(
+      9,
+      {{.deltaLargestAcknowledged = 0,
+        .timestamp_delta_count = 3,
+        .deltas = {500, 10, 5}}});
+
+  EXPECT_CALL(quicStats_, onAckReceiveTimestampsReceived(3));
+  ASSERT_FALSE(processAck(frame).hasError());
+}
+
+TEST_F(AckReceiveTimestampsStatsTest, DoesNotReportAckWithoutTimestamps) {
+  ReadAckFrame frame;
+  frame.largestAcked = 9;
+  frame.ackBlocks.emplace_back(0, 9);
+
+  EXPECT_CALL(quicStats_, onAckReceiveTimestampsReceived(_)).Times(0);
+  ASSERT_FALSE(processAck(frame).hasError());
 }
 
 } // namespace quic::test

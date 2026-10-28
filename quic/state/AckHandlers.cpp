@@ -583,6 +583,12 @@ quic::Expected<AckEvent, QuicError> processAckFrame(
     if (tsResult.hasError()) {
       return quic::make_unexpected(tsResult.error());
     }
+    if (!packetReceiveTimeStamps.empty()) {
+      QUIC_STATS(
+          conn.statsCallback,
+          onAckReceiveTimestampsReceived,
+          packetReceiveTimeStamps.size());
+    }
   }
   resolveSameAckCloneArrivals(
       ackedCloneCopies, packetReceiveTimeStamps, packetsWithHandlerContext);
