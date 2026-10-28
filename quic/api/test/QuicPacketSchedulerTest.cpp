@@ -4536,11 +4536,11 @@ TEST_F(QuicAckSchedulerTest, Draft02TakesPrecedenceOverAckExtendedAndAckEcn) {
 }
 
 TEST_F(QuicAckSchedulerTest, Draft02NotEmittedWhenLocalKnobDisabled) {
-  // Peer advertises draft-02 but local `enableIetfAckReceiveTimestamps` is
+  // Peer advertises draft-02 but local `sendDraft02AckReceiveTimestamps` is
   // off, so the negotiated outgoing version stays None and no draft-02
   // frame is emitted.
   conn_->transportSettings.readEcnOnIngress = false;
-  conn_->transportSettings.enableIetfAckReceiveTimestamps = false;
+  conn_->transportSettings.sendDraft02AckReceiveTimestamps = false;
   conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
       .version = AckReceiveTimestampsVersion::DraftIetf02,
       .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,

@@ -151,6 +151,99 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   return newConn;
 }
 
+quic::Expected<void, QuicError> processServerReceiveTimestampsParams(
+    QuicClientConnectionState& conn,
+    const ServerTransportParameters& serverParams) {
+  auto isAckReceiveTimestampsEnabledResult = getIntegerParameter(
+      TransportParameterId::ack_receive_timestamps_enabled,
+      serverParams.parameters);
+  if (isAckReceiveTimestampsEnabledResult.hasError()) {
+    return quic::make_unexpected(isAckReceiveTimestampsEnabledResult.error());
+  }
+  auto isAckReceiveTimestampsEnabled =
+      isAckReceiveTimestampsEnabledResult.value();
+
+  auto maxReceiveTimestampsPerAckResult = getIntegerParameter(
+      TransportParameterId::max_receive_timestamps_per_ack,
+      serverParams.parameters);
+  if (maxReceiveTimestampsPerAckResult.hasError()) {
+    return quic::make_unexpected(maxReceiveTimestampsPerAckResult.error());
+  }
+  auto maxReceiveTimestampsPerAck = maxReceiveTimestampsPerAckResult.value();
+
+  auto receiveTimestampsExponentResult = getIntegerParameter(
+      TransportParameterId::receive_timestamps_exponent,
+      serverParams.parameters);
+  if (receiveTimestampsExponentResult.hasError()) {
+    return quic::make_unexpected(receiveTimestampsExponentResult.error());
+  }
+  auto receiveTimestampsExponent = receiveTimestampsExponentResult.value();
+
+  auto draft02MaxResult = getIntegerParameter(
+      TransportParameterId::draft_02_max_receive_timestamps_per_ack,
+      serverParams.parameters);
+  if (draft02MaxResult.hasError()) {
+    return quic::make_unexpected(draft02MaxResult.error());
+  }
+  auto draft02MaxReceiveTimestampsPerAck = draft02MaxResult.value();
+
+  auto draft02ExpResult = getIntegerParameter(
+      TransportParameterId::draft_02_receive_timestamps_exponent,
+      serverParams.parameters);
+  if (draft02ExpResult.hasError()) {
+    return quic::make_unexpected(draft02ExpResult.error());
+  }
+  auto draft02ReceiveTimestampsExponent = draft02ExpResult.value();
+  if (draft02MaxReceiveTimestampsPerAck.value_or(0) > 0 &&
+      draft02ReceiveTimestampsExponent.has_value() &&
+      *draft02ReceiveTimestampsExponent >
+          kDraft02MaxReceiveTimestampsExponent) {
+    return quic::make_unexpected(QuicError(
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+        fmt::format(
+            "draft-02 receive_timestamps_exponent above max: {} > {}",
+            *draft02ReceiveTimestampsExponent,
+            kDraft02MaxReceiveTimestampsExponent)));
+  }
+
+  // Draft-02 wins when peer advertises a positive draft-02 max AND local
+  // sends draft-02 (`sendDraft02AckReceiveTimestamps`); otherwise fall back
+  // to legacy. Selection keys on max>0 (not
+  // mere presence): a draft-02 max of 0 means the peer is not requesting
+  // draft-02 timestamps, so a peer advertising draft-02 max=0 alongside a
+  // legacy max>0 must negotiate LegacyMvfst rather than DraftIetf02{max=0}
+  // (which the outbound gate would downgrade to None, silently dropping the
+  // legacy timestamps the peer asked for). This matches the wire-TP parser
+  // (`getSupportedExtTransportParams`) and the outbound gate, both of which
+  // gate on max>0. "Exponent without max" in draft-02 is ignored per spec.
+  // Peer max is capped by the local stored max so an attacker-controlled
+  // value can't drive unbounded scheduler allocations.
+  const uint64_t storedCap =
+      conn.transportSettings.maxReceiveTimestampsPerAckStored;
+  if (draft02MaxReceiveTimestampsPerAck.has_value() &&
+      *draft02MaxReceiveTimestampsPerAck > 0 &&
+      conn.transportSettings.sendDraft02AckReceiveTimestamps) {
+    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+        .version = AckReceiveTimestampsVersion::DraftIetf02,
+        .maxReceiveTimestampsPerAck =
+            std::min(*draft02MaxReceiveTimestampsPerAck, storedCap),
+        .exponent = draft02ReceiveTimestampsExponent.value_or(0),
+    };
+  } else if (
+      isAckReceiveTimestampsEnabled.has_value() &&
+      isAckReceiveTimestampsEnabled.value() == 1 &&
+      maxReceiveTimestampsPerAck.has_value() &&
+      receiveTimestampsExponent.has_value()) {
+    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+        .version = AckReceiveTimestampsVersion::LegacyMvfst,
+        .maxReceiveTimestampsPerAck =
+            std::min(*maxReceiveTimestampsPerAck, storedCap),
+        .exponent = *receiveTimestampsExponent,
+    };
+  }
+  return {};
+}
+
 quic::Expected<void, QuicError> processServerInitialParams(
     QuicClientConnectionState& conn,
     const ServerTransportParameters& serverParams,
@@ -257,56 +350,10 @@ quic::Expected<void, QuicError> processServerInitialParams(
   }
   auto minAckDelay = minAckDelayResult.value();
 
-  auto isAckReceiveTimestampsEnabledResult = getIntegerParameter(
-      TransportParameterId::ack_receive_timestamps_enabled,
-      serverParams.parameters);
-  if (isAckReceiveTimestampsEnabledResult.hasError()) {
-    return quic::make_unexpected(isAckReceiveTimestampsEnabledResult.error());
-  }
-  auto isAckReceiveTimestampsEnabled =
-      isAckReceiveTimestampsEnabledResult.value();
-
-  auto maxReceiveTimestampsPerAckResult = getIntegerParameter(
-      TransportParameterId::max_receive_timestamps_per_ack,
-      serverParams.parameters);
-  if (maxReceiveTimestampsPerAckResult.hasError()) {
-    return quic::make_unexpected(maxReceiveTimestampsPerAckResult.error());
-  }
-  auto maxReceiveTimestampsPerAck = maxReceiveTimestampsPerAckResult.value();
-
-  auto receiveTimestampsExponentResult = getIntegerParameter(
-      TransportParameterId::receive_timestamps_exponent,
-      serverParams.parameters);
-  if (receiveTimestampsExponentResult.hasError()) {
-    return quic::make_unexpected(receiveTimestampsExponentResult.error());
-  }
-  auto receiveTimestampsExponent = receiveTimestampsExponentResult.value();
-
-  auto draft02MaxResult = getIntegerParameter(
-      TransportParameterId::draft_02_max_receive_timestamps_per_ack,
-      serverParams.parameters);
-  if (draft02MaxResult.hasError()) {
-    return quic::make_unexpected(draft02MaxResult.error());
-  }
-  auto draft02MaxReceiveTimestampsPerAck = draft02MaxResult.value();
-
-  auto draft02ExpResult = getIntegerParameter(
-      TransportParameterId::draft_02_receive_timestamps_exponent,
-      serverParams.parameters);
-  if (draft02ExpResult.hasError()) {
-    return quic::make_unexpected(draft02ExpResult.error());
-  }
-  auto draft02ReceiveTimestampsExponent = draft02ExpResult.value();
-  if (draft02MaxReceiveTimestampsPerAck.value_or(0) > 0 &&
-      draft02ReceiveTimestampsExponent.has_value() &&
-      *draft02ReceiveTimestampsExponent >
-          kDraft02MaxReceiveTimestampsExponent) {
-    return quic::make_unexpected(QuicError(
-        TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
-        fmt::format(
-            "draft-02 receive_timestamps_exponent above max: {} > {}",
-            *draft02ReceiveTimestampsExponent,
-            kDraft02MaxReceiveTimestampsExponent)));
+  auto receiveTimestampsResult =
+      processServerReceiveTimestampsParams(conn, serverParams);
+  if (receiveTimestampsResult.hasError()) {
+    return quic::make_unexpected(receiveTimestampsResult.error());
   }
 
   auto knobFrameSupportedResult = getIntegerParameter(
@@ -504,46 +551,6 @@ quic::Expected<void, QuicError> processServerInitialParams(
     conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
   }
 
-  // Reset before populate so 0-RTT reject doesn't leave stale state that
-  // would let `updateNegotiatedAckFeatures` enable a wire format the server
-  // never advertised.
-  conn.maybePeerReceiveTimestampsConfig = std::nullopt;
-
-  // Draft-02 wins when peer advertises a positive draft-02 max AND local can
-  // speak it; otherwise fall back to legacy. Selection keys on max>0 (not
-  // mere presence): a draft-02 max of 0 means the peer is not requesting
-  // draft-02 timestamps, so a peer advertising draft-02 max=0 alongside a
-  // legacy max>0 must negotiate LegacyMvfst rather than DraftIetf02{max=0}
-  // (which the outbound gate would downgrade to None, silently dropping the
-  // legacy timestamps the peer asked for). This matches the wire-TP parser
-  // (`getSupportedExtTransportParams`) and the outbound gate, both of which
-  // gate on max>0. "Exponent without max" in draft-02 is ignored per spec.
-  // Peer max is capped by the local stored max so an attacker-controlled
-  // value can't drive unbounded scheduler allocations.
-  const uint64_t storedCap =
-      conn.transportSettings.maxReceiveTimestampsPerAckStored;
-  if (draft02MaxReceiveTimestampsPerAck.has_value() &&
-      *draft02MaxReceiveTimestampsPerAck > 0 &&
-      conn.transportSettings.enableIetfAckReceiveTimestamps) {
-    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-        .version = AckReceiveTimestampsVersion::DraftIetf02,
-        .maxReceiveTimestampsPerAck =
-            std::min(*draft02MaxReceiveTimestampsPerAck, storedCap),
-        .exponent = draft02ReceiveTimestampsExponent.value_or(0),
-    };
-  } else if (
-      isAckReceiveTimestampsEnabled.has_value() &&
-      isAckReceiveTimestampsEnabled.value() == 1 &&
-      maxReceiveTimestampsPerAck.has_value() &&
-      receiveTimestampsExponent.has_value()) {
-    conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-        .version = AckReceiveTimestampsVersion::LegacyMvfst,
-        .maxReceiveTimestampsPerAck =
-            std::min(*maxReceiveTimestampsPerAck, storedCap),
-        .exponent = *receiveTimestampsExponent,
-    };
-  }
-
   conn.peerAdvertisedKnobFrameSupport = knobFrameSupported.value_or(0) > 0;
   conn.peerTimestampFrameState.canReceive =
       timestampFrameSupported.value_or(0) > 0;
@@ -597,8 +604,7 @@ void cacheServerInitialParams(
       peerAdvertisedReliableStreamResetSupport;
   conn.peerAdvertisedExtendedAckFeatures = peerAdvertisedExtendedAckFeatures;
   // `maybePeerReceiveTimestampsConfig` is populated by
-  // `processServerInitialParams` or
-  // `updateTransportParamsFromCachedEarlyParams`; not mirrored here.
+  // `processServerReceiveTimestampsParams`; not mirrored here.
 }
 
 CachedServerTransportParameters getServerCachedTransportParameters(
@@ -672,60 +678,6 @@ quic::Expected<void, QuicError> updateTransportParamsFromCachedEarlyParams(
   conn.peerAdvertisedReliableStreamResetSupport =
       transportParams.reliableStreamResetSupport;
   conn.peerAdvertisedExtendedAckFeatures = transportParams.extendedAckFeatures;
-
-  // Restore the versioned peer-receive-timestamps state. Cap by local
-  // stored max for memory safety. DraftIetf02 -> LegacyMvfst downgrade when
-  // local can no longer speak draft-02.
-  const uint64_t storedCap =
-      conn.transportSettings.maxReceiveTimestampsPerAckStored;
-  auto populateLegacy = [&]() {
-    if (transportParams.ackReceiveTimestampsEnabled) {
-      conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-          .version = AckReceiveTimestampsVersion::LegacyMvfst,
-          .maxReceiveTimestampsPerAck =
-              std::min(transportParams.maxReceiveTimestampsPerAck, storedCap),
-          .exponent = transportParams.receiveTimestampsExponent,
-      };
-    } else {
-      conn.maybePeerReceiveTimestampsConfig = std::nullopt;
-    }
-  };
-  switch (transportParams.cachedReceiveTimestampsVersion) {
-    case AckReceiveTimestampsVersion::DraftIetf02:
-      if (conn.transportSettings.enableIetfAckReceiveTimestamps) {
-        conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-            .version = AckReceiveTimestampsVersion::DraftIetf02,
-            .maxReceiveTimestampsPerAck = std::min(
-                transportParams.draft02MaxReceiveTimestampsPerAck, storedCap),
-            .exponent = transportParams.draft02ReceiveTimestampsExponent,
-        };
-      } else {
-        // Downgrade DraftIetf02 -> LegacyMvfst when local can no longer
-        // speak draft-02. The Fizz PSK cache writer
-        // (`getServerCachedTransportParameters`) populates only the selected
-        // version's fields, so a Fizz-cached PSK whose negotiation selected
-        // DraftIetf02 has empty legacy fields and `populateLegacy()` falls
-        // back to nullopt. The next session caches a legacy-only PSK and
-        // works normally.
-        // TODO(Task #34): expand the cache writer to record both formats so
-        // the first reconnect after disabling draft-02 keeps timestamp
-        // support.
-        populateLegacy();
-      }
-      break;
-    case AckReceiveTimestampsVersion::LegacyMvfst:
-      conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-          .version = AckReceiveTimestampsVersion::LegacyMvfst,
-          .maxReceiveTimestampsPerAck =
-              std::min(transportParams.maxReceiveTimestampsPerAck, storedCap),
-          .exponent = transportParams.receiveTimestampsExponent,
-      };
-      break;
-    case AckReceiveTimestampsVersion::None:
-      // Caches written before the version trailer existed.
-      populateLegacy();
-      break;
-  }
 
   return {};
 }

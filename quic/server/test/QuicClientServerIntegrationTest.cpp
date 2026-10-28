@@ -611,11 +611,11 @@ TEST_F(
 
 // Scenario B: dual-advertise client + legacy-only server. The server did not
 // advertise draft-02, and the client's `enableIetf` stops it from sending
-// legacy timestamps, so the client sends none. The server still sends legacy
-// timestamps. Connection succeeds.
+// legacy timestamps, so the client sends none. The client advertised
+// draft-02, so the server sends draft-02 timestamps. Connection succeeds.
 TEST_F(
     ServerTransportParameters,
-    AckRxTsDualAdvertiseClientLegacyServerOnlyServerSendsLegacy) {
+    AckRxTsDualAdvertiseClientLegacyServerOnlyServerSendsDraft02) {
   serverTs_.enableIetfAckReceiveTimestamps = false;
   serverTs_.advertiseLegacyAckReceiveTimestamps = true;
   serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
@@ -646,16 +646,16 @@ TEST_F(
       clientConn->maybePeerReceiveTimestampsConfig->version,
       AckReceiveTimestampsVersion::LegacyMvfst);
 
-  // Server side: client advertised both formats, but server's
-  // `enableIetf=false` falls the parser back to LegacyMvfst, so the server
-  // sends legacy timestamps.
+  // Server side: client advertised both formats, and the server's
+  // `sendDraft02` (default true) picks draft-02 even though the server does
+  // not advertise it.
   auto serverConn = snapshotServerConnState();
   ASSERT_TRUE(serverConn.hasConn);
   EXPECT_EQ(
-      serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::LegacyMvfst);
+      serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::DraftIetf02);
   ASSERT_TRUE(serverConn.hasPeerConfig);
   EXPECT_EQ(
-      serverConn.peerConfigVersion, AckReceiveTimestampsVersion::LegacyMvfst);
+      serverConn.peerConfigVersion, AckReceiveTimestampsVersion::DraftIetf02);
 }
 
 // Scenario C: client advertises only draft-02 (legacy off); server
@@ -696,13 +696,13 @@ TEST_F(
 }
 
 // Scenario D: legacy-only client + dual-advertise server. The client does
-// not enable draft-02, so the parser falls back to LegacyMvfst and the client
-// sends legacy timestamps. The server only sees the client's legacy
-// advertise, and its `enableIetf` stops it from sending legacy timestamps, so
-// the server sends none.
+// not advertise draft-02, but it sends draft-02 timestamps because the server
+// asked for them and `sendDraft02` defaults to true. The server only sees the
+// client's legacy advertise, and its `enableIetf` stops it from sending
+// legacy timestamps, so the server sends none.
 TEST_F(
     ServerTransportParameters,
-    AckRxTsLegacyClientDualAdvertiseServerOnlyClientSendsLegacy) {
+    AckRxTsLegacyClientDualAdvertiseServerOnlyClientSendsDraft02) {
   serverTs_.enableIetfAckReceiveTimestamps = true;
   serverTs_.advertiseLegacyAckReceiveTimestamps = true;
   serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
@@ -720,11 +720,11 @@ TEST_F(
       dynamic_cast<const QuicClientConnectionState*>(client_->getState());
   EXPECT_EQ(
       clientConn->negotiatedOutgoingAckReceiveTimestampsVersion,
-      AckReceiveTimestampsVersion::LegacyMvfst);
+      AckReceiveTimestampsVersion::DraftIetf02);
   ASSERT_TRUE(clientConn->maybePeerReceiveTimestampsConfig.has_value());
   EXPECT_EQ(
       clientConn->maybePeerReceiveTimestampsConfig->version,
-      AckReceiveTimestampsVersion::LegacyMvfst);
+      AckReceiveTimestampsVersion::DraftIetf02);
 
   auto serverConn = snapshotServerConnState();
   ASSERT_TRUE(serverConn.hasConn);
@@ -770,9 +770,8 @@ TEST_F(ServerTransportParameters, AckRxTsBothEndpointsDisabledNoNegotiation) {
 // draft-ietf-quic-receive-ts-02 spec: negotiation is ONE-WAY per direction.
 // Endpoint A's outbound (A sending ACK_RECEIVE_TIMESTAMPS frames to B)
 // is governed by B's advertisement that B wants timestamps. A's OWN
-// advertisement governs only the B->A direction, independently. The old
-// implementation gated outbound on BOTH sides' advertisements, which was
-// over-restrictive and divergent from the spec.
+// advertisement governs only the B->A direction, independently. A sends only
+// with `sendDraft02` and a local receive timestamps config.
 
 // Client advertises draft-02 (asking for timestamps from server); server
 // does NOT advertise. Expected: server sends timestamps to client; client
@@ -780,11 +779,11 @@ TEST_F(ServerTransportParameters, AckRxTsBothEndpointsDisabledNoNegotiation) {
 TEST_F(
     ServerTransportParameters,
     AckRxTsDraft02OneWayClientAdvertisesServerDoesNot) {
-  // Server: enableIetf on (kill-switch open), but no config-sent-to-peer so
-  // server advertises NO timestamp TPs.
-  serverTs_.enableIetfAckReceiveTimestamps = true;
+  // Server: enableIetf and legacy off, so the server advertises NO timestamp
+  // TPs, but it has the local config that sending needs.
+  serverTs_.enableIetfAckReceiveTimestamps = false;
   serverTs_.advertiseLegacyAckReceiveTimestamps = false;
-  serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = std::nullopt;
+  serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
   startServer();
 
   client_ = createQuicClient();
@@ -833,11 +832,13 @@ TEST_F(
   serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
   startServer();
 
+  // Client: enableIetf and legacy off, so the client advertises NO timestamp
+  // TPs, but it has the local config that sending needs.
   client_ = createQuicClient();
   auto clientTs = client_->getTransportSettings();
-  clientTs.enableIetfAckReceiveTimestamps = true;
+  clientTs.enableIetfAckReceiveTimestamps = false;
   clientTs.advertiseLegacyAckReceiveTimestamps = false;
-  clientTs.maybeAckReceiveTimestampsConfigSentToPeer = std::nullopt;
+  clientTs.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
   client_->setTransportSettings(std::move(clientTs));
   clientConnect();
 
@@ -869,6 +870,33 @@ TEST_F(
   EXPECT_EQ(serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::None);
 }
 
+// Server advertises draft-02, but the client has no local receive timestamps
+// config, so it sends none even though `sendDraft02` defaults to true.
+TEST_F(
+    ServerTransportParameters,
+    AckRxTsDraft02ClientWithoutConfigDoesNotSend) {
+  serverTs_.enableIetfAckReceiveTimestamps = true;
+  serverTs_.advertiseLegacyAckReceiveTimestamps = true;
+  serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
+  startServer();
+
+  client_ = createQuicClient();
+  auto clientTs = client_->getTransportSettings();
+  clientTs.maybeAckReceiveTimestampsConfigSentToPeer = std::nullopt;
+  client_->setTransportSettings(std::move(clientTs));
+  clientConnect();
+
+  auto clientConn =
+      dynamic_cast<const QuicClientConnectionState*>(client_->getState());
+  ASSERT_TRUE(clientConn->maybePeerReceiveTimestampsConfig.has_value());
+  EXPECT_EQ(
+      clientConn->maybePeerReceiveTimestampsConfig->version,
+      AckReceiveTimestampsVersion::DraftIetf02);
+  EXPECT_EQ(
+      clientConn->negotiatedOutgoingAckReceiveTimestampsVersion,
+      AckReceiveTimestampsVersion::None);
+}
+
 // Both endpoints advertise + enableIetf, but client opts out of sending via
 // `sendDraft02AckReceiveTimestamps=false`. Asymmetric outcome: server still
 // sends draft-02 to client (client advertised); client does NOT send to
@@ -893,11 +921,9 @@ TEST_F(
 
   auto clientConn =
       dynamic_cast<const QuicClientConnectionState*>(client_->getState());
-  // Both sides saw each other's draft-02 advertisement.
-  ASSERT_TRUE(clientConn->maybePeerReceiveTimestampsConfig.has_value());
-  EXPECT_EQ(
-      clientConn->maybePeerReceiveTimestampsConfig->version,
-      AckReceiveTimestampsVersion::DraftIetf02);
+  // The client does not send draft-02 and the server did not advertise
+  // legacy, so the client has no peer config to send with.
+  EXPECT_FALSE(clientConn->maybePeerReceiveTimestampsConfig.has_value());
   // Client's outbound is None: operator opt-out via sendDraft02 = false.
   EXPECT_EQ(
       clientConn->negotiatedOutgoingAckReceiveTimestampsVersion,

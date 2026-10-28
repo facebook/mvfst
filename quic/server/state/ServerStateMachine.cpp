@@ -525,8 +525,9 @@ quic::Expected<void, QuicError> processClientInitialParams(
   // Reset before populate so stale state can't leak into a reprocess path.
   conn.maybePeerReceiveTimestampsConfig = std::nullopt;
 
-  // Draft-02 wins when peer advertises a positive draft-02 max AND local can
-  // speak it; otherwise fall back to legacy. Selection keys on max>0 (not
+  // Draft-02 wins when peer advertises a positive draft-02 max AND local
+  // sends draft-02 (`sendDraft02AckReceiveTimestamps`); otherwise fall back
+  // to legacy. Selection keys on max>0 (not
   // mere presence): a draft-02 max of 0 means the peer is not requesting
   // draft-02 timestamps, so a peer advertising draft-02 max=0 alongside a
   // legacy max>0 must negotiate LegacyMvfst rather than DraftIetf02{max=0}
@@ -539,7 +540,7 @@ quic::Expected<void, QuicError> processClientInitialParams(
       conn.transportSettings.maxReceiveTimestampsPerAckStored;
   if (draft02MaxReceiveTimestampsPerAck.has_value() &&
       *draft02MaxReceiveTimestampsPerAck > 0 &&
-      conn.transportSettings.enableIetfAckReceiveTimestamps) {
+      conn.transportSettings.sendDraft02AckReceiveTimestamps) {
     conn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
         .version = AckReceiveTimestampsVersion::DraftIetf02,
         .maxReceiveTimestampsPerAck =

@@ -1046,6 +1046,12 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
                 "Rejection of zero rtt parameters unsupported"));
           }
         }
+      } else {
+        auto receiveTimestampsResult = processServerReceiveTimestampsParams(
+            *clientConn_, serverParams.value());
+        if (!receiveTimestampsResult.has_value()) {
+          return quic::make_unexpected(receiveTimestampsResult.error());
+        }
       }
       updateNegotiatedAckFeatures(*conn_);
 

@@ -862,7 +862,7 @@ TEST(ServerStateMachineTest, DISABLED_RejectsDraft02FrameWhenLocalMaxIsZero) {
 }
 
 // When the client advertises both legacy and draft-02 TPs but the server
-// has `enableIetfAckReceiveTimestamps=false`, the parser populates
+// has `sendDraft02AckReceiveTimestamps=false`, the parser populates
 // `maybePeerReceiveTimestampsConfig` with the legacy version so the
 // negotiated outgoing version settles to LegacyMvfst.
 TEST(
@@ -870,7 +870,7 @@ TEST(
     ProcessClientParamsBothFormatsDraftDisabledFallsBackToLegacy) {
   QuicServerConnectionState serverConn(
       FizzServerQuicHandshakeContext::Builder().build());
-  serverConn.transportSettings.enableIetfAckReceiveTimestamps = false;
+  serverConn.transportSettings.sendDraft02AckReceiveTimestamps = false;
   auto clientParams = buildClientTpsWithTimestampParams(
       /*legacyEnabled=*/1,
       /*legacyMax=*/7,

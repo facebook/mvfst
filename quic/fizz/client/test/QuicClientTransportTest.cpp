@@ -6843,6 +6843,13 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
     return false;
   }
 
+  void addServerTransportParam(TransportParameterId id, uint64_t value) {
+    auto param = encodeIntegerParameter(id, value);
+    ASSERT_FALSE(param.hasError());
+    mockClientHandshake->params_->parameters.push_back(
+        std::move(param.value()));
+  }
+
  protected:
   std::shared_ptr<MockQuicPskCache> mockQuicPskCache_;
   TestEarlyDataAppParamsHandler earlyDataHandler_;
@@ -6923,6 +6930,39 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
             params.initialMaxStreamsUni, std::numeric_limits<uint32_t>::max());
       }));
   mockClientHandshake->triggerOnNewCachedPsk();
+}
+
+TEST_F(
+    QuicZeroRttClientTest,
+    ZeroRttAcceptedUsesServerReceiveTimestampsParams) {
+  auto clientSettings = client->getTransportSettings();
+  clientSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig{};
+  client->setTransportSettings(clientSettings);
+  EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
+      .WillOnce(InvokeWithoutArgs([]() {
+        QuicCachedPsk quicCachedPsk;
+        quicCachedPsk.transportParams.cachedReceiveTimestampsVersion =
+            AckReceiveTimestampsVersion::DraftIetf02;
+        quicCachedPsk.transportParams.draft02MaxReceiveTimestampsPerAck = 30;
+        return quicCachedPsk;
+      }));
+  startClient();
+  addServerTransportParam(
+      TransportParameterId::ack_receive_timestamps_enabled, 1);
+  addServerTransportParam(
+      TransportParameterId::max_receive_timestamps_per_ack, 5);
+  addServerTransportParam(TransportParameterId::receive_timestamps_exponent, 3);
+  mockClientHandshake->setZeroRttRejected(
+      false /*rejected*/, false /*canResendZeroRtt*/);
+  recvServerHello();
+
+  const auto& conn = client->getConn();
+  ASSERT_EQ(
+      conn.negotiatedOutgoingAckReceiveTimestampsVersion,
+      AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(
+      conn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck, 5);
 }
 
 TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {

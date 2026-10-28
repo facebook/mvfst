@@ -152,6 +152,11 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
     std::unique_ptr<QuicClientConnectionState> conn);
 
+[[nodiscard]] quic::Expected<void, QuicError>
+processServerReceiveTimestampsParams(
+    QuicClientConnectionState& conn,
+    const ServerTransportParameters& serverParams);
+
 [[nodiscard]] quic::Expected<void, QuicError> processServerInitialParams(
     QuicClientConnectionState& conn,
     const ServerTransportParameters& serverParams,

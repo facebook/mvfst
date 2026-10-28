@@ -88,10 +88,6 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
   client_->transportSettings.canIgnorePathMTU = true;
   client_->peerAdvertisedKnobFrameSupport = false;
   client_->peerAdvertisedExtendedAckFeatures = 0;
-  client_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-      .version = AckReceiveTimestampsVersion::LegacyMvfst,
-      .maxReceiveTimestampsPerAck = 10,
-      .exponent = 0};
 
   ASSERT_FALSE(
       updateTransportParamsFromCachedEarlyParams(*client_, kParams).hasError());
@@ -109,16 +105,6 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
       initialMaxStreamDataUni);
   EXPECT_EQ(client_->peerAdvertisedKnobFrameSupport, knobFrameSupport);
   EXPECT_EQ(client_->peerAdvertisedExtendedAckFeatures, extendedAckSupport);
-  ASSERT_TRUE(client_->maybePeerReceiveTimestampsConfig.has_value());
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->version,
-      AckReceiveTimestampsVersion::LegacyMvfst);
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
-      maxReceiveTimestampsPerAck);
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->exponent,
-      ackReceiveTimestampsExponent);
 
   for (unsigned long i = 0; i < initialMaxStreamsBidi; i++) {
     EXPECT_TRUE(
@@ -765,66 +751,17 @@ TEST_F(
   EXPECT_EQ(roundTripped.draft02ReceiveTimestampsExponent, 5);
 }
 
-// On 0-RTT reject, `processServerInitialParams` runs against the real server
-// TPs after `updateTransportParamsFromCachedEarlyParams` has populated the
-// peer receive-timestamps fields from cache. When the real server advertises
-// no timestamp support, the populate block must clear the cached value so
-// `updateNegotiatedAckFeatures` does not enable a wire format the server
-// never agreed to.
-TEST_F(
-    ClientStateMachineTest,
-    ProcessServerParamsClearsStalePeerReceiveTimestampsConfig) {
-  QuicClientConnectionState clientConn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  clientConn.maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
-      .version = AckReceiveTimestampsVersion::DraftIetf02,
-      .maxReceiveTimestampsPerAck = 5,
-      .exponent = 2,
-  };
-  ServerTransportParameters serverParams = buildServerTpsWithTimestampParams(
-      std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
-
-  ASSERT_FALSE(
-      processServerInitialParams(clientConn, serverParams, 0).hasError());
-
-  EXPECT_FALSE(clientConn.maybePeerReceiveTimestampsConfig.has_value());
-}
-
-TEST_F(
-    ClientStateMachineTest,
-    UpdateTransportParamsFromCachedEarlyParamsDraft02) {
-  client_->transportSettings.canIgnorePathMTU = true;
-  client_->transportSettings.enableIetfAckReceiveTimestamps = true;
-  CachedServerTransportParameters params{};
-  params.idleTimeout = std::chrono::milliseconds(kDefaultIdleTimeout).count();
-  params.cachedReceiveTimestampsVersion =
-      AckReceiveTimestampsVersion::DraftIetf02;
-  params.draft02MaxReceiveTimestampsPerAck = 6;
-  params.draft02ReceiveTimestampsExponent = 4;
-
-  ASSERT_FALSE(
-      updateTransportParamsFromCachedEarlyParams(*client_, params).hasError());
-
-  ASSERT_TRUE(client_->maybePeerReceiveTimestampsConfig.has_value());
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->version,
-      AckReceiveTimestampsVersion::DraftIetf02);
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck, 6);
-  EXPECT_EQ(client_->maybePeerReceiveTimestampsConfig->exponent, 4);
-}
-
 // When the peer advertises both legacy and draft-02 TPs but the local
-// endpoint has `enableIetfAckReceiveTimestamps=false`, the parser must
+// endpoint has `sendDraft02AckReceiveTimestamps=false`, the parser must
 // populate `maybePeerReceiveTimestampsConfig` with the legacy version. Local
-// cannot speak draft-02, so picking it would strand the negotiated outgoing
+// does not send draft-02, so picking it would strand the negotiated outgoing
 // version at None even though legacy is mutually supported.
 TEST_F(
     ClientStateMachineTest,
     ProcessServerParamsBothFormatsDraftDisabledFallsBackToLegacy) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
-  clientConn.transportSettings.enableIetfAckReceiveTimestamps = false;
+  clientConn.transportSettings.sendDraft02AckReceiveTimestamps = false;
   auto serverParams = buildServerTpsWithTimestampParams(
       /*legacyEnabled=*/1,
       /*legacyMax=*/7,
@@ -843,39 +780,6 @@ TEST_F(
       clientConn.maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck,
       7);
   EXPECT_EQ(clientConn.maybePeerReceiveTimestampsConfig->exponent, 3);
-}
-
-// 0-RTT cached-TP restore: a cache with
-// `cachedReceiveTimestampsVersion=DraftIetf02` falls back to LegacyMvfst
-// (using the legacy cache fields) when the restoring client does not enable
-// draft-02.
-TEST_F(
-    ClientStateMachineTest,
-    UpdateTransportParamsFromCachedEarlyParamsDraft02DisabledFallsBack) {
-  client_->transportSettings.canIgnorePathMTU = true;
-  client_->transportSettings.enableIetfAckReceiveTimestamps = false;
-  CachedServerTransportParameters params{};
-  params.idleTimeout = std::chrono::milliseconds(kDefaultIdleTimeout).count();
-  params.cachedReceiveTimestampsVersion =
-      AckReceiveTimestampsVersion::DraftIetf02;
-  params.draft02MaxReceiveTimestampsPerAck = 6;
-  params.draft02ReceiveTimestampsExponent = 4;
-  // Legacy cache fields populated as well: a cache from a dual-advertising
-  // server carries both.
-  params.ackReceiveTimestampsEnabled = true;
-  params.maxReceiveTimestampsPerAck = 5;
-  params.receiveTimestampsExponent = 2;
-
-  ASSERT_FALSE(
-      updateTransportParamsFromCachedEarlyParams(*client_, params).hasError());
-
-  ASSERT_TRUE(client_->maybePeerReceiveTimestampsConfig.has_value());
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->version,
-      AckReceiveTimestampsVersion::LegacyMvfst);
-  EXPECT_EQ(
-      client_->maybePeerReceiveTimestampsConfig->maxReceiveTimestampsPerAck, 5);
-  EXPECT_EQ(client_->maybePeerReceiveTimestampsConfig->exponent, 2);
 }
 
 // The convenience wrapper must return a coalesced IOBuf so callers can use

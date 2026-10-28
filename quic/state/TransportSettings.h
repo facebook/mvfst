@@ -461,6 +461,9 @@ struct TransportSettings {
   // If structure is not initialized, ACK receive timestamps are
   // not requested from peer regardless of whether the peer
   // supports them.
+  //
+  // This endpoint sends receive timestamps to a peer that requests them only
+  // when this is set.
   Optional<AckReceiveTimestampsConfig>
       maybeAckReceiveTimestampsConfigSentToPeer;
 
@@ -481,13 +484,11 @@ struct TransportSettings {
   // When true, advertise the legacy mvfst receive-timestamps transport
   // parameters (ack_receive_timestamps_enabled = 0xff0a001 and friends).
   bool advertiseLegacyAckReceiveTimestamps{true};
-  // Per-direction send opt-out for draft-02 ACK_RECEIVE_TIMESTAMPS. When
-  // false, this endpoint will NOT send draft-02 frames even if the peer
-  // advertised the receive-timestamps TPs (draft-ietf-quic-receive-ts-02
-  // negotiation is one-way; the peer advertising governs the peer->us
-  // direction independently). Lets an operator say "we want timestamps from
-  // the peer but won't send any" without flipping the global enableIetf
-  // kill-switch.
+  // When true, send draft-02 ACK_RECEIVE_TIMESTAMPS frames instead of legacy
+  // ones to a peer that advertised the draft-02 receive-timestamps TPs, as
+  // long as `maybeAckReceiveTimestampsConfigSentToPeer` is set. Independent
+  // of `enableIetfAckReceiveTimestamps` (draft-ietf-quic-receive-ts-02
+  // negotiation is one-way).
   bool sendDraft02AckReceiveTimestamps{true};
   // Close the connection completely if a migration occurs during the handshake.
   bool closeIfMigrationDuringHandshake{true};
