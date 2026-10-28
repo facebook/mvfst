@@ -16,6 +16,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
 #include <linux/net_tstamp.h>
@@ -254,19 +255,44 @@ void QuicServerWorker::setUnfinishedHandshakeLimit(
   unfinishedHandshakeLimitFn_ = std::move(limitFn);
 }
 
-void QuicServerWorker::start() {
+void QuicServerWorker::prepareForStart() {
+  if (stopping_) {
+    throw std::runtime_error(
+        "QuicServerWorker::prepareForStart called while stopping");
+  }
+  if (!transportFactory_) {
+    throw std::runtime_error(
+        "QuicServerWorker::prepareForStart requires a transport factory");
+  }
   MVCHECK(socket_);
+  if (prepared_) {
+    return;
+  }
   if (!pacingTimer_) {
     pacingTimer_ = std::make_unique<HighResQuicTimer>(
         evb_.get(), transportSettings_.pacingTimerResolution);
   }
-  if (transportSettings_.shouldUseWrapperRecvmmsgForBatchRecv) {
+  if (transportSettings_.shouldUseWrapperRecvmmsgForBatchRecv && !quicSocket_) {
     auto qEvb = std::make_shared<FollyQuicEventBase>(evb_.get());
     quicSocket_ = std::make_shared<FollyQuicAsyncUDPSocket>(qEvb, *socket_);
     quicReadCallbackAdapter_ = std::make_unique<QuicReadCallbackAdapter>(this);
+  }
+  prepared_ = true;
+}
+
+void QuicServerWorker::start() {
+  prepareForStart();
+  if (quicSocket_) {
     quicSocket_->resumeRead(quicReadCallbackAdapter_.get());
   } else {
     socket_->resumeRead(this);
+  }
+  if (!started_) {
+    if (takeoverCB_ && !takeoverCB_->resume()) {
+      throw std::runtime_error(
+          "QuicServerWorker::start takeover read activation failed");
+    }
+    started_ = true;
   }
   MVVLOG(10) << fmt::format(
       "Registered read on worker={}, thread={}, processId={}",
@@ -298,7 +324,9 @@ void QuicServerWorker::pauseRead() {
 }
 
 int QuicServerWorker::getFD() {
-  MVCHECK(socket_);
+  if (!socket_) {
+    return -1;
+  }
   return socket_->getNetworkSocket().toFd();
 }
 
@@ -1442,18 +1470,27 @@ void QuicServerWorker::allowBeingTakenOver(
     const quic::SocketAddress& address) {
   MVDCHECK(!takeoverCB_);
   // We instantiate and bind the TakeoverHandlerCallback to the given address.
-  // It is reset at shutdownAllConnections (i.e. only when the process dies).
-  takeoverCB_ = std::make_unique<TakeoverHandlerCallback>(
+  // It is reset by resetTakeoverHandler() (e.g. to roll back a partially
+  // installed handler for retry) and by shutdownAllConnections() at teardown.
+  auto takeoverCb = std::make_unique<TakeoverHandlerCallback>(
       this, takeoverPktHandler_, transportSettings_, std::move(socket));
-  takeoverCB_->bind(address);
+  takeoverCb->bind(address, started_);
+  takeoverCB_ = std::move(takeoverCb);
 }
 
 const quic::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
     const quic::SocketAddress& address) {
   MVCHECK(takeoverCB_);
-  takeoverCB_->rebind(std::move(socket), address);
+  takeoverCB_->rebind(std::move(socket), address, started_);
   return takeoverCB_->getAddress();
+}
+
+void QuicServerWorker::resetTakeoverHandler() {
+  if (takeoverCB_) {
+    takeoverCB_->pause();
+    takeoverCB_.reset();
+  }
 }
 
 void QuicServerWorker::startPacketForwarding(
@@ -1465,6 +1502,15 @@ void QuicServerWorker::startPacketForwarding(
 void QuicServerWorker::stopPacketForwarding() {
   packetForwardingEnabled_ = false;
   takeoverPktHandler_.stop();
+}
+
+void QuicServerWorker::stopPacketForwardingAfter(
+    std::chrono::milliseconds delay) {
+  if (delay.count() == 0) {
+    stopPacketForwarding();
+    return;
+  }
+  takeoverPktHandler_.stopAfter(delay);
 }
 
 void QuicServerWorker::onReadError(
@@ -1482,7 +1528,9 @@ void QuicServerWorker::onReadClosed() noexcept {
 }
 
 int QuicServerWorker::getTakeoverHandlerSocketFD() {
-  MVCHECK(takeoverCB_);
+  if (!takeoverCB_) {
+    return -1;
+  }
   return takeoverCB_->getSocketFD();
 }
 

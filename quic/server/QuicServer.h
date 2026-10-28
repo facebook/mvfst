@@ -106,6 +106,21 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
   QuicServer(QuicServer&&) = delete;
   QuicServer& operator=(QuicServer&&) = delete;
 
+  enum class State : uint8_t { Created, Bound, Running, Paused, Stopped };
+
+  [[nodiscard]] State state() const noexcept {
+    return phase_;
+  }
+
+  [[nodiscard]] bool stopping() const noexcept {
+    return runState_.stopRequested() && phase_ != State::Stopped;
+  }
+
+  void bind(
+      const quic::SocketAddress& address,
+      const std::vector<folly::EventBase*>& evbs,
+      const std::vector<int>& inheritedFds = {});
+
   // Initialize and start the quic server where the quic server manages
   // the eventbases for workers
   void start(const quic::SocketAddress& address, size_t maxWorkers);
@@ -199,11 +214,12 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
 
   /**
    * Invoke `fn` once per worker with that worker's listener
-   * `const folly::AsyncUDPSocket*`. Unbound workers are skipped — `fn` is
-   * never called with `nullptr`. Runs on the caller's thread; pointers are
-   * owned by the worker and must not outlive the callback. Intended for
-   * observation only (e.g. aggregating per-fd MSG_ZEROCOPY counters across
-   * the alias-socket model's one-listener-fd-per-worker layout); callers
+   * `const folly::AsyncUDPSocket*`. Unbound/stopped workers are skipped —
+   * `fn` is never called with `nullptr`. Each invocation runs
+   * synchronously on the owning worker's EventBase; pointers are owned by
+   * the worker and must not outlive the callback. Intended for observation
+   * only (e.g. aggregating per-fd MSG_ZEROCOPY counters across the
+   * alias-socket model's one-listener-fd-per-worker layout); callers
    * needing to mutate worker socket state should use the non-const
    * `QuicServerWorker::getListenerSocket()` directly.
    */
@@ -305,7 +321,7 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
   /**
    * Returns listening address of this server
    */
-  const quic::SocketAddress& getAddress() const;
+  quic::SocketAddress getAddress() const;
 
   /**
    * Returns true iff the server is fully initialized
@@ -496,7 +512,8 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
   void initializeImpl(
       const quic::SocketAddress& address,
       std::vector<MaybeOwnedEvbPtr> evbs,
-      bool useDefaultTransport = false);
+      bool useDefaultTransport = false,
+      const std::vector<int>* inheritedFds = nullptr);
 
   struct EventBaseBackendDetails {
     std::unique_ptr<folly::EventBaseBackendBase> (*factory)();
@@ -506,17 +523,16 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
   static EventBaseBackendDetails getEventBaseBackendDetails();
 
   // helper function to initialize workers
-  void initializeWorkers(bool useDefaultTransport);
+  void initializeWorkers();
 
   std::unique_ptr<QuicServerWorker> newWorkerWithoutSocket(size_t workerIndex);
-
-  // helper method to run the given function in all worker asynchronously
-  void runOnAllWorkers(const std::function<void(QuicServerWorker*)>& func);
 
   // helper method to run the given function in all worker synchronously
   void runOnAllWorkersSync(const std::function<void(QuicServerWorker*)>& func);
 
-  void bindWorkersToSocket(const quic::SocketAddress& address);
+  void bindWorkersToSocket(
+      const quic::SocketAddress& address,
+      bool useDefaultTransport);
 
   std::vector<QuicVersion> supportedVersions_{{
       QuicVersion::MVFST,
@@ -532,6 +548,7 @@ class QuicServer : public std::enable_shared_from_this<QuicServer> {
       QuicVersion::MVFST_PRIMING,
   }};
 
+  State phase_{State::Created};
   std::atomic<bool> shutdown_{true};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   const TransportSettings transportSettings_;

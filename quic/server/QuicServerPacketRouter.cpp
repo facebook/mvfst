@@ -8,6 +8,7 @@
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/MvfstLogging.h>
+#include <stdexcept>
 
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerWorker.h>
@@ -36,24 +37,49 @@ TakeoverHandlerCallback::~TakeoverHandlerCallback() {
   }
 }
 
-void TakeoverHandlerCallback::bind(const quic::SocketAddress& addr) {
+void TakeoverHandlerCallback::bind(
+    const quic::SocketAddress& addr,
+    bool startReading) {
   MVCHECK(socket_);
-  // first reset existing socket if any
   socket_->bind(addr);
-  socket_->resumeRead(this);
+  readError_ = false;
+  if (startReading) {
+    socket_->resumeRead(this);
+    if (readError_ || !socket_) {
+      throw std::runtime_error(
+          "TakeoverHandlerCallback read activation failed on bind");
+    }
+  }
 }
 
 void TakeoverHandlerCallback::rebind(
     std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-    const quic::SocketAddress& addr) {
+    const quic::SocketAddress& addr,
+    bool startReading) {
+  MVCHECK(socket);
+  socket->bind(addr);
   if (socket_) {
-    // first reset existing socket if any
     socket_->pauseRead();
     socket_.reset();
   }
   socket_ = std::move(socket);
-  socket_->bind(addr);
+  readError_ = false;
+  if (startReading) {
+    socket_->resumeRead(this);
+    if (readError_ || !socket_) {
+      throw std::runtime_error(
+          "TakeoverHandlerCallback read activation failed on rebind");
+    }
+  }
+}
+
+bool TakeoverHandlerCallback::resume() {
+  if (!socket_) {
+    return false;
+  }
+  readError_ = false;
   socket_->resumeRead(this);
+  return !readError_ && socket_ != nullptr;
 }
 
 void TakeoverHandlerCallback::pause() {
@@ -68,7 +94,9 @@ const quic::SocketAddress& TakeoverHandlerCallback::getAddress() const {
 }
 
 int TakeoverHandlerCallback::getSocketFD() {
-  MVCHECK(socket_);
+  if (!socket_) {
+    return -1;
+  }
   return socket_->getNetworkSocket().toFd();
 }
 
@@ -106,12 +134,13 @@ void TakeoverHandlerCallback::onDataAvailable(
 
 void TakeoverHandlerCallback::onReadError(
     const folly::AsyncSocketException& ex) noexcept {
-  folly::DelayedDestruction::DestructorGuard dg(this);
   MVVLOG(4) << "Error on TakeoverHandlerCallback " << ex.what();
+  readError_ = true;
   if (socket_) {
     socket_->pauseRead();
-    // delete the socket_ in the next loop
-    socket_->getEventBase()->runInLoop([this, dg] { socket_.reset(); });
+    auto* evb = socket_->getEventBase();
+    auto socket = std::move(socket_);
+    evb->runInLoop([socket = std::move(socket)]() mutable { socket.reset(); });
   }
 }
 
@@ -124,6 +153,7 @@ void TakeoverHandlerCallback::onReadClosed() noexcept {
 
 void TakeoverPacketHandler::setDestination(
     const quic::SocketAddress& destAddr) {
+  forwardingStopTimeout_.cancelTimeout();
   pktForwardDestAddr_ = quic::SocketAddress(destAddr);
   packetForwardingEnabled_ = true;
 }
@@ -244,8 +274,19 @@ void TakeoverPacketHandler::processForwardedPacket(
   worker_->handleNetworkData(packet, /* isForwardedData */ true);
 }
 
+void TakeoverPacketHandler::ForwardingStopTimeout::timeoutExpired() noexcept {
+  handler_->worker_->stopPacketForwarding();
+}
+
 void TakeoverPacketHandler::stop() {
+  forwardingStopTimeout_.cancelTimeout();
   packetForwardingEnabled_ = false;
   pktForwardingSocket_.reset();
+}
+
+void TakeoverPacketHandler::stopAfter(std::chrono::milliseconds delay) {
+  forwardingStopTimeout_.cancelTimeout();
+  worker_->getEventBase()->timer().scheduleTimeout(
+      &forwardingStopTimeout_, delay);
 }
 } // namespace quic

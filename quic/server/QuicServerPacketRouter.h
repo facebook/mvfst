@@ -8,6 +8,7 @@
 #pragma once
 
 #include <folly/io/async/AsyncUDPSocket.h>
+#include <folly/io/async/HHWheelTimer.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/ConnectionIdAlgo.h>
@@ -86,6 +87,8 @@ class TakeoverPacketHandler {
 
   void stop();
 
+  void stopAfter(std::chrono::milliseconds delay);
+
   [[nodiscard]] TakeoverProtocolVersion getTakeoverProtocolVersion()
       const noexcept {
     return TakeoverProtocolVersion::V0;
@@ -96,7 +99,6 @@ class TakeoverPacketHandler {
  private:
   std::unique_ptr<FollyAsyncUDPSocketAlias> makeSocket(folly::EventBase* evb);
   void forwardPacket(BufPtr packet);
-  // prevent copying
   TakeoverPacketHandler(const TakeoverPacketHandler&);
   TakeoverPacketHandler& operator=(const TakeoverPacketHandler&);
 
@@ -105,13 +107,25 @@ class TakeoverPacketHandler {
   std::unique_ptr<FollyAsyncUDPSocketAlias> pktForwardingSocket_;
   bool packetForwardingEnabled_{false};
   QuicUDPSocketFactory* socketFactory_{nullptr};
+
+  class ForwardingStopTimeout : public folly::HHWheelTimer::Callback {
+   public:
+    explicit ForwardingStopTimeout(TakeoverPacketHandler* handler)
+        : handler_(handler) {}
+
+    void timeoutExpired() noexcept override;
+
+   private:
+    TakeoverPacketHandler* handler_;
+  };
+
+  ForwardingStopTimeout forwardingStopTimeout_{this};
 };
 
 /**
  * Class for handling packets after the socket takeover has initiated
  */
-class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
-                                private folly::DelayedDestruction {
+class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback {
  public:
   explicit TakeoverHandlerCallback(
       QuicServerWorker* worker,
@@ -119,13 +133,14 @@ class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
       const TransportSettings& transportSettings,
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket);
 
-  // prevent copying
   TakeoverHandlerCallback(const TakeoverHandlerCallback&) = delete;
   TakeoverHandlerCallback& operator=(const TakeoverHandlerCallback&) = delete;
+  TakeoverHandlerCallback(TakeoverHandlerCallback&&) = delete;
+  TakeoverHandlerCallback& operator=(TakeoverHandlerCallback&&) = delete;
 
   ~TakeoverHandlerCallback() override;
 
-  void bind(const quic::SocketAddress& addr);
+  void bind(const quic::SocketAddress& addr, bool startReading);
 
   /**
    * Rebinds the given socket to the given address
@@ -133,7 +148,14 @@ class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
    */
   void rebind(
       std::unique_ptr<FollyAsyncUDPSocketAlias> socket,
-      const quic::SocketAddress& addr);
+      const quic::SocketAddress& addr,
+      bool startReading);
+
+  bool resume();
+
+  [[nodiscard]] bool failed() const noexcept {
+    return readError_;
+  }
 
   void pause();
 
@@ -163,5 +185,6 @@ class TakeoverHandlerCallback : public FollyAsyncUDPSocketAlias::ReadCallback,
   quic::SocketAddress address_;
   std::unique_ptr<FollyAsyncUDPSocketAlias> socket_;
   BufPtr readBuffer_;
+  bool readError_{false};
 };
 } // namespace quic

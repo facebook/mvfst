@@ -155,10 +155,16 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
       FollyAsyncUDPSocketAlias::BindOptions bindOptions =
           FollyAsyncUDPSocketAlias::BindOptions());
 
+  void prepareForStart();
+
   /**
    * start reading data from the socket
    */
   void start();
+
+  [[nodiscard]] bool isStopping() const noexcept {
+    return stopping_;
+  }
 
   /*
    * Pause reading from the listening socket this worker is bound to
@@ -223,6 +229,10 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
    * Stop forwarding of packets and clean up any allocated resources
    */
   void stopPacketForwarding();
+
+  void stopPacketForwardingAfter(std::chrono::milliseconds delay);
+
+  void resetTakeoverHandler();
 
   /*
    * Returns the File Descriptor of the listening socket that handles the
@@ -657,6 +667,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   RunState* runState_{nullptr};
   size_t workerIndex_{0};
   bool stopping_{false};
+  bool prepared_{false};
+  bool started_{false};
   folly::EventBase* eventBase_{nullptr};
   folly::Executor::KeepAlive<folly::EventBase> evb_;
 
@@ -666,8 +678,8 @@ class QuicServerWorker : public FollyAsyncUDPSocketAlias::ReadCallback,
   bool zeroCopyEnabled_{false};
 
   // factories are owned by quic server
-  QuicUDPSocketFactory* socketFactory_;
-  QuicServerTransportFactory* transportFactory_;
+  QuicUDPSocketFactory* socketFactory_{nullptr};
+  QuicServerTransportFactory* transportFactory_{nullptr};
   std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
   // Per-server `BatchWriterFactoryOverride` propagated to each accepted
   // connection's `QuicConnectionStateBase::batchWriterFactoryOverride`.
