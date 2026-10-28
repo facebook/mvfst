@@ -4375,6 +4375,76 @@ TEST_F(QuicAckSchedulerTest, AckExtendedTakesPrecedenceOverReceiveTimestamps) {
   EXPECT_EQ(ackFrame->ecnCECount, 3);
 }
 
+TEST_F(QuicAckSchedulerTest, IetfReceiveModeDoesNotWriteLegacyTimestamps) {
+  conn_->transportSettings.readEcnOnIngress = false;
+  conn_->transportSettings.enableIetfAckReceiveTimestamps = true;
+
+  // Peer requested legacy receive timestamps
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK);
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+}
+
+TEST_F(
+    QuicAckSchedulerTest,
+    IetfReceiveModeWritesAckExtendedWithoutTimestamps) {
+  conn_->transportSettings.enableIetfAckReceiveTimestamps = true;
+  conn_->transportSettings.enableExtendedAckFeatures =
+      3; // We support ECN + ReceiveTimestamps
+  conn_->peerAdvertisedExtendedAckFeatures =
+      3; // Peer supports ECN + ReceiveTimestamps
+
+  // Peer requested legacy receive timestamps
+  conn_->maybePeerReceiveTimestampsConfig = PeerReceiveTimestampsConfig{
+      .version = AckReceiveTimestampsVersion::LegacyMvfst,
+      .maxReceiveTimestampsPerAck = kMaxReceivedPktsTimestampsStored,
+      .exponent = 0};
+  conn_->transportSettings.maybeAckReceiveTimestampsConfigSentToPeer =
+      AckReceiveTimestampsConfig();
+
+  // We can read ECN
+  conn_->transportSettings.readEcnOnIngress = true;
+
+  updateNegotiatedAckFeatures(*conn_);
+
+  AckScheduler ackScheduler(*conn_, ackState_);
+  ASSERT_TRUE(ackScheduler.hasPendingAcks());
+
+  auto writeResult = ackScheduler.writeNextAcks(*builder_);
+  ASSERT_FALSE(writeResult.hasError());
+  ASSERT_TRUE(writeResult.value() != std::nullopt);
+  ASSERT_EQ(builder_->frames_.size(), 1);
+
+  auto ackFrame = builder_->frames_[0].asWriteAckFrame();
+  ASSERT_TRUE(ackFrame != nullptr);
+
+  EXPECT_EQ(ackFrame->frameType, FrameType::ACK_EXTENDED);
+  EXPECT_TRUE(ackFrame->recvdPacketsTimestampRanges.empty());
+
+  EXPECT_EQ(ackFrame->ecnECT0Count, 1);
+  EXPECT_EQ(ackFrame->ecnECT1Count, 2);
+  EXPECT_EQ(ackFrame->ecnCECount, 3);
+}
+
 // draft-ietf-quic-receive-ts-02 scheduler dispatch. The scheduler emits the
 // draft-02 frame type at highest priority when
 // `negotiatedOutgoingAckReceiveTimestampsVersion == DraftIetf02`. The `_ECN`

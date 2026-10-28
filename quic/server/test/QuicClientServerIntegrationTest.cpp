@@ -609,12 +609,13 @@ TEST_F(
       serverConn.peerConfigVersion, AckReceiveTimestampsVersion::DraftIetf02);
 }
 
-// Scenario B: dual-advertise client + legacy-only server. Negotiated
-// outgoing version on the client is Legacy because the server did not
-// advertise draft-02. Connection succeeds.
+// Scenario B: dual-advertise client + legacy-only server. The server did not
+// advertise draft-02, and the client's `enableIetf` stops it from sending
+// legacy timestamps, so the client sends none. The server still sends legacy
+// timestamps. Connection succeeds.
 TEST_F(
     ServerTransportParameters,
-    AckRxTsDualAdvertiseClientLegacyServerNegotiatesLegacy) {
+    AckRxTsDualAdvertiseClientLegacyServerOnlyServerSendsLegacy) {
   serverTs_.enableIetfAckReceiveTimestamps = false;
   serverTs_.advertiseLegacyAckReceiveTimestamps = true;
   serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
@@ -639,15 +640,15 @@ TEST_F(
       serverAdvertisedDraft02AckReceiveTimestamps(*serverTransportParams));
   EXPECT_EQ(
       clientConn->negotiatedOutgoingAckReceiveTimestampsVersion,
-      AckReceiveTimestampsVersion::LegacyMvfst);
+      AckReceiveTimestampsVersion::None);
   ASSERT_TRUE(clientConn->maybePeerReceiveTimestampsConfig.has_value());
   EXPECT_EQ(
       clientConn->maybePeerReceiveTimestampsConfig->version,
       AckReceiveTimestampsVersion::LegacyMvfst);
 
   // Server side: client advertised both formats, but server's
-  // `enableIetf=false` falls the parser back to LegacyMvfst. Mutual
-  // LegacyMvfst negotiation succeeds.
+  // `enableIetf=false` falls the parser back to LegacyMvfst, so the server
+  // sends legacy timestamps.
   auto serverConn = snapshotServerConnState();
   ASSERT_TRUE(serverConn.hasConn);
   EXPECT_EQ(
@@ -695,12 +696,13 @@ TEST_F(
 }
 
 // Scenario D: legacy-only client + dual-advertise server. The client does
-// not enable draft-02, so the parser falls back to LegacyMvfst. The server
-// only sees the client's legacy advertise. Both sides negotiate mutual
-// LegacyMvfst.
+// not enable draft-02, so the parser falls back to LegacyMvfst and the client
+// sends legacy timestamps. The server only sees the client's legacy
+// advertise, and its `enableIetf` stops it from sending legacy timestamps, so
+// the server sends none.
 TEST_F(
     ServerTransportParameters,
-    AckRxTsLegacyClientDualAdvertiseServerNegotiatesLegacy) {
+    AckRxTsLegacyClientDualAdvertiseServerOnlyClientSendsLegacy) {
   serverTs_.enableIetfAckReceiveTimestamps = true;
   serverTs_.advertiseLegacyAckReceiveTimestamps = true;
   serverTs_.maybeAckReceiveTimestampsConfigSentToPeer = testAckRxTsConfig();
@@ -726,8 +728,7 @@ TEST_F(
 
   auto serverConn = snapshotServerConnState();
   ASSERT_TRUE(serverConn.hasConn);
-  EXPECT_EQ(
-      serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::LegacyMvfst);
+  EXPECT_EQ(serverConn.negotiatedOutgoing, AckReceiveTimestampsVersion::None);
   ASSERT_TRUE(serverConn.hasPeerConfig);
   EXPECT_EQ(
       serverConn.peerConfigVersion, AckReceiveTimestampsVersion::LegacyMvfst);

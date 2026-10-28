@@ -473,8 +473,10 @@ struct TransportSettings {
 
   // When true, advertise the draft-ietf-quic-receive-ts-02 transport
   // parameters (TP 0x4ac07, 0x4ac26) whenever
-  // `maybeAckReceiveTimestampsConfigSentToPeer` is set, and accept incoming
-  // draft-02 ACK_RECEIVE_TIMESTAMPS frames.
+  // `maybeAckReceiveTimestampsConfigSentToPeer` is set, accept incoming
+  // draft-02 ACK_RECEIVE_TIMESTAMPS frames, and don't send legacy mvfst or
+  // ACK_EXTENDED receive timestamps. Accepting those is governed by
+  // `advertiseLegacyAckReceiveTimestamps`.
   bool enableIetfAckReceiveTimestamps{false};
   // When true, advertise the legacy mvfst receive-timestamps transport
   // parameters (ack_receive_timestamps_enabled = 0xff0a001 and friends).
