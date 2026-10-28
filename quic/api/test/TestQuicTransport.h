@@ -33,6 +33,9 @@ class TestQuicTransport
     setConnectionSetupCallback(connSetupCb);
     setConnectionCallbackFromCtor(connCb);
     test::initializePathManagerState(*conn_);
+    bufAccessor_ = std::make_unique<BufAccessor>(
+        kDefaultMaxUDPPayload * conn_->transportSettings.maxBatchSize);
+    conn_->bufAccessor = bufAccessor_.get();
   }
 
   ~TestQuicTransport() override {
@@ -205,6 +208,7 @@ class TestQuicTransport
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   bool closed{false};
+  std::unique_ptr<BufAccessor> bufAccessor_;
 
   // Container of observers for the socket / transport.
   //

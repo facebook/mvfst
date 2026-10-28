@@ -32,6 +32,7 @@ mvfst_cpp_library(
         "QuicClientTransportLite.h",
     ],
     deps = [
+        "fbsource//xplat/folly/lang:checked_math",
         "fbsource//xplat/folly/portability:sockets",
         ":client_extension",
         "//quic:constants",

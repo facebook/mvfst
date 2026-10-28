@@ -3472,18 +3472,6 @@ void QuicTransportBaseLite::setIdleTimer() {
 
 void QuicTransportBaseLite::setTransportSettings(
     TransportSettings transportSettings) {
-  if (conn_->nodeType == QuicNodeType::Client &&
-      transportSettings.dataPathType == DataPathType::ContinuousMemory) {
-    size_t capacity = 0;
-    MVCHECK(
-        folly::checked_mul(
-            &capacity,
-            static_cast<size_t>(kDefaultMaxUDPPayload),
-            static_cast<size_t>(transportSettings.maxBatchSize)),
-        "ContinuousMemory buffer capacity overflow");
-    createBufAccessor(capacity);
-  }
-
   // If transport parameters are encoded, we can only update congestion
   // control related params. Setting other transport settings again would be
   // buggy.
@@ -3491,6 +3479,17 @@ void QuicTransportBaseLite::setTransportSettings(
   if (conn_->transportParametersEncoded) {
     updateCongestionControlSettings(transportSettings);
   } else {
+    if (conn_->nodeType == QuicNodeType::Client &&
+        transportSettings.dataPathType == DataPathType::ContinuousMemory) {
+      size_t capacity = 0;
+      MVCHECK(
+          folly::checked_mul(
+              &capacity,
+              static_cast<size_t>(kDefaultMaxUDPPayload),
+              static_cast<size_t>(transportSettings.maxBatchSize)),
+          "ContinuousMemory buffer capacity overflow");
+      createBufAccessor(capacity);
+    }
     // TODO: We should let chain based GSO to use bufAccessor in the future as
     // well.
     MVCHECK(

@@ -244,6 +244,11 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         &connCallback,
         serverCtx,
         getUseConnectionEndWithErrorCallback());
+    // QuicServerWorker provides this buffer in production.
+    serverBufAccessor_ = std::make_unique<BufAccessor>(
+        kDefaultMaxUDPPayload *
+        server->getConn().transportSettings.maxBatchSize);
+    server->setBufAccessor(serverBufAccessor_.get());
     server->setCongestionControllerFactory(ccFactory_);
     server->setCongestionControl(CongestionControlType::Cubic);
     server->setRoutingCallback(&routingCallback);
@@ -727,6 +732,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   std::unique_ptr<MockQuicStats> quicStats_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   std::shared_ptr<CongestionControllerFactory> ccFactory_;
+  std::unique_ptr<BufAccessor> serverBufAccessor_;
   std::shared_ptr<TestingQuicServerTransport> server;
   quic::test::MockAsyncUDPSocket* socket;
   FakeServerHandshake* fakeHandshake{nullptr};

@@ -245,6 +245,8 @@ namespace quic::test {
 class QuicPacketSchedulerTestBase {
  public:
   QuicVersion version{QuicVersion::MVFST};
+  std::unique_ptr<BufAccessor> bufAccessor_{std::make_unique<BufAccessor>(
+      kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize)};
 
   std::unique_ptr<QuicClientConnectionState> createConn(
       uint32_t maxStreams,
@@ -749,6 +751,7 @@ TEST_P(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
 TEST_P(QuicPacketSchedulerTest, CloningSchedulerTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
@@ -1111,6 +1114,7 @@ TEST_P(QuicPacketSchedulerTest, AppDataPtoSchedulerWritesOneRttCrypto) {
 TEST_P(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
@@ -1187,6 +1191,7 @@ TEST_P(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 TEST_P(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, but then mark the first one processed by
@@ -1232,6 +1237,7 @@ TEST_P(
     CloneSchedulerSkipsAlreadyClonedPacketInSameWriteLoop) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
   conn.writeCount = 0;
@@ -1310,6 +1316,7 @@ TEST_P(
 TEST_P(QuicPacketSchedulerTest, DoNotSkipUnclonedCryptoPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "cryptoClone", 0);
 
@@ -1371,6 +1378,7 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
 TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   conn.version = QuicVersion::MVFST_EXPERIMENTAL2;
 
   FrameScheduler noopScheduler = std::move(
@@ -1472,6 +1480,7 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
 TEST_P(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, with second one being handshake
@@ -1561,6 +1570,7 @@ TEST_P(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
 TEST_P(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   auto result = conn.streamManager->setMaxLocalBidirectionalStreams(10);
   ASSERT_FALSE(result.hasError());
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -1866,6 +1876,7 @@ TEST_P(
 TEST_P(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   conn.udpSendPacketLen = 1000;
   auto result = conn.streamManager->setMaxLocalBidirectionalStreams(10);
   ASSERT_FALSE(result.hasError());

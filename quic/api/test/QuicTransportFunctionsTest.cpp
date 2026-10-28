@@ -221,6 +221,8 @@ class QuicTransportFunctionsTest : public Test {
 
     // Do not skip packet numbers for the tests.
     conn->transportSettings.skipOneInNPacketSequenceNumber = 0;
+    // These bare connections have no transport to give them a write buffer.
+    conn->bufAccessor = bufAccessor_.get();
     return conn;
   }
 
@@ -236,6 +238,7 @@ class QuicTransportFunctionsTest : public Test {
     conn->initialHeaderCipher = createNoOpHeaderCipher().value();
     initializePathManagerState(*conn);
     conn->transportSettings.skipOneInNPacketSequenceNumber = 0;
+    conn->bufAccessor = bufAccessor_.get();
     return conn;
   }
 
@@ -290,6 +293,8 @@ class QuicTransportFunctionsTest : public Test {
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<MockQuicStats> quicStats_;
   const PathInfo* currentPathInfo_{};
+  std::unique_ptr<BufAccessor> bufAccessor_{std::make_unique<BufAccessor>(
+      kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize)};
 };
 
 enum class LossAlarmFrameType : uint8_t { Ping, Timestamp };
@@ -3977,6 +3982,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldDataAckFreq) {
 TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   conn.serverConnectionId = getTestConnectionId();
   conn.clientConnectionId = getTestConnectionId();
   initializePathManagerState(conn);
@@ -4024,6 +4030,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
 TEST_F(QuicTransportFunctionsTest, WriteableBytesLimitedProbingCryptoData) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
+  conn.bufAccessor = bufAccessor_.get();
   conn.statsCallback = quicStats_.get();
   conn.transportSettings.enableWritableBytesLimit = true;
   conn.writableBytesLimit = 2 * conn.udpSendPacketLen;

@@ -247,6 +247,9 @@ class TestQuicTransport
     transportConn = conn.get();
     conn_.reset(conn.release());
     initializePathManagerState(*conn_);
+    bufAccessor_ = std::make_unique<BufAccessor>(
+        kDefaultMaxUDPPayload * conn_->transportSettings.maxBatchSize);
+    conn_->bufAccessor = bufAccessor_.get();
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher().value();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
@@ -650,6 +653,7 @@ class TestQuicTransport
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   bool transportClosed{false};
   PacketNum packetNum_{0};
+  std::unique_ptr<BufAccessor> bufAccessor_;
 
   // Container of observers for the socket / transport.
   //

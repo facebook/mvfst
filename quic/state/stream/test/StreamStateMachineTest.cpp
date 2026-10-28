@@ -10,6 +10,7 @@
 
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -30,9 +31,11 @@ void verifyStreamReset(
   EXPECT_EQ(readOffsetExpected, stream.finalReadOffset.value());
 }
 
-std::unique_ptr<QuicServerConnectionState> createConn() {
+std::unique_ptr<QuicServerConnectionState> createConn(
+    BufAccessor* bufAccessor = nullptr) {
   auto conn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder().build());
+  conn->bufAccessor = bufAccessor;
   conn->clientConnectionId = getTestConnectionId();
   conn->version = QuicVersion::MVFST;
   conn->ackStates.initialAckState->nextPacketNum = 1;
@@ -176,7 +179,8 @@ TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithoutFIN) {
 }
 
 TEST_F(QuicOpenStateTest, AckStream) {
-  auto conn = createConn();
+  BufAccessor bufAccessor(kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize);
+  auto conn = createConn(&bufAccessor);
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
@@ -266,7 +270,8 @@ TEST_F(QuicOpenStateTest, UnifiedAckReportsInclusiveDeliveryIntervals) {
 }
 
 TEST_F(QuicOpenStateTest, AckStreamMulti) {
-  auto conn = createConn();
+  BufAccessor bufAccessor(kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize);
+  auto conn = createConn(&bufAccessor);
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
@@ -462,7 +467,8 @@ TEST_F(QuicOpenStateTest, ClosedUnifiedAckRejectsUnackedFin) {
 }
 #endif
 TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
-  auto conn = createConn();
+  BufAccessor bufAccessor(kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize);
+  auto conn = createConn(&bufAccessor);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   EventBase evb;
   auto qEvb = std::make_shared<FollyQuicEventBase>(&evb);
@@ -775,7 +781,8 @@ TEST_F(QuicHalfClosedLocalStateTest, ReceiveStreamFrameWithoutFIN) {
 class QuicHalfClosedRemoteStateTest : public Test {};
 
 TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
-  auto conn = createConn();
+  BufAccessor bufAccessor(kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize);
+  auto conn = createConn(&bufAccessor);
   // create server chosen connId with processId = 0 and workerId = 0
   ServerConnectionIdParams params(0, 0, 0);
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();

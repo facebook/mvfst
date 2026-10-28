@@ -16,6 +16,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/events/FollyQuicEventBase.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/common/testutil/MockAsyncUDPSocket.h>
@@ -102,6 +103,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   std::unique_ptr<QuicServerConnectionState> createConn() {
     auto conn = std::make_unique<QuicServerConnectionState>(
         FizzServerQuicHandshakeContext::Builder().build());
+    conn->bufAccessor = &bufAccessor_;
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->ackStates.initialAckState->nextPacketNum = 1;
@@ -161,6 +163,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   }
 
   EventBase evb;
+  BufAccessor bufAccessor_{kDefaultMaxUDPPayload * kDefaultQuicMaxBatchSize};
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   MockLossTimeout timeout;

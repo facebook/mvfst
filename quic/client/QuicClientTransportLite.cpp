@@ -8,6 +8,7 @@
 #include <quic/client/QuicClientTransportLite.h>
 #include <quic/common/MvfstLogging.h>
 
+#include <folly/lang/CheckedMath.h>
 #include <folly/portability/Sockets.h>
 #include <algorithm>
 
@@ -1867,6 +1868,19 @@ void QuicClientTransportLite::start(
     return;
   }
   conn_->currentPathId = addPathRes.value();
+
+  // Clients that keep the default settings never call setTransportSettings().
+  if (conn_->transportSettings.dataPathType == DataPathType::ContinuousMemory &&
+      !conn_->bufAccessor) {
+    size_t capacity = 0;
+    MVCHECK(
+        folly::checked_mul(
+            &capacity,
+            static_cast<size_t>(kDefaultMaxUDPPayload),
+            static_cast<size_t>(conn_->transportSettings.maxBatchSize)),
+        "ContinuousMemory buffer capacity overflow");
+    createBufAccessor(capacity);
+  }
 
   auto handshakeResult = startCryptoHandshake();
   if (!handshakeResult.has_value()) {

@@ -1802,6 +1802,8 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto& conn = client->getNonConstConn();
   conn.oneRttWriteCipher = test::createNoOpAead();
   conn.oneRttWriteHeaderCipher = test::createNoOpHeaderCipherNoThrow();
+  // This test skips start(), which creates the write buffer.
+  client->setTransportSettings(client->getTransportSettings());
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 

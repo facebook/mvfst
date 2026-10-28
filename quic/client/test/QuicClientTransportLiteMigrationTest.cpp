@@ -122,6 +122,8 @@ class QuicClientTransportLiteMigrationTest : public Test {
     quicClient_->getConn()->oneRttWriteCipher = test::createNoOpAead();
     quicClient_->getConn()->oneRttWriteHeaderCipher =
         test::createNoOpHeaderCipher().value();
+    // These tests skip start(), which creates the write buffer.
+    quicClient_->setTransportSettings(quicClient_->getTransportSettings());
   }
 
   void TearDown() override {

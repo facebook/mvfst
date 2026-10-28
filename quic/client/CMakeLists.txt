@@ -42,6 +42,7 @@ mvfst_add_library(mvfst_client_client_lite
     mvfst_state_pacing_functions
     mvfst_state_simple_frame_functions
     mvfst_state_stream
+    Folly::folly_lang_checked_math
     Folly::folly_portability_sockets
   EXPORTED_DEPS
     mvfst_api_transport_lite
