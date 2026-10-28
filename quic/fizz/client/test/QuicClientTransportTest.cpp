@@ -3316,7 +3316,7 @@ class QuicClientTransportVersionAndRetryTest
     expectVersionNegotiationFatal(std::move(packet), serverAddr);
   }
 
-  void receiveVerifiedRetry() {
+  void receiveVerifiedRetry(bool validIntegrityTag = true) {
     const auto retrySourceConnectionId = ConnectionId::createAndMaybeCrash(
         {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
     const std::string retryToken = "version-negotiation-retry";
@@ -3333,6 +3333,9 @@ class QuicClientTransportVersionAndRetryTest
     auto integrityTag =
         tagGenerator.getRetryIntegrityTag(retryVersion, pseudoPacket.get());
     ASSERT_TRUE(integrityTag);
+    if (!validIntegrityTag) {
+      integrityTag->writableData()[0] ^= 1;
+    }
 
     folly::IOBuf retryPacket;
     BufAppender appender(&retryPacket, 100);
@@ -3358,9 +3361,17 @@ class QuicClientTransportVersionAndRetryTest
             *client->getConn().originalDestinationConnectionId,
             *parsed.retryPacket());
     ASSERT_TRUE(verified.has_value());
-    ASSERT_TRUE(verified.value());
+    if (validIntegrityTag) {
+      ASSERT_TRUE(verified.value());
+    } else {
+      ASSERT_FALSE(verified.value());
+    }
 
     deliverData(serverAddr, retryPacket.coalesce());
+
+    if (!validIntegrityTag) {
+      return;
+    }
 
     ASSERT_EQ(client->getConn().retryToken, retryToken);
     ASSERT_FALSE(client->getConn().retryToken.empty());
@@ -5635,6 +5646,43 @@ TEST_F(QuicClientTransportVersionAndRetryTest, AfterAcceptedRetry) {
       *client->getConn().originalDestinationConnectionId,
       *client->getConn().clientConnectionId,
       {MVFST2}));
+}
+
+TEST_F(
+    QuicClientTransportVersionAndRetryZeroLengthCidTest,
+    InvalidRetryIntegrityTagIsDropped) {
+  const auto& conn = client->getConn();
+  const auto version = conn.version;
+  const auto originalDestinationConnectionId =
+      conn.originalDestinationConnectionId;
+  const auto initialDestinationConnectionId =
+      conn.initialDestinationConnectionId;
+  const auto clientConnectionId = conn.clientConnectionId;
+  const auto retryToken = conn.retryToken;
+  ASSERT_TRUE(retryToken.empty());
+  ASSERT_FALSE(client->isClosed());
+  socketWrites.clear();
+
+  receiveVerifiedRetry(false);
+
+  const auto& finalConn = client->getConn();
+  EXPECT_EQ(
+      std::make_tuple(
+          finalConn.version,
+          finalConn.originalDestinationConnectionId,
+          finalConn.initialDestinationConnectionId,
+          finalConn.clientConnectionId,
+          finalConn.retryToken,
+          socketWrites.empty(),
+          client->isClosed()),
+      std::make_tuple(
+          version,
+          originalDestinationConnectionId,
+          initialDestinationConnectionId,
+          clientConnectionId,
+          retryToken,
+          true,
+          false));
 }
 
 TEST_F(
