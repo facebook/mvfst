@@ -300,4 +300,20 @@ TEST_F(PacketHeaderTest, ShortHeader) {
 
   EXPECT_EQ(readHeader.asShort()->getConnectionId(), connid);
 }
+
+TEST_F(TypesTest, PacketNumberSpaceToStringRejectsUnknown) {
+  EXPECT_EQ(toString(PacketNumberSpace::Initial), "InitialSpace");
+  EXPECT_EQ(toString(PacketNumberSpace::Handshake), "HandshakeSpace");
+  EXPECT_EQ(toString(PacketNumberSpace::AppData), "AppDataSpace");
+  EXPECT_DEATH((void)toString(static_cast<PacketNumberSpace>(255)), "");
+}
+
+TEST_F(TypesTest, ProtectionTypeToStringRejectsUnknown) {
+  EXPECT_EQ(toString(ProtectionType::Initial), "Initial");
+  EXPECT_EQ(toString(ProtectionType::Handshake), "Handshake");
+  EXPECT_EQ(toString(ProtectionType::ZeroRtt), "ZeroRtt");
+  EXPECT_EQ(toString(ProtectionType::KeyPhaseZero), "KeyPhaseZero");
+  EXPECT_EQ(toString(ProtectionType::KeyPhaseOne), "KeyPhaseOne");
+  EXPECT_DEATH((void)toString(static_cast<ProtectionType>(255)), "");
+}
 } // namespace quic::test

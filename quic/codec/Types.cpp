@@ -364,7 +364,6 @@ std::string_view toString(PacketNumberSpace pnSpace) {
       return "AppDataSpace";
   }
   MVCHECK(false, "Unknown packet number space");
-  folly::assume_unreachable();
 }
 
 std::string_view toString(ProtectionType protectionType) {
@@ -381,7 +380,6 @@ std::string_view toString(ProtectionType protectionType) {
       return "KeyPhaseOne";
   }
   MVCHECK(false, "Unknown protection type");
-  folly::assume_unreachable();
 }
 
 std::string_view toString(FrameType frame) {
