@@ -1384,6 +1384,8 @@ TYPED_TEST(
     PacketProcessorSendTwoDataPacketsWithAck) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
   auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
   auto rawPacketProcessor = mockPacketProcessor.get();
   this->getNonConstConn().packetProcessors.push_back(
@@ -1443,6 +1445,8 @@ TYPED_TEST(
     QuicTypedTransportAfterStartTest,
     PacketProcessorAckOrLossCarriesLostPacketDetails) {
   this->getNonConstConn().outstandings.reset();
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
   this->getNonConstConn().lossState.reorderingThreshold = 1;
   this->getNonConstConn().transportSettings.timeReorderingThreshDividend =
       100000000;
@@ -2026,6 +2030,8 @@ TYPED_TEST(
     StreamAckedIntervalsDeliveryCallbacks) {
   // clear any outstanding packets
   this->getNonConstConn().outstandings.reset();
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -4539,6 +4545,9 @@ TYPED_TEST(
   transport->addObserver(obs1.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(obs1.get()));
 
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
+
   // open stream that we will write to
   const auto streamId =
       this->getTransport()->createBidirectionalStream().value();
@@ -4847,6 +4856,8 @@ TYPED_TEST(
   // ACK outstanding packets so that we can switch out the congestion control
   this->ackAllOutstandingPackets();
   EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
 
   // determine the starting writeCount
   auto writeCount = this->getConn().writeCount;
@@ -5611,6 +5622,9 @@ TYPED_TEST(
           observerWithAcks1.get(),
           observerWithAcks2.get()));
 
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
+
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
   auto typedTestWriteChain65 = this->getTransport()->writeChain(
@@ -5858,6 +5872,9 @@ TYPED_TEST(
           observerWithNoAcks.get(),
           observerWithAcks1.get(),
           observerWithAcks2.get()));
+
+  // Packet number skipping would make write intervals non-contiguous.
+  this->getNonConstConn().transportSettings.skipOneInNPacketSequenceNumber = 0;
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
