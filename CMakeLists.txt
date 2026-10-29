@@ -133,6 +133,11 @@ SET(LIBFIZZ_INCLUDE_DIR ${FIZZ_INCLUDE_DIR})
 # Include mvfst functions for granular library targets
 include(MvfstFunctions)
 
+# A parent project's BUILD_TESTS is for its own tests.
+if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+  set(BUILD_TESTS OFF)
+endif()
+
 if(BUILD_TESTS)
   enable_testing()
   include(QuicTest)
