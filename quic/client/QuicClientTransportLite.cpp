@@ -324,6 +324,7 @@ quic::Expected<void, QuicError> QuicClientTransportLite::processUdpPacketData(
 
     clientConn_ = tempConn.get();
     conn_.reset(tempConn.release());
+    conn_->pathManager->setPathValidationCallback(this);
 
     clientConn_->retryToken = retryPacket->header.getToken();
 

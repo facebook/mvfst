@@ -3318,6 +3318,28 @@ class QuicClientTransportVersionAndRetryTest
     expectVersionNegotiationFatal(std::move(packet), serverAddr);
   }
 
+  class MigratingPathValidationCallback
+      : public QuicPathManager::PathValidationCallback {
+   public:
+    explicit MigratingPathValidationCallback(QuicClientTransportLite* client)
+        : client_(client) {}
+
+    void onPathValidationResult(const PathInfo& info) override {
+      called = true;
+      lastId = info.id;
+      lastStatus = info.status;
+      migrationSucceeded = client_->migrateConnection(info.id).has_value();
+    }
+
+    bool called{false};
+    PathIdType lastId{0};
+    PathStatus lastStatus{PathStatus::NotValid};
+    bool migrationSucceeded{false};
+
+   private:
+    QuicClientTransportLite* client_;
+  };
+
   void receiveVerifiedRetry(bool validIntegrityTag = true) {
     const auto retrySourceConnectionId = ConnectionId::createAndMaybeCrash(
         {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
@@ -5648,6 +5670,58 @@ TEST_F(QuicClientTransportVersionAndRetryTest, AfterAcceptedRetry) {
       *client->getConn().originalDestinationConnectionId,
       *client->getConn().clientConnectionId,
       {MVFST2}));
+}
+
+TEST_F(
+    QuicClientTransportVersionAndRetryTest,
+    PathValidationCallbackSurvivesRetry) {
+  client->getNonConstConn().serverConnectionId =
+      ConnectionId::createAndMaybeCrash({1, 2, 3, 4});
+  const auto* originalPathManager = client->getConn().pathManager.get();
+  receiveVerifiedRetry();
+  auto& conn = client->getNonConstConn();
+  ASSERT_NE(conn.pathManager.get(), originalPathManager);
+  ASSERT_FALSE(client->isClosed());
+  conn.oneRttWriteCipher = test::createNoOpAead();
+  conn.oneRttWriteHeaderCipher = test::createNoOpHeaderCipher().value();
+  conn.readCodec->setOneRttReadCipher(test::createNoOpAead());
+  conn.readCodec->setOneRttHeaderCipher(test::createNoOpHeaderCipher().value());
+  handshakeConfirmed(conn);
+
+  conn.peerSupportsActiveConnectionMigration = true;
+  conn.peerConnectionIds.emplace_back(
+      ConnectionId::createAndMaybeCrash({5, 6, 7, 8}), 1);
+
+  const quic::SocketAddress probeLocalAddr("1.2.3.4", 1234);
+  auto probeSocket = getMockSocketWithExpectations(qEvb_);
+  ON_CALL(*probeSocket, isBound()).WillByDefault(Return(true));
+  ON_CALL(*probeSocket, address())
+      .WillByDefault(Return(
+          quic::Expected<quic::SocketAddress, QuicError>{probeLocalAddr}));
+
+  MigratingPathValidationCallback callback(client.get());
+  auto probeResult = client->startPathProbe(std::move(probeSocket), &callback);
+  ASSERT_TRUE(probeResult.has_value()) << probeResult.error();
+  const auto probePathId = probeResult.value();
+
+  auto challengeResult =
+      conn.pathManager->prepareChallengeForSending(probePathId);
+  ASSERT_TRUE(challengeResult.has_value()) << challengeResult.error();
+  PathResponseFrame response{challengeResult.value().pathData};
+  const auto* validated =
+      conn.pathManager->onPathResponseReceived(response, probePathId);
+  ASSERT_NE(validated, nullptr);
+  ASSERT_EQ(validated->status, PathStatus::Validated);
+
+  EXPECT_EQ(
+      std::make_tuple(
+          callback.called,
+          callback.lastId,
+          callback.lastStatus,
+          callback.migrationSucceeded,
+          conn.currentPathId),
+      std::make_tuple(
+          true, probePathId, PathStatus::Validated, true, probePathId));
 }
 
 TEST_F(
